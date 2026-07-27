@@ -1,0 +1,41 @@
+name: joyride_flutter
+description: "Oumi — groups & community."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  flutter_svg: ^2.2.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/images/forya/
+    - assets/images/oumi/
+    - assets/images/yaychat/
+    - assets/images/yaychat/actions/
+    - assets/images/oumi/car/
+    - assets/images/oumi/charge/
+    - assets/images/oumi/chat/
+    - assets/images/oumi/dialog/
+    - assets/images/oumi/home/
+    - assets/images/oumi/intimacy/
+    - assets/images/oumi/ka/
+    - assets/images/oumi/mine/
+    - assets/images/oumi/msg/
+    - assets/images/oumi/rank/
+    - assets/images/oumi/room/
+    - assets/images/oumi/room/story/
+    - assets/images/oumi/room/tool/
+    - assets/images/oumi/tab/
