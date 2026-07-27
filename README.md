@@ -1,6 +1,6 @@
-# joyride_flutter
+# chimo
 
-A new Flutter project.
+Chimo — groups & community.
 
 ## Getting Started
 

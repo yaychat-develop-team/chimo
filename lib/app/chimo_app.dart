@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import '../core/theme/app_theme.dart';
 import '../features/splash/splash_page.dart';
 
-/// Oumi 根组件：配置 [MaterialApp] 主题；启动时先显示 Splash。
-class OumiApp extends StatelessWidget {
-  const OumiApp({super.key});
+/// Chimo 根组件：配置 [MaterialApp] 主题；启动时先显示 Splash。
+class ChimoApp extends StatelessWidget {
+  const ChimoApp({super.key});
 
   @override
   Widget build(BuildContext context) {

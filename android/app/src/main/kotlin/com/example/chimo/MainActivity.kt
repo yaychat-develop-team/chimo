@@ -1,4 +1,4 @@
-package com.example.joyride_flutter
+﻿package com.example.chimo
 
 import io.flutter.embedding.android.FlutterActivity
 
