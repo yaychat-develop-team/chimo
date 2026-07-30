@@ -6,7 +6,7 @@ import '../../../core/constants/app_assets.dart';
 class HomeAppBar extends StatelessWidget {
   const HomeAppBar({super.key, this.onSearchTap});
 
-  /// 搜索按钮点击回调（暂未接入业务）。
+  /// 搜索按钮点击回调。
   final VoidCallback? onSearchTap;
 
   static const double logoHeight = 28;

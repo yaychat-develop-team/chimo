@@ -5,6 +5,10 @@ import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_tip_dialog.dart';
 import '../friends/add_user_page.dart';
 import '../friends/friends_page.dart';
+import '../home/chat_user_profile_page.dart';
+import '../home/group_details_page.dart';
+import '../home/models/chat_user_profile.dart';
+import '../home/models/group_item.dart';
 import 'chat_detail_page.dart';
 import 'data/chats_list_controller.dart';
 import 'models/chat_conversation.dart';
@@ -71,6 +75,68 @@ class _ChatsPageState extends State<ChatsPage> {
     _openSwipeId.value = null;
   }
 
+  void _openConversation(ChatConversation item) {
+    // 小组会话进入小组详情；其余为私聊（同壳不同消息流）。
+    if (item.badge == ChatBadgeType.group) {
+      final stillJoined = _controller.isGroupJoined(item.id);
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => GroupDetailsPage(
+            group: PopularGroupItem(
+              id: item.id,
+              name: item.title,
+              category: 'Community',
+              description: item.lastMessage,
+              avatarAsset: item.avatarAsset,
+              memberCount: 128,
+              postCount: 36,
+              level: 6,
+              isJoined: stillJoined,
+            ),
+            chatsController: _controller,
+          ),
+        ),
+      );
+      return;
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            ChatDetailPage(conversation: item, chatsController: _controller),
+      ),
+    );
+  }
+
+  void _openAvatarProfile(ChatConversation item) {
+    // 小组会话没有个人主页，头像点击与整行一致进入小组。
+    if (item.badge == ChatBadgeType.group) {
+      _openConversation(item);
+      return;
+    }
+
+    final profile = ChatUserProfile(
+      id: item.id,
+      nickname: item.title,
+      userId: '47571${item.id.hashCode.abs() % 100000}'.padLeft(10, '0'),
+      avatarAsset: item.avatarAsset,
+      isMale: item.isMale,
+      age: 24,
+      zodiac: item.zodiac,
+      level: 16,
+      bio: item.signatureDisplay,
+      voiceSeconds: 12,
+      momentAssets: item.momentAssets,
+    );
+
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            ChatUserProfilePage(profile: profile, chatsController: _controller),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final conversations = _controller.visibleConversations;
@@ -133,14 +199,8 @@ class _ChatsPageState extends State<ChatsPage> {
                               openSwipeId: _openSwipeId,
                               onPin: () => _togglePinConversation(item),
                               onDelete: () => _confirmDeleteConversation(item),
-                              onTap: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute<void>(
-                                    builder: (_) =>
-                                        ChatDetailPage(conversation: item),
-                                  ),
-                                );
-                              },
+                              onTap: () => _openConversation(item),
+                              onAvatarTap: () => _openAvatarProfile(item),
                             );
                           },
                         ),

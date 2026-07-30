@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/agreement_page.dart';
+import '../debug/debug_page.dart';
 import '../shell/main_tab_shell.dart';
 import 'phone_login_page.dart';
 
@@ -164,10 +165,9 @@ class _LoginPageState extends State<LoginPage> {
                   const SizedBox(height: 20),
                   GestureDetector(
                     onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Debug Page coming soon'),
-                          behavior: SnackBarBehavior.floating,
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const DebugPage(),
                         ),
                       );
                     },

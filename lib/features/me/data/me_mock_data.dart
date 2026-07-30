@@ -43,11 +43,7 @@ abstract final class MeMockData {
       label: 'Settings',
       iconAsset: AppAssets.mineSetting,
     ),
-    QuickAccessItem(
-      id: 'help',
-      label: 'Help',
-      iconAsset: AppAssets.mineHelp,
-    ),
+    QuickAccessItem(id: 'help', label: 'Help', iconAsset: AppAssets.mineHelp),
     QuickAccessItem(
       id: 'about',
       label: 'About Us',

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
-import 'data/home_mock_data.dart';
+import '../chats/data/chats_list_controller.dart';
 import 'group_details_page.dart';
 import 'models/group_item.dart';
 import 'widgets/joined_group_card.dart';
@@ -10,10 +10,14 @@ import 'widgets/joined_group_card.dart';
 class JoinedGroupsPage extends StatelessWidget {
   const JoinedGroupsPage({
     super.key,
-    this.groups = HomeMockData.joinedGroups,
+    required this.groups,
+    this.chatsController,
+    this.onMembershipChanged,
   });
 
   final List<PopularGroupItem> groups;
+  final ChatsListController? chatsController;
+  final void Function(PopularGroupItem group, bool joined)? onMembershipChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -62,7 +66,14 @@ class JoinedGroupsPage extends StatelessWidget {
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute<void>(
-                          builder: (_) => GroupDetailsPage(group: group),
+                          builder: (_) => GroupDetailsPage(
+                            group: group,
+                            chatsController: chatsController,
+                            onMembershipChanged: onMembershipChanged == null
+                                ? null
+                                : (joined) =>
+                                    onMembershipChanged!(group, joined),
+                          ),
                         ),
                       );
                     },

@@ -13,6 +13,7 @@ class ChatsConversationTile extends StatefulWidget {
     required this.conversation,
     required this.openSwipeId,
     this.onTap,
+    this.onAvatarTap,
     this.onPin,
     this.onDelete,
   });
@@ -23,6 +24,9 @@ class ChatsConversationTile extends StatefulWidget {
   final ValueNotifier<String?> openSwipeId;
 
   final VoidCallback? onTap;
+
+  /// 点击头像（私聊进个人主页；与 [onTap] 互斥）。
+  final VoidCallback? onAvatarTap;
   final VoidCallback? onPin;
   final VoidCallback? onDelete;
 
@@ -176,9 +180,24 @@ class _ChatsConversationTileState extends State<ChatsConversationTile> {
                     padding: const EdgeInsets.fromLTRB(12, 12, 14, 12),
                     child: Row(
                       children: [
-                        _Avatar(
-                          asset: conversation.avatarAsset,
-                          isOnline: conversation.isOnline,
+                        GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () {
+                            if (_dragOffset != 0) {
+                              _close();
+                              return;
+                            }
+                            if (widget.onAvatarTap != null) {
+                              widget.onAvatarTap!();
+                            } else {
+                              widget.onTap?.call();
+                            }
+                          },
+                          child: _Avatar(
+                            asset: conversation.avatarAsset,
+                            isOnline: conversation.isOnline,
+                            isGroup: conversation.badge == ChatBadgeType.group,
+                          ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -250,24 +269,43 @@ class _ChatsConversationTileState extends State<ChatsConversationTile> {
   }
 }
 
-/// 圆形头像，可选右下角在线绿点。
+/// 头像：私聊圆形，小组圆角方形；可选右下角在线绿点。
 class _Avatar extends StatelessWidget {
-  const _Avatar({required this.asset, required this.isOnline});
+  const _Avatar({
+    required this.asset,
+    required this.isOnline,
+    this.isGroup = false,
+  });
 
   final String asset;
   final bool isOnline;
+  final bool isGroup;
+
+  static const double _size = 52;
+  static const double _groupRadius = 12;
 
   @override
   Widget build(BuildContext context) {
+    final image = Image.asset(
+      asset,
+      width: _size,
+      height: _size,
+      fit: BoxFit.cover,
+    );
+
     return SizedBox(
-      width: 52,
-      height: 52,
+      width: _size,
+      height: _size,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          ClipOval(
-            child: Image.asset(asset, width: 52, height: 52, fit: BoxFit.cover),
-          ),
+          if (isGroup)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(_groupRadius),
+              child: image,
+            )
+          else
+            ClipOval(child: image),
           if (isOnline)
             Positioned(
               right: 0,

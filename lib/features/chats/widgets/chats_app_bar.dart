@@ -29,16 +29,28 @@ class ChatsAppBar extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 4),
-              CustomPaint(
-                size: const Size(36, 10),
-                painter: _TitleSquigglePainter(),
+              SizedBox(
+                height: 10,
+                width: 36,
+                child: Image.asset(
+                  AppAssets.chatTitleTips,
+                  fit: BoxFit.contain,
+                ),
               ),
             ],
           ),
           const Spacer(),
-          _HeaderIconButton(asset: AppAssets.msgContacts, onTap: onContactsTap),
+          _HeaderIconButton(
+            asset: AppAssets.msgContacts,
+            onTap: onContactsTap,
+            iconSize: 42,
+          ),
           const SizedBox(width: 10),
-          _HeaderIconButton(asset: AppAssets.msgSearch, onTap: onSearchTap),
+          _HeaderIconButton(
+            asset: AppAssets.msgSearch,
+            onTap: onSearchTap,
+            iconSize: 42,
+          ),
         ],
       ),
     );
@@ -47,10 +59,15 @@ class ChatsAppBar extends StatelessWidget {
 
 /// 顶栏右侧圆角图标按钮（资源图）。
 class _HeaderIconButton extends StatelessWidget {
-  const _HeaderIconButton({required this.asset, this.onTap});
+  const _HeaderIconButton({
+    required this.asset,
+    this.onTap,
+    this.iconSize = 22,
+  });
 
   final String asset;
   final VoidCallback? onTap;
+  final double iconSize;
 
   @override
   Widget build(BuildContext context) {
@@ -66,8 +83,8 @@ class _HeaderIconButton extends StatelessWidget {
           child: Center(
             child: Image.asset(
               asset,
-              width: 22,
-              height: 22,
+              width: iconSize,
+              height: iconSize,
               color: AppColors.textPrimary,
             ),
           ),
@@ -75,39 +92,4 @@ class _HeaderIconButton extends StatelessWidget {
       ),
     );
   }
-}
-
-/// 绘制「Chats」标题下的绿色浪线装饰。
-class _TitleSquigglePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = AppColors.primaryBright
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3
-      ..strokeCap = StrokeCap.round;
-
-    final path = Path()
-      ..moveTo(0, size.height * 0.55)
-      ..cubicTo(
-        size.width * 0.25,
-        size.height * 0.05,
-        size.width * 0.45,
-        size.height * 1.05,
-        size.width * 0.7,
-        size.height * 0.45,
-      )
-      ..cubicTo(
-        size.width * 0.85,
-        size.height * 0.1,
-        size.width * 0.92,
-        size.height * 0.7,
-        size.width,
-        size.height * 0.35,
-      );
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

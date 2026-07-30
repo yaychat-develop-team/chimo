@@ -107,10 +107,7 @@ class QuickAccessItem {
 
 /// 统计条单项（Friends / Fans 等）。
 class MeStatItem {
-  const MeStatItem({
-    required this.label,
-    required this.value,
-  });
+  const MeStatItem({required this.label, required this.value});
 
   final String label;
   final String value;

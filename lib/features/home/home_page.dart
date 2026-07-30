@@ -3,10 +3,15 @@ import 'package:flutter/services.dart';
 
 import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
+import '../chats/data/chats_list_controller.dart';
 import 'data/home_mock_data.dart';
+import 'chat_user_profile_page.dart';
 import 'group_details_page.dart';
+import 'home_search_page.dart';
 import 'joined_groups_page.dart';
+import 'models/chat_user_profile.dart';
 import 'models/group_item.dart';
+import 'widgets/group_members_sheet.dart';
 import 'widgets/home_app_bar.dart';
 import 'widgets/home_hero_banner.dart';
 import 'widgets/my_groups_section.dart';
@@ -23,7 +28,10 @@ enum _HomeRefreshPhase {
 
 /// 首页：顶栏、运营 Banner、我的小组、热门小组。
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  const HomePage({super.key, required this.chatsController});
+
+  /// 与主壳共享：加入 / 退出小组时同步消息列表。
+  final ChatsListController chatsController;
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -51,12 +59,43 @@ class _HomePageState extends State<HomePage> {
       for (final group in _popularGroups)
         if (group.isJoined) group,
     ];
+    // 从任意入口退出 / 加入时，按成员身份同步首页（与会话是否存在无关）。
+    widget.chatsController.addListener(_syncMembershipFromController);
   }
 
   @override
   void dispose() {
+    widget.chatsController.removeListener(_syncMembershipFromController);
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _syncMembershipFromController() {
+    final ids = widget.chatsController.joinedGroupIds;
+    final staleJoined = _joinedGroups.any((g) => !ids.contains(g.id));
+    final popularMismatch = _popularGroups.any(
+      (g) => g.isJoined != ids.contains(g.id),
+    );
+    final missingJoined = _popularGroups.any(
+      (g) => ids.contains(g.id) && !_joinedGroups.any((j) => j.id == g.id),
+    );
+    if (!staleJoined && !popularMismatch && !missingJoined) return;
+
+    setState(() {
+      _popularGroups = [
+        for (final g in _popularGroups)
+          g.copyWith(isJoined: ids.contains(g.id)),
+      ];
+      _joinedGroups = [
+        for (final g in _joinedGroups)
+          if (ids.contains(g.id)) g.copyWith(isJoined: true),
+      ];
+      for (final g in _popularGroups) {
+        if (!ids.contains(g.id)) continue;
+        if (_joinedGroups.any((j) => j.id == g.id)) continue;
+        _joinedGroups = [..._joinedGroups, g];
+      }
+    });
   }
 
   List<MyGroupItem> get _myGroups => [
@@ -89,6 +128,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _setJoined(PopularGroupItem group, bool joined) {
+    late PopularGroupItem updated;
     setState(() {
       final popularIndex =
           _popularGroups.indexWhere((item) => item.id == group.id);
@@ -100,7 +140,7 @@ class _HomePageState extends State<HomePage> {
       final joinedIndex =
           _joinedGroups.indexWhere((item) => item.id == group.id);
       if (joined) {
-        final updated = (popularIndex >= 0
+        updated = (popularIndex >= 0
                 ? _popularGroups[popularIndex]
                 : group)
             .copyWith(isJoined: true);
@@ -110,12 +150,21 @@ class _HomePageState extends State<HomePage> {
           _joinedGroups[joinedIndex] = updated;
         }
       } else if (joinedIndex >= 0) {
+        updated = group.copyWith(isJoined: false);
         _joinedGroups = [
           for (var i = 0; i < _joinedGroups.length; i++)
             if (i != joinedIndex) _joinedGroups[i],
         ];
+      } else {
+        updated = group.copyWith(isJoined: false);
       }
     });
+
+    if (joined) {
+      widget.chatsController.joinGroup(updated);
+    } else {
+      widget.chatsController.leaveGroup(group.id);
+    }
   }
 
   void _toggleJoin(PopularGroupItem group) {
@@ -138,9 +187,30 @@ class _HomePageState extends State<HomePage> {
       MaterialPageRoute<void>(
         builder: (_) => GroupDetailsPage(
           group: latest,
+          chatsController: widget.chatsController,
           onMembershipChanged: (joined) => _setJoined(latest, joined),
         ),
       ),
+    );
+  }
+
+  void _openMembersSheet(PopularGroupItem group) {
+    GroupMembersSheet.show(
+      context,
+      onMemberTap: (member) {
+        Navigator.of(context).pop();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => ChatUserProfilePage(
+                profile: ChatUserProfile.fromMember(member),
+                chatsController: widget.chatsController,
+              ),
+            ),
+          );
+        });
+      },
     );
   }
 
@@ -248,13 +318,23 @@ class _HomePageState extends State<HomePage> {
                   alignment: Alignment.topCenter,
                 ),
               ),
-              child: const SafeArea(
+              child: SafeArea(
                 bottom: false,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    HomeAppBar(),
-                    HomeHeroBanner(),
+                    HomeAppBar(
+                      onSearchTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => HomeSearchPage(
+                              chatsController: widget.chatsController,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    const HomeHeroBanner(),
                   ],
                 ),
               ),
@@ -301,6 +381,8 @@ class _HomePageState extends State<HomePage> {
                               MaterialPageRoute<void>(
                                 builder: (_) => JoinedGroupsPage(
                                   groups: _joinedGroups,
+                                  chatsController: widget.chatsController,
+                                  onMembershipChanged: _setJoined,
                                 ),
                               ),
                             );
@@ -322,6 +404,7 @@ class _HomePageState extends State<HomePage> {
                         groups: _popularGroups,
                         onJoinTap: _toggleJoin,
                         onGroupTap: _openGroupDetails,
+                        onMembersTap: _openMembersSheet,
                       ),
                     ),
                   ],

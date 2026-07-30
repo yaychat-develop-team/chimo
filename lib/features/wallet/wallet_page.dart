@@ -199,21 +199,21 @@ class _BalanceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 96,
-      padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+      height: 102,
+      padding: const EdgeInsets.fromLTRB(18, 16, 16, 16),
       decoration: BoxDecoration(
         color: AppColors.primaryBright,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(28),
         image: const DecorationImage(
           image: AssetImage(AppAssets.walletTopBg),
           fit: BoxFit.cover,
-          opacity: 0.22,
+          opacity: 0.34,
           alignment: Alignment.centerRight,
         ),
       ),
       child: Row(
         children: [
-          Image.asset(AppAssets.coin, width: 52, height: 52),
+          Image.asset(AppAssets.coin, width: 42, height: 42),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -224,16 +224,16 @@ class _BalanceCard extends StatelessWidget {
                   'My Coins',
                   style: TextStyle(
                     color: Colors.black87,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
                   balanceText,
                   style: const TextStyle(
                     color: Colors.black,
-                    fontSize: 28,
+                    fontSize: 24,
                     fontWeight: FontWeight.w800,
                     height: 1.1,
                   ),
@@ -243,17 +243,17 @@ class _BalanceCard extends StatelessWidget {
           ),
           Material(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(18),
             child: InkWell(
               onTap: onDetails,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(18),
               child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 child: Text(
                   'Details',
                   style: TextStyle(
                     color: Colors.black,
-                    fontSize: 13,
+                    fontSize: 16,
                     fontWeight: FontWeight.w600,
                   ),
                 ),

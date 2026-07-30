@@ -28,6 +28,11 @@ class ChatConversation {
     this.isOnline = false,
     this.isPinned = false,
     this.titleColor,
+    this.isMale = true,
+    this.signature = '',
+    this.zodiac = 'Capricorn',
+    this.isFollowing = false,
+    this.momentAssets = const [],
   });
 
   final String id;
@@ -47,6 +52,28 @@ class ChatConversation {
   /// 可选标题颜色（如官方账号绿色名）。
   final Color? titleColor;
 
+  /// 对端性别（私聊顶栏）。
+  final bool isMale;
+
+  /// 对端签名；空则展示默认占位文案。
+  final String signature;
+
+  /// 对端星座文案。
+  final String zodiac;
+
+  /// 是否已关注（私聊顶栏 Follow）。
+  final bool isFollowing;
+
+  /// 资料页 Moments 图片，用于私聊顶部预览。
+  final List<String> momentAssets;
+
+  String get signatureDisplay {
+    if (signature.trim().isNotEmpty) return signature.trim();
+    return isMale
+        ? "He doesn't have a signature yet."
+        : "She doesn't have a signature yet.";
+  }
+
   ChatConversation copyWith({
     String? id,
     String? title,
@@ -58,6 +85,11 @@ class ChatConversation {
     bool? isOnline,
     bool? isPinned,
     Color? titleColor,
+    bool? isMale,
+    String? signature,
+    String? zodiac,
+    bool? isFollowing,
+    List<String>? momentAssets,
   }) {
     return ChatConversation(
       id: id ?? this.id,
@@ -70,6 +102,11 @@ class ChatConversation {
       isOnline: isOnline ?? this.isOnline,
       isPinned: isPinned ?? this.isPinned,
       titleColor: titleColor ?? this.titleColor,
+      isMale: isMale ?? this.isMale,
+      signature: signature ?? this.signature,
+      zodiac: zodiac ?? this.zodiac,
+      isFollowing: isFollowing ?? this.isFollowing,
+      momentAssets: momentAssets ?? this.momentAssets,
     );
   }
 }

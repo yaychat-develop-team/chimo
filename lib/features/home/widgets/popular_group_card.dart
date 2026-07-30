@@ -12,6 +12,7 @@ class PopularGroupCard extends StatelessWidget {
     required this.group,
     this.onJoinTap,
     this.onTap,
+    this.onMembersTap,
   });
 
   final PopularGroupItem group;
@@ -21,6 +22,9 @@ class PopularGroupCard extends StatelessWidget {
 
   /// 整卡点击。
   final VoidCallback? onTap;
+
+  /// 成员数点击（弹出成员列表）。
+  final VoidCallback? onMembersTap;
 
   static const double cardHeight = 148;
   static const double avatarSize = 72;
@@ -130,16 +134,21 @@ class PopularGroupCard extends StatelessWidget {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 10),
                   // 成员数 / 帖子数
                   Row(
                     children: [
-                      _Stat(
-                        icon: Icons.person_outline_rounded,
-                        value: '${group.memberCount}',
+                      GestureDetector(
+                        onTap: onMembersTap,
+                        behavior: HitTestBehavior.opaque,
+                        child: _Stat(
+                          iconAsset: AppAssets.homePerson,
+                          value: '${group.memberCount}',
+                        ),
                       ),
                       const SizedBox(width: 14),
                       _Stat(
-                        icon: Icons.image_outlined,
+                        iconAsset: AppAssets.homeImg,
                         value: '${group.postCount}',
                       ),
                     ],
@@ -156,9 +165,9 @@ class PopularGroupCard extends StatelessWidget {
 
 /// 底部统计项：图标 + 数字。
 class _Stat extends StatelessWidget {
-  const _Stat({required this.icon, required this.value});
+  const _Stat({required this.iconAsset, required this.value});
 
-  final IconData icon;
+  final String iconAsset;
   final String value;
 
   @override
@@ -166,7 +175,7 @@ class _Stat extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 15, color: AppColors.textTertiary),
+        Image.asset(iconAsset, width: 12, height: 12),
         const SizedBox(width: 4),
         Text(
           value,

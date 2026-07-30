@@ -195,10 +195,11 @@ class _VoiceNotePageState extends State<VoiceNotePage> {
                         child: isPreview
                             ? _SideActionButton(
                                 onTap: _reset,
-                                child: SvgPicture.asset(
+                                child: Image.asset(
                                   AppAssets.audioRefreshIcon,
-                                  width: 22,
-                                  height: 20,
+                                  width: 24,
+                                  height: 24,
+                                  fit: BoxFit.contain,
                                 ),
                               )
                             : const SizedBox.shrink(),
@@ -216,10 +217,11 @@ class _VoiceNotePageState extends State<VoiceNotePage> {
                         child: isPreview
                             ? _SideActionButton(
                                 onTap: _confirm,
-                                child: SvgPicture.asset(
+                                child: Image.asset(
                                   AppAssets.audioFinishIcon,
-                                  width: 20,
-                                  height: 16,
+                                  width: 24,
+                                  height: 24,
+                                  fit: BoxFit.contain,
                                 ),
                               )
                             : const SizedBox.shrink(),
@@ -302,15 +304,17 @@ class _MainRecordButton extends StatelessWidget {
                 child: Center(
                   child: switch (phase) {
                     _VoicePhase.idle || _VoicePhase.recording =>
-                      SvgPicture.asset(
+                      Image.asset(
                         AppAssets.audioRecordIcon,
                         width: 36,
                         height: 36,
+                        fit: BoxFit.contain,
                       ),
-                    _VoicePhase.preview => SvgPicture.asset(
+                    _VoicePhase.preview => Image.asset(
                         AppAssets.audioPlayingIcon,
                         width: 36,
-                        height: 24,
+                        height: 28,
+                        fit: BoxFit.contain,
                       ),
                   },
                 ),

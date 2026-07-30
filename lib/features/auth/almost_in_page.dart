@@ -125,6 +125,12 @@ class _AlmostInPageState extends State<AlmostInPage> {
                             width: 128,
                             height: 128,
                             fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Image.asset(
+                              AppAssets.friendsEmpty,
+                              width: 128,
+                              height: 128,
+                              fit: BoxFit.cover,
+                            ),
                           ),
                         ),
                         Positioned(

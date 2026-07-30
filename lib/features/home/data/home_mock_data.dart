@@ -24,7 +24,6 @@ abstract final class HomeMockData {
       memberCount: 1874,
       postCount: 812,
       level: 6,
-      isJoined: true,
     ),
     PopularGroupItem(
       id: 'book',

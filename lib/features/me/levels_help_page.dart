@@ -46,7 +46,7 @@ class LevelsHelpPage extends StatelessWidget {
                     ),
                   ),
                   const Text(
-                    'Chimo',
+                    'Level Introduction',
                     style: TextStyle(
                       color: AppColors.textPrimary,
                       fontSize: 18,
@@ -79,7 +79,7 @@ class LevelsHelpPage extends StatelessWidget {
                       Text(
                         faq.answer,
                         style: const TextStyle(
-                          color: AppColors.textSecondary,
+                          color: AppColors.textPrimary,
                           fontSize: 14,
                           fontWeight: FontWeight.w400,
                           height: 1.45,

@@ -54,12 +54,15 @@ class _MainTabShellState extends State<MainTabShell> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      // 仅构建当前 Tab；会话状态由 [_chatsController] 在壳层保活。
-      body: switch (_currentTab) {
-        MainTab.home => const HomePage(),
-        MainTab.chats => ChatsPage(controller: _chatsController),
-        MainTab.me => const MePage(),
-      },
+      // IndexedStack 保活各 Tab，避免切页后丢失已加入小组等状态。
+      body: IndexedStack(
+        index: _currentTab.index,
+        children: [
+          HomePage(chatsController: _chatsController),
+          ChatsPage(controller: _chatsController),
+          const MePage(),
+        ],
+      ),
       bottomNavigationBar: AppBottomNavBar(
         currentTab: _currentTab,
         destinations: _destinations,

@@ -5,19 +5,30 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
+import '../chats/data/chats_list_controller.dart';
+import '../chats/models/chat_conversation.dart';
 import '../report/report_page.dart';
+import 'chat_user_profile_page.dart';
+import 'data/group_members_mock_data.dart';
+import 'models/chat_user_profile.dart';
 import 'models/group_item.dart';
+import 'widgets/chat_user_profile_sheet.dart';
 import 'widgets/group_level_badge.dart';
+import 'widgets/group_members_sheet.dart';
 
 /// 小组聊天页：未加入 = 限看 + Join；已加入 = 消息流 + 输入栏。
 class GroupDetailsPage extends StatefulWidget {
   const GroupDetailsPage({
     super.key,
     required this.group,
+    this.chatsController,
     this.onMembershipChanged,
   });
 
   final PopularGroupItem group;
+
+  /// 加入时写入消息会话；退出只改成员身份，不删会话。
+  final ChatsListController? chatsController;
 
   /// 加入状态变化回调（同步首页「我的小组」）。
   final ValueChanged<bool>? onMembershipChanged;
@@ -28,21 +39,70 @@ class GroupDetailsPage extends StatefulWidget {
 
 class _GroupDetailsPageState extends State<GroupDetailsPage> {
   late bool _isJoined = widget.group.isJoined;
-  bool _descExpanded = false;
+  bool _descExpanded = true;
   int _tabIndex = 0;
+  final TextEditingController _inputController = TextEditingController();
+  final ScrollController _messagesScroll = ScrollController();
+  final List<String> _sentMessages = [];
+  late final List<String> _photoAssets = [
+    _group.avatarAsset,
+    AppAssets.personalBg,
+    AppAssets.homeRoomBg,
+    AppAssets.launchBg,
+    AppAssets.genderFemaleImg,
+    AppAssets.genderMaleImg,
+  ];
 
   PopularGroupItem get _group => widget.group;
+
+  @override
+  void dispose() {
+    _inputController.dispose();
+    _messagesScroll.dispose();
+    super.dispose();
+  }
 
   void _join() {
     if (_isJoined) return;
     setState(() => _isJoined = true);
+    final joined = _group.copyWith(isJoined: true);
+    widget.chatsController?.joinGroup(joined);
     widget.onMembershipChanged?.call(true);
   }
 
   void _leave() {
     if (!_isJoined) return;
+    setState(() => _isJoined = false);
+    // 退出小组不删除消息会话。
+    widget.chatsController?.leaveGroup(_group.id);
     widget.onMembershipChanged?.call(false);
     Navigator.of(context).pop();
+  }
+
+  void _sendMessage([String? raw]) {
+    final text = (raw ?? _inputController.text).trim();
+    if (text.isEmpty || !_isJoined) return;
+    setState(() {
+      _sentMessages.add(text);
+      _tabIndex = 0;
+    });
+    _inputController.clear();
+    // 左滑删除后，有新消息则会话重新出现在消息列表。
+    widget.chatsController?.onNewMessage(
+      id: _group.id,
+      title: _group.name,
+      avatarAsset: _group.avatarAsset,
+      lastMessage: text,
+      badge: ChatBadgeType.group,
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_messagesScroll.hasClients) return;
+      _messagesScroll.animateTo(
+        _messagesScroll.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 240),
+        curve: Curves.easeOut,
+      );
+    });
   }
 
   Future<void> _openMoreMenu() async {
@@ -62,6 +122,46 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
       case _GroupMoreAction.leave:
         _leave();
     }
+  }
+
+  void _openUserProfile(ChatUserProfile profile) {
+    ChatUserProfileSheet.show(
+      context,
+      profile: profile,
+      chatsController: widget.chatsController,
+    );
+  }
+
+  void _openMembersSheet() {
+    GroupMembersSheet.show(
+      context,
+      onMemberTap: (member) {
+        Navigator.of(context).pop();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => ChatUserProfilePage(
+                profile: ChatUserProfile.fromMember(member),
+                chatsController: widget.chatsController,
+              ),
+            ),
+          );
+        });
+      },
+    );
+  }
+
+  void _openPhotoViewer(int initialIndex) {
+    if (!_isJoined || _photoAssets.isEmpty) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => _GroupPhotoViewerPage(
+          photos: _photoAssets,
+          initialIndex: initialIndex,
+        ),
+      ),
+    );
   }
 
   @override
@@ -108,23 +208,51 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
           Column(
             children: [
               SizedBox(height: topPadding),
-              _DetailsAppBar(onMoreTap: _openMoreMenu),
-              _ProfileHeader(
+              _DetailsAppBar(
                 group: _group,
+                isJoined: _isJoined,
                 descExpanded: _descExpanded,
+                onMoreTap: _openMoreMenu,
                 onToggleDesc: () =>
                     setState(() => _descExpanded = !_descExpanded),
               ),
+              AnimatedSize(
+                duration: const Duration(milliseconds: 280),
+                curve: Curves.easeOutCubic,
+                alignment: Alignment.topCenter,
+                child: _descExpanded
+                    ? _ProfileHeader(
+                        group: _group,
+                        isJoined: _isJoined,
+                        onCollapse: () => setState(() => _descExpanded = false),
+                        onMembersTap: _openMembersSheet,
+                      )
+                    : const SizedBox.shrink(),
+              ),
               if (!_isJoined) const _MemberLimitBanner(),
               Expanded(
-                child: _ChatBody(
-                  tabIndex: _tabIndex,
-                  isJoined: _isJoined,
-                  onTabChanged: (i) => setState(() => _tabIndex = i),
+                child: ColoredBox(
+                  color: _isJoined
+                      ? AppColors.background
+                      : _MemberLimitBanner.color,
+                  child: _ChatBody(
+                    tabIndex: _tabIndex,
+                    isJoined: _isJoined,
+                    sentMessages: _sentMessages,
+                    photos: _photoAssets,
+                    messagesScroll: _messagesScroll,
+                    onTabChanged: (i) => setState(() => _tabIndex = i),
+                    onPeerAvatarTap: _openUserProfile,
+                    onPhotoTap: _openPhotoViewer,
+                  ),
                 ),
               ),
               if (_isJoined)
-                _ChatInputBar(bottomInset: bottomPadding)
+                _ChatInputBar(
+                  bottomInset: bottomPadding,
+                  controller: _inputController,
+                  onSend: _sendMessage,
+                )
               else
                 _JoinCommunityBar(
                   bottomInset: bottomPadding,
@@ -141,9 +269,19 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
 enum _GroupMoreAction { report, leave }
 
 class _DetailsAppBar extends StatelessWidget {
-  const _DetailsAppBar({required this.onMoreTap});
+  const _DetailsAppBar({
+    required this.group,
+    required this.isJoined,
+    required this.descExpanded,
+    required this.onMoreTap,
+    required this.onToggleDesc,
+  });
 
+  final PopularGroupItem group;
+  final bool isJoined;
+  final bool descExpanded;
   final VoidCallback onMoreTap;
+  final VoidCallback onToggleDesc;
 
   @override
   Widget build(BuildContext context) {
@@ -159,6 +297,28 @@ class _DetailsAppBar extends StatelessWidget {
               height: 7,
             ),
           ),
+          if (!descExpanded) ...[
+            Flexible(
+              child: Text(
+                group.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            GroupLevelBadge(level: group.level),
+            const SizedBox(width: 8),
+            _DescToggleChip(
+              expanded: false,
+              joinedStyle: isJoined,
+              onTap: onToggleDesc,
+            ),
+          ],
           const Spacer(),
           IconButton(
             onPressed: onMoreTap,
@@ -170,6 +330,59 @@ class _DetailsAppBar extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 简介展开 / 收起胶囊；加入后使用深绿底 + 亮绿字。
+class _DescToggleChip extends StatelessWidget {
+  const _DescToggleChip({
+    required this.expanded,
+    required this.joinedStyle,
+    required this.onTap,
+  });
+
+  final bool expanded;
+  final bool joinedStyle;
+  final VoidCallback onTap;
+
+  static const Color _joinedBg = Color(0xFF1A3A28);
+  static const Color _joinedFg = Color(0xFFB8FF6A);
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = joinedStyle
+        ? _joinedBg
+        : Colors.white.withValues(alpha: 0.12);
+    final fg = joinedStyle ? _joinedFg : AppColors.textPrimary;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 5, 8, 5),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              expanded ? 'See Less' : 'See More',
+              style: TextStyle(
+                color: fg,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            Icon(
+              expanded ? Icons.arrow_drop_up : Icons.arrow_drop_down,
+              color: fg,
+              size: 20,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -361,22 +574,18 @@ class _LeaveGroupDialog extends StatelessWidget {
 class _ProfileHeader extends StatelessWidget {
   const _ProfileHeader({
     required this.group,
-    required this.descExpanded,
-    required this.onToggleDesc,
+    required this.isJoined,
+    required this.onCollapse,
+    required this.onMembersTap,
   });
 
   final PopularGroupItem group;
-  final bool descExpanded;
-  final VoidCallback onToggleDesc;
+  final bool isJoined;
+  final VoidCallback onCollapse;
+  final VoidCallback onMembersTap;
 
   @override
   Widget build(BuildContext context) {
-    final desc = group.description;
-    final showToggle = desc.length > 48;
-    final visibleDesc = (!descExpanded && showToggle)
-        ? '${desc.substring(0, 48).trimRight()}…'
-        : desc;
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
       child: Column(
@@ -425,7 +634,7 @@ class _ProfileHeader extends StatelessWidget {
                       ),
                       decoration: BoxDecoration(
                         color: AppColors.tagBackground,
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
                         group.category,
@@ -439,31 +648,40 @@ class _ProfileHeader extends StatelessWidget {
                     const SizedBox(height: 10),
                     Row(
                       children: [
-                        const Icon(
-                          Icons.person_outline_rounded,
-                          size: 15,
-                          color: AppColors.textTertiary,
-                        ),
-                        const SizedBox(width: 3),
-                        Text(
-                          '${group.memberCount}',
-                          style: const TextStyle(
-                            color: AppColors.textTertiary,
-                            fontSize: 12,
+                        GestureDetector(
+                          onTap: onMembersTap,
+                          behavior: HitTestBehavior.opaque,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Image.asset(
+                                AppAssets.homePerson,
+                                width: 11,
+                                height: 11,
+                              ),
+                              const SizedBox(width: 3),
+                              Text(
+                                '${group.memberCount}',
+                                style: const TextStyle(
+                                  color: AppColors.textTertiary,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         const SizedBox(width: 12),
-                        const Icon(
-                          Icons.image_outlined,
-                          size: 15,
-                          color: AppColors.textTertiary,
+                        Image.asset(
+                          AppAssets.homeImg,
+                          width: 11,
+                          height: 11,
                         ),
                         const SizedBox(width: 3),
                         Text(
                           '${group.postCount}',
                           style: const TextStyle(
                             color: AppColors.textTertiary,
-                            fontSize: 12,
+                            fontSize: 11,
                           ),
                         ),
                       ],
@@ -473,53 +691,23 @@ class _ProfileHeader extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           Text(
-            visibleDesc,
+            group.description,
             style: const TextStyle(
               color: AppColors.textSecondary,
               fontSize: 14,
               height: 1.4,
             ),
           ),
-          if (showToggle) ...[
-            const SizedBox(height: 10),
-            Center(
-              child: GestureDetector(
-                onTap: onToggleDesc,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        descExpanded ? 'See Less' : 'See More',
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      Icon(
-                        descExpanded
-                            ? Icons.keyboard_arrow_up_rounded
-                            : Icons.keyboard_arrow_down_rounded,
-                        color: AppColors.textPrimary,
-                        size: 16,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+          const SizedBox(height: 12),
+          Center(
+            child: _DescToggleChip(
+              expanded: true,
+              joinedStyle: isJoined,
+              onTap: onCollapse,
             ),
-          ],
+          ),
         ],
       ),
     );
@@ -529,12 +717,18 @@ class _ProfileHeader extends StatelessWidget {
 class _MemberLimitBanner extends StatelessWidget {
   const _MemberLimitBanner();
 
+  /// 与白底圆角面板背后露色一致。
+  static const Color color = Color(0xFF1A3A28);
+
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-      color: const Color(0xFF1A3A28),
+      decoration: const BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
       child: const Text(
         'Not a member? Viewing is limited to 10 messages',
         textAlign: TextAlign.center,
@@ -552,12 +746,22 @@ class _ChatBody extends StatelessWidget {
   const _ChatBody({
     required this.tabIndex,
     required this.isJoined,
+    required this.sentMessages,
+    required this.photos,
+    required this.messagesScroll,
     required this.onTabChanged,
+    required this.onPeerAvatarTap,
+    required this.onPhotoTap,
   });
 
   final int tabIndex;
   final bool isJoined;
+  final List<String> sentMessages;
+  final List<String> photos;
+  final ScrollController messagesScroll;
   final ValueChanged<int> onTabChanged;
+  final ValueChanged<ChatUserProfile> onPeerAvatarTap;
+  final ValueChanged<int> onPhotoTap;
 
   @override
   Widget build(BuildContext context) {
@@ -592,8 +796,17 @@ class _ChatBody extends StatelessWidget {
           ),
           Expanded(
             child: tabIndex == 0
-                ? _MessagesFeed(isJoined: isJoined)
-                : _PhotosPlaceholder(isJoined: isJoined),
+                ? _MessagesFeed(
+                    isJoined: isJoined,
+                    sentMessages: sentMessages,
+                    scrollController: messagesScroll,
+                    onPeerAvatarTap: onPeerAvatarTap,
+                  )
+                : _PhotosGrid(
+                    isJoined: isJoined,
+                    photos: photos,
+                    onPhotoTap: onPhotoTap,
+                  ),
           ),
         ],
       ),
@@ -644,23 +857,67 @@ class _TabLabel extends StatelessWidget {
 }
 
 class _MessagesFeed extends StatelessWidget {
-  const _MessagesFeed({required this.isJoined});
+  const _MessagesFeed({
+    required this.isJoined,
+    required this.sentMessages,
+    required this.scrollController,
+    required this.onPeerAvatarTap,
+  });
 
   final bool isJoined;
+  final List<String> sentMessages;
+  final ScrollController scrollController;
+  final ValueChanged<ChatUserProfile> onPeerAvatarTap;
+
+  static final _candy = ChatUserProfile.fromMember(
+    GroupMembersMockData.members[0],
+  );
+  static final _priya = ChatUserProfile.fromMember(
+    GroupMembersMockData.members[1],
+  );
 
   @override
   Widget build(BuildContext context) {
     return ListView(
+      controller: scrollController,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
       children: [
         const _TimestampLabel('yesterday 6:01 AM'),
         const SizedBox(height: 12),
+        _PeerMessageBubble(
+          profile: _candy,
+          text:
+              'Hey everyone! Just managed to set up my new compost bin. Any pro-tips for a beginner? 🥕',
+          showAvatar: true,
+          onAvatarTap: () => onPeerAvatarTap(_candy),
+        ),
+        const SizedBox(height: 12),
+        _PeerMessageBubble(
+          profile: _priya,
+          text: "That's awesome!",
+          showAvatar: true,
+          onAvatarTap: () => onPeerAvatarTap(_priya),
+        ),
+        if (!isJoined) ...[
+          const SizedBox(height: 12),
+          _PeerLockedImageBubble(
+            profile: _candy,
+            imageAsset: AppAssets.homeRoomBg,
+            showAvatar: true,
+            onAvatarTap: () => onPeerAvatarTap(_candy),
+          ),
+        ],
+        const SizedBox(height: 16),
         const _SelfMessageBubble(text: '1'),
         if (isJoined) ...[
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           const _TimestampLabel('1:35 AM'),
           const SizedBox(height: 10),
           const _SystemJoinNotice(name: 'P-2083172'),
+        ],
+        for (var i = 0; i < sentMessages.length; i++) ...[
+          SizedBox(height: i == 0 ? 16 : 4),
+          _SelfMessageBubble(text: sentMessages[i], showAvatar: i == 0),
         ],
       ],
     );
@@ -685,23 +942,268 @@ class _TimestampLabel extends StatelessWidget {
   }
 }
 
+class _PeerMessageBubble extends StatelessWidget {
+  const _PeerMessageBubble({
+    required this.profile,
+    required this.text,
+    required this.showAvatar,
+    required this.onAvatarTap,
+  });
+
+  final ChatUserProfile profile;
+  final String text;
+  final bool showAvatar;
+  final VoidCallback onAvatarTap;
+
+  static const double _avatar = 40;
+  static const double _avatarGap = 10;
+  static const double _bubbleMax = 243;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (showAvatar)
+          GestureDetector(
+            onTap: onAvatarTap,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.asset(
+                profile.avatarAsset,
+                width: _avatar,
+                height: _avatar,
+                fit: BoxFit.cover,
+              ),
+            ),
+          )
+        else
+          const SizedBox(width: _avatar),
+        const SizedBox(width: _avatarGap),
+        Flexible(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(
+                      profile.nickname,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF666666),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Image.asset(
+                    profile.isMale
+                        ? AppAssets.genderMan
+                        : AppAssets.genderWoman,
+                    width: 14,
+                    height: 14,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: _bubbleMax),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 14,
+                  ),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF0F0F0),
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(4),
+                      topRight: Radius.circular(18),
+                      bottomLeft: Radius.circular(18),
+                      bottomRight: Radius.circular(18),
+                    ),
+                  ),
+                  child: Text(
+                    text,
+                    style: const TextStyle(
+                      color: Color(0xFF111111),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                      height: 20 / 15,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 未加入小组时：图片消息模糊锁定 + Join to view。
+class _PeerLockedImageBubble extends StatelessWidget {
+  const _PeerLockedImageBubble({
+    required this.profile,
+    required this.imageAsset,
+    required this.showAvatar,
+    required this.onAvatarTap,
+  });
+
+  final ChatUserProfile profile;
+  final String imageAsset;
+  final bool showAvatar;
+  final VoidCallback onAvatarTap;
+
+  static const double _avatar = 40;
+  static const double _avatarGap = 10;
+  static const double _size = 180;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (showAvatar)
+          GestureDetector(
+            onTap: onAvatarTap,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.asset(
+                profile.avatarAsset,
+                width: _avatar,
+                height: _avatar,
+                fit: BoxFit.cover,
+              ),
+            ),
+          )
+        else
+          const SizedBox(width: _avatar),
+        const SizedBox(width: _avatarGap),
+        Flexible(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(
+                      profile.nickname,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF666666),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Image.asset(
+                    profile.isMale
+                        ? AppAssets.genderMan
+                        : AppAssets.genderWoman,
+                    width: 14,
+                    height: 14,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(4),
+                  topRight: Radius.circular(16),
+                  bottomLeft: Radius.circular(16),
+                  bottomRight: Radius.circular(16),
+                ),
+                child: SizedBox(
+                  width: _size,
+                  height: _size,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      ImageFiltered(
+                        imageFilter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                        child: Transform.scale(
+                          scale: 1.08,
+                          child: Image.asset(imageAsset, fit: BoxFit.cover),
+                        ),
+                      ),
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        child: ColoredBox(
+                          color: Colors.black.withValues(alpha: 0.48),
+                          child: SizedBox(
+                            height: 40,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                SvgPicture.asset(
+                                  AppAssets.lockIcon,
+                                  width: 13,
+                                  height: 14,
+                                ),
+                                const SizedBox(width: 6),
+                                const Text(
+                                  'Join to view',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _SelfMessageBubble extends StatelessWidget {
-  const _SelfMessageBubble({required this.text});
+  const _SelfMessageBubble({required this.text, this.showAvatar = true});
 
   final String text;
+  final bool showAvatar;
+
+  static const double _avatar = 40;
+  static const double _avatarGap = 10;
+  static const double _bubbleMax = 260;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
-      crossAxisAlignment: CrossAxisAlignment.end,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Flexible(
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: _bubbleMax),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: const Color(0xFFB8FF6A),
-              borderRadius: BorderRadius.circular(18),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            decoration: const BoxDecoration(
+              color: Color(0xFFB8FF6A),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(18),
+                topRight: Radius.circular(4),
+                bottomLeft: Radius.circular(18),
+                bottomRight: Radius.circular(18),
+              ),
             ),
             child: Text(
               text,
@@ -709,19 +1211,24 @@ class _SelfMessageBubble extends StatelessWidget {
                 color: Color(0xFF111111),
                 fontSize: 15,
                 fontWeight: FontWeight.w500,
+                height: 20 / 15,
               ),
             ),
           ),
         ),
-        const SizedBox(width: 8),
-        ClipOval(
-          child: Image.asset(
-            AppAssets.avatarPlace,
-            width: 36,
-            height: 36,
-            fit: BoxFit.cover,
-          ),
-        ),
+        const SizedBox(width: _avatarGap),
+        if (showAvatar)
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.asset(
+              AppAssets.avatarPlace,
+              width: _avatar,
+              height: _avatar,
+              fit: BoxFit.cover,
+            ),
+          )
+        else
+          const SizedBox(width: _avatar),
       ],
     );
   }
@@ -759,22 +1266,41 @@ class _SystemJoinNotice extends StatelessWidget {
   }
 }
 
-class _PhotosPlaceholder extends StatelessWidget {
-  const _PhotosPlaceholder({required this.isJoined});
+class _PhotosGrid extends StatelessWidget {
+  const _PhotosGrid({
+    required this.isJoined,
+    required this.photos,
+    required this.onPhotoTap,
+  });
 
   final bool isJoined;
+  final List<String> photos;
+  final ValueChanged<int> onPhotoTap;
 
   @override
   Widget build(BuildContext context) {
     if (isJoined) {
-      return const Center(
-        child: Text(
-          'No photos yet~',
-          style: TextStyle(
-            color: AppColors.textTertiary,
-            fontSize: 15,
-          ),
+      return GridView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3,
+          mainAxisSpacing: 8,
+          crossAxisSpacing: 8,
+          childAspectRatio: 1,
         ),
+        itemCount: photos.length,
+        itemBuilder: (context, index) {
+          return GestureDetector(
+            onTap: () => onPhotoTap(index),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.asset(
+                photos[index],
+                fit: BoxFit.cover,
+              ),
+            ),
+          );
+        },
       );
     }
 
@@ -803,6 +1329,96 @@ class _PhotosPlaceholder extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _GroupPhotoViewerPage extends StatefulWidget {
+  const _GroupPhotoViewerPage({
+    required this.photos,
+    required this.initialIndex,
+  });
+
+  final List<String> photos;
+  final int initialIndex;
+
+  @override
+  State<_GroupPhotoViewerPage> createState() => _GroupPhotoViewerPageState();
+}
+
+class _GroupPhotoViewerPageState extends State<_GroupPhotoViewerPage> {
+  late final PageController _pageController = PageController(
+    initialPage: widget.initialIndex,
+  );
+  late int _currentIndex = widget.initialIndex;
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final top = MediaQuery.paddingOf(context).top;
+    final total = widget.photos.length;
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          PageView.builder(
+            controller: _pageController,
+            itemCount: total,
+            onPageChanged: (index) => setState(() => _currentIndex = index),
+            itemBuilder: (context, index) {
+              return InteractiveViewer(
+                minScale: 1,
+                maxScale: 4,
+                child: Center(
+                  child: Image.asset(
+                    widget.photos[index],
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                  ),
+                ),
+              );
+            },
+          ),
+          Positioned(
+            top: top + 4,
+            left: 8,
+            right: 8,
+            child: SizedBox(
+              height: 44,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: SvgPicture.asset(
+                        AppAssets.chatBack,
+                        width: 17,
+                        height: 7,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '${_currentIndex + 1}/$total',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -849,55 +1465,125 @@ class _JoinCommunityBar extends StatelessWidget {
   }
 }
 
-class _ChatInputBar extends StatelessWidget {
-  const _ChatInputBar({required this.bottomInset});
+class _ChatInputBar extends StatefulWidget {
+  const _ChatInputBar({
+    required this.bottomInset,
+    required this.controller,
+    required this.onSend,
+  });
 
   final double bottomInset;
+  final TextEditingController controller;
+  final ValueChanged<String> onSend;
+
+  @override
+  State<_ChatInputBar> createState() => _ChatInputBarState();
+}
+
+class _ChatInputBarState extends State<_ChatInputBar> {
+  /// 黑底灰线素材：用亮度作透明度，避免 `color` 把黑底染成实心块。
+  static const ColorFilter _iconFilter = ColorFilter.matrix(<double>[
+    0, 0, 0, 0, 90,
+    0, 0, 0, 0, 90,
+    0, 0, 0, 0, 90,
+    0.333, 0.333, 0.333, 0, 0,
+  ]);
+
+  bool get _hasText => widget.controller.text.trim().isNotEmpty;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_onTextChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onTextChanged);
+    super.dispose();
+  }
+
+  void _onTextChanged() => setState(() {});
+
+  Widget _icon(String asset) {
+    return ColorFiltered(
+      colorFilter: _iconFilter,
+      child: Image.asset(
+        asset,
+        width: 22,
+        height: 22,
+        fit: BoxFit.contain,
+      ),
+    );
+  }
+
+  void _submit() => widget.onSend(widget.controller.text);
 
   @override
   Widget build(BuildContext context) {
     return ColoredBox(
       color: Colors.white,
       child: Padding(
-        padding: EdgeInsets.fromLTRB(12, 8, 12, 8 + bottomInset),
+        padding: EdgeInsets.fromLTRB(12, 8, 12, 8 + widget.bottomInset),
         child: Container(
-          height: 48,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
+          constraints: const BoxConstraints(minHeight: 48),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
             color: const Color(0xFFF0F0F0),
             borderRadius: BorderRadius.circular(24),
           ),
           child: Row(
             children: [
-              Image.asset(
-                AppAssets.inputVoice,
-                width: 24,
-                height: 24,
-                color: const Color(0xFF8A8A8A),
-              ),
-              const SizedBox(width: 10),
-              const Expanded(
-                child: Text(
-                  'Please type here...',
-                  style: TextStyle(
-                    color: Color(0xFF9A9A9A),
+              _icon(AppAssets.inputVoice),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  controller: widget.controller,
+                  minLines: 1,
+                  maxLines: 4,
+                  textInputAction: TextInputAction.send,
+                  onSubmitted: (_) => _submit(),
+                  style: const TextStyle(
+                    color: Color(0xFF111111),
                     fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    hintText: 'Please type here...',
+                    hintStyle: TextStyle(
+                      color: Color(0xFF9A9A9A),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w400,
+                    ),
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.symmetric(vertical: 10),
                   ),
                 ),
               ),
-              Image.asset(
-                AppAssets.inputImage,
-                width: 24,
-                height: 24,
-                color: const Color(0xFF8A8A8A),
-              ),
-              const SizedBox(width: 12),
-              Image.asset(
-                AppAssets.inputEmoji,
-                width: 24,
-                height: 24,
-                color: const Color(0xFF8A8A8A),
-              ),
+              if (_hasText) ...[
+                const SizedBox(width: 4),
+                GestureDetector(
+                  onTap: _submit,
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF1CFF8A),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.arrow_upward_rounded,
+                      size: 18,
+                      color: Colors.black,
+                    ),
+                  ),
+                ),
+              ] else ...[
+                _icon(AppAssets.inputImage),
+                const SizedBox(width: 10),
+                _icon(AppAssets.inputEmoji),
+              ],
             ],
           ),
         ),

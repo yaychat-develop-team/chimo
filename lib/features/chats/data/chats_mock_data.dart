@@ -1,69 +1,44 @@
-import 'package:flutter/material.dart';
-
 import '../../../core/constants/app_assets.dart';
 import '../models/chat_conversation.dart';
 
-/// 消息列表 Mock 数据（头像暂用占位 / Logo）。
+/// 消息列表 Mock：含私聊示例；小组会话仍由加入动作写入。
 abstract final class ChatsMockData {
   static const List<ChatConversation> conversations = [
     ChatConversation(
-      id: 'product',
-      title: 'Product Name',
-      avatarAsset: AppAssets.iconLogo,
-      lastMessage: 'Synthesis Game 3.0 is here! ...',
-      timeLabel: 'Just',
-      unreadCount: 120,
-      badge: ChatBadgeType.verified,
-      titleColor: Color(0xFF24B572),
-    ),
-    ChatConversation(
-      id: 'system',
-      title: 'System Message',
-      avatarAsset: AppAssets.logo,
-      lastMessage: 'Mike just followed you',
-      timeLabel: 'Just',
-      unreadCount: 1,
-    ),
-    ChatConversation(
-      id: 'cat',
-      title: 'Cat Club',
+      id: 'dm_priya',
+      title: 'Priya',
       avatarAsset: AppAssets.avatarPlace,
-      lastMessage: "My kitty's gotten so fussy about food...",
-      timeLabel: 'Just',
-      badge: ChatBadgeType.group,
+      lastMessage: 'I love taking sunset shots 🌅',
+      timeLabel: '2m',
+      unreadCount: 2,
+      isMale: true,
+      signature: '',
+      zodiac: 'Capricorn',
+      isOnline: true,
+      momentAssets: [AppAssets.launchBg, AppAssets.homeRoomBg],
     ),
     ChatConversation(
-      id: 'seraphina',
-      title: 'Seraphina',
-      avatarAsset: AppAssets.emptyAvatar,
-      lastMessage: 'Oksy! Thanks',
-      timeLabel: '5 min ago',
-      unreadCount: 1,
+      id: 'dm_elita',
+      title: 'Elita 💃',
+      avatarAsset: AppAssets.genderFemaleImg,
+      lastMessage: 'Nice to meet you too!',
+      timeLabel: '1h',
+      isMale: false,
+      signature: 'I love listening to songs and playing games.',
+      zodiac: 'Capricorn',
       badge: ChatBadgeType.soulmate,
+      momentAssets: [AppAssets.homeRoomBg, AppAssets.mineBgTop],
+    ),
+    ChatConversation(
+      id: 'dm_leo',
+      title: 'Leo',
+      avatarAsset: AppAssets.genderMaleImg,
+      lastMessage: 'Are you free this weekend?',
+      timeLabel: 'Yesterday',
+      isMale: true,
+      zodiac: 'Leo',
       isOnline: true,
-    ),
-    ChatConversation(
-      id: 'davidson',
-      title: 'Davidson',
-      avatarAsset: AppAssets.avatarPlace,
-      lastMessage: "You're so much fun",
-      timeLabel: '5 min ago',
-    ),
-    ChatConversation(
-      id: 'food',
-      title: 'Food Hub',
-      avatarAsset: AppAssets.avatarPlace,
-      lastMessage: 'Thank you for your hospitality',
-      timeLabel: '5 min ago',
-      badge: ChatBadgeType.group,
-    ),
-    ChatConversation(
-      id: 'amara',
-      title: 'Amara',
-      avatarAsset: AppAssets.emptyAvatar,
-      lastMessage: "I've been into K-POP lately - have...",
-      timeLabel: '5 min ago',
-      isOnline: true,
+      momentAssets: [AppAssets.mineBgTop, AppAssets.launchBg],
     ),
   ];
 }

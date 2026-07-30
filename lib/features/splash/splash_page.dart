@@ -55,20 +55,51 @@ class _SplashPageState extends State<SplashPage> {
       body: Stack(
         fit: StackFit.expand,
         children: [
+          // 背景图底部自带 “Chimo” 字标；向上对齐，给 slogan 留出底部空间。
           Image.asset(
             AppAssets.launchBg,
             fit: BoxFit.cover,
-            alignment: Alignment.topCenter,
+            alignment: const Alignment(0, -0.45),
+          ),
+          // 底部渐变遮罩，避免背景字标与 slogan 抢同一行。
+          const Align(
+            alignment: Alignment.bottomCenter,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Color(0x00000000),
+                    Color(0xCC000000),
+                    Color(0xFF000000),
+                  ],
+                  stops: [0.0, 0.45, 1.0],
+                ),
+              ),
+              child: SizedBox(height: 140, width: double.infinity),
+            ),
           ),
           SafeArea(
             child: Align(
               alignment: Alignment.bottomCenter,
               child: Padding(
-                padding: const EdgeInsets.only(bottom: 36),
-                child: Image.asset(
-                  AppAssets.splashSlogan,
-                  height: 16,
-                  fit: BoxFit.contain,
+                padding: const EdgeInsets.only(bottom: 28),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Image.asset(
+                      AppAssets.splashTitle,
+                      height: 34,
+                      fit: BoxFit.contain,
+                    ),
+                    const SizedBox(height: 12),
+                    Image.asset(
+                      AppAssets.splashSlogan,
+                      height: 15,
+                      fit: BoxFit.contain,
+                    ),
+                  ],
                 ),
               ),
             ),

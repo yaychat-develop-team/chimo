@@ -112,10 +112,10 @@ class JoinedGroupCard extends StatelessWidget {
                   const Spacer(),
                   Row(
                     children: [
-                      const Icon(
-                        Icons.person_outline_rounded,
-                        size: 14,
-                        color: AppColors.textTertiary,
+                      Image.asset(
+                        AppAssets.homePerson,
+                        width: 11,
+                        height: 11,
                       ),
                       const SizedBox(width: 3),
                       Text(
@@ -128,10 +128,10 @@ class JoinedGroupCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 14),
-                      const Icon(
-                        Icons.image_outlined,
-                        size: 14,
-                        color: AppColors.textTertiary,
+                      Image.asset(
+                        AppAssets.homeImg,
+                        width: 11,
+                        height: 11,
                       ),
                       const SizedBox(width: 3),
                       Text(

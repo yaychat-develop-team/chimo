@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
+import '../debug/debug_page.dart';
 import '../friends/friends_page.dart';
 import '../level/level_page.dart';
 import '../profile/edit_profile_page.dart';
@@ -110,7 +111,13 @@ class _MePageState extends State<MePage> {
                 MeQuickAccessSection(
                   items: MeMockData.quickAccess,
                   onItemTap: (item) async {
-                    if (item.id == 'about') {
+                    if (item.id == 'debug') {
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const DebugPage(),
+                        ),
+                      );
+                    } else if (item.id == 'about') {
                       Navigator.of(context).push(
                         MaterialPageRoute<void>(
                           builder: (_) => const AboutUsPage(),

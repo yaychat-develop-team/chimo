@@ -757,7 +757,7 @@ class _VoiceNoteCardState extends State<_VoiceNoteCard> {
                           fit: BoxFit.contain,
                         )
                       else
-                        SvgPicture.asset(
+                        Image.asset(
                           AppAssets.audioWaveLine,
                           width: 72,
                           height: 14,

@@ -11,6 +11,7 @@ class PopularGroupsSection extends StatelessWidget {
     required this.groups,
     this.onJoinTap,
     this.onGroupTap,
+    this.onMembersTap,
   });
 
   final List<PopularGroupItem> groups;
@@ -20,6 +21,9 @@ class PopularGroupsSection extends StatelessWidget {
 
   /// 整卡点击回调。
   final ValueChanged<PopularGroupItem>? onGroupTap;
+
+  /// 成员数点击回调。
+  final ValueChanged<PopularGroupItem>? onMembersTap;
 
   @override
   Widget build(BuildContext context) {
@@ -33,6 +37,9 @@ class PopularGroupsSection extends StatelessWidget {
             onJoinTap:
                 onJoinTap == null ? null : () => onJoinTap!(groups[i]),
             onTap: onGroupTap == null ? null : () => onGroupTap!(groups[i]),
+            onMembersTap: onMembersTap == null
+                ? null
+                : () => onMembersTap!(groups[i]),
           ),
           // 卡片间距（最后一项不加）
           if (i != groups.length - 1) const SizedBox(height: 12),
