@@ -1,21 +1,21 @@
 import 'package:flutter/material.dart';
 
-/// 会话标题旁的标签类型。
+/// Badge type beside conversation title.
 enum ChatBadgeType {
-  /// 无标签
+  /// No badge
   none,
 
-  /// 官方认证勾
+  /// Official verified check
   verified,
 
-  /// 绿色 Group 标签
+  /// Green Group badge
   group,
 
-  /// 粉色 Soulmate 花体标签
+  /// Pink Soulmate script badge
   soulmate,
 }
 
-/// 会话列表单项数据。
+/// Single conversation row in the list.
 class ChatConversation {
   const ChatConversation({
     required this.id,
@@ -43,28 +43,28 @@ class ChatConversation {
   final int unreadCount;
   final ChatBadgeType badge;
 
-  /// 头像右下角在线绿点。
+  /// Green online dot on avatar corner.
   final bool isOnline;
 
-  /// 是否已置顶。
+  /// Whether pinned.
   final bool isPinned;
 
-  /// 可选标题颜色（如官方账号绿色名）。
+  /// Optional title color (e.g. official green name).
   final Color? titleColor;
 
-  /// 对端性别（私聊顶栏）。
+  /// Peer gender (DM app bar).
   final bool isMale;
 
-  /// 对端签名；空则展示默认占位文案。
+  /// Peer signature; default placeholder if empty.
   final String signature;
 
-  /// 对端星座文案。
+  /// Peer zodiac label.
   final String zodiac;
 
-  /// 是否已关注（私聊顶栏 Follow）。
+  /// Whether following (DM app bar Follow).
   final bool isFollowing;
 
-  /// 资料页 Moments 图片，用于私聊顶部预览。
+  /// Profile Moments images for DM header preview.
   final List<String> momentAssets;
 
   String get signatureDisplay {

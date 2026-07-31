@@ -6,7 +6,7 @@ import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/agreement_page.dart';
 
-/// About Us：Logo、版本、官网与协议入口。
+/// About Us: logo, version, website, and agreement links.
 class AboutUsPage extends StatelessWidget {
   const AboutUsPage({
     super.key,

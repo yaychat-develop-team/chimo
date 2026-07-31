@@ -4,7 +4,7 @@ import '../models/group_item.dart';
 import 'popular_group_card.dart';
 import 'section_header.dart';
 
-/// 「热门小组」区块：标题 + 纵向卡片列表。
+/// Popular Groups section: header + vertical card list.
 class PopularGroupsSection extends StatelessWidget {
   const PopularGroupsSection({
     super.key,
@@ -16,13 +16,13 @@ class PopularGroupsSection extends StatelessWidget {
 
   final List<PopularGroupItem> groups;
 
-  /// 加入按钮回调。
+  /// Join button callback.
   final ValueChanged<PopularGroupItem>? onJoinTap;
 
-  /// 整卡点击回调。
+  /// Whole card tap callback.
   final ValueChanged<PopularGroupItem>? onGroupTap;
 
-  /// 成员数点击回调。
+  /// Member count tap callback.
   final ValueChanged<PopularGroupItem>? onMembersTap;
 
   @override
@@ -41,7 +41,7 @@ class PopularGroupsSection extends StatelessWidget {
                 ? null
                 : () => onMembersTap!(groups[i]),
           ),
-          // 卡片间距（最后一项不加）
+          // Card spacing (skip after last item)
           if (i != groups.length - 1) const SizedBox(height: 12),
         ],
         const SizedBox(height: 16),

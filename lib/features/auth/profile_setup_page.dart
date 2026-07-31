@@ -8,7 +8,7 @@ import 'almost_in_page.dart';
 
 enum _Gender { male, female }
 
-/// 注册后完善资料：性别 + 生日。
+/// Post-registration profile setup: gender + birthday.
 class ProfileSetupPage extends StatefulWidget {
   const ProfileSetupPage({super.key});
 
@@ -257,7 +257,7 @@ class _GenderCard extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // 未选：man_img / woman_img；已选：man_select / woman_select
+            // Unselected: man_img / woman_img; selected: man_select / woman_select
             Image.asset(image, fit: BoxFit.contain),
             Positioned(
               top: 14,

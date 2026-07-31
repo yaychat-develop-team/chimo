@@ -7,7 +7,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
 
-/// 选择兴趣标签页。
+/// Interest tag selection page.
 class MyTagsPage extends StatefulWidget {
   const MyTagsPage({super.key, this.initialSelected = const []});
 

@@ -5,7 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
 
-/// 编辑个性签名页。
+/// Edit personal signature page.
 class PersonalSignaturePage extends StatefulWidget {
   const PersonalSignaturePage({super.key, this.initialText = ''});
 

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui';
 
+import 'package:characters/characters.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -9,7 +10,9 @@ import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_tip_dialog.dart';
 import '../../core/widgets/center_toast.dart';
+import '../home/chat_user_profile_page.dart';
 import '../home/home_search_page.dart';
+import '../home/models/chat_user_profile.dart';
 import '../report/report_page.dart';
 import '../wallet/wallet_page.dart';
 import 'data/chats_list_controller.dart';
@@ -44,7 +47,7 @@ class _ChatLine {
   }
 }
 
-/// 设计稿气泡尺寸（私聊消息流）。
+/// Design spec bubble sizes (DM message stream).
 abstract final class _BubbleLayout {
   static const double avatar = 40;
   static const double avatarRadius = 8;
@@ -65,7 +68,7 @@ abstract final class _BubbleLayout {
   );
 }
 
-/// 私聊详情：黑底顶栏 + 白底消息区（拖拽条）+ 输入栏。
+/// DM detail: black app bar + white message area (drag handle) + input bar.
 class ChatDetailPage extends StatefulWidget {
   const ChatDetailPage({
     super.key,
@@ -75,7 +78,7 @@ class ChatDetailPage extends StatefulWidget {
 
   final ChatConversation conversation;
 
-  /// 发送新消息时回写列表（含左滑删除后重新显示）。
+  /// Sync list when sending (including re-show after swipe-delete).
   final ChatsListController? chatsController;
 
   @override
@@ -89,10 +92,11 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   late bool _following = widget.conversation.isFollowing;
   bool _blocked = false;
 
-  /// 0 = 简介展开，1 = 简介收起（仅保留顶栏一行）。
+  /// 0 = intro expanded, 1 = intro collapsed (app bar row only).
   late final AnimationController _introCollapse;
 
-  static const double _introDragRange = 64;
+  /// Intro is taller with Moments thumbs; increase drag range for handle.
+  static const double _introDragRange = 120;
 
   late final List<_ChatLine> _messages = [
     const _ChatLine(
@@ -132,7 +136,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   }
 
   void _onIntroDragUpdate(DragUpdateDetails details) {
-    // 手指上滑（dy < 0）→ 收起简介
+    // Swipe up (dy < 0) collapses intro.
     final next = (_introCollapse.value - details.delta.dy / _introDragRange)
         .clamp(0.0, 1.0);
     _introCollapse.value = next;
@@ -150,40 +154,6 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         curve: Curves.easeOutCubic,
       );
     }
-  }
-
-  bool _onMessagesScroll(ScrollNotification notification) {
-    if (notification.depth != 0) return false;
-
-    if (notification is OverscrollNotification) {
-      // 顶部继续下拉 → 展开简介（overscroll 在顶部为负）
-      if (notification.overscroll < 0 && _introCollapse.value > 0) {
-        _introCollapse.value =
-            (_introCollapse.value + notification.overscroll / _introDragRange)
-                .clamp(0.0, 1.0);
-      }
-      return false;
-    }
-
-    if (notification is! ScrollUpdateNotification) return false;
-    final delta = notification.scrollDelta;
-    if (delta == null || delta == 0) return false;
-    if (!_messagesScroll.hasClients) return false;
-
-    final atTop = _messagesScroll.offset <= 0;
-    // 向下滚消息（手指上滑）→ 收起简介
-    if (delta > 0 && _introCollapse.value < 1) {
-      _introCollapse.value = (_introCollapse.value + delta / _introDragRange)
-          .clamp(0.0, 1.0);
-      return false;
-    }
-    // 列表顶部继续下拉 → 展开简介
-    if (atTop && delta < 0 && _introCollapse.value > 0) {
-      _introCollapse.value = (_introCollapse.value + delta / _introDragRange)
-          .clamp(0.0, 1.0);
-      return false;
-    }
-    return false;
   }
 
   void _sendMessage([String? raw]) {
@@ -303,6 +273,31 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     showCenterToast(context, message: 'The other user has been blocked.');
   }
 
+  void _openPeerProfile() {
+    final profile = ChatUserProfile(
+      id: _conversation.id,
+      nickname: _conversation.title,
+      userId:
+          '47571${_conversation.id.hashCode.abs() % 100000}'.padLeft(10, '0'),
+      avatarAsset: _conversation.avatarAsset,
+      isMale: _conversation.isMale,
+      age: 24,
+      zodiac: _conversation.zodiac,
+      level: 16,
+      bio: _conversation.signatureDisplay,
+      voiceSeconds: 12,
+      momentAssets: _conversation.momentAssets,
+    );
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ChatUserProfilePage(
+          profile: profile,
+          chatsController: widget.chatsController,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final topPadding = MediaQuery.paddingOf(context).top;
@@ -310,6 +305,8 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
     return Scaffold(
       backgroundColor: Colors.black,
+      // Input bar handles keyboard inset to avoid overflow when panel + keyboard overlap.
+      resizeToAvoidBottomInset: false,
       body: Column(
         children: [
           SizedBox(height: topPadding),
@@ -321,6 +318,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                 following: _following,
                 collapse: _introCollapse.value,
                 onFollowTap: () => setState(() => _following = !_following),
+                onAvatarTap: _openPeerProfile,
                 onMoreTap: _openMoreMenu,
               );
             },
@@ -332,7 +330,6 @@ class _ChatDetailPageState extends State<ChatDetailPage>
               messagesScroll: _messagesScroll,
               onHandleDragUpdate: _onIntroDragUpdate,
               onHandleDragEnd: _onIntroDragEnd,
-              onMessagesScroll: _onMessagesScroll,
             ),
           ),
           _DmInputBar(
@@ -356,6 +353,7 @@ class _DmAppBar extends StatelessWidget {
     required this.following,
     required this.collapse,
     required this.onFollowTap,
+    required this.onAvatarTap,
     required this.onMoreTap,
   });
 
@@ -365,6 +363,7 @@ class _DmAppBar extends StatelessWidget {
   /// 0 expanded → 1 collapsed.
   final double collapse;
   final VoidCallback onFollowTap;
+  final VoidCallback onAvatarTap;
   final VoidCallback onMoreTap;
 
   static const Color _green = Color(0xFF1CFF8A);
@@ -395,39 +394,46 @@ class _DmAppBar extends StatelessWidget {
                     ),
                   ),
                 ),
-                ClipOval(
-                  child: Image.asset(
-                    conversation.avatarAsset,
-                    width: 36,
-                    height: 36,
-                    fit: BoxFit.cover,
+                GestureDetector(
+                  onTap: onAvatarTap,
+                  child: ClipOval(
+                    child: Image.asset(
+                      conversation.avatarAsset,
+                      width: 36,
+                      height: 36,
+                      fit: BoxFit.cover,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          conversation.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
+                  child: GestureDetector(
+                    onTap: onAvatarTap,
+                    behavior: HitTestBehavior.opaque,
+                    child: Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            conversation.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 4),
-                      Image.asset(
-                        conversation.isMale
-                            ? AppAssets.genderMan
-                            : AppAssets.genderWoman,
-                        width: 14,
-                        height: 14,
-                      ),
-                    ],
+                        const SizedBox(width: 4),
+                        Image.asset(
+                          conversation.isMale
+                              ? AppAssets.genderMan
+                              : AppAssets.genderWoman,
+                          width: 14,
+                          height: 14,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 ClipRect(
@@ -688,7 +694,6 @@ class _DmChatBody extends StatelessWidget {
     required this.messagesScroll,
     required this.onHandleDragUpdate,
     required this.onHandleDragEnd,
-    required this.onMessagesScroll,
   });
 
   final List<_ChatLine> messages;
@@ -696,7 +701,6 @@ class _DmChatBody extends StatelessWidget {
   final ScrollController messagesScroll;
   final GestureDragUpdateCallback onHandleDragUpdate;
   final GestureDragEndCallback onHandleDragEnd;
-  final NotificationListenerCallback<ScrollNotification> onMessagesScroll;
 
   @override
   Widget build(BuildContext context) {
@@ -731,13 +735,10 @@ class _DmChatBody extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: NotificationListener<ScrollNotification>(
-              onNotification: onMessagesScroll,
-              child: _DmMessagesFeed(
-                messages: messages,
-                peerAvatar: peerAvatar,
-                scrollController: messagesScroll,
-              ),
+            child: _DmMessagesFeed(
+              messages: messages,
+              peerAvatar: peerAvatar,
+              scrollController: messagesScroll,
             ),
           ),
         ],
@@ -914,7 +915,7 @@ class _SelfBubble extends StatelessWidget {
   }
 }
 
-class _VoiceBubble extends StatelessWidget {
+class _VoiceBubble extends StatefulWidget {
   const _VoiceBubble({
     required this.side,
     required this.seconds,
@@ -927,45 +928,137 @@ class _VoiceBubble extends StatelessWidget {
   final String peerAvatar;
   final bool showAvatar;
 
-  bool get _isSelf => side == _ChatSide.self;
+  @override
+  State<_VoiceBubble> createState() => _VoiceBubbleState();
+}
+
+class _VoiceBubbleState extends State<_VoiceBubble>
+    with SingleTickerProviderStateMixin {
+  /// Only one voice message may play at a time.
+  static VoidCallback? _activeStop;
+
+  bool _playing = false;
+  int _remaining = 0;
+  Timer? _playTimer;
+  late final AnimationController _waveController;
+
+  bool get _isSelf => widget.side == _ChatSide.self;
+
+  @override
+  void initState() {
+    super.initState();
+    _waveController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    );
+  }
+
+  @override
+  void dispose() {
+    if (_activeStop == _stopPlay) {
+      _activeStop = null;
+    }
+    _playTimer?.cancel();
+    _waveController.dispose();
+    super.dispose();
+  }
+
+  void _stopPlay() {
+    _playTimer?.cancel();
+    _playTimer = null;
+    _waveController.stop();
+    _waveController.reset();
+    if (_activeStop == _stopPlay) {
+      _activeStop = null;
+    }
+    if (!mounted) {
+      _playing = false;
+      _remaining = 0;
+      return;
+    }
+    setState(() {
+      _playing = false;
+      _remaining = 0;
+    });
+  }
+
+  void _togglePlay() {
+    if (widget.seconds <= 0) return;
+    if (_playing) {
+      _stopPlay();
+      return;
+    }
+    _activeStop?.call();
+    _activeStop = _stopPlay;
+    setState(() {
+      _playing = true;
+      _remaining = widget.seconds;
+    });
+    _waveController.repeat();
+    _playTimer?.cancel();
+    _playTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_remaining <= 1) {
+        timer.cancel();
+        _playTimer = null;
+        _stopPlay();
+        return;
+      }
+      setState(() => _remaining -= 1);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final bubble = Container(
-      constraints: BoxConstraints(
-        minWidth: 88,
-        maxWidth: 88 + (seconds.clamp(1, 60) * 1.6),
-      ),
-      height: 44,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: BoxDecoration(
-        color: _isSelf ? _BubbleLayout.selfColor : _BubbleLayout.peerColor,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(_isSelf ? 18 : 4),
-          topRight: Radius.circular(_isSelf ? 4 : 18),
-          bottomLeft: const Radius.circular(18),
-          bottomRight: const Radius.circular(18),
+    final displaySeconds = _playing ? _remaining : widget.seconds;
+
+    final bubble = GestureDetector(
+      onTap: _togglePlay,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        constraints: BoxConstraints(
+          minWidth: 88,
+          maxWidth: 88 + (widget.seconds.clamp(1, 60) * 1.6),
         ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const _VoiceBarsIcon(),
-          const SizedBox(width: 10),
-          Text(
-            '${seconds}s',
-            style: const TextStyle(
-              color: Color(0xFF111111),
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-            ),
+        height: 44,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: _isSelf ? _BubbleLayout.selfColor : _BubbleLayout.peerColor,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(_isSelf ? 18 : 4),
+            topRight: Radius.circular(_isSelf ? 4 : 18),
+            bottomLeft: const Radius.circular(18),
+            bottomRight: const Radius.circular(18),
           ),
-        ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _VoiceBarsIcon(
+              playing: _playing,
+              animation: _waveController,
+            ),
+            const SizedBox(width: 10),
+            Text(
+              '${displaySeconds}s',
+              style: const TextStyle(
+                color: Color(0xFF111111),
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
       ),
     );
 
-    final avatar = showAvatar
-        ? _ChatAvatar(asset: _isSelf ? AppAssets.avatarPlace : peerAvatar)
+    final avatar = widget.showAvatar
+        ? _ChatAvatar(
+            asset: _isSelf ? AppAssets.avatarPlace : widget.peerAvatar,
+          )
         : const SizedBox(width: _BubbleLayout.avatar);
 
     if (_isSelf) {
@@ -991,21 +1084,49 @@ class _VoiceBubble extends StatelessWidget {
   }
 }
 
-/// 设计稿：语音气泡左侧三道波形条。
+/// Design: three waveform bars left of voice bubble; animate while playing.
 class _VoiceBarsIcon extends StatelessWidget {
-  const _VoiceBarsIcon();
+  const _VoiceBarsIcon({
+    this.playing = false,
+    this.animation,
+  });
+
+  final bool playing;
+  final Animation<double>? animation;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 16,
-      height: 16,
-      child: CustomPaint(painter: _VoiceBarsPainter()),
+    if (!playing || animation == null) {
+      return const SizedBox(
+        width: 16,
+        height: 16,
+        child: CustomPaint(painter: _VoiceBarsPainter()),
+      );
+    }
+    return AnimatedBuilder(
+      animation: animation!,
+      builder: (context, _) {
+        return SizedBox(
+          width: 16,
+          height: 16,
+          child: CustomPaint(
+            painter: _VoiceBarsPainter(
+              phase: animation!.value * 2 * math.pi,
+              playing: true,
+            ),
+          ),
+        );
+      },
     );
   }
 }
 
 class _VoiceBarsPainter extends CustomPainter {
+  const _VoiceBarsPainter({this.phase = 0, this.playing = false});
+
+  final double phase;
+  final bool playing;
+
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
@@ -1014,10 +1135,14 @@ class _VoiceBarsPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
 
     const widths = 2.4;
-    final heights = [size.height * 0.45, size.height, size.height * 0.62];
+    final base = [size.height * 0.45, size.height, size.height * 0.62];
     final gap = (size.width - widths * 3) / 2;
     for (var i = 0; i < 3; i++) {
-      final h = heights[i];
+      var h = base[i];
+      if (playing) {
+        final pulse = 0.55 + 0.45 * ((math.sin(phase + i * 1.7) + 1) / 2);
+        h = size.height * (0.28 + 0.72 * pulse * (base[i] / size.height));
+      }
       final x = i * (widths + gap);
       final y = (size.height - h) / 2;
       canvas.drawRRect(
@@ -1031,10 +1156,12 @@ class _VoiceBarsPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _VoiceBarsPainter oldDelegate) {
+    return oldDelegate.phase != phase || oldDelegate.playing != playing;
+  }
 }
 
-/// 图片消息：清晰图 / 锁定模糊 + Join to view。
+/// Image message: clear image / locked blur + Join to view.
 class _ImageBubble extends StatelessWidget {
   const _ImageBubble({
     required this.side,
@@ -1170,7 +1297,7 @@ class _DmInputBar extends StatefulWidget {
 
 enum _ChatVoicePhase { idle, recording, preview }
 
-enum _DmPanel { none, voice, photo }
+enum _DmPanel { none, voice, photo, emoji }
 
 class _DmInputBarState extends State<_DmInputBar> {
   static const int _maxVoiceSeconds = 60;
@@ -1194,6 +1321,8 @@ class _DmInputBarState extends State<_DmInputBar> {
     AppAssets.defaultAvatar,
   ];
 
+  final FocusNode _inputFocus = FocusNode();
+
   bool get _hasText => widget.controller.text.trim().isNotEmpty;
   _DmPanel _panel = _DmPanel.none;
   _ChatVoicePhase _voicePhase = _ChatVoicePhase.idle;
@@ -1210,16 +1339,46 @@ class _DmInputBarState extends State<_DmInputBar> {
   void initState() {
     super.initState();
     widget.controller.addListener(_onChanged);
+    _inputFocus.addListener(_onInputFocusChanged);
   }
 
   @override
   void dispose() {
     _voiceTimer?.cancel();
+    _inputFocus.removeListener(_onInputFocusChanged);
+    _inputFocus.dispose();
     widget.controller.removeListener(_onChanged);
     super.dispose();
   }
 
   void _onChanged() => setState(() {});
+
+  void _onInputFocusChanged() {
+    if (_inputFocus.hasFocus) {
+      _closeFunctionPanel();
+    }
+  }
+
+  /// Dismiss keyboard before opening bottom function panel.
+  void _dismissKeyboard() {
+    _inputFocus.unfocus();
+    FocusManager.instance.primaryFocus?.unfocus();
+  }
+
+  /// Close voice/photo panel when input is focused.
+  void _closeFunctionPanel() {
+    if (_panel == _DmPanel.none) return;
+    _voiceTimer?.cancel();
+    _voiceTimer = null;
+    _voiceStartedAt = null;
+    setState(() {
+      _panel = _DmPanel.none;
+      _voicePhase = _ChatVoicePhase.idle;
+      _voiceSeconds = 0;
+      _voiceProgress = 0;
+      _selectedPhotos.clear();
+    });
+  }
 
   String get _voiceTimeLabel {
     final m = (_voiceSeconds ~/ 60).toString().padLeft(2, '0');
@@ -1227,11 +1386,58 @@ class _DmInputBarState extends State<_DmInputBar> {
     return '$m:$s';
   }
 
+  void _toggleEmojiPanel() {
+    if (_panel == _DmPanel.emoji) {
+      setState(() => _panel = _DmPanel.none);
+      _inputFocus.requestFocus();
+      return;
+    }
+    _dismissKeyboard();
+    _voiceTimer?.cancel();
+    setState(() {
+      _panel = _DmPanel.emoji;
+      _voicePhase = _ChatVoicePhase.idle;
+      _voiceSeconds = 0;
+      _voiceProgress = 0;
+      _voiceStartedAt = null;
+      _selectedPhotos.clear();
+    });
+  }
+
+  void _insertEmoji(String emoji) {
+    final text = widget.controller.text;
+    final selection = widget.controller.selection;
+    final start = selection.isValid ? selection.start : text.length;
+    final end = selection.isValid ? selection.end : text.length;
+    final next = text.replaceRange(start, end, emoji);
+    final cursor = start + emoji.length;
+    widget.controller.value = TextEditingValue(
+      text: next,
+      selection: TextSelection.collapsed(offset: cursor),
+    );
+  }
+
+  void _emojiBackspace() {
+    final text = widget.controller.text;
+    if (text.isEmpty) return;
+    final truncated = text.characters.skipLast(1).toString();
+    widget.controller.value = TextEditingValue(
+      text: truncated,
+      selection: TextSelection.collapsed(offset: truncated.length),
+    );
+  }
+
+  void _sendFromEmojiPanel() {
+    if (!_hasText) return;
+    widget.onSend(null);
+  }
+
   void _toggleVoicePanel() {
     if (_panel == _DmPanel.voice) {
       _closeVoicePanel();
       return;
     }
+    _dismissKeyboard();
     _voiceTimer?.cancel();
     setState(() {
       _panel = _DmPanel.voice;
@@ -1250,6 +1456,7 @@ class _DmInputBarState extends State<_DmInputBar> {
       });
       return;
     }
+    _dismissKeyboard();
     _voiceTimer?.cancel();
     setState(() {
       _panel = _DmPanel.photo;
@@ -1384,6 +1591,7 @@ class _DmInputBarState extends State<_DmInputBar> {
   }
 
   void _showGiftSheet() {
+    _dismissKeyboard();
     if (_panel != _DmPanel.none) {
       setState(() => _panel = _DmPanel.none);
     }
@@ -1405,6 +1613,10 @@ class _DmInputBarState extends State<_DmInputBar> {
   @override
   Widget build(BuildContext context) {
     final showPanel = _panel != _DmPanel.none;
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    // Panel open: safe area only; keyboard open (no panel): pad by keyboard height.
+    final bottomPad =
+        showPanel ? widget.bottomInset : math.max(widget.bottomInset, keyboardInset);
 
     return ColoredBox(
       color: Colors.white,
@@ -1416,7 +1628,7 @@ class _DmInputBarState extends State<_DmInputBar> {
               16,
               10,
               16,
-              showPanel ? 0 : 8 + widget.bottomInset,
+              showPanel ? 0 : 8 + bottomPad,
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -1433,10 +1645,12 @@ class _DmInputBarState extends State<_DmInputBar> {
                       Expanded(
                         child: TextField(
                           controller: widget.controller,
+                          focusNode: _inputFocus,
                           minLines: 1,
                           maxLines: 4,
                           textInputAction: TextInputAction.send,
                           onSubmitted: widget.onSend,
+                          onTap: _closeFunctionPanel,
                           style: const TextStyle(
                             color: AppColors.textPrimary,
                             fontSize: 15,
@@ -1456,7 +1670,15 @@ class _DmInputBarState extends State<_DmInputBar> {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      if (_hasText)
+                      if (_panel == _DmPanel.emoji)
+                        GestureDetector(
+                          onTap: _toggleEmojiPanel,
+                          child: _toolIconFromAsset(
+                            AppAssets.inputEmoji,
+                            size: 24,
+                          ),
+                        )
+                      else if (_hasText)
                         GestureDetector(
                           onTap: () => widget.onSend(null),
                           child: Container(
@@ -1474,7 +1696,13 @@ class _DmInputBarState extends State<_DmInputBar> {
                           ),
                         )
                       else
-                        _toolIconFromAsset(AppAssets.inputEmoji, size: 24),
+                        GestureDetector(
+                          onTap: _toggleEmojiPanel,
+                          child: _toolIconFromAsset(
+                            AppAssets.inputEmoji,
+                            size: 24,
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -1509,39 +1737,186 @@ class _DmInputBarState extends State<_DmInputBar> {
             SizedBox(
               height: _panelHeight + widget.bottomInset,
               width: double.infinity,
-              child: _panel == _DmPanel.voice
-                  ? Padding(
-                      padding: EdgeInsets.only(bottom: widget.bottomInset),
-                      child: Center(
-                        child: _ChatVoicePanel(
-                          timeLabel: _voiceTimeLabel,
-                          phase: _voicePhase,
-                          progress: _voiceProgress,
-                          onMainTap: _onVoiceMainTap,
-                          onReset: _resetVoice,
-                          onConfirm: _confirmVoice,
-                        ),
-                      ),
-                    )
-                  : _ChatPhotoPanel(
-                      photos: _mockPhotos,
-                      selected: _selectedPhotos,
-                      originalPhoto: _originalPhoto,
-                      bottomInset: widget.bottomInset,
-                      onTogglePhoto: _togglePhotoAt,
-                      onCamera: () => _showPlaceholder('Camera coming soon'),
-                      onPreview: () {
-                        if (_selectedPhotos.isEmpty) return;
-                        _showPlaceholder('Preview coming soon');
-                      },
-                      onAlbum: () => _showPlaceholder('Album coming soon'),
-                      onToggleOriginal: () {
-                        setState(() => _originalPhoto = !_originalPhoto);
-                      },
-                      onSend: _sendSelectedPhotos,
+              child: switch (_panel) {
+                _DmPanel.voice => Padding(
+                  padding: EdgeInsets.only(bottom: widget.bottomInset),
+                  child: Center(
+                    child: _ChatVoicePanel(
+                      timeLabel: _voiceTimeLabel,
+                      phase: _voicePhase,
+                      progress: _voiceProgress,
+                      onMainTap: _onVoiceMainTap,
+                      onReset: _resetVoice,
+                      onConfirm: _confirmVoice,
                     ),
+                  ),
+                ),
+                _DmPanel.photo => _ChatPhotoPanel(
+                  photos: _mockPhotos,
+                  selected: _selectedPhotos,
+                  originalPhoto: _originalPhoto,
+                  bottomInset: widget.bottomInset,
+                  onTogglePhoto: _togglePhotoAt,
+                  onCamera: () => _showPlaceholder('Camera coming soon'),
+                  onPreview: () {
+                    if (_selectedPhotos.isEmpty) return;
+                    _showPlaceholder('Preview coming soon');
+                  },
+                  onAlbum: () => _showPlaceholder('Album coming soon'),
+                  onToggleOriginal: () {
+                    setState(() => _originalPhoto = !_originalPhoto);
+                  },
+                  onSend: _sendSelectedPhotos,
+                ),
+                _DmPanel.emoji => _ChatEmojiPanel(
+                  bottomInset: widget.bottomInset,
+                  canSend: _hasText,
+                  onEmojiTap: _insertEmoji,
+                  onBackspace: _emojiBackspace,
+                  onSend: _sendFromEmojiPanel,
+                ),
+                _DmPanel.none => const SizedBox.shrink(),
+              },
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _ChatEmojiPanel extends StatelessWidget {
+  const _ChatEmojiPanel({
+    required this.bottomInset,
+    required this.canSend,
+    required this.onEmojiTap,
+    required this.onBackspace,
+    required this.onSend,
+  });
+
+  final double bottomInset;
+  final bool canSend;
+  final ValueChanged<String> onEmojiTap;
+  final VoidCallback onBackspace;
+  final VoidCallback onSend;
+
+  static const Color _green = Color(0xFF1CFF8A);
+
+  static const List<String> _emojis = [
+    '😀', '😁', '😂', '🤣', '😃', '😄', '😅', '😆',
+    '😉', '😊', '😋', '😎', '😍', '😘', '🥰', '😗',
+    '😙', '😚', '🙂', '🤗', '🤩', '🤔', '🤨', '😐',
+    '😑', '😶', '🙄', '😏', '😣', '😥', '😮', '🤐',
+    '😯', '😪', '😫', '🥱', '😴', '😌', '😛', '😜',
+    '😝', '🤤', '😒', '😓', '😔', '😕', '🙃', '🤑',
+    '😲', '☹️', '🙁', '😖', '😞', '😟', '😤', '😢',
+    '😭', '😦', '😧', '😨', '😩', '🤯', '😬', '😰',
+    '😱', '🥵', '🥶', '😳', '🤪', '😵', '😡', '😠',
+    '🤬', '😷', '🤒', '🤕', '🤢', '🤮', '🤧', '😇',
+    '🥳', '🥺', '🤠', '🤡', '🤥', '🤫', '🤭', '🧐',
+    '🤓', '😈', '👿', '👹', '👺', '💀', '👻', '👽',
+    '🤖', '💩', '😺', '😸', '😹', '😻', '😼', '😽',
+    '🙀', '😿', '😾', '👍', '👎', '👏', '🙏', '💪',
+    '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '💔',
+    '💕', '💞', '💓', '💗', '💖', '💘', '💝', '✨',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: const Color(0xFFF7F7F7),
+      child: Padding(
+        padding: EdgeInsets.only(bottom: bottomInset),
+        child: Column(
+          children: [
+            SizedBox(
+              height: 44,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 16),
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    alignment: Alignment.center,
+                    child: const Text('😊', style: TextStyle(fontSize: 20)),
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: GridView.builder(
+                padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+                physics: const BouncingScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 8,
+                  mainAxisSpacing: 4,
+                  crossAxisSpacing: 4,
+                ),
+                itemCount: _emojis.length,
+                itemBuilder: (context, index) {
+                  final emoji = _emojis[index];
+                  return GestureDetector(
+                    onTap: () => onEmojiTap(emoji),
+                    behavior: HitTestBehavior.opaque,
+                    child: Center(
+                      child: Text(emoji, style: const TextStyle(fontSize: 26)),
+                    ),
+                  );
+                },
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+              child: Row(
+                children: [
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: onBackspace,
+                    child: Container(
+                      width: 44,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFE5E5E5)),
+                      ),
+                      child: const Icon(
+                        Icons.backspace_outlined,
+                        size: 20,
+                        color: Color(0xFF666666),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  GestureDetector(
+                    onTap: canSend ? onSend : null,
+                    child: Container(
+                      height: 36,
+                      padding: const EdgeInsets.symmetric(horizontal: 18),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: canSend ? _green : const Color(0xFFE0E0E0),
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Text(
+                        'Send',
+                        style: TextStyle(
+                          color: canSend ? Colors.black : const Color(0xFF999999),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

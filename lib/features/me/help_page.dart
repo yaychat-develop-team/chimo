@@ -6,7 +6,7 @@ import '../../core/theme/app_colors.dart';
 import 'joy_coins_help_page.dart';
 import 'levels_help_page.dart';
 
-/// Help 入口页：标题 Chimo，下列帮助主题。
+/// Help entry: Chimo title with help topics below.
 class HelpPage extends StatelessWidget {
   const HelpPage({super.key});
 

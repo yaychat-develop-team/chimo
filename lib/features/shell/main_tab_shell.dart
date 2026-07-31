@@ -9,7 +9,7 @@ import 'models/app_bottom_nav_destination.dart';
 import 'models/main_tab.dart';
 import 'widgets/app_bottom_nav_bar.dart';
 
-/// 主壳层：承载三个 Tab 页面，底部挂载封装好的导航栏。
+/// Main shell: hosts three tab pages with the bottom nav bar.
 class MainTabShell extends StatefulWidget {
   const MainTabShell({super.key});
 
@@ -20,7 +20,7 @@ class MainTabShell extends StatefulWidget {
 class _MainTabShellState extends State<MainTabShell> {
   MainTab _currentTab = MainTab.home;
 
-  /// 消息列表状态：未读角标 = 各会话 unread 之和。
+  /// Chats list state: badge count = sum of per-conversation unread counts.
   late final ChatsListController _chatsController;
 
   @override
@@ -54,7 +54,7 @@ class _MainTabShellState extends State<MainTabShell> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      // IndexedStack 保活各 Tab，避免切页后丢失已加入小组等状态。
+      // IndexedStack keeps tabs alive so state (e.g. joined groups) survives tab switches.
       body: IndexedStack(
         index: _currentTab.index,
         children: [

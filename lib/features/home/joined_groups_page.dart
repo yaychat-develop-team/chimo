@@ -6,7 +6,7 @@ import 'group_details_page.dart';
 import 'models/group_item.dart';
 import 'widgets/joined_group_card.dart';
 
-/// 已加入群组列表页（首页 My Groups → More）。
+/// Joined groups list (Home My Groups → More).
 class JoinedGroupsPage extends StatelessWidget {
   const JoinedGroupsPage({
     super.key,

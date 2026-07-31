@@ -17,7 +17,7 @@ import 'widgets/home_hero_banner.dart';
 import 'widgets/my_groups_section.dart';
 import 'widgets/popular_groups_section.dart';
 
-/// 首页下拉刷新阶段文案。
+/// Home pull-to-refresh phase labels.
 enum _HomeRefreshPhase {
   idle,
   pull,
@@ -26,11 +26,11 @@ enum _HomeRefreshPhase {
   success,
 }
 
-/// 首页：顶栏、运营 Banner、我的小组、热门小组。
+/// Home: app bar, promo banner, My Groups, Popular Groups.
 class HomePage extends StatefulWidget {
   const HomePage({super.key, required this.chatsController});
 
-  /// 与主壳共享：加入 / 退出小组时同步消息列表。
+  /// Shared with shell: sync chat list on join / leave.
   final ChatsListController chatsController;
 
   @override
@@ -59,7 +59,7 @@ class _HomePageState extends State<HomePage> {
       for (final group in _popularGroups)
         if (group.isJoined) group,
     ];
-    // 从任意入口退出 / 加入时，按成员身份同步首页（与会话是否存在无关）。
+    // Sync home membership from any join/leave entry (independent of chat existence).
     widget.chatsController.addListener(_syncMembershipFromController);
   }
 

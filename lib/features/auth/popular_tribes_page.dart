@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../core/auth/auth_session.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
 import '../shell/main_tab_shell.dart';
@@ -20,7 +21,7 @@ class _TribeOption {
   final String avatarAsset;
 }
 
-/// 注册流程：选择热门 Tribes。
+/// Registration flow: pick popular tribes.
 class PopularTribesPage extends StatefulWidget {
   const PopularTribesPage({super.key});
 
@@ -92,7 +93,9 @@ class _PopularTribesPageState extends State<PopularTribesPage> {
     });
   }
 
-  void _goMain() {
+  Future<void> _goMain() async {
+    await AuthSession.markLoggedIn(method: 'phone');
+    if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       PageRouteBuilder<void>(
         pageBuilder: (_, _, _) => const MainTabShell(),
@@ -259,7 +262,7 @@ class _TribeCard extends StatelessWidget {
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            // 卡片底：150×105，头像下沉半高。
+            // Card base: 150×105; avatar hangs half above.
             Positioned(
               top: avatarHang,
               left: 0,
@@ -275,7 +278,7 @@ class _TribeCard extends StatelessWidget {
                 ),
               ),
             ),
-            // 选中勾：卡片右上 20×20。
+            // Selected checkmark: top-right of card, 20×20.
             Positioned(
               top: avatarHang + 10,
               right: 10,
@@ -299,7 +302,7 @@ class _TribeCard extends StatelessWidget {
                     : null,
               ),
             ),
-            // 头像 60×60，一半悬在卡片上方。
+            // Avatar 60×60, half overlapping card top.
             Positioned(
               top: 0,
               left: 12,
@@ -313,7 +316,7 @@ class _TribeCard extends StatelessWidget {
                 ),
               ),
             ),
-            // 标题 + 副标题：头像下方左侧。
+            // Title + subtitle: below avatar on the left.
             Positioned(
               left: 12,
               right: 36,

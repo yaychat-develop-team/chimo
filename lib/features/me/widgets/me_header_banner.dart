@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_assets.dart';
 
-/// 顶部气泡背景（兼容旧引用；完整头部请用 [MeHeaderSection]）。
+/// Top bubble background (legacy; use [MeHeaderSection] for full header).
 class MeHeaderBanner extends StatelessWidget {
   const MeHeaderBanner({super.key, this.height = 168});
 

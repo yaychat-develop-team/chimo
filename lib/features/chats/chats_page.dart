@@ -17,11 +17,11 @@ import 'widgets/chats_conversation_tile.dart';
 import 'widgets/chats_empty_state.dart';
 import 'widgets/chats_promo_banner.dart';
 
-/// 消息列表页：顶栏、可关闭引导 Banner、会话列表 / 空状态。
+/// Chats list: app bar, dismissible promo banner, list or empty state.
 class ChatsPage extends StatefulWidget {
   const ChatsPage({super.key, required this.controller});
 
-  /// 与主壳共享的会话列表状态（未读角标据此计算）。
+  /// Shared with shell; unread badge derived from this.
   final ChatsListController controller;
 
   @override
@@ -76,7 +76,7 @@ class _ChatsPageState extends State<ChatsPage> {
   }
 
   void _openConversation(ChatConversation item) {
-    // 小组会话进入小组详情；其余为私聊（同壳不同消息流）。
+    // Group row → group details; others → DM (same shell, different stream).
     if (item.badge == ChatBadgeType.group) {
       final stillJoined = _controller.isGroupJoined(item.id);
       Navigator.of(context).push(
@@ -109,7 +109,7 @@ class _ChatsPageState extends State<ChatsPage> {
   }
 
   void _openAvatarProfile(ChatConversation item) {
-    // 小组会话没有个人主页，头像点击与整行一致进入小组。
+    // Groups have no profile; avatar tap same as row → group details.
     if (item.badge == ChatBadgeType.group) {
       _openConversation(item);
       return;

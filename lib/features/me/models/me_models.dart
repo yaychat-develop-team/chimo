@@ -1,4 +1,4 @@
-/// 个人中心用户资料数据模型。
+/// Me page user profile model.
 class MeProfile {
   const MeProfile({
     required this.displayName,
@@ -18,25 +18,25 @@ class MeProfile {
     this.nicknameChangedOnce = false,
   });
 
-  /// 展示昵称。
+  /// Display nickname.
   final String displayName;
 
-  /// 用户 ID（用于复制）。
+  /// User ID (for copy).
   final String userId;
 
-  /// 头像本地资源路径。
+  /// Local avatar asset path.
   final String avatarAsset;
 
-  /// 好友数。
+  /// Friend count.
   final int friends;
 
-  /// 粉丝数。
+  /// Fan count.
   final int fans;
 
-  /// 关注数。
+  /// Following count.
   final int follows;
 
-  /// 访客数。
+  /// Visitor count.
   final int visitors;
 
   final String gender;
@@ -90,7 +90,7 @@ class MeProfile {
   }
 }
 
-/// 快捷入口单项。
+/// Quick access menu item.
 class QuickAccessItem {
   const QuickAccessItem({
     required this.id,
@@ -101,11 +101,11 @@ class QuickAccessItem {
   final String id;
   final String label;
 
-  /// 图标资源路径（webp）。
+  /// Icon asset path (webp).
   final String iconAsset;
 }
 
-/// 统计条单项（Friends / Fans 等）。
+/// Stats row item (Friends / Fans, etc.).
 class MeStatItem {
   const MeStatItem({required this.label, required this.value});
 

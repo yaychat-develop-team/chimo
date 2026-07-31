@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// 设计稿 Tip 确认弹窗：白底圆角，Cancel / Confirm。
+/// Design Tip confirm dialog: white rounded card, Cancel / Confirm.
 class AppTipDialog extends StatelessWidget {
   const AppTipDialog({
     super.key,
@@ -15,7 +15,7 @@ class AppTipDialog extends StatelessWidget {
   final String cancelLabel;
   final String confirmLabel;
 
-  /// 弹出确认框；返回 `true` 表示用户点了 Confirm。
+  /// Shows the confirm dialog; returns `true` if the user taps Confirm.
   static Future<bool> show(
     BuildContext context, {
     required String message,

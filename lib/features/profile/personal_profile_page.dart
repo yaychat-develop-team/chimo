@@ -4,7 +4,7 @@ import '../me/models/me_models.dart';
 import 'edit_profile_page.dart';
 import 'widgets/user_profile_scaffold.dart';
 
-/// 个人主页：与他人主页同布局，底栏为 Edit Profile。
+/// Own profile page: same layout as others; bottom bar is Edit Profile.
 class PersonalProfilePage extends StatefulWidget {
   const PersonalProfilePage({
     super.key,

@@ -5,7 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
 
-/// 编辑网名页。
+/// Edit nickname page.
 class NicknamePage extends StatefulWidget {
   const NicknamePage({
     super.key,
@@ -15,7 +15,7 @@ class NicknamePage extends StatefulWidget {
 
   final String initialText;
 
-  /// 已修改过一次后再次进入时展示规则说明。
+  /// Show rules when re-entering after one prior edit.
   final bool showRules;
 
   static const int maxLength = 20;

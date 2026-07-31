@@ -1,6 +1,6 @@
 import '../../../core/constants/app_assets.dart';
 
-/// 小组成员项。
+/// A group member entry.
 class GroupMember {
   const GroupMember({
     required this.id,
@@ -15,7 +15,7 @@ class GroupMember {
   final bool isMale;
 }
 
-/// 小组成员 Mock 列表。
+/// Mock list of group members.
 abstract final class GroupMembersMockData {
   static const List<GroupMember> members = [
     GroupMember(

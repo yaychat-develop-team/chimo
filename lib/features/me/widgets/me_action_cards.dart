@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_assets.dart';
 
-/// Wallet / Level：整卡背景色 + 标题 + 图标（高 60）。
+/// Wallet / Level cards: full background, title, icon (height 60).
 class MeActionCards extends StatelessWidget {
   const MeActionCards({
     super.key,

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../models/me_models.dart';
 
-/// 社交数据横条：每项左右布局（标签 + 数值），四项均分一行。
+/// Social stats row: label + value per item, four equal columns.
 class MeStatsRow extends StatelessWidget {
   const MeStatsRow({
     super.key,

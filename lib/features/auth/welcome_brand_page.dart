@@ -7,7 +7,7 @@ import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
 import 'popular_tribes_page.dart';
 
-/// 品牌欢迎 → 上滑过渡到行业选择（同页形态动画）。
+/// Brand welcome → swipe up to industry selection (same-page morph animation).
 class WelcomeBrandPage extends StatefulWidget {
   const WelcomeBrandPage({super.key});
 
@@ -28,7 +28,7 @@ class WelcomeBrandPage extends StatefulWidget {
 
 class _WelcomeBrandPageState extends State<WelcomeBrandPage>
     with SingleTickerProviderStateMixin {
-  /// 0 = 品牌欢迎，1 = 行业选择。
+  /// 0 = brand welcome, 1 = industry selection.
   late final AnimationController _progress;
   final Set<String> _selected = {};
   final ScrollController _listController = ScrollController();
@@ -107,7 +107,7 @@ class _WelcomeBrandPageState extends State<WelcomeBrandPage>
             final logoHeight = lerpDouble(56, 36, t)!;
             final sloganOpacity = (1.0 - t * 1.35).clamp(0.0, 1.0);
             final industryOpacity = ((t - 0.18) / 0.55).clamp(0.0, 1.0);
-            // Logo：从垂直居中过渡到顶部。
+            // Logo: animate from vertical center to top.
             final logoTop = lerpDouble(
               (size.height - logoHeight) / 2 - 40,
               top + 12,
@@ -129,7 +129,7 @@ class _WelcomeBrandPageState extends State<WelcomeBrandPage>
                     ),
                   ),
                 ),
-                // 上滑手势层（展开后交给列表滚动）。
+                // Swipe-up gesture layer (hands off to list scroll when expanded).
                 if (!_expanded)
                   GestureDetector(
                     behavior: HitTestBehavior.opaque,
@@ -150,7 +150,7 @@ class _WelcomeBrandPageState extends State<WelcomeBrandPage>
                     ),
                   ),
                 ),
-                // Slogan（随上滑淡出）
+                // Slogan (fades out on swipe up)
                 if (sloganOpacity > 0.01)
                   Positioned(
                     top: logoTop + logoHeight + 28,
@@ -175,7 +175,7 @@ class _WelcomeBrandPageState extends State<WelcomeBrandPage>
                       ),
                     ),
                   ),
-                // 行业选择内容
+                // Industry selection content
                 Positioned(
                   top: logoTop + logoHeight + 20,
                   left: 0,
@@ -208,7 +208,7 @@ class _WelcomeBrandPageState extends State<WelcomeBrandPage>
                               child: NotificationListener<
                                   OverscrollNotification>(
                                 onNotification: (n) {
-                                  // 列表顶部下拉可收回欢迎态。
+                                  // Pull down at list top collapses back to welcome state.
                                   if (_expanded &&
                                       n.overscroll < 0 &&
                                       (_listController.hasClients &&

@@ -4,7 +4,7 @@ import '../../../core/constants/app_assets.dart';
 import '../../../core/theme/app_colors.dart';
 import '../data/group_members_mock_data.dart';
 
-/// 小组成员列表弹窗：昵称模糊搜索。
+/// Group members bottom sheet with fuzzy nickname search.
 class GroupMembersSheet extends StatefulWidget {
   const GroupMembersSheet({
     super.key,
@@ -46,13 +46,13 @@ class _GroupMembersSheetState extends State<GroupMembersSheet> {
     super.dispose();
   }
 
-  /// 模糊匹配：忽略大小写 / 空格，支持子串包含。
+  /// Fuzzy match: ignore case/spaces; supports substring contains.
   bool _matches(GroupMember member, String rawQuery) {
     final query = rawQuery.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '');
     if (query.isEmpty) return true;
     final name = member.nickname.toLowerCase().replaceAll(RegExp(r'\s+'), '');
     if (name.contains(query)) return true;
-    // 简单子序列：查询字符按顺序出现在昵称中。
+    // Simple subsequence: query chars appear in order in nickname.
     var i = 0;
     for (final code in name.codeUnits) {
       if (code == query.codeUnitAt(i)) {

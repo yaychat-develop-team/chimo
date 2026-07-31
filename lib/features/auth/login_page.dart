@@ -5,10 +5,10 @@ import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/agreement_page.dart';
 import '../debug/debug_page.dart';
-import '../shell/main_tab_shell.dart';
+import '../me/bind_email_page.dart';
 import 'phone_login_page.dart';
 
-/// 登录页：按设计稿 — Email 主按钮 + 协议 + Debug + 手机号入口。
+/// Login page per design: Email primary button, agreement, Debug, phone entry.
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -27,45 +27,32 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Future<void> _showWelcomeSheet() async {
-    final accepted = await showModalBottomSheet<bool>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      barrierColor: Colors.black.withValues(alpha: 0.55),
-      builder: (sheetContext) => _WelcomeAgreementSheet(
-        onOpenAgreement: (title) {
-          Navigator.of(sheetContext).push(
-            MaterialPageRoute<void>(
-              builder: (_) => AgreementPage(title: title),
-            ),
-          );
-        },
-      ),
-    );
-    if (!mounted || accepted != true) return;
-    setState(() => _agreed = true);
-    _goMain();
-  }
-
-  void _goMain() {
-    Navigator.of(context).pushReplacement(
-      PageRouteBuilder<void>(
-        pageBuilder: (_, _, _) => const MainTabShell(),
-        transitionsBuilder: (_, animation, _, child) {
-          return FadeTransition(opacity: animation, child: child);
-        },
-        transitionDuration: const Duration(milliseconds: 420),
-      ),
-    );
-  }
-
-  void _enterApp() {
+  Future<void> _openEmailLogin() async {
     if (!_agreed) {
-      _showWelcomeSheet();
-      return;
+      final accepted = await showModalBottomSheet<bool>(
+        context: context,
+        backgroundColor: Colors.transparent,
+        isScrollControlled: true,
+        barrierColor: Colors.black.withValues(alpha: 0.55),
+        builder: (sheetContext) => _WelcomeAgreementSheet(
+          onOpenAgreement: (title) {
+            Navigator.of(sheetContext).push(
+              MaterialPageRoute<void>(
+                builder: (_) => AgreementPage(title: title),
+              ),
+            );
+          },
+        ),
+      );
+      if (!mounted || accepted != true) return;
+      setState(() => _agreed = true);
     }
-    _goMain();
+    if (!mounted) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const BindEmailPage(forLogin: true),
+      ),
+    );
   }
 
   Future<void> _openPhoneLogin() async {
@@ -152,7 +139,7 @@ class _LoginPageState extends State<LoginPage> {
                     fit: BoxFit.contain,
                   ),
                   const Spacer(flex: 3),
-                  _EmailLoginButton(onTap: _enterApp),
+                  _EmailLoginButton(onTap: _openEmailLogin),
                   const SizedBox(height: 18),
                   _AgreementRow(
                     agreed: _agreed,
@@ -412,7 +399,7 @@ class _AgreementRowState extends State<_AgreementRow> {
   }
 }
 
-/// 未勾选协议时弹出的欢迎确认底栏。
+/// Welcome confirmation bottom sheet when agreement is unchecked.
 class _WelcomeAgreementSheet extends StatefulWidget {
   const _WelcomeAgreementSheet({required this.onOpenAgreement});
 

@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../core/auth/auth_session.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
 import 'profile_setup_page.dart';
 
-/// 手机验证码输入页（白底设计稿）。
+/// Phone verification code page (white background design).
 class VerificationCodePage extends StatefulWidget {
   const VerificationCodePage({super.key, required this.phone});
 
@@ -50,7 +51,9 @@ class _VerificationCodePageState extends State<VerificationCodePage> {
     }
   }
 
-  void _goProfileSetup() {
+  Future<void> _goProfileSetup() async {
+    await AuthSession.markLoggedIn(method: 'phone', phone: widget.phone);
+    if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       PageRouteBuilder<void>(
         pageBuilder: (_, _, _) => const ProfileSetupPage(),
@@ -162,7 +165,7 @@ class _VerificationCodePageState extends State<VerificationCodePage> {
                           );
                         }),
                       ),
-                      // 隐藏输入框，承接系统数字键盘。
+                      // Hidden input field for system numeric keyboard.
                       Opacity(
                         opacity: 0,
                         child: TextField(

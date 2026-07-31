@@ -8,7 +8,7 @@ import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
 import 'welcome_brand_page.dart';
 
-/// 注册收尾：头像 + 昵称。
+/// Registration finale: avatar + nickname.
 class AlmostInPage extends StatefulWidget {
   const AlmostInPage({super.key});
 

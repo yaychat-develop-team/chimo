@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/theme/app_theme.dart';
 import '../features/splash/splash_page.dart';
 
-/// Chimo 根组件：配置 [MaterialApp] 主题；启动时先显示 Splash。
+/// Chimo root widget: configures [MaterialApp] theme; shows Splash first.
 class ChimoApp extends StatelessWidget {
   const ChimoApp({super.key});
 
@@ -12,7 +12,7 @@ class ChimoApp extends StatelessWidget {
     return MaterialApp(
       title: 'Chimo',
       debugShowCheckedModeBanner: false,
-      // 全局使用暗色主题，与首页设计稿一致。
+      // App-wide dark theme aligned with the home design.
       theme: AppTheme.dark,
       home: const SplashPage(),
     );

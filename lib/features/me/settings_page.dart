@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../core/auth/auth_session.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_tip_dialog.dart';
 import '../auth/login_page.dart';
 
-/// 设置页：账号安全 / 隐私 / 清缓存 / 退出登录。
+/// Settings: account security, privacy, clear cache, log out.
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
 
@@ -33,6 +34,8 @@ class SettingsPage extends StatelessWidget {
     );
     if (!context.mounted || !confirmed) return;
 
+    await AuthSession.clear();
+    if (!context.mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute<void>(builder: (_) => const LoginPage()),
       (_) => false,

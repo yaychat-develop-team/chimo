@@ -5,7 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
 
-/// 身高 / 体重数字输入页。
+/// Height / weight numeric input page.
 class BodyMetricPage extends StatefulWidget {
   const BodyMetricPage({
     super.key,

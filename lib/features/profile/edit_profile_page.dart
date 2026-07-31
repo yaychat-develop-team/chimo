@@ -15,7 +15,7 @@ import 'personal_signature_page.dart';
 import 'photo_pick_sheet.dart';
 import 'voice_note_page.dart';
 
-/// 编辑资料页。
+/// Edit profile page.
 class EditProfilePage extends StatefulWidget {
   const EditProfilePage({
     super.key,

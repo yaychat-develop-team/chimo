@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/app_assets.dart';
 import '../models/main_tab.dart';
 
-/// 底部导航图标：使用 tab 资源（选中 / 未选中）。
+/// Bottom nav icons from tab assets (selected / unselected).
 abstract final class MainTabIcons {
-  /// 根据 [tab] 与选中态返回对应图标。
+  /// Returns the icon for [tab] and selection state.
   static Widget build(MainTab tab, {required bool selected, double size = 30}) {
     final asset = switch (tab) {
       MainTab.home => selected ? AppAssets.tabHomeSelected : AppAssets.tabHome,
@@ -14,7 +14,7 @@ abstract final class MainTabIcons {
       MainTab.me => selected ? AppAssets.tabMeSelected : AppAssets.tabMe,
     };
 
-    // 资源本身已带选中/未选中样式，不再二次着色。
+    // Assets already include selected/unselected styles; no tinting applied.
     return Image.asset(
       asset,
       width: size,

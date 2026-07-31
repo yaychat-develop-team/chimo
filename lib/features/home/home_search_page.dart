@@ -12,7 +12,7 @@ import 'models/chat_user_profile.dart';
 
 enum _SearchRelation { self, notFollowing, following }
 
-/// 首页搜索命中的用户（Mock）。
+/// Mock user hit from home search.
 class _SearchUser {
   const _SearchUser({
     required this.id,
@@ -48,7 +48,7 @@ class _SearchUser {
   }
 }
 
-/// 首页搜索：联系人 / 消息，含搜索历史与用户结果。
+/// Home search: contacts / messages, history, and user results.
 class HomeSearchPage extends StatefulWidget {
   const HomeSearchPage({super.key, this.chatsController});
 
@@ -69,7 +69,7 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
 
   static final RegExp _idPattern = RegExp(r'^\d{5,}$');
 
-  /// 设计稿示例：自己的 ID。
+  /// Design spec: current user's ID.
   static const String _demoSelfId = '1011231';
 
   static const Map<String, _SearchUser> _mockUsers = {

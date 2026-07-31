@@ -13,7 +13,7 @@ import '../../chats/widgets/gift_bottom_sheet.dart';
 import '../../report/report_page.dart';
 import '../models/chat_user_profile.dart';
 
-/// 小组聊天点击对方头像：底部资料卡。
+/// Bottom profile sheet when tapping a peer avatar in group chat.
 class ChatUserProfileSheet extends StatefulWidget {
   const ChatUserProfileSheet({
     super.key,

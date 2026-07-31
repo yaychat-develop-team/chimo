@@ -1,15 +1,15 @@
-/// 主壳底部导航的三个目的地。
+/// The three main bottom-nav destinations.
 enum MainTab {
-  /// 首页
+  /// Home tab.
   home,
 
-  /// 聊天
+  /// Chats tab.
   chats,
 
-  /// 我的
+  /// Me tab.
   me;
 
-  /// Tab 展示文案（与设计稿一致）。
+  /// Tab label (matches design).
   String get label => switch (this) {
     MainTab.home => 'Home',
     MainTab.chats => 'Chats',

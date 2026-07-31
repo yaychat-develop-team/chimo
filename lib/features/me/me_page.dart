@@ -9,6 +9,7 @@ import '../profile/edit_profile_page.dart';
 import '../profile/personal_profile_page.dart';
 import '../wallet/wallet_page.dart';
 import 'about_us_page.dart';
+import 'bind_email_page.dart';
 import 'data/me_mock_data.dart';
 import 'help_page.dart';
 import 'models/me_models.dart';
@@ -18,7 +19,7 @@ import 'widgets/me_profile_header.dart';
 import 'widgets/me_quick_access_section.dart';
 import 'widgets/me_stats_row.dart';
 
-/// 个人中心页：`mine_bg` 背景图宽度与屏幕一致。
+/// Me page: `mine_bg` background matches screen width.
 class MePage extends StatefulWidget {
   const MePage({super.key});
 
@@ -48,8 +49,8 @@ class _MePageState extends State<MePage> {
   void _openStatPage(MeStatItem item) {
     final tab = switch (item.label) {
       'Friends' => FriendsTab.friends,
-      'Fans' => FriendsTab.follow,
-      'Follows' => FriendsTab.followers,
+      'Fans' => FriendsTab.followers,
+      'Follows' => FriendsTab.follow,
       _ => null,
     };
     if (tab == null) return;
@@ -115,6 +116,12 @@ class _MePageState extends State<MePage> {
                       Navigator.of(context).push(
                         MaterialPageRoute<void>(
                           builder: (_) => const DebugPage(),
+                        ),
+                      );
+                    } else if (item.id == 'bind_email') {
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const BindEmailPage(),
                         ),
                       );
                     } else if (item.id == 'about') {

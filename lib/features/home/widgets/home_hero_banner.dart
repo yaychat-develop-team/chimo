@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_assets.dart';
 
-/// 首页运营 Banner：竖直轮播，2 张图首尾相接循环。
+/// Home promo banner: vertical carousel, seamless loop of 2 images.
 class HomeHeroBanner extends StatefulWidget {
   const HomeHeroBanner({
     super.key,
@@ -13,13 +13,13 @@ class HomeHeroBanner extends StatefulWidget {
     this.autoPlayInterval = const Duration(seconds: 4),
   });
 
-  /// 轮播图片资源列表。
+  /// Carousel image asset list.
   final List<String> banners;
 
-  /// 是否自动轮播。
+  /// Whether to auto-advance.
   final bool autoPlay;
 
-  /// 自动轮播间隔。
+  /// Auto-advance interval.
   final Duration autoPlayInterval;
 
   @override
@@ -30,7 +30,7 @@ class _HomeHeroBannerState extends State<HomeHeroBanner> {
   late final PageController _pageController;
   Timer? _autoPlayTimer;
 
-  /// 扩展页：`[最后一张, ...真实, 第一张]`，用于无缝首尾相接。
+  /// Extended pages: `[last, ...real, first]` for seamless looping.
   List<String> get _loopPages {
     final banners = widget.banners;
     if (banners.length <= 1) return banners;
@@ -40,7 +40,7 @@ class _HomeHeroBannerState extends State<HomeHeroBanner> {
   @override
   void initState() {
     super.initState();
-    // 从真实第一张开始（扩展列表下标 1）。
+    // Start on the first real page (index 1 in extended list).
     final initial = widget.banners.length <= 1 ? 0 : 1;
     _pageController = PageController(initialPage: initial);
     _startAutoPlay();
@@ -75,12 +75,12 @@ class _HomeHeroBannerState extends State<HomeHeroBanner> {
     _startAutoPlay();
   }
 
-  /// 滑到两端克隆页时，瞬间跳到对应真实页，视觉上首尾相接。
+  /// On clone pages at ends, jump to matching real page for seamless loop.
   void _onPageChanged(int page) {
     final n = widget.banners.length;
     if (n <= 1) return;
 
-    // 扩展：0=末张克隆，1…n=真实，n+1=首张克隆
+    // Extended: 0=last clone, 1…n=real, n+1=first clone
     if (page == 0) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_pageController.hasClients) {
@@ -105,7 +105,7 @@ class _HomeHeroBannerState extends State<HomeHeroBanner> {
 
     final pages = _loopPages;
 
-    // 设计稿：宽 343、高 100（左右各 16 边距）。
+    // Design: 343×100 wide (16 horizontal padding each side).
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: SizedBox(

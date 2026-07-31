@@ -4,7 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../core/constants/app_assets.dart';
 import '../me/levels_help_page.dart';
 
-/// 我的等级：当前等级卡片 + 等级特权列表（按设计稿素材还原）。
+/// My level: current level card + privilege list (from design assets).
 class LevelPage extends StatelessWidget {
   const LevelPage({
     super.key,

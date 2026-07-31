@@ -7,7 +7,7 @@ import '../../core/widgets/center_toast.dart';
 
 enum _ServerEnv { prod, test, local }
 
-/// 调试页：服务器环境 / 开关 / 代理与快捷入口。
+/// Debug page: server environment / toggles / proxy and shortcuts.
 class DebugPage extends StatefulWidget {
   const DebugPage({super.key});
 
@@ -34,7 +34,7 @@ class _DebugPageState extends State<DebugPage> {
   }
 
   void _saveAndRestart() {
-    _toast('已保存，重启生效');
+    _toast('Saved. Restart to apply.');
   }
 
   @override
@@ -55,31 +55,31 @@ class _DebugPageState extends State<DebugPage> {
                   padding: EdgeInsets.fromLTRB(16, 8, 16, 24 + bottom),
                   children: [
                     _SectionHeader(
-                      title: '服务器环境',
-                      actionLabel: '保存并重启',
+                      title: 'Server environment',
+                      actionLabel: 'Save & restart',
                       onAction: _saveAndRestart,
                     ),
                     const SizedBox(height: 8),
                     _EnvOption(
                       selected: _env == _ServerEnv.prod,
-                      title: '正式环境',
+                      title: 'Production',
                       subtitle: 'api.yqdf.xyz/api/v1',
                       onTap: () => setState(() => _env = _ServerEnv.prod),
                     ),
                     _EnvOption(
                       selected: _env == _ServerEnv.test,
-                      title: 'Test环境',
+                      title: 'Test environment',
                       subtitle: 'test-api.yqdf.xyz/api/v1',
                       onTap: () => setState(() => _env = _ServerEnv.test),
                     ),
                     _EnvOption(
                       selected: _env == _ServerEnv.local,
                       title: 'Local host',
-                      subtitle: '点击设置',
+                      subtitle: 'Tap to configure',
                       subtitleMuted: true,
                       onTap: () {
                         setState(() => _env = _ServerEnv.local);
-                        _toast('Local host 设置');
+                        _toast('Local host settings');
                       },
                     ),
                     const SizedBox(height: 6),
@@ -94,33 +94,33 @@ class _DebugPageState extends State<DebugPage> {
                       onChanged: (v) => setState(() => _pb = v),
                     ),
                     _NavRow(
-                      label: '代理配置',
-                      onTap: () => _toast('代理配置'),
+                      label: 'Proxy config',
+                      onTap: () => _toast('Proxy config'),
                     ),
                     _InputActionRow(
-                      label: '中台域名',
+                      label: 'Platform domain',
                       controller: _midDomainController,
                       action: _GreenCapsuleButton(
-                        label: '保存并重启',
+                        label: 'Save & restart',
                         onTap: _saveAndRestart,
                       ),
                     ),
                     _InputActionRow(
-                      label: 'h5跳转',
+                      label: 'H5 jump',
                       controller: _h5Controller,
                       action: _GreenCircleButton(
-                        label: '跳转',
-                        onTap: () => _toast('h5 跳转'),
+                        label: 'Jump',
+                        onTap: () => _toast('H5 jump'),
                       ),
                     ),
-                    _NavRow(label: '跳转测试', onTap: () => _toast('跳转测试')),
-                    _NavRow(label: '创建聊天群', onTap: () => _toast('创建聊天群')),
-                    _NavRow(label: '消息push条', onTap: () => _toast('消息push条')),
-                    _NavRow(label: '测试push', onTap: () => _toast('测试push')),
-                    _NavRow(label: '全局弹窗', onTap: () => _toast('全局弹窗')),
-                    _NavRow(label: '全局飘屏', onTap: () => _toast('全局飘屏')),
-                    _NavRow(label: '房间进场飘屏', onTap: () => _toast('房间进场飘屏')),
-                    _NavRow(label: '测试日志上传', onTap: () => _toast('测试日志上传')),
+                    _NavRow(label: 'Jump test', onTap: () => _toast('Jump test')),
+                    _NavRow(label: 'Create chat group', onTap: () => _toast('Create chat group')),
+                    _NavRow(label: 'Message push banner', onTap: () => _toast('Message push banner')),
+                    _NavRow(label: 'Test push', onTap: () => _toast('Test push')),
+                    _NavRow(label: 'Global popup', onTap: () => _toast('Global popup')),
+                    _NavRow(label: 'Global floating banner', onTap: () => _toast('Global floating banner')),
+                    _NavRow(label: 'Room entry banner', onTap: () => _toast('Room entry banner')),
+                    _NavRow(label: 'Test log upload', onTap: () => _toast('Test log upload')),
                   ],
                 ),
               ),
@@ -158,7 +158,7 @@ class _DebugAppBar extends StatelessWidget {
             ),
           ),
           const Text(
-            '调试页',
+            'Debug page',
             style: TextStyle(
               color: Colors.black,
               fontSize: 18,

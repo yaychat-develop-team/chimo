@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../models/me_models.dart';
 
-/// Quick Access：标题 + 四列网格，图标 42×42。
+/// Quick Access: title + 4-column grid, 42×42 icons.
 class MeQuickAccessSection extends StatelessWidget {
   const MeQuickAccessSection({
     super.key,
@@ -42,7 +42,7 @@ class MeQuickAccessSection extends StatelessWidget {
             crossAxisCount: 4,
             mainAxisSpacing: 16,
             crossAxisSpacing: 8,
-            // 42 图标 + 间距 + 18 文案
+            // 42 icon + spacing + 18 label
             childAspectRatio: 0.85,
           ),
           itemBuilder: (context, index) {

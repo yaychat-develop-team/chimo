@@ -7,7 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/center_toast.dart';
 import '../models/me_models.dart';
 
-/// 头像在上；下一行左右布局：左=网名+ID，右=My Profile。
+/// Avatar on top; row below: left = name + ID, right = My Profile.
 class MeProfileHeader extends StatelessWidget {
   const MeProfileHeader({
     super.key,

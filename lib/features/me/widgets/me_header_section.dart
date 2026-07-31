@@ -7,9 +7,9 @@ import '../models/me_models.dart';
 import 'me_profile_header.dart';
 import 'me_stats_row.dart';
 
-/// 「我的」页头部整块：气泡背景 + 弧形深色面板 + 头像资料 + 统计。
+/// Me page header: bubble bg, curved panel, avatar, stats.
 ///
-/// 弧线按设计稿：从左侧起，绕过头像底部下凹，再向右轻微下斜。
+/// Curve per design: dips under avatar, then slopes down right.
 class MeHeaderSection extends StatelessWidget {
   const MeHeaderSection({
     super.key,
@@ -25,13 +25,13 @@ class MeHeaderSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 头像大部分压在气泡区，底部落入弧线下凹处。
+    // Avatar overlaps bubble; bottom sits in curve dip.
     const avatarTop = _bubbleHeight - _avatarSize * 0.72;
 
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        // 气泡插画（已裁掉资源自带锯齿深色底）
+        // Bubble illustration (asset jagged bottom cropped)
         SizedBox(
           height: _bubbleHeight + 100,
           width: double.infinity,
@@ -41,7 +41,7 @@ class MeHeaderSection extends StatelessWidget {
             alignment: Alignment.topCenter,
           ),
         ),
-        // 平滑弧形深色面板
+        // Smooth curved dark panel
         Padding(
           padding: const EdgeInsets.only(top: _bubbleHeight * 0.42),
           child: ClipPath(
@@ -59,7 +59,7 @@ class MeHeaderSection extends StatelessWidget {
             ),
           ),
         ),
-        // 头像 + 昵称
+        // Avatar + nickname
         Positioned(
           top: avatarTop,
           left: 0,
@@ -71,7 +71,7 @@ class MeHeaderSection extends StatelessWidget {
   }
 }
 
-/// 设计稿弧线：绕过头像底部下凹，再向右轻微下斜。
+/// Design curve: dips under avatar, then slopes down right.
 class _MePanelCurveClipper extends CustomClipper<Path> {
   const _MePanelCurveClipper();
 
@@ -81,9 +81,9 @@ class _MePanelCurveClipper extends CustomClipper<Path> {
     final h = size.height;
     final path = Path();
 
-    // 左侧起点（相对较高）
+    // Left start (relatively high)
     path.moveTo(0, h * 0.16);
-    // 进入头像左侧
+    // Into left side of avatar
     path.cubicTo(
       w * 0.04,
       h * 0.16,
@@ -92,7 +92,7 @@ class _MePanelCurveClipper extends CustomClipper<Path> {
       w * 0.12,
       h * 0.28,
     );
-    // 绕过头像底部的深凹
+    // Deep dip under avatar bottom
     path.cubicTo(
       w * 0.18,
       h * 0.48,
@@ -101,7 +101,7 @@ class _MePanelCurveClipper extends CustomClipper<Path> {
       w * 0.38,
       h * 0.30,
     );
-    // 头像右侧抬起后向右缓降
+    // Rise past avatar right, then slope down
     path.cubicTo(
       w * 0.48,
       h * 0.14,

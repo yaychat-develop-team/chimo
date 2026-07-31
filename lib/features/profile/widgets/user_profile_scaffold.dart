@@ -9,7 +9,7 @@ import '../../../core/constants/app_assets.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/center_toast.dart';
 
-/// Flavor 标签（emoji + 文案）。
+/// Flavor tag (emoji + label).
 class ProfileFlavorTag {
   const ProfileFlavorTag({required this.label, this.emoji = ''});
 
@@ -25,7 +25,7 @@ class ProfileFlavorTag {
   ];
 }
 
-/// 个人 / 他人主页共享壳：背景、信息区、Moments、Flavor、Gift Wall；底栏由调用方注入。
+/// Shared shell for own / other profiles: background, info, Moments, Flavor, Gift Wall; caller supplies bottom bar.
 class UserProfileScaffold extends StatelessWidget {
   const UserProfileScaffold({
     super.key,
@@ -57,7 +57,7 @@ class UserProfileScaffold extends StatelessWidget {
   final int level;
   final String bio;
 
-  /// 与编辑资料 Voice Note 一致；无录音时不展示播放条。
+  /// Matches Edit Profile Voice Note; hides player when no recording.
   final int? voiceSeconds;
   final List<String> momentAssets;
   final List<ProfileFlavorTag> flavors;
@@ -366,7 +366,7 @@ class UserProfileScaffold extends StatelessWidget {
   }
 }
 
-/// 主色实心底栏按钮（Edit Profile / Follow / Chat）。
+/// Primary solid bottom-bar button (Edit Profile / Follow / Chat).
 class ProfilePrimaryAction extends StatelessWidget {
   const ProfilePrimaryAction({
     super.key,
@@ -401,7 +401,7 @@ class ProfilePrimaryAction extends StatelessWidget {
   }
 }
 
-/// 描边底栏按钮。
+/// Outlined bottom-bar button.
 class ProfileOutlineAction extends StatelessWidget {
   const ProfileOutlineAction({
     super.key,
@@ -436,7 +436,7 @@ class ProfileOutlineAction extends StatelessWidget {
   }
 }
 
-/// 礼物圆形按钮。
+/// Circular gift button.
 class ProfileGiftAction extends StatelessWidget {
   const ProfileGiftAction({super.key, required this.onTap});
 
@@ -507,7 +507,7 @@ class _ProfileChip extends StatelessWidget {
   }
 }
 
-/// 个人主页语音条：静态 [AppAssets.voiceWaveLine]，播放中切换为动态波形。
+/// Profile voice bar: static [AppAssets.voiceWaveLine]; switches to animated wave while playing.
 class _VoiceCard extends StatefulWidget {
   const _VoiceCard({required this.seconds});
 
@@ -657,7 +657,7 @@ class _VoiceCardState extends State<_VoiceCard>
   }
 }
 
-/// 播放中动态波形：大部分保持水平线，仅一小段脉冲左右游走。
+/// Animated wave while playing: mostly flat line with a short pulse moving left/right.
 class _AnimatedVoiceWave extends StatelessWidget {
   const _AnimatedVoiceWave({required this.animation});
 

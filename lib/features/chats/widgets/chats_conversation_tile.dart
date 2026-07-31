@@ -4,9 +4,9 @@ import '../../../core/constants/app_assets.dart';
 import '../../../core/theme/app_colors.dart';
 import '../models/chat_conversation.dart';
 
-/// 会话列表单行：胶囊卡片、标签、在线点、未读数，支持左滑置顶/删除。
+/// List row: pill card, badge, online dot, unread; swipe to pin/delete.
 ///
-/// [openSwipeId] 由列表页共享：同一时间只允许一条会话保持左滑展开。
+/// [openSwipeId] shared by list: only one row swipe-open at a time.
 class ChatsConversationTile extends StatefulWidget {
   const ChatsConversationTile({
     super.key,
@@ -20,12 +20,12 @@ class ChatsConversationTile extends StatefulWidget {
 
   final ChatConversation conversation;
 
-  /// 当前左滑展开的会话 id；`null` 表示全部收起。
+  /// Id of swipe-open row; `null` means all closed.
   final ValueNotifier<String?> openSwipeId;
 
   final VoidCallback? onTap;
 
-  /// 点击头像（私聊进个人主页；与 [onTap] 互斥）。
+  /// Avatar tap (DM → profile; mutually exclusive with [onTap]).
   final VoidCallback? onAvatarTap;
   final VoidCallback? onPin;
   final VoidCallback? onDelete;
@@ -35,10 +35,10 @@ class ChatsConversationTile extends StatefulWidget {
 }
 
 class _ChatsConversationTileState extends State<ChatsConversationTile> {
-  /// 左滑露出操作区的偏移（负值向左）。
+  /// Swipe offset exposing actions (negative = left).
   double _dragOffset = 0;
 
-  /// 操作区宽度（两个圆按钮 + 间距）。
+  /// Action strip width (two round buttons + spacing).
   static const double _actionsWidth = 112;
 
   String get _id => widget.conversation.id;
@@ -64,7 +64,7 @@ class _ChatsConversationTileState extends State<ChatsConversationTile> {
     super.dispose();
   }
 
-  /// 其它行开始左滑时，收起本行。
+  /// Collapse this row when another starts swiping.
   void _onOpenSwipeChanged() {
     final openId = widget.openSwipeId.value;
     if (openId != _id && _dragOffset != 0) {
@@ -92,7 +92,7 @@ class _ChatsConversationTileState extends State<ChatsConversationTile> {
   }
 
   void _onDragEnd(DragEndDetails details) {
-    // 超过一半则展开，否则回弹。
+    // Past halfway: snap open; else spring back.
     final next = _dragOffset < -_actionsWidth / 2 ? -_actionsWidth : 0.0;
     setState(() => _dragOffset = next);
     if (next == 0) {
@@ -117,7 +117,7 @@ class _ChatsConversationTileState extends State<ChatsConversationTile> {
         height: 76,
         child: Stack(
           children: [
-            // 底层：置顶 / 删除
+            // Back layer: pin / delete
             Positioned.fill(
               child: Align(
                 alignment: Alignment.centerRight,
@@ -146,7 +146,7 @@ class _ChatsConversationTileState extends State<ChatsConversationTile> {
                 ),
               ),
             ),
-            // 上层：可拖动的会话卡片
+            // Front layer: draggable conversation card
             AnimatedPositioned(
               duration: const Duration(milliseconds: 160),
               curve: Curves.easeOut,
@@ -168,7 +168,7 @@ class _ChatsConversationTileState extends State<ChatsConversationTile> {
                   color: const Color(0xFF161616),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(28),
-                    // 置顶：亮绿色描边
+                    // Pinned: bright green border
                     side: conversation.isPinned
                         ? const BorderSide(
                             color: Color(0xFF1CFF8A),
@@ -269,7 +269,7 @@ class _ChatsConversationTileState extends State<ChatsConversationTile> {
   }
 }
 
-/// 头像：私聊圆形，小组圆角方形；可选右下角在线绿点。
+/// Avatar: circle for DM, rounded square for group; optional online dot.
 class _Avatar extends StatelessWidget {
   const _Avatar({
     required this.asset,
@@ -326,7 +326,7 @@ class _Avatar extends StatelessWidget {
   }
 }
 
-/// 名称旁标签：认证勾 / Group / Soulmate。
+/// Title badge: verified / Group / Soulmate.
 class _TitleBadge extends StatelessWidget {
   const _TitleBadge({required this.type});
 
@@ -359,7 +359,7 @@ class _TitleBadge extends StatelessWidget {
   }
 }
 
-/// 红色未读数角标。
+/// Red unread count badge.
 class _UnreadBadge extends StatelessWidget {
   const _UnreadBadge({required this.count});
 
@@ -388,7 +388,7 @@ class _UnreadBadge extends StatelessWidget {
   }
 }
 
-/// 左滑操作圆按钮：优先使用设计稿资源图（自带圆形底），否则用纯色 + Icon。
+/// Swipe action circle: prefer design asset (built-in circle), else solid color + Icon.
 class _ActionCircle extends StatelessWidget {
   const _ActionCircle({
     this.color,

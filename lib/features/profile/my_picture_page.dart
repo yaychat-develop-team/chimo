@@ -6,7 +6,7 @@ import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
 import 'photo_pick_sheet.dart';
 
-/// 头像大图预览页。
+/// Full-size avatar preview page.
 class MyPicturePage extends StatelessWidget {
   const MyPicturePage({super.key, required this.avatarAsset});
 

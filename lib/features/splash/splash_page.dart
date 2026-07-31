@@ -2,18 +2,20 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/auth/auth_session.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
 import '../auth/login_page.dart';
+import '../shell/main_tab_shell.dart';
 
-/// 应用启动页：`launch_bg` + 底部 slogan，随后进入登录页。
+/// App launch screen: launch_bg + bottom slogan, then login or main.
 class SplashPage extends StatefulWidget {
   const SplashPage({
     super.key,
     this.displayDuration = const Duration(milliseconds: 1800),
   });
 
-  /// 展示时长（结束后跳转登录）。
+  /// Display duration (navigates when elapsed).
   final Duration displayDuration;
 
   @override
@@ -26,7 +28,7 @@ class _SplashPageState extends State<SplashPage> {
   @override
   void initState() {
     super.initState();
-    _timer = Timer(widget.displayDuration, _goLogin);
+    _timer = Timer(widget.displayDuration, _goNext);
   }
 
   @override
@@ -35,11 +37,14 @@ class _SplashPageState extends State<SplashPage> {
     super.dispose();
   }
 
-  void _goLogin() {
+  Future<void> _goNext() async {
+    if (!mounted) return;
+    final loggedIn = await AuthSession.isLoggedIn();
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
       PageRouteBuilder<void>(
-        pageBuilder: (_, _, _) => const LoginPage(),
+        pageBuilder: (_, _, _) =>
+            loggedIn ? const MainTabShell() : const LoginPage(),
         transitionsBuilder: (_, animation, _, child) {
           return FadeTransition(opacity: animation, child: child);
         },
@@ -55,13 +60,13 @@ class _SplashPageState extends State<SplashPage> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // 背景图底部自带 “Chimo” 字标；向上对齐，给 slogan 留出底部空间。
+          // Background includes "Chimo" wordmark at bottom; align upward to leave room for slogan.
           Image.asset(
             AppAssets.launchBg,
             fit: BoxFit.cover,
             alignment: const Alignment(0, -0.45),
           ),
-          // 底部渐变遮罩，避免背景字标与 slogan 抢同一行。
+          // Bottom gradient mask so wordmark and slogan don't clash.
           const Align(
             alignment: Alignment.bottomCenter,
             child: DecoratedBox(

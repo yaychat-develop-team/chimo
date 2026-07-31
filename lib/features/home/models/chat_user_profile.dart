@@ -1,7 +1,7 @@
 import '../../../core/constants/app_assets.dart';
 import '../data/group_members_mock_data.dart';
 
-/// 聊天场景中对方用户资料（头像弹窗）。
+/// Other user's profile in chat (avatar sheet).
 class ChatUserProfile {
   const ChatUserProfile({
     required this.id,
@@ -29,7 +29,7 @@ class ChatUserProfile {
   final int level;
   final String bio;
 
-  /// 语音签名秒数（与编辑资料 Voice Note 同源）；无录音则为 null。
+  /// Voice note duration in seconds (same source as Edit Profile); null if none.
   final int? voiceSeconds;
   final int giftUnlocked;
   final int giftTotal;
@@ -40,7 +40,7 @@ class ChatUserProfile {
     AppAssets.homeRoomBg,
   ];
 
-  /// 设计稿示例用户。
+  /// Sample user from the design spec.
   static const ChatUserProfile elita = ChatUserProfile(
     id: 'elita',
     nickname: 'Elita 💃',

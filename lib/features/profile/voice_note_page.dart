@@ -9,7 +9,7 @@ import '../../core/constants/app_assets.dart';
 
 enum _VoicePhase { idle, recording, preview }
 
-/// 语音签名录制页（UI 模拟）。
+/// Voice signature recording page (UI mock).
 class VoiceNotePage extends StatefulWidget {
   const VoiceNotePage({super.key});
 

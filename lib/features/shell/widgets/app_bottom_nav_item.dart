@@ -5,7 +5,7 @@ import '../models/app_bottom_nav_destination.dart';
 import '../models/main_tab.dart';
 import 'main_tab_icons.dart';
 
-/// 底部导航单项：图标 30×30 + 下方文案约 15 高。
+/// Single bottom nav item: 30×30 icon + ~15pt label below.
 class AppBottomNavItem extends StatelessWidget {
   const AppBottomNavItem({
     super.key,
@@ -18,7 +18,7 @@ class AppBottomNavItem extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
-  /// 设计稿选中绿（与 tab_*_select 资源一致）。
+  /// Selected green from design (matches tab_*_select assets).
   static const Color _selectedGreen = Color(0xFF1CFF8A);
 
   @override

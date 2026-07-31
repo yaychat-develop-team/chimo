@@ -1,9 +1,9 @@
 import '../models/group_item.dart';
 import '../../../core/constants/app_assets.dart';
 
-/// 首页临时 Mock 数据（头像暂用占位图，后续接接口）。
+/// Temporary home mock data (placeholder avatars; API to follow).
 abstract final class HomeMockData {
-  /// 「热门小组」纵向列表。
+  /// Vertical list of popular groups.
   static const List<PopularGroupItem> popularGroups = [
     PopularGroupItem(
       id: 'teachers',
@@ -37,7 +37,7 @@ abstract final class HomeMockData {
     ),
   ];
 
-  /// 「已加入群组」完整列表（My Groups → More）。
+  /// Full joined-groups list (My Groups → More).
   static const List<PopularGroupItem> joinedGroups = [
     PopularGroupItem(
       id: 'green',
@@ -108,7 +108,7 @@ abstract final class HomeMockData {
     ),
   ];
 
-  /// 根据 id / 名称解析详情页所需的完整小组数据。
+  /// Resolve full group data for the details page by id or name.
   static PopularGroupItem resolveGroup({String? id, String? name}) {
     for (final group in [...joinedGroups, ...popularGroups]) {
       if (id != null && group.id == id) return group;

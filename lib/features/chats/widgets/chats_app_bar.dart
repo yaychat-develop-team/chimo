@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/app_assets.dart';
 import '../../../core/theme/app_colors.dart';
 
-/// 消息页顶栏：左侧标题（带绿色浪线）+ 右侧通讯录 / 搜索。
+/// Chats app bar: title with green underline + contacts/search.
 class ChatsAppBar extends StatelessWidget {
   const ChatsAppBar({super.key, this.onContactsTap, this.onSearchTap});
 
@@ -57,7 +57,7 @@ class ChatsAppBar extends StatelessWidget {
   }
 }
 
-/// 顶栏右侧圆角图标按钮（资源图）。
+/// Rounded icon button on app bar right (asset image).
 class _HeaderIconButton extends StatelessWidget {
   const _HeaderIconButton({
     required this.asset,

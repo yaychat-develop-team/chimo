@@ -5,7 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../models/group_item.dart';
 import 'group_level_badge.dart';
 
-/// 已加入群组列表卡片（设计稿：343×148，头像 72，内边距 12）。
+/// Joined group list card (design: 343×148, avatar 72, padding 12).
 class JoinedGroupCard extends StatelessWidget {
   const JoinedGroupCard({
     super.key,

@@ -4,7 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
 
-/// 举报页：选择类型、上传凭证图、填写反馈。
+/// Report page: pick type, upload proof images, enter feedback.
 class ReportPage extends StatefulWidget {
   const ReportPage({super.key});
 
@@ -37,7 +37,7 @@ class _ReportPageState extends State<ReportPage> {
 
   void _addImage() {
     if (_images.length >= _maxImages) return;
-    // UI 演示：用色块占位，后续可接相册选择。
+    // UI demo: color blocks as placeholders; hook up gallery picker later.
     const palette = [
       Color(0xFF3A3A3C),
       Color(0xFF2C3A34),

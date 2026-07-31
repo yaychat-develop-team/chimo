@@ -1,7 +1,7 @@
 import '../../../core/constants/app_assets.dart';
 import '../models/chat_conversation.dart';
 
-/// 消息列表 Mock：含私聊示例；小组会话仍由加入动作写入。
+/// Chats list mock: includes DM samples; group chats added on join.
 abstract final class ChatsMockData {
   static const List<ChatConversation> conversations = [
     ChatConversation(

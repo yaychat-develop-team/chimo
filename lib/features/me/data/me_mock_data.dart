@@ -1,7 +1,7 @@
 import '../models/me_models.dart';
 import '../../../core/constants/app_assets.dart';
 
-/// 个人中心 Mock 数据（后续可替换为接口）。
+/// Me page mock data (replace with API later).
 abstract final class MeMockData {
   static const MeProfile profile = MeProfile(
     displayName: 'Seraphina',
@@ -13,7 +13,7 @@ abstract final class MeMockData {
     visitors: 88000,
   );
 
-  /// 社交数据展示列表（已格式化）。
+  /// Social stats display list (formatted).
   static const List<MeStatItem> stats = [
     MeStatItem(label: 'Friends', value: '208'),
     MeStatItem(label: 'Fans', value: '88K'),
@@ -21,7 +21,7 @@ abstract final class MeMockData {
     MeStatItem(label: 'Visitors', value: '88K'),
   ];
 
-  /// Quick Access 菜单项（对齐设计稿 6 项）。
+  /// Quick Access menu items (6 per design).
   static const List<QuickAccessItem> quickAccess = [
     QuickAccessItem(
       id: 'debug',

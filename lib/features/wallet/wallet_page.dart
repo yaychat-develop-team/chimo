@@ -4,7 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
 
-/// 充值档位。
+/// Recharge tier option.
 class _RechargeOption {
   const _RechargeOption({required this.coins, required this.price});
 
@@ -14,7 +14,7 @@ class _RechargeOption {
   String get priceLabel => '\$${price.toStringAsFixed(2)}';
 }
 
-/// 我的钱包：余额卡片 + 充值档位 + Top Up。
+/// My wallet: balance card + recharge tiers + Top Up.
 class WalletPage extends StatefulWidget {
   const WalletPage({super.key, this.balance = 876684});
 

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_assets.dart';
 
-/// 消息列表上方引导图；右侧关闭热区对应切图上的 ×。
+/// Promo banner above list; close hit area matches × on asset.
 class ChatsPromoBanner extends StatelessWidget {
   const ChatsPromoBanner({
     super.key,
@@ -27,7 +27,7 @@ class ChatsPromoBanner extends StatelessWidget {
               fit: BoxFit.fitWidth,
             ),
           ),
-          // 切图右侧已有 ×，这里只做透明点击区域。
+          // Asset includes × on the right; transparent tap target only.
           Positioned(
             top: 0,
             right: 0,

@@ -16,7 +16,7 @@ import 'widgets/chat_user_profile_sheet.dart';
 import 'widgets/group_level_badge.dart';
 import 'widgets/group_members_sheet.dart';
 
-/// 小组聊天页：未加入 = 限看 + Join；已加入 = 消息流 + 输入栏。
+/// Group chat page: not joined = limited view + Join; joined = messages + input.
 class GroupDetailsPage extends StatefulWidget {
   const GroupDetailsPage({
     super.key,
@@ -27,10 +27,10 @@ class GroupDetailsPage extends StatefulWidget {
 
   final PopularGroupItem group;
 
-  /// 加入时写入消息会话；退出只改成员身份，不删会话。
+  /// On join, add chat session; on leave, update membership only, keep session.
   final ChatsListController? chatsController;
 
-  /// 加入状态变化回调（同步首页「我的小组」）。
+  /// Join-state callback (syncs home My Groups).
   final ValueChanged<bool>? onMembershipChanged;
 
   @override
@@ -73,7 +73,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
   void _leave() {
     if (!_isJoined) return;
     setState(() => _isJoined = false);
-    // 退出小组不删除消息会话。
+    // Leaving a group does not delete the chat session.
     widget.chatsController?.leaveGroup(_group.id);
     widget.onMembershipChanged?.call(false);
     Navigator.of(context).pop();
@@ -87,7 +87,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
       _tabIndex = 0;
     });
     _inputController.clear();
-    // 左滑删除后，有新消息则会话重新出现在消息列表。
+    // After swipe-delete, a new message brings the session back to the list.
     widget.chatsController?.onNewMessage(
       id: _group.id,
       title: _group.name,
@@ -335,7 +335,7 @@ class _DetailsAppBar extends StatelessWidget {
   }
 }
 
-/// 简介展开 / 收起胶囊；加入后使用深绿底 + 亮绿字。
+/// Description expand/collapse chip; joined style uses dark green bg + bright green text.
 class _DescToggleChip extends StatelessWidget {
   const _DescToggleChip({
     required this.expanded,
@@ -388,7 +388,7 @@ class _DescToggleChip extends StatelessWidget {
   }
 }
 
-/// 已加入小组：右上角更多弹层（Report / Leave Group）。
+/// Joined group: top-right more sheet (Report / Leave Group).
 class _GroupMoreSheet extends StatelessWidget {
   const _GroupMoreSheet({required this.showLeave});
 
@@ -469,7 +469,7 @@ class _MoreActionTile extends StatelessWidget {
   }
 }
 
-/// 退出小组二次确认。
+/// Leave group confirmation dialog.
 class _LeaveGroupDialog extends StatelessWidget {
   const _LeaveGroupDialog();
 
@@ -717,7 +717,7 @@ class _ProfileHeader extends StatelessWidget {
 class _MemberLimitBanner extends StatelessWidget {
   const _MemberLimitBanner();
 
-  /// 与白底圆角面板背后露色一致。
+  /// Matches the color peeking behind the white rounded panel.
   static const Color color = Color(0xFF1A3A28);
 
   @override
@@ -1045,7 +1045,7 @@ class _PeerMessageBubble extends StatelessWidget {
   }
 }
 
-/// 未加入小组时：图片消息模糊锁定 + Join to view。
+/// Not joined: blurred locked image message + Join to view.
 class _PeerLockedImageBubble extends StatelessWidget {
   const _PeerLockedImageBubble({
     required this.profile,
@@ -1481,7 +1481,7 @@ class _ChatInputBar extends StatefulWidget {
 }
 
 class _ChatInputBarState extends State<_ChatInputBar> {
-  /// 黑底灰线素材：用亮度作透明度，避免 `color` 把黑底染成实心块。
+  /// Black-bg gray-line asset: use luminance as alpha so `color` won't fill black as solid.
   static const ColorFilter _iconFilter = ColorFilter.matrix(<double>[
     0, 0, 0, 0, 90,
     0, 0, 0, 0, 90,

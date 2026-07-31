@@ -3,10 +3,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:chimo/app/chimo_app.dart';
 
 void main() {
-  /// 冒烟测试：启动页结束后首页应渲染主要区块标题。
+  /// Smoke test: after splash, home should render main section titles.
   testWidgets('Home tab renders brand and sections', (tester) async {
     await tester.pumpWidget(const ChimoApp());
-    // 越过 Splash 展示时长。
+    // Skip past the splash display duration.
     await tester.pump(const Duration(milliseconds: 1800));
     await tester.pumpAndSettle();
 
