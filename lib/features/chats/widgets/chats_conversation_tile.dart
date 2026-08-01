@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_assets.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_asset_image.dart';
 import '../models/chat_conversation.dart';
 
 /// List row: pill card, badge, online dot, unread; swipe to pin/delete.
+/// Spec from Figma 39:428 — height 72, radius 36, avatar 54.
 ///
 /// [openSwipeId] shared by list: only one row swipe-open at a time.
 class ChatsConversationTile extends StatefulWidget {
@@ -38,8 +40,8 @@ class _ChatsConversationTileState extends State<ChatsConversationTile> {
   /// Swipe offset exposing actions (negative = left).
   double _dragOffset = 0;
 
-  /// Action strip width (two round buttons + spacing).
-  static const double _actionsWidth = 112;
+  /// Action strip width (two 36 buttons + gaps; Figma ~52px exposed).
+  static const double _actionsWidth = 100;
 
   String get _id => widget.conversation.id;
 
@@ -92,7 +94,6 @@ class _ChatsConversationTileState extends State<ChatsConversationTile> {
   }
 
   void _onDragEnd(DragEndDetails details) {
-    // Past halfway: snap open; else spring back.
     final next = _dragOffset < -_actionsWidth / 2 ? -_actionsWidth : 0.0;
     setState(() => _dragOffset = next);
     if (next == 0) {
@@ -107,6 +108,11 @@ class _ChatsConversationTileState extends State<ChatsConversationTile> {
     _releaseOpen();
   }
 
+  bool get _useBrandTitle {
+    final c = widget.conversation;
+    return c.badge == ChatBadgeType.verified || c.titleColor != null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final conversation = widget.conversation;
@@ -114,10 +120,9 @@ class _ChatsConversationTileState extends State<ChatsConversationTile> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
       child: SizedBox(
-        height: 76,
+        height: 72,
         child: Stack(
           children: [
-            // Back layer: pin / delete
             Positioned.fill(
               child: Align(
                 alignment: Alignment.centerRight,
@@ -128,25 +133,25 @@ class _ChatsConversationTileState extends State<ChatsConversationTile> {
                       asset: conversation.isPinned
                           ? AppAssets.msgUnpin
                           : AppAssets.msgPin,
+                      // Pin SVG already includes the 36 circle; unpin.webp needs a fill.
+                      wrapInCircle: conversation.isPinned,
                       onTap: () {
                         _close();
                         widget.onPin?.call();
                       },
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 16),
                     _ActionCircle(
-                      asset: AppAssets.msgDelete,
+                      asset: AppAssets.msgSwipeDelete,
                       onTap: () {
                         _close();
                         widget.onDelete?.call();
                       },
                     ),
-                    const SizedBox(width: 4),
                   ],
                 ),
               ),
             ),
-            // Front layer: draggable conversation card
             AnimatedPositioned(
               duration: const Duration(milliseconds: 160),
               curve: Curves.easeOut,
@@ -165,98 +170,101 @@ class _ChatsConversationTileState extends State<ChatsConversationTile> {
                   }
                 },
                 child: Material(
-                  color: const Color(0xFF161616),
+                  // Opaque surface under the 8% white fill so swipe actions
+                  // stay hidden until the row is dragged open.
+                  color: AppColors.surface,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(28),
-                    // Pinned: bright green border
+                    borderRadius: BorderRadius.circular(36),
                     side: conversation.isPinned
                         ? const BorderSide(
-                            color: Color(0xFF1CFF8A),
+                            color: AppColors.accentLime,
                             width: 1.5,
                           )
                         : BorderSide.none,
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 12, 14, 12),
-                    child: Row(
-                      children: [
-                        GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: () {
-                            if (_dragOffset != 0) {
-                              _close();
-                              return;
-                            }
-                            if (widget.onAvatarTap != null) {
-                              widget.onAvatarTap!();
-                            } else {
-                              widget.onTap?.call();
-                            }
-                          },
-                          child: _Avatar(
-                            asset: conversation.avatarAsset,
-                            isOnline: conversation.isOnline,
-                            isGroup: conversation.badge == ChatBadgeType.group,
+                  child: Ink(
+                    decoration: BoxDecoration(
+                      color: AppColors.chatsRowFill,
+                      borderRadius: BorderRadius.circular(36),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(10, 9, 16, 9),
+                      child: Row(
+                        children: [
+                          GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () {
+                              if (_dragOffset != 0) {
+                                _close();
+                                return;
+                              }
+                              if (widget.onAvatarTap != null) {
+                                widget.onAvatarTap!();
+                              } else {
+                                widget.onTap?.call();
+                              }
+                            },
+                            child: _Avatar(
+                              asset: conversation.avatarAsset,
+                              isOnline: conversation.isOnline,
+                              isGroup: conversation.badge == ChatBadgeType.group,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Row(
-                                children: [
-                                  Flexible(
-                                    child: Text(
-                                      conversation.title,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        color: conversation.titleColor ??
-                                            AppColors.textPrimary,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w700,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Row(
+                                  children: [
+                                    Flexible(
+                                      child: _TitleText(
+                                        text: conversation.title,
+                                        useBrandGradient: _useBrandTitle,
+                                        solidColor: conversation.titleColor,
                                       ),
                                     ),
+                                    const SizedBox(width: 4),
+                                    _TitleBadge(type: conversation.badge),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  conversation.lastMessage,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: AppColors.textPreview,
+                                    fontSize: 13,
+                                    height: 1.2,
+                                    fontWeight: FontWeight.w400,
                                   ),
-                                  const SizedBox(width: 6),
-                                  _TitleBadge(type: conversation.badge),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
                               Text(
-                                conversation.lastMessage,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                                conversation.timeLabel,
                                 style: const TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 13,
-                                  height: 1.2,
+                                  color: AppColors.textTime,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w400,
                                 ),
                               ),
+                              if (conversation.unreadCount > 0) ...[
+                                const SizedBox(height: 6),
+                                _UnreadBadge(count: conversation.unreadCount),
+                              ],
                             ],
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              conversation.timeLabel,
-                              style: const TextStyle(
-                                color: AppColors.textTertiary,
-                                fontSize: 12,
-                              ),
-                            ),
-                            if (conversation.unreadCount > 0) ...[
-                              const SizedBox(height: 8),
-                              _UnreadBadge(count: conversation.unreadCount),
-                            ],
-                          ],
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -269,7 +277,50 @@ class _ChatsConversationTileState extends State<ChatsConversationTile> {
   }
 }
 
-/// Avatar: circle for DM, rounded square for group; optional online dot.
+/// Title: solid white / brand gradient for official accounts.
+class _TitleText extends StatelessWidget {
+  const _TitleText({
+    required this.text,
+    required this.useBrandGradient,
+    this.solidColor,
+  });
+
+  final String text;
+  final bool useBrandGradient;
+  final Color? solidColor;
+
+  static const _style = TextStyle(
+    fontSize: 16,
+    fontWeight: FontWeight.w700,
+    height: 1.2,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    if (!useBrandGradient) {
+      return Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: _style.copyWith(color: solidColor ?? AppColors.textPrimary),
+      );
+    }
+
+    return ShaderMask(
+      blendMode: BlendMode.srcIn,
+      shaderCallback: (bounds) =>
+          AppColors.brandTextGradient.createShader(bounds),
+      child: Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: _style.copyWith(color: Colors.white),
+      ),
+    );
+  }
+}
+
+/// Avatar: circle for DM, rounded square for group; online dot bottom-right.
 class _Avatar extends StatelessWidget {
   const _Avatar({
     required this.asset,
@@ -281,7 +332,7 @@ class _Avatar extends StatelessWidget {
   final bool isOnline;
   final bool isGroup;
 
-  static const double _size = 52;
+  static const double _size = 54;
   static const double _groupRadius = 12;
 
   @override
@@ -309,14 +360,17 @@ class _Avatar extends StatelessWidget {
           if (isOnline)
             Positioned(
               right: 0,
-              bottom: 0,
+              bottom: 2,
               child: Container(
-                width: 12,
-                height: 12,
+                width: 10,
+                height: 10,
                 decoration: BoxDecoration(
-                  color: AppColors.primaryBright,
+                  color: AppColors.onlineDot,
                   shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFF161616), width: 2),
+                  border: Border.all(
+                    color: AppColors.surface,
+                    width: 2,
+                  ),
                 ),
               ),
             ),
@@ -336,30 +390,27 @@ class _TitleBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     return switch (type) {
       ChatBadgeType.none => const SizedBox.shrink(),
-      ChatBadgeType.verified => const Icon(
-          Icons.verified_rounded,
-          size: 16,
-          color: AppColors.primaryBright,
+      ChatBadgeType.verified => const AppAssetImage(
+          AppAssets.chatVerified,
+          width: 16,
+          height: 16,
         ),
       ChatBadgeType.group => Image.asset(
           AppAssets.chatGroupTag,
           height: 16,
           fit: BoxFit.contain,
         ),
-      ChatBadgeType.soulmate => const Text(
-          'Soulmate',
-          style: TextStyle(
-            color: Color(0xFFFF6BA8),
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            fontStyle: FontStyle.italic,
-          ),
+      ChatBadgeType.soulmate => const AppAssetImage(
+          AppAssets.chatSoulmate,
+          width: 53,
+          height: 14,
+          fit: BoxFit.contain,
         ),
     };
   }
 }
 
-/// Red unread count badge.
+/// Red unread count badge (Figma: h16, r8, #FD4B4B, 11 SemiBold).
 class _UnreadBadge extends StatelessWidget {
   const _UnreadBadge({required this.count});
 
@@ -369,52 +420,75 @@ class _UnreadBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final label = count > 99 ? '99+' : '$count';
     return Container(
-      constraints: const BoxConstraints(minWidth: 20, minHeight: 18),
-      padding: const EdgeInsets.symmetric(horizontal: 6),
+      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 5),
       decoration: BoxDecoration(
         color: AppColors.badge,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
       ),
       alignment: Alignment.center,
       child: Text(
         label,
         style: const TextStyle(
           color: Colors.white,
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          height: 1,
         ),
       ),
     );
   }
 }
 
-/// Swipe action circle: prefer design asset (built-in circle), else solid color + Icon.
+/// Swipe action circle: prefer design asset (built-in circle).
 class _ActionCircle extends StatelessWidget {
   const _ActionCircle({
     this.color,
     this.icon,
     this.asset,
+    this.wrapInCircle = false,
     this.onTap,
   }) : assert(asset != null || (color != null && icon != null));
 
   final Color? color;
   final IconData? icon;
   final String? asset;
+  final bool wrapInCircle;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final child = asset != null
-        ? Image.asset(asset!, width: 44, height: 44, fit: BoxFit.contain)
-        : Material(
-            color: color,
-            shape: const CircleBorder(),
-            child: SizedBox(
-              width: 44,
-              height: 44,
-              child: Icon(icon, color: Colors.white, size: 22),
-            ),
-          );
+    Widget child;
+    if (asset != null) {
+      final image = AppAssetImage(
+        asset!,
+        width: wrapInCircle ? 18 : 36,
+        height: wrapInCircle ? 18 : 36,
+        fit: BoxFit.contain,
+      );
+      child = wrapInCircle
+          ? Container(
+              width: 36,
+              height: 36,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(
+                color: AppColors.chatsRowFill,
+                shape: BoxShape.circle,
+              ),
+              child: image,
+            )
+          : image;
+    } else {
+      child = Material(
+        color: color,
+        shape: const CircleBorder(),
+        child: SizedBox(
+          width: 36,
+          height: 36,
+          child: Icon(icon, color: Colors.white, size: 18),
+        ),
+      );
+    }
 
     return Material(
       color: Colors.transparent,

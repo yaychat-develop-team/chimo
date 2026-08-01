@@ -92,12 +92,7 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
       return;
     }
 
-    final confirmed = await AppTipDialog.show(
-      context,
-      title: 'Block this user?',
-      message: "You won't get any more messages from this user.",
-      confirmLabel: 'Block',
-    );
+    final confirmed = await AppTipDialog.confirmBlockUser(context);
     if (!mounted || !confirmed) return;
     setState(() {
       _blocked = true;
@@ -113,7 +108,7 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
           Expanded(
             child: ProfilePrimaryAction(label: 'Chat', onTap: _openChat),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           ProfileGiftAction(onTap: () => showGiftBottomSheet(context)),
         ],
       );
@@ -127,11 +122,11 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
             onTap: () => setState(() => _following = true),
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 10),
         Expanded(
           child: ProfileOutlineAction(label: 'Chat', onTap: _openChat),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 10),
         ProfileGiftAction(onTap: () => showGiftBottomSheet(context)),
       ],
     );
@@ -152,6 +147,7 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
       momentAssets: _profile.momentAssets,
       giftUnlocked: _profile.giftUnlocked,
       giftTotal: _profile.giftTotal,
+      inPartyName: 'Masquerade Ball',
       showMore: true,
       onMore: _openMoreMenu,
       bottomBar: _buildBottomBar(),

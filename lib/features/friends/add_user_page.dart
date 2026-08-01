@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/app_asset_image.dart';
 
 /// Add user page: search by User ID or nickname (messages search entry).
 class AddUserPage extends StatefulWidget {
@@ -82,7 +83,7 @@ class _AddUserPageState extends State<AddUserPage> {
                 ),
                 child: Row(
                   children: [
-                    Image.asset(
+                    const AppAssetImage(
                       AppAssets.msgSearch,
                       width: 18,
                       height: 18,

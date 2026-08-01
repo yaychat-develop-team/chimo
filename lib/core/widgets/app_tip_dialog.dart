@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
-/// Design Tip confirm dialog: white rounded card, Cancel / Confirm.
+/// Shared Tip confirm dialog: white rounded card, Cancel / Confirm.
+///
+/// Use [show] for one-off copy, or the named presets for common flows.
 class AppTipDialog extends StatelessWidget {
   const AppTipDialog({
     super.key,
@@ -36,8 +38,38 @@ class AppTipDialog extends StatelessWidget {
     return result ?? false;
   }
 
+  /// Chats list: swipe-delete conversation.
+  static Future<bool> confirmDeleteConversation(BuildContext context) {
+    return show(
+      context,
+      message: 'Are you sure you want to delete this conversation?',
+    );
+  }
+
+  /// DM / profile: block user.
+  static Future<bool> confirmBlockUser(BuildContext context) {
+    return show(
+      context,
+      title: 'Block this user?',
+      message: "You won't get any more messages from this user.",
+      confirmLabel: 'Block',
+    );
+  }
+
+  /// Group details: leave group.
+  static Future<bool> confirmLeaveGroup(BuildContext context) {
+    return show(
+      context,
+      title: 'Leave this Group?',
+      message: 'You will no longer receive updates.',
+      confirmLabel: 'Leave',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final hasMessage = message.trim().isNotEmpty;
+
     return Dialog(
       backgroundColor: Colors.white,
       elevation: 0,
@@ -58,17 +90,19 @@ class AppTipDialog extends StatelessWidget {
                 height: 1.2,
               ),
             ),
-            const SizedBox(height: 14),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Color(0xFF666666),
-                fontSize: 14,
-                fontWeight: FontWeight.w400,
-                height: 1.4,
+            if (hasMessage) ...[
+              const SizedBox(height: 14),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Color(0xFF666666),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
+                  height: 1.4,
+                ),
               ),
-            ),
+            ],
             const SizedBox(height: 22),
             Row(
               children: [

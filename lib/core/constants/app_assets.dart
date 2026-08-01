@@ -160,8 +160,8 @@ abstract final class AppAssets {
   // ---------- Messages / chat ----------
   static const String msgBg = homeTopBg;
   static const String msgEmpty = '$_forya/empty_no_msg.webp';
-  static const String msgContacts = '$_forya/home_address.webp';
-  static const String msgSearch = homeSearchBtn;
+  static const String msgContacts = '$_forya/chats_contacts.svg';
+  static const String msgSearch = '$_forya/chats_search.svg';
 
   /// Friends / follow empty-state illustration.
   static const String friendsEmpty = '$_forya/empty_no_data.webp';
@@ -169,7 +169,7 @@ abstract final class AppAssets {
   static const String emptyNoWifi = '$_forya/empty_no_wifi.webp';
 
   /// Chats app bar more.
-  static const String msgMore = homeSearchBtn;
+  static const String msgMore = msgSearch;
 
   /// Gender badge icons.
   static const String genderMan = '$_forya/man.webp';
@@ -181,36 +181,54 @@ abstract final class AppAssets {
   static const String genderMaleSelected = '$_forya/man_select.webp';
   static const String genderFemaleSelected = '$_forya/woman_select.webp';
 
-  /// Chats list top promo (includes close affordance).
+  /// Legacy full-bleed promo image (kept for fallbacks).
   static const String msgPromo = '$_forya/home_tips.webp';
   static const String msgPromoAlt = launchBg;
 
+  /// Chats promo banner illustrations (Figma 39:428).
+  static const String msgPromoHand = '$_forya/chats_promo_hand.png';
+  static const String msgPromoHi = '$_forya/chats_promo_hi.png';
+  static const String msgPromoClose = '$_forya/chats_promo_close.svg';
+
   /// Curve decoration under the Chats title.
-  static const String chatTitleTips = '$_forya/chat_tips.webp';
+  static const String chatTitleTips = '$_forya/chats_title_underline.svg';
 
-  /// Chats list swipe "Pin" icon.
-  static const String msgPin = '$_forya/pin.webp';
+  /// Official verified check beside title.
+  static const String chatVerified = '$_forya/chats_verified.svg';
 
-  /// Chats list swipe "Unpin" icon.
+  /// Soulmate script badge beside title.
+  static const String chatSoulmate = '$_forya/chats_soulmate.svg';
+
+  /// Chats list swipe "Pin" / "Unpin" / "Delete" (36 circle assets).
+  static const String msgPin = '$_forya/chats_swipe_pin.svg';
   static const String msgUnpin = '$_forya/unpin.webp';
+  static const String msgSwipeDelete = '$_forya/chats_swipe_delete.svg';
 
-  /// Chats list swipe "Delete" icon.
+  /// Generic delete icon (raster; used outside swipe actions).
   static const String msgDelete = '$_forya/delete_icon.webp';
 
-  /// Chat detail back icon.
+  /// Chat detail / global back icon.
   static const String chatBack = '$_forya/half_back.svg';
 
-  /// Chat input bar: voice / image / emoji / gift / Wish.
+  /// DM detail back (Figma 55:274).
+  static const String chatDmBack = '$_forya/chat_dm_back.svg';
+
+  /// DM more (⋯) in app bar.
+  static const String chatDmMore = '$_forya/chat_dm_more.svg';
+
+  /// Chat input bar: voice / image / emoji / gift / Wish (DM Figma).
   static const String inputVoice = '$_forya/input_voice.webp';
   static const String inputImage = '$_forya/input_img.webp';
+  /// Legacy emoji (group / non-DM); DM uses [chatDmEmoji].
   static const String inputEmoji = '$_forya/input_emoji.webp';
-  static const String chatVoice = '$_forya/chat_voice.webp';
-  static const String chatImg = '$_forya/chat_img.webp';
-  static const String chatGift = '$_forya/chat_gift.webp';
-  static const String chatWish = '$_forya/chat_wish.webp';
+  static const String chatDmEmoji = '$_forya/chat_dm_emoji.svg';
+  static const String chatVoice = '$_forya/chat_dm_tool_voice.svg';
+  static const String chatImg = '$_forya/chat_dm_tool_img.svg';
+  static const String chatGift = '$_forya/chat_dm_tool_gift.png';
+  static const String chatWish = '$_forya/chat_dm_tool_wish.svg';
 
-  /// Profile Gift button (same asset as chat gift).
-  static const String giftIcon = chatGift;
+  /// Profile Gift button (prefer dedicated asset if available).
+  static const String giftIcon = '$_forya/chat_gift.webp';
 
   /// Report / system message icons.
   static const String reportIcon = '$_forya/report_icon.webp';

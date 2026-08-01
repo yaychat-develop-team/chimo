@@ -3,12 +3,13 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../app/app_router.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
-import 'welcome_brand_page.dart';
 
-/// Registration finale: avatar + nickname.
+/// Registration finale: avatar + nickname (Figma 完善资料 — You're almost in!).
 class AlmostInPage extends StatefulWidget {
   const AlmostInPage({super.key});
 
@@ -43,16 +44,7 @@ class _AlmostInPageState extends State<AlmostInPage> {
       );
       return;
     }
-    Navigator.of(context).pushAndRemoveUntil(
-      PageRouteBuilder<void>(
-        pageBuilder: (_, _, _) => const WelcomeBrandPage(),
-        transitionsBuilder: (_, animation, _, child) {
-          return FadeTransition(opacity: animation, child: child);
-        },
-        transitionDuration: const Duration(milliseconds: 420),
-      ),
-      (_) => false,
-    );
+    context.go(AppRoutes.welcomeBrand);
   }
 
   @override
@@ -62,10 +54,10 @@ class _AlmostInPageState extends State<AlmostInPage> {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
-        backgroundColor: Colors.black,
+        backgroundColor: const Color(0xFF0A0A14),
         body: SafeArea(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(20, 8, 20, 16 + bottom),
+            padding: EdgeInsets.fromLTRB(30, 16, 30, 16 + bottom),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -78,13 +70,17 @@ class _AlmostInPageState extends State<AlmostInPage> {
                       onTap: () => Navigator.of(context).pop(),
                       borderRadius: BorderRadius.circular(12),
                       child: SizedBox(
-                        width: 40,
-                        height: 40,
+                        width: 36,
+                        height: 36,
                         child: Center(
                           child: SvgPicture.asset(
                             AppAssets.backArrow,
-                            width: 8,
-                            height: 14,
+                            width: 7,
+                            height: 12,
+                            colorFilter: const ColorFilter.mode(
+                              Colors.white,
+                              BlendMode.srcIn,
+                            ),
                           ),
                         ),
                       ),
@@ -96,64 +92,64 @@ class _AlmostInPageState extends State<AlmostInPage> {
                   "You're almost in!",
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 28,
+                    fontSize: 26,
                     fontWeight: FontWeight.w700,
-                    height: 1.2,
+                    height: 1.5,
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 4),
                 const Text(
                   'A great profile picture and nickname help you stand out.',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 15,
+                    fontSize: 14,
                     fontWeight: FontWeight.w400,
-                    height: 1.4,
+                    height: 1.5,
                   ),
                 ),
-                const SizedBox(height: 48),
+                const SizedBox(height: 40),
                 Center(
                   child: SizedBox(
-                    width: 128,
-                    height: 128,
+                    width: 112,
+                    height: 112,
                     child: Stack(
                       clipBehavior: Clip.none,
                       children: [
                         ClipOval(
                           child: Image.asset(
                             AppAssets.defaultAvatar,
-                            width: 128,
-                            height: 128,
+                            width: 112,
+                            height: 112,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Image.asset(
+                            errorBuilder: (_, _, _) => Image.asset(
                               AppAssets.friendsEmpty,
-                              width: 128,
-                              height: 128,
+                              width: 112,
+                              height: 112,
                               fit: BoxFit.cover,
                             ),
                           ),
                         ),
                         Positioned(
-                          right: -2,
-                          bottom: -2,
+                          right: 0,
+                          bottom: 0,
                           child: Image.asset(
                             AppAssets.cameraIcon,
-                            width: 36,
-                            height: 36,
+                            width: 32,
+                            height: 32,
                           ),
                         ),
                       ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 28),
+                const SizedBox(height: 36),
                 Container(
-                  height: 52,
+                  height: 54,
                   padding: const EdgeInsets.symmetric(horizontal: 18),
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: const Color(0xFF2A2A2A),
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(27),
                   ),
                   child: TextField(
                     controller: _nickController,
@@ -163,43 +159,50 @@ class _AlmostInPageState extends State<AlmostInPage> {
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
                     ),
-                    cursorColor: AppColors.primaryBright,
+                    cursorColor: AppColors.accentLime,
                     inputFormatters: [
                       LengthLimitingTextInputFormatter(20),
                     ],
                     decoration: const InputDecoration(
                       border: InputBorder.none,
                       isCollapsed: true,
-                      hintText: 'Nickname',
+                      hintText: 'Enter a nickname',
                       hintStyle: TextStyle(
                         color: Color(0xFF8A8A8A),
-                        fontSize: 16,
+                        fontSize: 14,
                       ),
                     ),
                   ),
                 ),
-                const Spacer(),
-                Material(
-                  color: AppColors.primaryBright,
-                  borderRadius: BorderRadius.circular(28),
-                  child: InkWell(
-                    onTap: _onLetsGo,
-                    borderRadius: BorderRadius.circular(28),
-                    child: const SizedBox(
-                      height: 54,
-                      child: Center(
-                        child: Text(
-                          "Let's Go!",
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontSize: 17,
-                            fontWeight: FontWeight.w700,
+                const SizedBox(height: 110),
+                Center(
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: _onLetsGo,
+                      borderRadius: BorderRadius.circular(27),
+                      child: Ink(
+                        width: 134,
+                        height: 54,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(27),
+                          gradient: AppColors.promoBannerGradient,
+                        ),
+                        child: const Center(
+                          child: Text(
+                            "Let's Go!",
+                            style: TextStyle(
+                              color: AppColors.promoText,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
                 ),
+                const Spacer(),
               ],
             ),
           ),

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../app/app_router.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
-import 'verification_code_page.dart';
 
 /// Phone login page (white background design).
 class PhoneLoginPage extends StatefulWidget {
@@ -48,11 +49,7 @@ class _PhoneLoginPageState extends State<PhoneLoginPage> {
       );
       return;
     }
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => VerificationCodePage(phone: _phone),
-      ),
-    );
+    context.push(AppRoutes.verifyPath(_phone));
   }
 
   @override

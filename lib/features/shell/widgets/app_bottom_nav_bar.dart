@@ -25,7 +25,7 @@ class AppBottomNavBar extends StatelessWidget {
     final bottomInset = MediaQuery.paddingOf(context).bottom;
 
     return ColoredBox(
-      color: const Color(0xFF121212),
+      color: const Color(0xFF1D1D1D),
       child: SizedBox(
         height: barHeight + bottomInset,
         child: Padding(

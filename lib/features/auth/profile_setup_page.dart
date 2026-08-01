@@ -1,14 +1,16 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../app/app_router.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
-import 'almost_in_page.dart';
 
 enum _Gender { male, female }
 
-/// Post-registration profile setup: gender + birthday.
+/// Post-registration profile setup: gender + birthday (Figma 完善资料).
 class ProfileSetupPage extends StatefulWidget {
   const ProfileSetupPage({super.key});
 
@@ -28,7 +30,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
     final y = d.year.toString().padLeft(4, '0');
     final m = d.month.toString().padLeft(2, '0');
     final day = d.day.toString().padLeft(2, '0');
-    return '$y-$m-$day';
+    return '$y / $m / $day';
   }
 
   Future<void> _pickBirthday() async {
@@ -63,7 +65,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                         child: const Text(
                           'Done',
                           style: TextStyle(
-                            color: AppColors.primaryBright,
+                            color: AppColors.accentLime,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -104,9 +106,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
 
   void _onNext() {
     if (!_canNext) return;
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const AlmostInPage()),
-    );
+    context.push(AppRoutes.almostIn);
   }
 
   @override
@@ -116,20 +116,27 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
-        backgroundColor: Colors.black,
+        backgroundColor: const Color(0xFF0A0A14),
         body: SafeArea(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(20, 28, 20, 16 + bottom),
+            padding: EdgeInsets.fromLTRB(30, 16, 30, 16 + bottom),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: _BackButton(
+                    onTap: () => Navigator.of(context).maybePop(),
+                  ),
+                ),
+                const SizedBox(height: 28),
                 const Text(
                   'Spice up your profile!',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 28,
+                    fontSize: 26,
                     fontWeight: FontWeight.w700,
-                    height: 1.2,
+                    height: 1.5,
                   ),
                 ),
                 const SizedBox(height: 36),
@@ -137,54 +144,50 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                   'Gender',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 16,
+                    fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 12),
                 Row(
                   children: [
-                    Expanded(
-                      child: _GenderCard(
-                        label: "I'm Male",
-                        image: _gender == _Gender.male
-                            ? AppAssets.genderMaleSelected
-                            : AppAssets.genderMaleImg,
-                        onTap: () => setState(() => _gender = _Gender.male),
-                      ),
+                    _GenderCard(
+                      label: "I'm male",
+                      image: _gender == _Gender.male
+                          ? AppAssets.genderMaleSelected
+                          : AppAssets.genderMaleImg,
+                      onTap: () => setState(() => _gender = _Gender.male),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _GenderCard(
-                        label: "I'm Female",
-                        image: _gender == _Gender.female
-                            ? AppAssets.genderFemaleSelected
-                            : AppAssets.genderFemaleImg,
-                        onTap: () => setState(() => _gender = _Gender.female),
-                      ),
+                    const SizedBox(width: 18),
+                    _GenderCard(
+                      label: "I'm female",
+                      image: _gender == _Gender.female
+                          ? AppAssets.genderFemaleSelected
+                          : AppAssets.genderFemaleImg,
+                      onTap: () => setState(() => _gender = _Gender.female),
                     ),
                   ],
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 36),
                 const Text(
                   "When's your birthday?",
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 16,
+                    fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 12),
                 Material(
                   color: const Color(0xFF2A2A2A),
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(27),
                   child: InkWell(
                     onTap: _pickBirthday,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(27),
                     child: SizedBox(
                       height: 54,
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 18),
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Align(
                           alignment: Alignment.centerLeft,
                           child: Text(
@@ -193,7 +196,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                               color: _birthday == null
                                   ? const Color(0xFF8A8A8A)
                                   : Colors.white,
-                              fontSize: 16,
+                              fontSize: 14,
                               fontWeight: FontWeight.w400,
                             ),
                           ),
@@ -202,33 +205,74 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                     ),
                   ),
                 ),
-                const Spacer(),
-                Material(
-                  color: _canNext
-                      ? AppColors.primaryBright
-                      : const Color(0xFF2A2A2A),
-                  borderRadius: BorderRadius.circular(28),
-                  child: InkWell(
-                    onTap: _canNext ? _onNext : null,
-                    borderRadius: BorderRadius.circular(28),
-                    child: SizedBox(
-                      height: 54,
-                      child: Center(
-                        child: Text(
-                          'Next',
-                          style: TextStyle(
-                            color: _canNext
-                                ? Colors.black
-                                : const Color(0xFF6E6E6E),
-                            fontSize: 17,
-                            fontWeight: FontWeight.w700,
+                const SizedBox(height: 60),
+                Center(
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: _canNext ? _onNext : null,
+                      borderRadius: BorderRadius.circular(27),
+                      child: Ink(
+                        width: 134,
+                        height: 54,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(27),
+                          gradient: _canNext
+                              ? AppColors.promoBannerGradient
+                              : null,
+                          color: _canNext ? null : const Color(0xFF2A2A2A),
+                        ),
+                        child: Center(
+                          child: Text(
+                            'Next',
+                            style: TextStyle(
+                              color: _canNext
+                                  ? AppColors.promoText
+                                  : const Color(0xFF6E6E6E),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
                 ),
+                const Spacer(),
               ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BackButton extends StatelessWidget {
+  const _BackButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: const Color(0xFF2A2A2A),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: SizedBox(
+          width: 36,
+          height: 36,
+          child: Center(
+            child: SvgPicture.asset(
+              AppAssets.backArrow,
+              width: 7,
+              height: 12,
+              colorFilter: const ColorFilter.mode(
+                Colors.white,
+                BlendMode.srcIn,
+              ),
             ),
           ),
         ),
@@ -252,15 +296,16 @@ class _GenderCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: AspectRatio(
-        aspectRatio: 1,
+      child: SizedBox(
+        width: 148,
+        height: 148,
         child: Stack(
           fit: StackFit.expand,
           children: [
             // Unselected: man_img / woman_img; selected: man_select / woman_select
             Image.asset(image, fit: BoxFit.contain),
             Positioned(
-              top: 14,
+              top: 6,
               left: 0,
               right: 0,
               child: Text(

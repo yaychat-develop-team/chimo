@@ -13,6 +13,7 @@ class PopularGroupCard extends StatelessWidget {
     this.onJoinTap,
     this.onTap,
     this.onMembersTap,
+    this.showJoinAction = true,
   });
 
   final PopularGroupItem group;
@@ -25,6 +26,9 @@ class PopularGroupCard extends StatelessWidget {
 
   /// Member count tap (opens member list).
   final VoidCallback? onMembersTap;
+
+  /// Home Popular list shows join control; My Groups list hides it.
+  final bool showJoinAction;
 
   static const double cardHeight = 148;
   static const double avatarSize = 72;
@@ -62,7 +66,7 @@ class PopularGroupCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Title row: name + level + join button
+                  // Title row: name + level + optional join button
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -86,20 +90,22 @@ class PopularGroupCard extends StatelessWidget {
                           ],
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      // Stop propagation to card onTap so Join doesn't open details.
-                      GestureDetector(
-                        onTap: onJoinTap,
-                        behavior: HitTestBehavior.opaque,
-                        child: Image.asset(
-                          group.isJoined
-                              ? AppAssets.homeJoined
-                              : AppAssets.homeJoin,
-                          width: 36,
-                          height: 36,
-                          fit: BoxFit.contain,
+                      if (showJoinAction) ...[
+                        const SizedBox(width: 8),
+                        // Stop propagation to card onTap so Join doesn't open details.
+                        GestureDetector(
+                          onTap: onJoinTap,
+                          behavior: HitTestBehavior.opaque,
+                          child: Image.asset(
+                            group.isJoined
+                                ? AppAssets.homeJoined
+                                : AppAssets.homeJoin,
+                            width: 36,
+                            height: 36,
+                            fit: BoxFit.contain,
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 6),

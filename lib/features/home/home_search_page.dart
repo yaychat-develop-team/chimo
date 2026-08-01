@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/app_asset_image.dart';
 import '../../core/widgets/center_toast.dart';
 import '../chats/chat_detail_page.dart';
 import '../chats/data/chats_list_controller.dart';
@@ -292,7 +293,7 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
                       ),
                       child: Row(
                         children: [
-                          Image.asset(
+                          const AppAssetImage(
                             AppAssets.msgSearch,
                             width: 16,
                             height: 16,

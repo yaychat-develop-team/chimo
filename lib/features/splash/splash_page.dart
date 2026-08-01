@@ -1,12 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../app/app_router.dart';
 import '../../core/auth/auth_session.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
-import '../auth/login_page.dart';
-import '../shell/main_tab_shell.dart';
 
 /// App launch screen: launch_bg + bottom slogan, then login or main.
 class SplashPage extends StatefulWidget {
@@ -41,16 +41,7 @@ class _SplashPageState extends State<SplashPage> {
     if (!mounted) return;
     final loggedIn = await AuthSession.isLoggedIn();
     if (!mounted) return;
-    Navigator.of(context).pushReplacement(
-      PageRouteBuilder<void>(
-        pageBuilder: (_, _, _) =>
-            loggedIn ? const MainTabShell() : const LoginPage(),
-        transitionsBuilder: (_, animation, _, child) {
-          return FadeTransition(opacity: animation, child: child);
-        },
-        transitionDuration: const Duration(milliseconds: 420),
-      ),
-    );
+    context.go(loggedIn ? AppRoutes.shell : AppRoutes.login);
   }
 
   @override

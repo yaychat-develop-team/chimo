@@ -4,9 +4,11 @@ import '../../core/theme/app_colors.dart';
 import '../chats/data/chats_list_controller.dart';
 import 'group_details_page.dart';
 import 'models/group_item.dart';
-import 'widgets/joined_group_card.dart';
+import 'widgets/popular_group_card.dart';
 
 /// Joined groups list (Home My Groups → More).
+///
+/// Same card layout as Popular Groups, without the join / leave control.
 class JoinedGroupsPage extends StatelessWidget {
   const JoinedGroupsPage({
     super.key,
@@ -61,8 +63,9 @@ class JoinedGroupsPage extends StatelessWidget {
                 separatorBuilder: (_, _) => const SizedBox(height: 12),
                 itemBuilder: (context, index) {
                   final group = groups[index];
-                  return JoinedGroupCard(
+                  return PopularGroupCard(
                     group: group,
+                    showJoinAction: false,
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute<void>(

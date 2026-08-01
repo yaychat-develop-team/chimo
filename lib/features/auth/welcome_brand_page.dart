@@ -2,10 +2,11 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../app/app_router.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
-import 'popular_tribes_page.dart';
 
 /// Brand welcome → swipe up to industry selection (same-page morph animation).
 class WelcomeBrandPage extends StatefulWidget {
@@ -78,15 +79,7 @@ class _WelcomeBrandPageState extends State<WelcomeBrandPage>
   }
 
   void _onNext() {
-    Navigator.of(context).push(
-      PageRouteBuilder<void>(
-        pageBuilder: (_, _, _) => const PopularTribesPage(),
-        transitionsBuilder: (_, animation, _, child) {
-          return FadeTransition(opacity: animation, child: child);
-        },
-        transitionDuration: const Duration(milliseconds: 420),
-      ),
-    );
+    context.push(AppRoutes.tribes);
   }
 
   @override
@@ -99,7 +92,7 @@ class _WelcomeBrandPageState extends State<WelcomeBrandPage>
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
-        backgroundColor: Colors.black,
+        backgroundColor: const Color(0xFF0A0A14),
         body: AnimatedBuilder(
           animation: _progress,
           builder: (context, _) {
@@ -191,19 +184,19 @@ class _WelcomeBrandPageState extends State<WelcomeBrandPage>
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 20),
+                              padding: EdgeInsets.symmetric(horizontal: 30),
                               child: Text(
                                 'Select your Industry/Area of Interest',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w700,
-                                  height: 1.25,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  height: 1.5,
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 20),
+                            const SizedBox(height: 28),
                             Expanded(
                               child: NotificationListener<
                                   OverscrollNotification>(
@@ -230,15 +223,15 @@ class _WelcomeBrandPageState extends State<WelcomeBrandPage>
                                       ? const BouncingScrollPhysics()
                                       : const NeverScrollableScrollPhysics(),
                                   padding: const EdgeInsets.fromLTRB(
-                                    20,
+                                    30,
                                     0,
-                                    20,
+                                    30,
                                     12,
                                   ),
                                   itemCount:
                                       WelcomeBrandPage.industries.length,
                                   separatorBuilder: (_, _) =>
-                                      const SizedBox(height: 12),
+                                      const SizedBox(height: 10),
                                   itemBuilder: (context, index) {
                                     final industry =
                                         WelcomeBrandPage.industries[index];
@@ -253,29 +246,36 @@ class _WelcomeBrandPageState extends State<WelcomeBrandPage>
                             ),
                             Padding(
                               padding: EdgeInsets.fromLTRB(
-                                20,
+                                30,
                                 8,
-                                20,
+                                30,
                                 bottom + 16,
                               ),
-                              child: SizedBox(
-                                height: 52,
-                                child: FilledButton(
-                                  onPressed: _expanded ? _onNext : null,
-                                  style: FilledButton.styleFrom(
-                                    backgroundColor: AppColors.primaryBright,
-                                    disabledBackgroundColor:
-                                        AppColors.primaryBright.withValues(
-                                      alpha: 0.45,
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  onTap: _expanded ? _onNext : null,
+                                  borderRadius: BorderRadius.circular(27),
+                                  child: Ink(
+                                    height: 54,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(27),
+                                      gradient: AppColors.promoBannerGradient,
                                     ),
-                                    foregroundColor: Colors.black,
-                                    shape: const StadiumBorder(),
-                                    textStyle: const TextStyle(
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.w700,
+                                    child: Center(
+                                      child: Text(
+                                        'Next Step',
+                                        style: TextStyle(
+                                          color: AppColors.promoText
+                                              .withValues(
+                                            alpha: _expanded ? 1 : 0.45,
+                                          ),
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
                                     ),
                                   ),
-                                  child: const Text('Next Step'),
                                 ),
                               ),
                             ),
@@ -308,52 +308,50 @@ class _IndustryTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: const Color(0xFF1C1C1E),
-      borderRadius: BorderRadius.circular(14),
+      color: const Color(0xFF2A2A2A),
+      borderRadius: BorderRadius.circular(27),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: selected ? AppColors.primaryBright : Colors.transparent,
-              width: 1.5,
+        borderRadius: BorderRadius.circular(27),
+        child: SizedBox(
+          height: 54,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    label,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ),
+                Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: selected ? AppColors.promoBannerGradient : null,
+                    border: selected
+                        ? null
+                        : Border.all(
+                            color: const Color(0xFF5A5A5E),
+                            width: 1.5,
+                          ),
+                  ),
+                  child: selected
+                      ? const Icon(
+                          Icons.check,
+                          size: 14,
+                          color: Color(0xFF232518),
+                        )
+                      : null,
+                ),
+              ],
             ),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  label,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                width: 24,
-                height: 24,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: selected ? AppColors.primaryBright : Colors.transparent,
-                  border: Border.all(
-                    color: selected
-                        ? AppColors.primaryBright
-                        : const Color(0xFF5A5A5E),
-                    width: 1.5,
-                  ),
-                ),
-                child: selected
-                    ? const Icon(Icons.check, size: 16, color: Colors.white)
-                    : null,
-              ),
-            ],
           ),
         ),
       ),

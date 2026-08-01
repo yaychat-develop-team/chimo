@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../app/app_router.dart';
 import '../../core/auth/auth_session.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_tip_dialog.dart';
-import '../auth/login_page.dart';
 
 /// Settings: account security, privacy, clear cache, log out.
 class SettingsPage extends StatelessWidget {
@@ -36,10 +37,7 @@ class SettingsPage extends StatelessWidget {
 
     await AuthSession.clear();
     if (!context.mounted) return;
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute<void>(builder: (_) => const LoginPage()),
-      (_) => false,
-    );
+    context.go(AppRoutes.login);
   }
 
   @override

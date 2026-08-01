@@ -261,6 +261,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     final signatureHint = _signature.isEmpty
         ? "Don't be shy! Drop a fun line about yourself!"
         : _signature;
+    final bottom = MediaQuery.paddingOf(context).bottom;
 
     return PopScope(
       canPop: false,
@@ -269,76 +270,99 @@ class _EditProfilePageState extends State<EditProfilePage> {
         _popWithResult();
       },
       child: Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _EditProfileAppBar(
-              percent: widget.completionPercent,
-              onBack: _popWithResult,
-            ),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                children: [
-                  _AvatarCard(
-                    avatarAsset: widget.profile.avatarAsset,
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => MyPicturePage(
-                            avatarAsset: widget.profile.avatarAsset,
+        backgroundColor: const Color(0xFF0A0A14),
+        body: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _EditProfileAppBar(onBack: _popWithResult),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                  children: [
+                    _AvatarCard(
+                      avatarAsset: widget.profile.avatarAsset,
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => MyPicturePage(
+                              avatarAsset: widget.profile.avatarAsset,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    _PhotoCard(count: widget.photoCount),
+                    const SizedBox(height: 16),
+                    _PromptCard(
+                      title: 'My Signature',
+                      hint: signatureHint,
+                      hintAsValue: _signature.isNotEmpty,
+                      onTap: _openSignature,
+                    ),
+                    const SizedBox(height: 16),
+                    _VoiceNoteCard(
+                      seconds: _voiceSeconds,
+                      onTap: _openVoiceNote,
+                      onDelete: _deleteVoiceNote,
+                    ),
+                    const SizedBox(height: 16),
+                    _TagsCard(tags: _tags, onTap: _openTags),
+                    const SizedBox(height: 16),
+                    _BasicInfoCard(
+                      nickname: _nickname,
+                      gender: _gender,
+                      birthday: _birthday,
+                      height: _height,
+                      weight: _weight,
+                      onNicknameTap: _openNickname,
+                      onGenderTap: _openGender,
+                      onBirthdayTap: _openBirthday,
+                      onHeightTap: _openHeight,
+                      onWeightTap: _openWeight,
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.fromLTRB(16, 8, 16, 12 + bottom),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: _popWithResult,
+                    borderRadius: BorderRadius.circular(24),
+                    child: Ink(
+                      height: 48,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(24),
+                        gradient: AppColors.promoBannerGradient,
+                      ),
+                      child: const Center(
+                        child: Text(
+                          'Save',
+                          style: TextStyle(
+                            color: AppColors.promoText,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                      );
-                    },
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: 12),
-                  _PhotoCard(count: widget.photoCount),
-                  const SizedBox(height: 12),
-                  _PromptCard(
-                    title: 'My Signature',
-                    hint: signatureHint,
-                    hintAsValue: _signature.isNotEmpty,
-                    onTap: _openSignature,
-                  ),
-                  const SizedBox(height: 12),
-                  _VoiceNoteCard(
-                    seconds: _voiceSeconds,
-                    onTap: _openVoiceNote,
-                    onDelete: _deleteVoiceNote,
-                  ),
-                  const SizedBox(height: 12),
-                  _TagsCard(tags: _tags, onTap: _openTags),
-                  const SizedBox(height: 12),
-                  _BasicInfoCard(
-                    nickname: _nickname,
-                    gender: _gender,
-                    birthday: _birthday,
-                    height: _height,
-                    weight: _weight,
-                    onNicknameTap: _openNickname,
-                    onGenderTap: _openGender,
-                    onBirthdayTap: _openBirthday,
-                    onHeightTap: _openHeight,
-                    onWeightTap: _openWeight,
-                  ),
-                ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
 }
 
 class _EditProfileAppBar extends StatelessWidget {
-  const _EditProfileAppBar({required this.percent, required this.onBack});
+  const _EditProfileAppBar({required this.onBack});
 
-  final int percent;
   final VoidCallback onBack;
 
   @override
@@ -356,39 +380,20 @@ class _EditProfileAppBar extends StatelessWidget {
                 AppAssets.chatBack,
                 width: 17,
                 height: 7,
+                colorFilter: const ColorFilter.mode(
+                  Colors.white,
+                  BlendMode.srcIn,
+                ),
               ),
             ),
           ),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Edit Profile',
-                style: TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  '$percent%',
-                  style: const TextStyle(
-                    color: Colors.black,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    height: 1,
-                  ),
-                ),
-              ),
-            ],
+          const Text(
+            'Edit Profile',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),
@@ -396,11 +401,29 @@ class _EditProfileAppBar extends StatelessWidget {
   }
 }
 
+class _Chevron extends StatelessWidget {
+  const _Chevron();
+
+  @override
+  Widget build(BuildContext context) {
+    return SvgPicture.asset(
+      AppAssets.mineArrow,
+      width: 5,
+      height: 8,
+      colorFilter: const ColorFilter.mode(
+        Color(0xFF8A8A8A),
+        BlendMode.srcIn,
+      ),
+    );
+  }
+}
+
 class _SectionCard extends StatelessWidget {
-  const _SectionCard({required this.child, this.onTap});
+  const _SectionCard({required this.child, this.onTap, this.padding});
 
   final Widget child;
   final VoidCallback? onTap;
+  final EdgeInsetsGeometry? padding;
 
   @override
   Widget build(BuildContext context) {
@@ -411,7 +434,7 @@ class _SectionCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: padding ?? const EdgeInsets.fromLTRB(14, 14, 14, 14),
           child: child,
         ),
       ),
@@ -429,42 +452,43 @@ class _AvatarCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return _SectionCard(
       onTap: onTap,
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(14),
-            child: Image.asset(
-              avatarAsset,
-              width: 72,
-              height: 72,
-              fit: BoxFit.cover,
-            ),
-          ),
-          const SizedBox(width: 14),
-          const Expanded(
-            child: Text(
-              'My Profile Picture',
-              style: TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+      child: SizedBox(
+        height: 96,
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.asset(
+                avatarAsset,
+                width: 96,
+                height: 96,
+                fit: BoxFit.cover,
               ),
             ),
-          ),
-          const Text(
-            'Edit',
-            style: TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'My Profile Picture',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ),
-          ),
-          const Icon(
-            Icons.chevron_right_rounded,
-            color: AppColors.textSecondary,
-            size: 20,
-          ),
-        ],
+            const Text(
+              'Edit',
+              style: TextStyle(
+                color: Color(0xFF8A8A8A),
+                fontSize: 14,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+            const SizedBox(width: 6),
+            const _Chevron(),
+          ],
+        ),
       ),
     );
   }
@@ -479,8 +503,8 @@ class _PhotoCard extends StatelessWidget {
     final action = await showPhotoPickSheet(context);
     if (!context.mounted || action == null) return;
     final tip = switch (action) {
-      PhotoPickAction.takePhoto => 'Take Photo',
-      PhotoPickAction.gallery => 'Choose from Gallery',
+      PhotoPickAction.takePhoto => 'Camera',
+      PhotoPickAction.gallery => 'Choose from the phone album',
     };
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -497,28 +521,35 @@ class _PhotoCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'My Photo ($count/${EditProfilePage.maxPhotos})',
-            style: const TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'My Photos（$count/${EditProfilePage.maxPhotos}）',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              const _Chevron(),
+            ],
           ),
           const SizedBox(height: 12),
           GestureDetector(
             onTap: () => _onAdd(context),
             child: Container(
-              width: 72,
-              height: 72,
+              width: 98,
+              height: 98,
               decoration: BoxDecoration(
                 color: const Color(0xFF2C2C2E),
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(12),
               ),
               child: const Icon(
                 Icons.add_rounded,
-                color: AppColors.textPrimary,
-                size: 32,
+                color: Colors.white,
+                size: 28,
               ),
             ),
           ),
@@ -554,28 +585,25 @@ class _PromptCard extends StatelessWidget {
                 child: Text(
                   title,
                   style: const TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
-              const Icon(
-                Icons.chevron_right_rounded,
-                color: AppColors.textSecondary,
-                size: 20,
-              ),
+              const _Chevron(),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Text(
             hint,
             style: TextStyle(
               color: hintAsValue
-                  ? AppColors.textSecondary
-                  : AppColors.textTertiary,
+                  ? const Color(0xFFB0B0B0)
+                  : const Color(0xFF8A8A8A),
               fontSize: 13,
               fontWeight: FontWeight.w400,
+              height: 20 / 13,
             ),
           ),
         ],
@@ -687,21 +715,17 @@ class _VoiceNoteCardState extends State<_VoiceNoteCard> {
                   child: Text(
                     'Voice Note',
                     style: TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: AppColors.textSecondary,
-                  size: 20,
-                ),
+                _Chevron(),
               ],
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           if (!hasVoice)
             GestureDetector(
               behavior: HitTestBehavior.opaque,
@@ -709,9 +733,10 @@ class _VoiceNoteCardState extends State<_VoiceNoteCard> {
               child: const Text(
                 'Speak up — your voice is your vibe!',
                 style: TextStyle(
-                  color: AppColors.textTertiary,
+                  color: Color(0xFF8A8A8A),
                   fontSize: 13,
                   fontWeight: FontWeight.w400,
+                  height: 20 / 13,
                 ),
               ),
             )
@@ -719,12 +744,12 @@ class _VoiceNoteCardState extends State<_VoiceNoteCard> {
             Row(
               children: [
                 Container(
-                  height: 36,
-                  constraints: const BoxConstraints(minWidth: 148, maxWidth: 168),
-                  padding: const EdgeInsets.fromLTRB(3, 3, 10, 3),
+                  height: 28,
+                  constraints: const BoxConstraints(minWidth: 108),
+                  padding: const EdgeInsets.fromLTRB(2, 2, 8, 2),
                   decoration: BoxDecoration(
                     color: const Color(0xFF2E2E16),
-                    borderRadius: BorderRadius.circular(18),
+                    borderRadius: BorderRadius.circular(14),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -732,8 +757,8 @@ class _VoiceNoteCardState extends State<_VoiceNoteCard> {
                       GestureDetector(
                         onTap: _togglePlay,
                         child: Container(
-                          width: 30,
-                          height: 30,
+                          width: 24,
+                          height: 24,
                           decoration: const BoxDecoration(
                             color: Color(0xFFFDF652),
                             shape: BoxShape.circle,
@@ -744,7 +769,7 @@ class _VoiceNoteCardState extends State<_VoiceNoteCard> {
                                 ? Icons.pause_rounded
                                 : Icons.play_arrow_rounded,
                             color: Colors.black,
-                            size: 22,
+                            size: 16,
                           ),
                         ),
                       ),
@@ -752,15 +777,15 @@ class _VoiceNoteCardState extends State<_VoiceNoteCard> {
                       if (_playing)
                         Image.asset(
                           AppAssets.audioWaveAnim,
-                          width: 72,
-                          height: 14,
+                          width: 44,
+                          height: 8,
                           fit: BoxFit.contain,
                         )
                       else
                         Image.asset(
                           AppAssets.audioWaveLine,
-                          width: 72,
-                          height: 14,
+                          width: 44,
+                          height: 8,
                           fit: BoxFit.contain,
                         ),
                       const SizedBox(width: 6),
@@ -768,7 +793,7 @@ class _VoiceNoteCardState extends State<_VoiceNoteCard> {
                         '$displaySeconds"',
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 14,
+                          fontSize: 13,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -780,8 +805,8 @@ class _VoiceNoteCardState extends State<_VoiceNoteCard> {
                   onTap: _onDelete,
                   child: Image.asset(
                     AppAssets.voiceDeleteIcon,
-                    width: 36,
-                    height: 36,
+                    width: 28,
+                    height: 28,
                     fit: BoxFit.contain,
                   ),
                 ),
@@ -812,27 +837,24 @@ class _TagsCard extends StatelessWidget {
                 child: Text(
                   'My Tags',
                   style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: AppColors.textSecondary,
-                size: 20,
-              ),
+              _Chevron(),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           if (tags.isEmpty)
             const Text(
               'Pick tags to find like-minded friends!',
               style: TextStyle(
-                color: AppColors.textTertiary,
+                color: Color(0xFF8A8A8A),
                 fontSize: 13,
                 fontWeight: FontWeight.w400,
+                height: 20 / 13,
               ),
             )
           else
@@ -841,21 +863,24 @@ class _TagsCard extends StatelessWidget {
               runSpacing: 8,
               children: [
                 for (final tag in tags)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
+                  DecoratedBox(
                     decoration: BoxDecoration(
                       color: const Color(0xFF2C2C2E),
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(15),
                     ),
-                    child: Text(
-                      tag,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 7,
+                      ),
+                      child: Text(
+                        tag,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          height: 1.2,
+                        ),
                       ),
                     ),
                   ),
@@ -892,23 +917,33 @@ class _BasicInfoCard extends StatelessWidget {
   final VoidCallback? onHeightTap;
   final VoidCallback? onWeightTap;
 
+  String get _birthdayDisplay {
+    final parsed = DateTime.tryParse(birthday);
+    if (parsed == null) return birthday;
+    final m = parsed.month.toString().padLeft(2, '0');
+    final d = parsed.day.toString().padLeft(2, '0');
+    final y = parsed.year.toString().padLeft(4, '0');
+    return '$m/$d/$y';
+  }
+
   @override
   Widget build(BuildContext context) {
     return _SectionCard(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
             'My Basic Info',
             style: TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 8),
           _InfoRow(
-            label: 'Nickname',
+            label: 'NickName',
             value: nickname,
             onTap: onNicknameTap,
           ),
@@ -919,23 +954,17 @@ class _BasicInfoCard extends StatelessWidget {
           ),
           _InfoRow(
             label: 'Birthday',
-            value: birthday,
+            value: _birthdayDisplay,
             onTap: onBirthdayTap,
           ),
           _InfoRow(
             label: 'Height',
-            value: height == null
-                ? 'Please enter your height'
-                : '$height Inch',
-            isPlaceholder: height == null,
+            value: height == null ? '' : '${height}Inch',
             onTap: onHeightTap,
           ),
           _InfoRow(
             label: 'Weight',
-            value: weight == null
-                ? 'Please enter your weight'
-                : '$weight LB',
-            isPlaceholder: weight == null,
+            value: weight == null ? '' : '${weight}Ib',
             showDivider: false,
             onTap: onWeightTap,
           ),
@@ -949,14 +978,12 @@ class _InfoRow extends StatelessWidget {
   const _InfoRow({
     required this.label,
     required this.value,
-    this.isPlaceholder = false,
     this.showDivider = true,
     this.onTap,
   });
 
   final String label;
   final String value;
-  final bool isPlaceholder;
   final bool showDivider;
   final VoidCallback? onTap;
 
@@ -966,19 +993,16 @@ class _InfoRow extends StatelessWidget {
       children: [
         InkWell(
           onTap: onTap ?? () {},
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 14),
+          child: SizedBox(
+            height: 37,
             child: Row(
               children: [
-                SizedBox(
-                  width: 88,
-                  child: Text(
-                    label,
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
                   ),
                 ),
                 Expanded(
@@ -987,21 +1011,15 @@ class _InfoRow extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.right,
-                    style: TextStyle(
-                      color: isPlaceholder
-                          ? AppColors.textTertiary
-                          : AppColors.textPrimary,
+                    style: const TextStyle(
+                      color: Colors.white,
                       fontSize: 14,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w400,
                     ),
                   ),
                 ),
-                const SizedBox(width: 4),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: AppColors.textSecondary,
-                  size: 20,
-                ),
+                const SizedBox(width: 6),
+                const _Chevron(),
               ],
             ),
           ),
@@ -1038,49 +1056,39 @@ class _GenderPickerSheetState extends State<_GenderPickerSheet> {
     return Container(
       decoration: const BoxDecoration(
         color: Color(0xFF1C1C1E),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      padding: EdgeInsets.fromLTRB(16, 8, 16, 20 + bottom),
+      padding: EdgeInsets.fromLTRB(16, 24, 16, 20 + bottom),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           SizedBox(
-            height: 48,
+            height: 32,
             child: Stack(
               alignment: Alignment.center,
               children: [
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text(
-                      'Cancel',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ),
                 const Text(
                   'Gender',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 Align(
                   alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: () => Navigator.of(context).pop(_selected),
-                    child: const Text(
-                      'Save',
-                      style: TextStyle(
-                        color: AppColors.primaryBright,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
+                  child: GestureDetector(
+                    onTap: () => Navigator.of(context).pop(_selected),
+                    behavior: HitTestBehavior.opaque,
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                      child: Text(
+                        'Save',
+                        style: TextStyle(
+                          color: AppColors.accentLime,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),
@@ -1088,7 +1096,7 @@ class _GenderPickerSheetState extends State<_GenderPickerSheet> {
               ],
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 28),
           Row(
             children: [
               Expanded(
@@ -1099,7 +1107,7 @@ class _GenderPickerSheetState extends State<_GenderPickerSheet> {
                   onTap: () => setState(() => _selected = 'Male'),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 15),
               Expanded(
                 child: _GenderOption(
                   label: 'Female',
@@ -1110,7 +1118,6 @@ class _GenderPickerSheetState extends State<_GenderPickerSheet> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
         ],
       ),
     );
@@ -1133,24 +1140,24 @@ class _GenderOption extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: const Color(0xFF2A2A2A),
-      borderRadius: BorderRadius.circular(14),
+      color: selected ? const Color(0xFF2E2E16) : const Color(0xFF2A2A2A),
+      borderRadius: BorderRadius.circular(27),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(27),
         child: Container(
-          height: 56,
+          height: 54,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(27),
             border: Border.all(
-              color: selected ? AppColors.primaryBright : Colors.transparent,
+              color: selected ? AppColors.accentLime : Colors.transparent,
               width: 1.5,
             ),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Image.asset(iconAsset, width: 22, height: 22),
+              Image.asset(iconAsset, width: 16, height: 16),
               const SizedBox(width: 8),
               Text(
                 label,

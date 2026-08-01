@@ -2,10 +2,11 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:path_provider/path_provider.dart';
 
 /// Local auth session: cold start uses this to skip phone / OTP.
 ///
-/// Stored as JSON under the app private directory to avoid native plugins that need symlinks.
+/// Stored as JSON under the application support directory.
 abstract final class AuthSession {
   static const _fileName = 'auth_session.json';
 
@@ -18,15 +19,13 @@ abstract final class AuthSession {
   }
 
   static Future<Directory> _storageDir() async {
-    if (Platform.isAndroid) {
-      // Matches Flutter default application-support path (see android applicationId).
-      return Directory('/data/user/0/com.example.chimo/app_flutter');
-    }
-    if (Platform.isIOS) {
-      // Writable temp fallback on simulator / device; switch to path_provider later.
+    try {
+      return await getApplicationSupportDirectory();
+    } catch (error, stack) {
+      debugPrint('AuthSession path_provider failed: $error\n$stack');
+      // Fallback when plugins are unavailable (e.g. some test hosts).
       return Directory('${Directory.systemTemp.path}/chimo_auth');
     }
-    return Directory('${Directory.systemTemp.path}/chimo_auth');
   }
 
   static Future<Map<String, dynamic>> _read() async {

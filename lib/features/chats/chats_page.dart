@@ -9,6 +9,8 @@ import '../home/chat_user_profile_page.dart';
 import '../home/group_details_page.dart';
 import '../home/models/chat_user_profile.dart';
 import '../home/models/group_item.dart';
+import '../me/data/me_mock_data.dart';
+import '../profile/edit_profile_page.dart';
 import 'chat_detail_page.dart';
 import 'data/chats_list_controller.dart';
 import 'models/chat_conversation.dart';
@@ -66,16 +68,15 @@ class _ChatsPageState extends State<ChatsPage> {
   }
 
   Future<void> _confirmDeleteConversation(ChatConversation item) async {
-    final confirmed = await AppTipDialog.show(
-      context,
-      message: 'Are you sure you want to delete this conversation?',
-    );
+    final confirmed = await AppTipDialog.confirmDeleteConversation(context);
     if (!confirmed || !mounted) return;
     _controller.delete(item.id);
     _openSwipeId.value = null;
   }
 
   void _openConversation(ChatConversation item) {
+    _controller.markRead(item.id);
+
     // Group row → group details; others → DM (same shell, different stream).
     if (item.badge == ChatBadgeType.group) {
       final stillJoined = _controller.isGroupJoined(item.id);
@@ -108,9 +109,18 @@ class _ChatsPageState extends State<ChatsPage> {
     );
   }
 
+  bool _isPeerConversation(ChatConversation item) {
+    if (item.badge == ChatBadgeType.group) return false;
+    if (item.badge == ChatBadgeType.verified) return false;
+    if (item.id.startsWith('system_') || item.id.startsWith('official_')) {
+      return false;
+    }
+    return true;
+  }
+
   void _openAvatarProfile(ChatConversation item) {
-    // Groups have no profile; avatar tap same as row → group details.
-    if (item.badge == ChatBadgeType.group) {
+    // Groups / official / system: avatar tap same as row.
+    if (!_isPeerConversation(item)) {
       _openConversation(item);
       return;
     }
@@ -137,13 +147,21 @@ class _ChatsPageState extends State<ChatsPage> {
     );
   }
 
+  Future<void> _openPromoCompleteProfile() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => EditProfilePage(profile: MeMockData.profile),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final conversations = _controller.visibleConversations;
     final isEmpty = conversations.isEmpty;
 
     return ColoredBox(
-      color: AppColors.background,
+      color: AppColors.surface,
       child: DecoratedBox(
         decoration: const BoxDecoration(
           image: DecorationImage(
@@ -175,6 +193,7 @@ class _ChatsPageState extends State<ChatsPage> {
               ),
               if (_showPromo)
                 ChatsPromoBanner(
+                  onTap: _openPromoCompleteProfile,
                   onClose: () => setState(() => _showPromo = false),
                 ),
               Expanded(

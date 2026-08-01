@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_assets.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_asset_image.dart';
 import '../data/group_members_mock_data.dart';
 
 /// Group members bottom sheet with fuzzy nickname search.
@@ -108,7 +109,7 @@ class _GroupMembersSheetState extends State<GroupMembersSheet> {
                   ),
                   child: Row(
                     children: [
-                      Image.asset(
+                      const AppAssetImage(
                         AppAssets.msgSearch,
                         width: 18,
                         height: 18,

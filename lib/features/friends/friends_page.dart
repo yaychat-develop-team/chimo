@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/app_asset_image.dart';
 import '../chats/chat_detail_page.dart';
 import '../chats/models/chat_conversation.dart';
 import '../home/chat_user_profile_page.dart';
@@ -304,7 +305,7 @@ class _FriendsSearchField extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Image.asset(
+          const AppAssetImage(
             AppAssets.msgSearch,
             width: 18,
             height: 18,

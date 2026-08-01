@@ -18,12 +18,24 @@ class AppBottomNavItem extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
-  /// Selected green from design (matches tab_*_select assets).
-  static const Color _selectedGreen = Color(0xFF1CFF8A);
-
   @override
   Widget build(BuildContext context) {
-    final color = selected ? _selectedGreen : AppColors.textSecondary;
+    final labelStyle = TextStyle(
+      color: selected ? Colors.white : const Color(0xB3FFFFFF),
+      fontSize: 10,
+      fontWeight: FontWeight.w400,
+      height: 1.2,
+    );
+
+    Widget label = Text(destination.label, style: labelStyle);
+    if (selected) {
+      label = ShaderMask(
+        blendMode: BlendMode.srcIn,
+        shaderCallback: (bounds) =>
+            AppColors.brandTextGradient.createShader(bounds),
+        child: label,
+      );
+    }
 
     return Expanded(
       child: InkWell(
@@ -55,18 +67,7 @@ class AppBottomNavItem extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 4),
-            SizedBox(
-              height: 15,
-              child: Text(
-                destination.label,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 11,
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                  height: 1.2,
-                ),
-              ),
-            ),
+            SizedBox(height: 15, child: label),
           ],
         ),
       ),
@@ -86,16 +87,15 @@ class _NavBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 4),
       decoration: BoxDecoration(
         color: AppColors.badge,
-        borderRadius: BorderRadius.circular(9),
-        border: Border.all(color: const Color(0xFF121212), width: 1.5),
+        borderRadius: BorderRadius.circular(8),
       ),
       alignment: Alignment.center,
       child: Text(
         label,
         style: const TextStyle(
           color: Colors.white,
-          fontSize: 9,
-          fontWeight: FontWeight.w700,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
           height: 1.1,
         ),
       ),

@@ -37,13 +37,13 @@ class PhotoPickSheet extends StatelessWidget {
             child: Column(
               children: [
                 _SheetAction(
-                  label: 'Take Photo',
+                  label: 'Camera',
                   onTap: () =>
                       Navigator.pop(context, PhotoPickAction.takePhoto),
                 ),
                 const Divider(height: 1, thickness: 1, color: _divider),
                 _SheetAction(
-                  label: 'Choose from Gallery',
+                  label: 'Choose from the phone album',
                   onTap: () => Navigator.pop(context, PhotoPickAction.gallery),
                 ),
               ],

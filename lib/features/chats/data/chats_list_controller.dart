@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../../home/models/group_item.dart';
-import '../models/chat_conversation.dart';
-import 'chats_mock_data.dart';
+import '../../../core/repositories/mock_chat_repository.dart';
+import '../../../core/repositories/repositories.dart';
+import '../../../shared/models/chat_conversation.dart';
+import '../../../shared/models/group_item.dart';
 
 /// Shared chats list state for chats page and nav unread badge.
 ///
@@ -11,9 +12,12 @@ import 'chats_mock_data.dart';
 /// - Swipe-delete conversation → does not leave group
 /// - Open/send DM → upsert private chat
 class ChatsListController extends ChangeNotifier {
-  ChatsListController() {
-    _conversations.addAll(ChatsMockData.conversations);
+  ChatsListController({ChatRepository? chatRepository})
+      : _chatRepository = chatRepository ?? MockChatRepository() {
+    _conversations.addAll(_chatRepository.seedConversations());
   }
+
+  final ChatRepository _chatRepository;
 
   final List<ChatConversation> _conversations = [];
   final List<String> _pinnedIds = [];
@@ -62,6 +66,16 @@ class ChatsListController extends ChangeNotifier {
   void delete(String id) {
     _conversations.removeWhere((c) => c.id == id);
     _pinnedIds.remove(id);
+    notifyListeners();
+  }
+
+  /// Clear unread when the user opens a conversation.
+  void markRead(String id) {
+    final index = _conversations.indexWhere((c) => c.id == id);
+    if (index < 0) return;
+    final prev = _conversations[index];
+    if (prev.unreadCount == 0) return;
+    _conversations[index] = prev.copyWith(unreadCount: 0);
     notifyListeners();
   }
 

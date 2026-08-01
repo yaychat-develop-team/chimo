@@ -3,12 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../app/app_router.dart';
 import '../../core/auth/auth_session.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/center_toast.dart';
-import '../shell/main_tab_shell.dart';
 
 /// Email page: shared Welcome Back flow for login and binding.
 class BindEmailPage extends StatefulWidget {
@@ -282,16 +283,7 @@ class _BindEmailCodePageState extends State<_BindEmailCodePage> {
     if (widget.forLogin) {
       await AuthSession.markLoggedIn(method: 'email');
       if (!mounted) return;
-      Navigator.of(context).pushAndRemoveUntil(
-        PageRouteBuilder<void>(
-          pageBuilder: (_, _, _) => const MainTabShell(),
-          transitionsBuilder: (_, animation, _, child) {
-            return FadeTransition(opacity: animation, child: child);
-          },
-          transitionDuration: const Duration(milliseconds: 420),
-        ),
-        (_) => false,
-      );
+      context.go(AppRoutes.shell);
       return;
     }
 

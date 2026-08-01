@@ -5,6 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/app_tip_dialog.dart';
 import '../chats/data/chats_list_controller.dart';
 import '../chats/models/chat_conversation.dart';
 import '../report/report_page.dart';
@@ -395,7 +396,7 @@ class _GroupMoreSheet extends StatelessWidget {
   final bool showLeave;
 
   Future<void> _onLeaveTap(BuildContext context) async {
-    final confirmed = await _LeaveGroupDialog.show(context);
+    final confirmed = await AppTipDialog.confirmLeaveGroup(context);
     if (!context.mounted) return;
     if (confirmed) {
       Navigator.of(context).pop(_GroupMoreAction.leave);
@@ -464,108 +465,6 @@ class _MoreActionTile extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// Leave group confirmation dialog.
-class _LeaveGroupDialog extends StatelessWidget {
-  const _LeaveGroupDialog();
-
-  static Future<bool> show(BuildContext context) async {
-    final result = await showDialog<bool>(
-      context: context,
-      barrierColor: Colors.black.withValues(alpha: 0.55),
-      builder: (_) => const _LeaveGroupDialog(),
-    );
-    return result ?? false;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    const dividerColor = Color(0xFFE5E5E5);
-
-    return Dialog(
-      backgroundColor: Colors.white,
-      elevation: 0,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 52),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(20, 28, 20, 24),
-            child: Column(
-              children: [
-                Text(
-                  'Leave this Group?',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    height: 1.3,
-                  ),
-                ),
-                SizedBox(height: 6),
-                Text(
-                  'You will no longer receive updates.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w400,
-                    height: 1.35,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 1, thickness: 1, color: dividerColor),
-          SizedBox(
-            height: 50,
-            child: Row(
-              children: [
-                Expanded(
-                  child: InkWell(
-                    onTap: () => Navigator.of(context).pop(false),
-                    child: const Center(
-                      child: Text(
-                        'Cancel',
-                        style: TextStyle(
-                          color: Color(0xFF8E8E93),
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const VerticalDivider(
-                  width: 1,
-                  thickness: 1,
-                  color: dividerColor,
-                ),
-                Expanded(
-                  child: InkWell(
-                    onTap: () => Navigator.of(context).pop(true),
-                    child: const Center(
-                      child: Text(
-                        'Leave',
-                        style: TextStyle(
-                          color: AppColors.primaryBright,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }

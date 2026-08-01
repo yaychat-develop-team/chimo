@@ -1,19 +1,7 @@
 import '../../../core/constants/app_assets.dart';
+import '../../../shared/models/group_member.dart';
 
-/// A group member entry.
-class GroupMember {
-  const GroupMember({
-    required this.id,
-    required this.nickname,
-    required this.avatarAsset,
-    required this.isMale,
-  });
-
-  final String id;
-  final String nickname;
-  final String avatarAsset;
-  final bool isMale;
-}
+export '../../../shared/models/group_member.dart';
 
 /// Mock list of group members.
 abstract final class GroupMembersMockData {

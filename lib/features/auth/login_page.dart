@@ -1,12 +1,12 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../app/app_router.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/agreement_page.dart';
 import '../debug/debug_page.dart';
-import '../me/bind_email_page.dart';
-import 'phone_login_page.dart';
 
 /// Login page per design: Email primary button, agreement, Debug, phone entry.
 class LoginPage extends StatefulWidget {
@@ -48,11 +48,7 @@ class _LoginPageState extends State<LoginPage> {
       setState(() => _agreed = true);
     }
     if (!mounted) return;
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => const BindEmailPage(forLogin: true),
-      ),
-    );
+    context.push(AppRoutes.bindEmailLogin);
   }
 
   Future<void> _openPhoneLogin() async {
@@ -76,9 +72,7 @@ class _LoginPageState extends State<LoginPage> {
       setState(() => _agreed = true);
     }
     if (!mounted) return;
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const PhoneLoginPage()),
-    );
+    context.push(AppRoutes.phoneLogin);
   }
 
   @override

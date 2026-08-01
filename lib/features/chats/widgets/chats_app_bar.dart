@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_assets.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_asset_image.dart';
 
 /// Chats app bar: title with green underline + contacts/search.
+/// Spec from Figma 39:428 — title 24 ExtraBold; icon buttons 36×36 r12.
 class ChatsAppBar extends StatelessWidget {
   const ChatsAppBar({super.key, this.onContactsTap, this.onSearchTap});
 
@@ -13,43 +15,54 @@ class ChatsAppBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 16, 12),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       child: Row(
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Chats',
-                style: TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 32,
-                  fontWeight: FontWeight.w800,
-                  height: 1,
+          SizedBox(
+            height: 40,
+            child: Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.topLeft,
+              children: [
+                // Non-positioned so Stack gets a finite width in the Row.
+                const Text(
+                  'Chats',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    height: 1.2,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              SizedBox(
-                height: 10,
-                width: 36,
-                child: Image.asset(
-                  AppAssets.chatTitleTips,
-                  fit: BoxFit.contain,
+                // Green scribble under "a" (Figma Vector 1).
+                const Positioned(
+                  left: 17,
+                  top: 22,
+                  child: SizedBox(
+                    width: 48,
+                    height: 17,
+                    child: AppAssetImage(
+                      AppAssets.chatTitleTips,
+                      width: 48,
+                      height: 17,
+                      fit: BoxFit.fill,
+                    ),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           const Spacer(),
           _HeaderIconButton(
             asset: AppAssets.msgContacts,
             onTap: onContactsTap,
-            iconSize: 42,
+            iconSize: 22,
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           _HeaderIconButton(
             asset: AppAssets.msgSearch,
             onTap: onSearchTap,
-            iconSize: 42,
+            iconSize: 18,
           ),
         ],
       ),
@@ -72,20 +85,19 @@ class _HeaderIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: const Color(0xFF1A1A1A),
-      borderRadius: BorderRadius.circular(14),
+      color: AppColors.chatsRowFill,
+      borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         child: SizedBox(
-          width: 44,
-          height: 44,
+          width: 36,
+          height: 36,
           child: Center(
-            child: Image.asset(
+            child: AppAssetImage(
               asset,
               width: iconSize,
               height: iconSize,
-              color: AppColors.textPrimary,
             ),
           ),
         ),

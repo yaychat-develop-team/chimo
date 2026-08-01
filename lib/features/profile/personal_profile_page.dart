@@ -9,7 +9,7 @@ class PersonalProfilePage extends StatefulWidget {
   const PersonalProfilePage({
     super.key,
     required this.profile,
-    this.zodiac = 'Capricorn',
+    this.zodiac = 'Capricornus',
   });
 
   final MeProfile profile;
@@ -85,10 +85,11 @@ class _PersonalProfilePageState extends State<PersonalProfilePage> {
         isMale: _profile.isMale,
         age: _age,
         zodiac: widget.zodiac,
-        level: 0,
+        level: 16,
         bio: _signatureText,
         voiceSeconds: _profile.voiceSeconds,
         flavors: _flavors,
+        inPartyName: 'Masquerade Ball',
         showMore: false,
         onBack: _popWithResult,
         bottomBar: ProfilePrimaryAction(
