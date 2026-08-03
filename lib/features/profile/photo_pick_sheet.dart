@@ -11,22 +11,40 @@ Future<PhotoPickAction?> showPhotoPickSheet(BuildContext context) {
     context: context,
     backgroundColor: Colors.transparent,
     barrierColor: Colors.black.withValues(alpha: 0.55),
-    builder: (_) => const PhotoPickSheet(),
+    isScrollControlled: true,
+    builder: (sheetContext) {
+      return SafeArea(
+        child: PhotoPickSheet(
+          onTakePhoto: () =>
+              Navigator.pop(sheetContext, PhotoPickAction.takePhoto),
+          onGallery: () =>
+              Navigator.pop(sheetContext, PhotoPickAction.gallery),
+          onCancel: () => Navigator.pop(sheetContext),
+        ),
+      );
+    },
   );
 }
 
 class PhotoPickSheet extends StatelessWidget {
-  const PhotoPickSheet({super.key});
+  const PhotoPickSheet({
+    super.key,
+    required this.onTakePhoto,
+    required this.onGallery,
+    required this.onCancel,
+  });
+
+  final VoidCallback onTakePhoto;
+  final VoidCallback onGallery;
+  final VoidCallback onCancel;
 
   static const Color _card = Color(0xFF1C1C1E);
   static const Color _divider = Color(0xFF2A2A2C);
 
   @override
   Widget build(BuildContext context) {
-    final bottom = MediaQuery.paddingOf(context).bottom;
-
     return Padding(
-      padding: EdgeInsets.fromLTRB(16, 0, 16, 12 + bottom),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -36,16 +54,9 @@ class PhotoPickSheet extends StatelessWidget {
             clipBehavior: Clip.antiAlias,
             child: Column(
               children: [
-                _SheetAction(
-                  label: 'Camera',
-                  onTap: () =>
-                      Navigator.pop(context, PhotoPickAction.takePhoto),
-                ),
+                _SheetAction(label: 'Take Photo', onTap: onTakePhoto),
                 const Divider(height: 1, thickness: 1, color: _divider),
-                _SheetAction(
-                  label: 'Choose from the phone album',
-                  onTap: () => Navigator.pop(context, PhotoPickAction.gallery),
-                ),
+                _SheetAction(label: 'Choose from Gallery', onTap: onGallery),
               ],
             ),
           ),
@@ -55,7 +66,7 @@ class PhotoPickSheet extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             clipBehavior: Clip.antiAlias,
             child: InkWell(
-              onTap: () => Navigator.pop(context),
+              onTap: onCancel,
               child: const SizedBox(
                 height: 52,
                 width: double.infinity,

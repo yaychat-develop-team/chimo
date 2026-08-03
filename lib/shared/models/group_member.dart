@@ -5,10 +5,12 @@ class GroupMember {
     required this.nickname,
     required this.avatarAsset,
     required this.isMale,
+    this.avatarUrl,
   });
 
   final String id;
   final String nickname;
   final String avatarAsset;
+  final String? avatarUrl;
   final bool isMale;
 }

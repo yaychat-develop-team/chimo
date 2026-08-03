@@ -66,5 +66,11 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Allow camera access to take profile photos.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Allow photo library access to choose profile photos.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Allow saving profile photos to your library.</string>
 </dict>
 </plist>

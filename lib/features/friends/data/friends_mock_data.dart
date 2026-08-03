@@ -1,7 +1,11 @@
 import '../../../core/constants/app_assets.dart';
 import '../models/friend_user.dart';
 
-/// Friends / following / followers mock (Friends = mutual follow).
+/// Friends / following / followers mock.
+///
+/// - [FriendRelation.mutual]: both follow → Friends; also listed in Follow & Followers
+/// - [FriendRelation.following]: I follow only → Follow tab
+/// - [FriendRelation.follower]: they follow only → Followers tab
 abstract final class FriendsMockData {
   static const List<String> _moments = [
     AppAssets.launchBg,
@@ -23,7 +27,7 @@ abstract final class FriendsMockData {
     ),
     FriendUser(
       id: 'mutual_elita',
-      nickname: 'Elita 💃',
+      nickname: 'Elita',
       userId: '1002048',
       avatarAsset: AppAssets.genderFemaleImg,
       isMale: false,

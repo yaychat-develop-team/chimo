@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_assets.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/network_or_asset_avatar.dart';
 import '../models/group_item.dart';
 import 'group_level_badge.dart';
 
@@ -54,11 +55,11 @@ class PopularGroupCard extends StatelessWidget {
             // Left rounded avatar
             ClipRRect(
               borderRadius: BorderRadius.circular(18),
-              child: Image.asset(
-                group.avatarAsset,
+              child: NetworkOrAssetAvatar(
+                asset: group.avatarAsset,
+                url: group.avatarUrl,
                 width: avatarSize,
                 height: avatarSize,
-                fit: BoxFit.cover,
               ),
             ),
             const SizedBox(width: 12),
@@ -92,19 +93,36 @@ class PopularGroupCard extends StatelessWidget {
                       ),
                       if (showJoinAction) ...[
                         const SizedBox(width: 8),
-                        // Stop propagation to card onTap so Join doesn't open details.
-                        GestureDetector(
-                          onTap: onJoinTap,
-                          behavior: HitTestBehavior.opaque,
-                          child: Image.asset(
-                            group.isJoined
-                                ? AppAssets.homeJoined
-                                : AppAssets.homeJoin,
-                            width: 36,
-                            height: 36,
-                            fit: BoxFit.contain,
+                        // Joined = status only (not leave). Join = tappable +.
+                        if (group.isJoined)
+                          IgnorePointer(
+                            child: Opacity(
+                              opacity: 0.9,
+                              child: Padding(
+                                padding: const EdgeInsets.all(6),
+                                child: Image.asset(
+                                  AppAssets.homeJoined,
+                                  width: 36,
+                                  height: 36,
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
+                            ),
+                          )
+                        else
+                          GestureDetector(
+                            onTap: onJoinTap,
+                            behavior: HitTestBehavior.opaque,
+                            child: Padding(
+                              padding: const EdgeInsets.all(6),
+                              child: Image.asset(
+                                AppAssets.homeJoin,
+                                width: 36,
+                                height: 36,
+                                fit: BoxFit.contain,
+                              ),
+                            ),
                           ),
-                        ),
                       ],
                     ],
                   ),

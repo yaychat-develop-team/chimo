@@ -3,9 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../core/constants/app_assets.dart';
+import '../../core/network/api_config.dart';
+import '../../core/network/api_config_store.dart';
+import '../../core/network/api_probe_suite.dart';
+import '../../core/network/network_bootstrap.dart';
 import '../../core/widgets/center_toast.dart';
-
-enum _ServerEnv { prod, test, local }
 
 /// Debug page: server environment / toggles / proxy and shortcuts.
 class DebugPage extends StatefulWidget {
@@ -16,9 +18,10 @@ class DebugPage extends StatefulWidget {
 }
 
 class _DebugPageState extends State<DebugPage> {
-  _ServerEnv _env = _ServerEnv.test;
+  ApiEnvironment _env = ApiConfig.environment;
   bool _http2 = true;
   bool _pb = true;
+  bool _saving = false;
   final TextEditingController _midDomainController = TextEditingController();
   final TextEditingController _h5Controller = TextEditingController();
 
@@ -33,8 +36,23 @@ class _DebugPageState extends State<DebugPage> {
     showCenterToast(context, message: message);
   }
 
-  void _saveAndRestart() {
-    _toast('Saved. Restart to apply.');
+  Future<void> _saveAndRestart() async {
+    if (_saving) return;
+    setState(() => _saving = true);
+    try {
+      await ApiConfigStore.save(_env);
+      final ping = await NetworkBootstrap.client.pingUserOpen(open: false);
+      if (!mounted) return;
+      _toast(
+        'Saved → ${ApiConfig.baseUrl}\n'
+        '${ping.success ? 'OK' : ping.message} (${ping.code})',
+      );
+    } catch (error) {
+      if (!mounted) return;
+      _toast('Save failed: $error');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   @override
@@ -56,31 +74,28 @@ class _DebugPageState extends State<DebugPage> {
                   children: [
                     _SectionHeader(
                       title: 'Server environment',
-                      actionLabel: 'Save & restart',
+                      actionLabel: _saving ? 'Saving…' : 'Save & restart',
                       onAction: _saveAndRestart,
                     ),
                     const SizedBox(height: 8),
                     _EnvOption(
-                      selected: _env == _ServerEnv.prod,
+                      selected: _env == ApiEnvironment.production,
                       title: 'Production',
-                      subtitle: 'api.yqdf.xyz/api/v1',
-                      onTap: () => setState(() => _env = _ServerEnv.prod),
+                      subtitle: 'api.echimo.com/api/v1',
+                      onTap: () => setState(() => _env = ApiEnvironment.production),
                     ),
                     _EnvOption(
-                      selected: _env == _ServerEnv.test,
+                      selected: _env == ApiEnvironment.test,
                       title: 'Test environment',
-                      subtitle: 'test-api.yqdf.xyz/api/v1',
-                      onTap: () => setState(() => _env = _ServerEnv.test),
+                      subtitle: 'test-api.echimo.com/api/v1',
+                      onTap: () => setState(() => _env = ApiEnvironment.test),
                     ),
                     _EnvOption(
-                      selected: _env == _ServerEnv.local,
+                      selected: _env == ApiEnvironment.local,
                       title: 'Local host',
-                      subtitle: 'Tap to configure',
+                      subtitle: '127.0.0.1:8080/api/v1',
                       subtitleMuted: true,
-                      onTap: () {
-                        setState(() => _env = _ServerEnv.local);
-                        _toast('Local host settings');
-                      },
+                      onTap: () => setState(() => _env = ApiEnvironment.local),
                     ),
                     const SizedBox(height: 6),
                     _ToggleRow(
@@ -112,6 +127,40 @@ class _DebugPageState extends State<DebugPage> {
                         label: 'Jump',
                         onTap: () => _toast('H5 jump'),
                       ),
+                    ),
+                    _NavRow(
+                      label: 'Ping test API',
+                      onTap: () async {
+                        try {
+                          final ping =
+                              await NetworkBootstrap.client.pingUserOpen();
+                          _toast(
+                            '${ApiConfig.baseUrl}\n'
+                            '${ping.success ? 'OK' : ping.message} (${ping.code})',
+                          );
+                        } catch (error) {
+                          _toast('Ping failed: $error');
+                        }
+                      },
+                    ),
+                    _NavRow(
+                      label: 'Run D:\\forya API suite',
+                      onTap: () async {
+                        _toast('Probing…');
+                        try {
+                          final results = await ApiProbeSuite(
+                            NetworkBootstrap.api,
+                          ).run();
+                          final ok = results.where((e) => e.ok).length;
+                          final lines = results
+                              .take(6)
+                              .map((e) => '${e.ok ? '✓' : '✗'} ${e.name} ${e.response.message}')
+                              .join('\n');
+                          _toast('$ok/${results.length} reachable\n$lines');
+                        } catch (error) {
+                          _toast('Suite failed: $error');
+                        }
+                      },
                     ),
                     _NavRow(label: 'Jump test', onTap: () => _toast('Jump test')),
                     _NavRow(label: 'Create chat group', onTap: () => _toast('Create chat group')),

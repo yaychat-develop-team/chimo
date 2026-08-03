@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/app_assets.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_asset_image.dart';
+import '../../../core/widgets/network_or_asset_avatar.dart';
 import '../models/chat_conversation.dart';
 
 /// List row: pill card, badge, online dot, unread; swipe to pin/delete.
@@ -206,6 +207,7 @@ class _ChatsConversationTileState extends State<ChatsConversationTile> {
                             },
                             child: _Avatar(
                               asset: conversation.avatarAsset,
+                              url: conversation.avatarUrl,
                               isOnline: conversation.isOnline,
                               isGroup: conversation.badge == ChatBadgeType.group,
                             ),
@@ -325,10 +327,12 @@ class _Avatar extends StatelessWidget {
   const _Avatar({
     required this.asset,
     required this.isOnline,
+    this.url,
     this.isGroup = false,
   });
 
   final String asset;
+  final String? url;
   final bool isOnline;
   final bool isGroup;
 
@@ -337,11 +341,11 @@ class _Avatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final image = Image.asset(
-      asset,
+    final image = NetworkOrAssetAvatar(
+      asset: asset,
+      url: url,
       width: _size,
       height: _size,
-      fit: BoxFit.cover,
     );
 
     return SizedBox(
@@ -367,10 +371,7 @@ class _Avatar extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: AppColors.onlineDot,
                   shape: BoxShape.circle,
-                  border: Border.all(
-                    color: AppColors.surface,
-                    width: 2,
-                  ),
+                  border: Border.all(color: Colors.black, width: 1.5),
                 ),
               ),
             ),

@@ -4,6 +4,7 @@ class MyGroupItem {
     required this.id,
     required this.name,
     required this.avatarAsset,
+    this.avatarUrl,
   });
 
   /// Unique identifier.
@@ -12,8 +13,11 @@ class MyGroupItem {
   /// Group name.
   final String name;
 
-  /// Local asset path for the circular avatar.
+  /// Local asset path for the circular avatar (fallback).
   final String avatarAsset;
+
+  /// Remote avatar URL from API when available.
+  final String? avatarUrl;
 }
 
 /// Data for a popular group list item.
@@ -27,6 +31,7 @@ class PopularGroupItem {
     required this.memberCount,
     required this.postCount,
     required this.level,
+    this.avatarUrl,
     this.isJoined = false,
   });
 
@@ -42,8 +47,11 @@ class PopularGroupItem {
   /// Short description.
   final String description;
 
-  /// Local asset path for the rounded-square avatar.
+  /// Local asset path for the rounded-square avatar (fallback).
   final String avatarAsset;
+
+  /// Remote avatar URL from API when available.
+  final String? avatarUrl;
 
   /// Member count.
   final int memberCount;
@@ -63,6 +71,7 @@ class PopularGroupItem {
     String? category,
     String? description,
     String? avatarAsset,
+    String? avatarUrl,
     int? memberCount,
     int? postCount,
     int? level,
@@ -74,6 +83,7 @@ class PopularGroupItem {
       category: category ?? this.category,
       description: description ?? this.description,
       avatarAsset: avatarAsset ?? this.avatarAsset,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
       memberCount: memberCount ?? this.memberCount,
       postCount: postCount ?? this.postCount,
       level: level ?? this.level,
@@ -86,5 +96,6 @@ class PopularGroupItem {
         id: id,
         name: name,
         avatarAsset: avatarAsset,
+        avatarUrl: avatarUrl,
       );
 }

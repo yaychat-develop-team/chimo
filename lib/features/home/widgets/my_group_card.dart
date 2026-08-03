@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_assets.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/network_or_asset_avatar.dart';
 import '../models/group_item.dart';
 
 /// My Groups card (design: width 100, base card height 70, avatar 54).
@@ -85,7 +86,10 @@ class MyGroupCard extends StatelessWidget {
                   ],
                 ),
                 child: ClipOval(
-                  child: Image.asset(group.avatarAsset, fit: BoxFit.cover),
+                  child: NetworkOrAssetAvatar(
+                    asset: group.avatarAsset,
+                    url: group.avatarUrl,
+                  ),
                 ),
               ),
             ),

@@ -124,6 +124,14 @@ class _DmMessagesFeed extends StatelessWidget {
               peerAvatar: peerAvatar,
               showAvatar: showAvatar,
             ),
+            _ChatLineKind.gift => _GiftMessageCard(
+              side: line.side,
+              giftId: line.giftId,
+              qty: line.giftQty,
+              emoji: line.giftEmoji,
+              peerAvatar: peerAvatar,
+              showAvatar: showAvatar,
+            ),
             _ChatLineKind.text =>
               line.side == _ChatSide.self
                   ? _SelfBubble(text: line.text, showAvatar: showAvatar)
@@ -590,6 +598,207 @@ class _ImageBubble extends StatelessWidget {
         avatar,
         const SizedBox(width: _BubbleLayout.avatarGap),
         bubble,
+      ],
+    );
+  }
+}
+
+class _GiftMessageCard extends StatelessWidget {
+  const _GiftMessageCard({
+    required this.side,
+    required this.giftId,
+    required this.qty,
+    required this.emoji,
+    required this.peerAvatar,
+    required this.showAvatar,
+  });
+
+  final _ChatSide side;
+  final int giftId;
+  final int qty;
+  final String emoji;
+  final String peerAvatar;
+  final bool showAvatar;
+
+  /// Design: pink→peach gift strip with corner chest badge.
+  static const _cardHeight = 82.0;
+  static const _cardMax = 268.0;
+  static const _qtyYellow = Color(0xFFE8FF00);
+
+  @override
+  Widget build(BuildContext context) {
+    final isSelf = side == _ChatSide.self;
+    final avatar = showAvatar
+        ? (isSelf
+            ? const SizedBox(width: _BubbleLayout.avatar)
+            : _ChatAvatar(asset: peerAvatar))
+        : const SizedBox(width: _BubbleLayout.avatar);
+
+    final card = ConstrainedBox(
+      constraints: const BoxConstraints(
+        maxWidth: _cardMax,
+        minWidth: 220,
+      ),
+      child: SizedBox(
+        height: _cardHeight,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  gradient: const LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: [
+                      Color(0xFFFFD0E4),
+                      Color(0xFFFFE4C4),
+                      Color(0xFFFFF3C8),
+                    ],
+                    stops: [0.0, 0.55, 1.0],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFFF8AB8).withValues(alpha: 0.18),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 8, 20, 8),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 66,
+                        height: 66,
+                        child: Center(
+                          child: Text(
+                            emoji.isEmpty ? '🎁' : emoji,
+                            style: const TextStyle(fontSize: 44, height: 1),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Gift to you',
+                              style: TextStyle(
+                                color: Color(0xFF1A1A1A),
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                height: 1.15,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  '$giftId',
+                                  style: const TextStyle(
+                                    color: Color(0xFF1A1A1A),
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w800,
+                                    height: 1.1,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                // Neon yellow qty with light outline for cream bg.
+                                Stack(
+                                  children: [
+                                    Text(
+                                      'x $qty',
+                                      style: TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w900,
+                                        fontStyle: FontStyle.italic,
+                                        height: 1,
+                                        foreground: Paint()
+                                          ..style = PaintingStyle.stroke
+                                          ..strokeWidth = 2.2
+                                          ..color = const Color(0xFF3A2A00),
+                                      ),
+                                    ),
+                                    Text(
+                                      'x $qty',
+                                      style: const TextStyle(
+                                        color: _qtyYellow,
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w900,
+                                        fontStyle: FontStyle.italic,
+                                        height: 1,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              right: -4,
+              bottom: -8,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFFFB020).withValues(alpha: 0.55),
+                          blurRadius: 10,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Image.asset(
+                    AppAssets.giftIcon,
+                    width: 30,
+                    height: 30,
+                    fit: BoxFit.contain,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (isSelf) {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          card,
+          const SizedBox(width: _BubbleLayout.avatarGap),
+          avatar,
+        ],
+      );
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        avatar,
+        const SizedBox(width: _BubbleLayout.avatarGap),
+        card,
       ],
     );
   }

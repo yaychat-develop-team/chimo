@@ -5,6 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/constants/app_assets.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/center_toast.dart';
+import '../../../core/widgets/network_or_asset_avatar.dart';
 import '../models/me_models.dart';
 
 /// Avatar on top; row below: left = name + ID, right = My Profile.
@@ -37,7 +38,10 @@ class MeProfileHeader extends StatelessWidget {
               border: Border.all(color: Colors.white, width: 2),
             ),
             child: ClipOval(
-              child: Image.asset(profile.avatarAsset, fit: BoxFit.cover),
+              child: NetworkOrAssetAvatar(
+                asset: profile.avatarAsset,
+                url: profile.avatarUrl,
+              ),
             ),
           ),
         ),
@@ -50,7 +54,7 @@ class MeProfileHeader extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    profile.displayName,
+                    profile.displayName.isEmpty ? 'User' : profile.displayName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(

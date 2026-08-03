@@ -9,12 +9,14 @@ class _GiftSheet extends StatefulWidget {
 
 class _GiftItem {
   const _GiftItem({
+    required this.id,
     required this.name,
     required this.emoji,
     required this.cost,
     required this.color,
   });
 
+  final int id;
   final String name;
   final String emoji;
   final int cost;
@@ -29,38 +31,56 @@ class _GiftSheetState extends State<_GiftSheet> {
 
   final List<_GiftItem> _gifts = const [
     _GiftItem(
-      name: 'Sagittarius M...',
-      emoji: '🔮',
+      id: 423,
+      name: 'Rose Moon',
+      emoji: '🌹',
       cost: 3000,
-      color: Color(0xFF2D6BFF),
+      color: Color(0xFFEF5350),
     ),
-    _GiftItem(name: 'Rosee', emoji: '🌹', cost: 10, color: Color(0xFFEF5350)),
-    _GiftItem(name: 'Kisses', emoji: '💋', cost: 10, color: Color(0xFFFF5BA8)),
     _GiftItem(
-      name: 'Thanksgiving...',
-      emoji: '🦃',
+      id: 426,
+      name: 'Love Chest',
+      emoji: '💝',
+      cost: 10,
+      color: Color(0xFFFF5BA8),
+    ),
+    _GiftItem(
+      id: 421,
+      name: 'Sunflower',
+      emoji: '🌻',
+      cost: 10,
+      color: Color(0xFFFFA726),
+    ),
+    _GiftItem(
+      id: 424,
+      name: 'Flower Truck',
+      emoji: '🚚',
       cost: 40000,
-      color: Color(0xFF7B4DFF),
+      color: Color(0xFFFF5BA8),
     ),
     _GiftItem(
+      id: 430,
       name: 'Spellbook',
       emoji: '📕',
       cost: 60,
       color: Color(0xFFEF5350),
     ),
     _GiftItem(
+      id: 431,
       name: 'Fortune Cook...',
       emoji: '🍳',
       cost: 100,
       color: Color(0xFF2F6BFF),
     ),
     _GiftItem(
+      id: 432,
       name: 'Doughnut',
       emoji: '🍩',
       cost: 60,
       color: Color(0xFFFFA726),
     ),
     _GiftItem(
+      id: 433,
       name: 'Flutter',
       emoji: '🦋',
       cost: 120,
@@ -112,12 +132,16 @@ class _GiftSheetState extends State<_GiftSheet> {
   void _sendSelected() {
     final item = _gifts[_selected];
     final total = item.cost * _qty;
-    Navigator.of(context).pop();
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Send ${item.name} ×$_qty (cost: $total)'),
-        behavior: SnackBarBehavior.floating,
+    if (_balance < total) {
+      showCenterToast(context, message: 'Insufficient balance.');
+      return;
+    }
+    Navigator.of(context).pop(
+      _GiftSendResult(
+        id: item.id,
+        emoji: item.emoji,
+        name: item.name,
+        qty: _qty,
       ),
     );
   }

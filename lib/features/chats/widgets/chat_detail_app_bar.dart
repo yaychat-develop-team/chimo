@@ -38,7 +38,10 @@ class _DmAppBar extends StatelessWidget {
                 IconButton(
                   onPressed: () => Navigator.of(context).pop(),
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                  constraints: const BoxConstraints(
+                    minWidth: 40,
+                    minHeight: 40,
+                  ),
                   icon: const AppAssetImage(
                     AppAssets.chatDmBack,
                     width: 17,
@@ -198,9 +201,7 @@ class _DmAppBar extends StatelessWidget {
                         spacing: 6,
                         runSpacing: 6,
                         children: [
-                          _ProfileTag(
-                            label: '♑ ${conversation.zodiac}',
-                          ),
+                          _ProfileTag(label: '♑ ${conversation.zodiac}'),
                         ],
                       ),
                       if (conversation.momentAssets.isNotEmpty) ...[
@@ -378,4 +379,3 @@ class _DmMoreItem extends StatelessWidget {
     );
   }
 }
-

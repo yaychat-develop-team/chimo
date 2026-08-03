@@ -23,7 +23,6 @@ abstract final class AuthSession {
       return await getApplicationSupportDirectory();
     } catch (error, stack) {
       debugPrint('AuthSession path_provider failed: $error\n$stack');
-      // Fallback when plugins are unavailable (e.g. some test hosts).
       return Directory('${Directory.systemTemp.path}/chimo_auth');
     }
   }
@@ -52,7 +51,10 @@ abstract final class AuthSession {
 
   static Future<bool> isLoggedIn() async {
     final data = await _read();
-    return data['loggedIn'] == true;
+    final token = data['token'];
+    return data['loggedIn'] == true &&
+        token is String &&
+        token.isNotEmpty;
   }
 
   static Future<String?> phone() async {
@@ -61,16 +63,40 @@ abstract final class AuthSession {
     return value is String && value.isNotEmpty ? value : null;
   }
 
+  static Future<String?> token() async {
+    final data = await _read();
+    final value = data['token'];
+    return value is String && value.isNotEmpty ? value : null;
+  }
+
+  static Future<String?> nickname() async {
+    final data = await _read();
+    final value = data['nickname'];
+    return value is String && value.isNotEmpty ? value : null;
+  }
+
+  static Future<String?> avatarUrl() async {
+    final data = await _read();
+    final value = data['avatarUrl'];
+    return value is String && value.isNotEmpty ? value : null;
+  }
+
   /// [method]: `phone` / `email`.
   static Future<void> markLoggedIn({
     String method = 'phone',
     String? phone,
+    String? token,
+    String? nickname,
+    String? avatarUrl,
   }) async {
     final data = await _read();
     data['loggedIn'] = true;
     data['method'] = method;
-    if (phone != null && phone.isNotEmpty) {
-      data['phone'] = phone;
+    if (phone != null && phone.isNotEmpty) data['phone'] = phone;
+    if (token != null && token.isNotEmpty) data['token'] = token;
+    if (nickname != null && nickname.isNotEmpty) data['nickname'] = nickname;
+    if (avatarUrl != null && avatarUrl.isNotEmpty) {
+      data['avatarUrl'] = avatarUrl;
     }
     await _write(data);
   }
@@ -78,9 +104,7 @@ abstract final class AuthSession {
   static Future<void> clear() async {
     try {
       final file = await _sessionFile();
-      if (await file.exists()) {
-        await file.delete();
-      }
+      if (await file.exists()) await file.delete();
     } catch (error, stack) {
       debugPrint('AuthSession clear failed: $error\n$stack');
     }

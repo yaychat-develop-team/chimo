@@ -28,7 +28,7 @@ class AppProviders extends StatelessWidget {
         Provider<GroupRepository>.value(value: groupRepository),
         Provider<UserRepository>.value(value: userRepository),
         ChangeNotifierProvider<ChatsListController>(
-          create: (_) => ChatsListController(chatRepository: chatRepository),
+          create: (_) => ChatsListController(),
         ),
       ],
       child: child,

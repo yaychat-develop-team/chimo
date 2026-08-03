@@ -1,11 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/constants/app_assets.dart';
+import '../../core/network/group_dto.dart';
+import '../../core/network/network_bootstrap.dart';
 import '../../core/theme/app_colors.dart';
 import '../chats/data/chats_list_controller.dart';
-import 'data/home_mock_data.dart';
 import 'chat_user_profile_page.dart';
+import 'data/banner_dto.dart';
 import 'group_details_page.dart';
 import 'home_search_page.dart';
 import 'joined_groups_page.dart';
@@ -38,8 +42,11 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  late List<PopularGroupItem> _popularGroups;
-  late List<PopularGroupItem> _joinedGroups;
+  List<PopularGroupItem> _popularGroups = const [];
+  List<PopularGroupItem> _joinedGroups = const [];
+  List<HomeBannerItem> _banners = const [];
+  bool _initialLoading = true;
+  String? _loadError;
 
   final ScrollController _scrollController = ScrollController();
 
@@ -54,13 +61,10 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    _popularGroups = List.of(HomeMockData.popularGroups);
-    _joinedGroups = [
-      for (final group in _popularGroups)
-        if (group.isJoined) group,
-    ];
-    // Sync home membership from any join/leave entry (independent of chat existence).
     widget.chatsController.addListener(_syncMembershipFromController);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_loadFromApi(showError: true));
+    });
   }
 
   @override
@@ -133,8 +137,13 @@ class _HomePageState extends State<HomePage> {
       final popularIndex =
           _popularGroups.indexWhere((item) => item.id == group.id);
       if (popularIndex >= 0) {
-        _popularGroups[popularIndex] =
-            _popularGroups[popularIndex].copyWith(isJoined: joined);
+        _popularGroups = [
+          for (var i = 0; i < _popularGroups.length; i++)
+            if (i == popularIndex)
+              _popularGroups[i].copyWith(isJoined: joined)
+            else
+              _popularGroups[i],
+        ];
       }
 
       final joinedIndex =
@@ -147,16 +156,17 @@ class _HomePageState extends State<HomePage> {
         if (joinedIndex < 0) {
           _joinedGroups = [..._joinedGroups, updated];
         } else {
-          _joinedGroups[joinedIndex] = updated;
+          _joinedGroups = [
+            for (var i = 0; i < _joinedGroups.length; i++)
+              if (i == joinedIndex) updated else _joinedGroups[i],
+          ];
         }
-      } else if (joinedIndex >= 0) {
-        updated = group.copyWith(isJoined: false);
-        _joinedGroups = [
-          for (var i = 0; i < _joinedGroups.length; i++)
-            if (i != joinedIndex) _joinedGroups[i],
-        ];
       } else {
         updated = group.copyWith(isJoined: false);
+        _joinedGroups = [
+          for (final item in _joinedGroups)
+            if (item.id != group.id) item,
+        ];
       }
     });
 
@@ -167,8 +177,34 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  void _toggleJoin(PopularGroupItem group) {
-    _setJoined(group, !group.isJoined);
+  Future<void> _toggleJoin(PopularGroupItem group) async {
+    final latest = _latestGroup(group);
+    if (latest.isJoined) return;
+
+    _setJoined(latest, true);
+
+    try {
+      final res = await NetworkBootstrap.api.joinGroup([latest.id]);
+      if (!mounted) return;
+      if (!res.success) {
+        _setJoined(latest, false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(res.message.isEmpty ? 'Join failed' : res.message),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (error) {
+      if (!mounted) return;
+      _setJoined(latest, false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Join failed: $error'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   PopularGroupItem _latestGroup(PopularGroupItem group) {
@@ -197,6 +233,7 @@ class _HomePageState extends State<HomePage> {
   void _openMembersSheet(PopularGroupItem group) {
     GroupMembersSheet.show(
       context,
+      groupId: group.id,
       onMemberTap: (member) {
         Navigator.of(context).pop();
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -214,26 +251,109 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Future<void> _reloadData() async {
-    await Future<void>.delayed(const Duration(milliseconds: 900));
-    if (!mounted) return;
-    setState(() {
-      final joinedIds = {for (final group in _joinedGroups) group.id};
-      _popularGroups = [
-        for (final group in HomeMockData.popularGroups)
-          group.copyWith(isJoined: joinedIds.contains(group.id)),
+  Future<void> _loadFromApi({bool showError = false}) async {
+    try {
+      final api = NetworkBootstrap.api;
+      final results = await Future.wait([
+        api.groupList(pageNum: 1, pageSize: 20),
+        api.myGroups(),
+        api.homeMain(),
+      ]);
+      final popularRes = results[0];
+      final mineRes = results[1];
+      final homeRes = results[2];
+
+      if (!mounted) return;
+
+      if (!popularRes.success && popularRes.message == 'user.not.login') {
+        setState(() {
+          _initialLoading = false;
+          _loadError = 'Please log in again to load groups';
+          _popularGroups = const [];
+          _joinedGroups = const [];
+        });
+        if (showError) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(_loadError!),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+        return;
+      }
+
+      final popular = GroupDto.parseList(popularRes);
+      var mine = GroupDto.parseList(mineRes);
+      if (mine.isEmpty && mineRes.success) {
+        final data = mineRes.data;
+        if (data is Map) {
+          final list = data['groupList'] ?? data['myGroups'] ?? data['list'];
+          if (list is List) {
+            mine = [
+              for (final item in list)
+                if (item is Map)
+                  GroupDto.fromMap(Map<String, dynamic>.from(item)),
+            ];
+          }
+        }
+      }
+
+      final banners = homeRes.success
+          ? BannerDto.parseHomeMain(homeRes.data)
+          : const <HomeBannerItem>[];
+
+      final controllerIds = widget.chatsController.joinedGroupIds;
+      final mineIds = {for (final g in mine) g.id, ...controllerIds};
+      final mergedPopular = [
+        for (final g in popular)
+          g.copyWith(isJoined: g.isJoined || mineIds.contains(g.id)),
       ];
-      _joinedGroups = [
-        for (final group in _joinedGroups)
-          () {
-            for (final popular in _popularGroups) {
-              if (popular.id == group.id) return popular;
-            }
-            return group;
-          }(),
+
+      final joined = <PopularGroupItem>[
+        for (final g in mine) g.copyWith(isJoined: true),
       ];
-    });
+      for (final g in mergedPopular) {
+        if (!g.isJoined) continue;
+        if (joined.any((j) => j.id == g.id)) continue;
+        joined.add(g);
+      }
+
+      setState(() {
+        _popularGroups = mergedPopular;
+        _joinedGroups = joined;
+        _banners = banners;
+        _initialLoading = false;
+        _loadError = popularRes.success
+            ? null
+            : (popularRes.message.isEmpty
+                ? 'Failed to load groups'
+                : popularRes.message);
+      });
+
+      for (final g in joined) {
+        if (!widget.chatsController.joinedGroupIds.contains(g.id)) {
+          widget.chatsController.joinGroup(g);
+        }
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _initialLoading = false;
+        _loadError = '$error';
+      });
+      if (showError) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load groups: $error'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
+
+  Future<void> _reloadData() => _loadFromApi();
 
   void _updatePull(double extent) {
     final next = extent.clamp(0.0, _maxPullExtent);
@@ -334,7 +454,7 @@ class _HomePageState extends State<HomePage> {
                         );
                       },
                     ),
-                    const HomeHeroBanner(),
+                    HomeHeroBanner(banners: _banners),
                   ],
                 ),
               ),
@@ -362,54 +482,103 @@ class _HomePageState extends State<HomePage> {
                   : null,
             ),
             Expanded(
-              child: Listener(
-                onPointerMove: _onPointerMove,
-                onPointerUp: _onPointerUp,
-                onPointerCancel: _onPointerUp,
-                child: CustomScrollView(
-                  controller: _scrollController,
-                  physics: lockListScroll
-                      ? const NeverScrollableScrollPhysics()
-                      : const AlwaysScrollableScrollPhysics(),
-                  slivers: [
-                    if (_joinedGroups.isNotEmpty)
-                      SliverToBoxAdapter(
-                        child: MyGroupsSection(
-                          groups: _myGroups,
-                          onMoreTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) => JoinedGroupsPage(
-                                  groups: _joinedGroups,
-                                  chatsController: widget.chatsController,
-                                  onMembershipChanged: _setJoined,
+              child: _initialLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        color: AppColors.primaryBright,
+                      ),
+                    )
+                  : Listener(
+                      onPointerMove: _onPointerMove,
+                      onPointerUp: _onPointerUp,
+                      onPointerCancel: _onPointerUp,
+                      child: CustomScrollView(
+                        controller: _scrollController,
+                        physics: lockListScroll
+                            ? const NeverScrollableScrollPhysics()
+                            : const AlwaysScrollableScrollPhysics(),
+                        slivers: [
+                          if (_loadError != null && _popularGroups.isEmpty)
+                            SliverFillRemaining(
+                              hasScrollBody: false,
+                              child: Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(24),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        _loadError!,
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(
+                                          color: AppColors.textSecondary,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      TextButton(
+                                        onPressed: () {
+                                          setState(() {
+                                            _initialLoading = true;
+                                            _loadError = null;
+                                          });
+                                          unawaited(
+                                            _loadFromApi(showError: true),
+                                          );
+                                        },
+                                        child: const Text('Retry'),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
-                            );
-                          },
-                          onGroupTap: (item) {
-                            final full = _joinedGroups.firstWhere(
-                              (g) => g.id == item.id,
-                              orElse: () => HomeMockData.resolveGroup(
-                                id: item.id,
-                                name: item.name,
+                            ),
+                          if (_joinedGroups.isNotEmpty)
+                            SliverToBoxAdapter(
+                              child: MyGroupsSection(
+                                groups: _myGroups,
+                                onMoreTap: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute<void>(
+                                      builder: (_) => JoinedGroupsPage(
+                                        groups: _joinedGroups,
+                                        chatsController: widget.chatsController,
+                                        onMembershipChanged: _setJoined,
+                                      ),
+                                    ),
+                                  );
+                                },
+                                onGroupTap: (item) {
+                                  final full = _joinedGroups.firstWhere(
+                                    (g) => g.id == item.id,
+                                    orElse: () => PopularGroupItem(
+                                      id: item.id,
+                                      name: item.name,
+                                      category: '',
+                                      description: '',
+                                      avatarAsset: item.avatarAsset,
+                                      avatarUrl: item.avatarUrl,
+                                      memberCount: 0,
+                                      postCount: 0,
+                                      level: 1,
+                                      isJoined: true,
+                                    ),
+                                  );
+                                  _openGroupDetails(full);
+                                },
                               ),
-                            );
-                            _openGroupDetails(full);
-                          },
-                        ),
-                      ),
-                    SliverToBoxAdapter(
-                      child: PopularGroupsSection(
-                        groups: _popularGroups,
-                        onJoinTap: _toggleJoin,
-                        onGroupTap: _openGroupDetails,
-                        onMembersTap: _openMembersSheet,
+                            ),
+                          SliverToBoxAdapter(
+                            child: PopularGroupsSection(
+                              groups: _popularGroups,
+                              onJoinTap: (g) => unawaited(_toggleJoin(g)),
+                              onGroupTap: _openGroupDetails,
+                              onMembersTap: _openMembersSheet,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
-              ),
             ),
           ],
         ),

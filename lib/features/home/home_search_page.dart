@@ -1,19 +1,25 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/constants/app_assets.dart';
+import '../../core/network/network_bootstrap.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_asset_image.dart';
 import '../../core/widgets/center_toast.dart';
+import '../../core/widgets/network_or_asset_avatar.dart';
+import '../../shared/models/friend_user.dart';
 import '../chats/chat_detail_page.dart';
 import '../chats/data/chats_list_controller.dart';
 import '../chats/models/chat_conversation.dart';
-import '../me/data/me_mock_data.dart';
+import '../friends/data/friend_dto.dart';
+import '../me/data/user_dto.dart';
 import 'models/chat_user_profile.dart';
 
 enum _SearchRelation { self, notFollowing, following }
 
-/// Mock user hit from home search.
+/// User hit from home search (`/user-relation/searchUser`).
 class _SearchUser {
   const _SearchUser({
     required this.id,
@@ -22,6 +28,7 @@ class _SearchUser {
     required this.avatarAsset,
     required this.isMale,
     required this.age,
+    this.avatarUrl,
     this.momentAssets = const [],
     this.relation = _SearchRelation.notFollowing,
   });
@@ -30,6 +37,7 @@ class _SearchUser {
   final String nickname;
   final String userId;
   final String avatarAsset;
+  final String? avatarUrl;
   final bool isMale;
   final int age;
   final List<String> momentAssets;
@@ -41,6 +49,7 @@ class _SearchUser {
       nickname: nickname,
       userId: userId,
       avatarAsset: avatarAsset,
+      avatarUrl: avatarUrl,
       isMale: isMale,
       age: age,
       momentAssets: momentAssets,
@@ -63,52 +72,13 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
   final TextEditingController _controller = TextEditingController();
   final FocusNode _focusNode = FocusNode();
   final List<String> _history = [];
-  final Set<String> _followingIds = {'1002031'};
   bool _editingHistory = false;
   _SearchUser? _result;
   bool _hasSearched = false;
+  bool _searching = false;
+  String? _selfUserId;
 
   static final RegExp _idPattern = RegExp(r'^\d{5,}$');
-
-  /// Design spec: current user's ID.
-  static const String _demoSelfId = '1011231';
-
-  static const Map<String, _SearchUser> _mockUsers = {
-    '1002031': _SearchUser(
-      id: 'dm_snake',
-      nickname: 'snake',
-      userId: '1002031',
-      avatarAsset: AppAssets.avatarPlace,
-      isMale: false,
-      age: 33,
-      momentAssets: ChatUserProfile.demoMomentAssets,
-      relation: _SearchRelation.following,
-    ),
-    '1008981': _SearchUser(
-      id: 'dm_l7',
-      nickname: 'L7',
-      userId: '1008981',
-      avatarAsset: AppAssets.genderMaleImg,
-      isMale: true,
-      age: 30,
-      momentAssets: ChatUserProfile.demoMomentAssets,
-      relation: _SearchRelation.notFollowing,
-    ),
-    _demoSelfId: _SearchUser(
-      id: 'me',
-      nickname: 'xiaoge',
-      userId: _demoSelfId,
-      avatarAsset: AppAssets.genderFemaleImg,
-      isMale: false,
-      age: 31,
-      momentAssets: ChatUserProfile.demoMomentAssets,
-      relation: _SearchRelation.self,
-    ),
-  };
-
-  bool _isSelfId(String userId) {
-    return userId == _demoSelfId || userId == MeMockData.profile.userId;
-  }
 
   @override
   void initState() {
@@ -116,7 +86,17 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
     _controller.addListener(_onInputChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _focusNode.requestFocus();
+      unawaited(_loadSelfId());
     });
+  }
+
+  Future<void> _loadSelfId() async {
+    try {
+      final res = await NetworkBootstrap.api.userInfo();
+      final profile = UserDto.parseProfile(res);
+      if (!mounted || profile == null) return;
+      setState(() => _selfUserId = profile.userId);
+    } catch (_) {}
   }
 
   @override
@@ -171,39 +151,26 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
 
   bool _isValidId(String query) => _idPattern.hasMatch(query);
 
-  _SearchUser _userForId(String userId) {
-    if (_isSelfId(userId)) {
-      final self = _mockUsers[_demoSelfId];
-      if (userId == _demoSelfId && self != null) return self;
-      return _SearchUser(
-        id: 'me',
-        nickname: MeMockData.profile.displayName,
-        userId: MeMockData.profile.userId,
-        avatarAsset: MeMockData.profile.avatarAsset,
-        isMale: MeMockData.profile.isMale,
-        age: 31,
-        relation: _SearchRelation.self,
-      );
-    }
-
-    final base =
-        _mockUsers[userId] ??
-        _SearchUser(
-          id: 'dm_$userId',
-          nickname: 'User$userId',
-          userId: userId,
-          avatarAsset: AppAssets.avatarPlace,
-          isMale: userId.hashCode.isEven,
-          age: 22 + (userId.hashCode.abs() % 20),
-        );
-
-    if (_followingIds.contains(userId)) {
-      return base.copyWith(relation: _SearchRelation.following);
-    }
-    return base.copyWith(relation: _SearchRelation.notFollowing);
+  _SearchUser _fromFriend(FriendUser u) {
+    final relation = switch (u.relation) {
+      FriendRelation.mutual || FriendRelation.following =>
+        _SearchRelation.following,
+      _ => _SearchRelation.notFollowing,
+    };
+    return _SearchUser(
+      id: 'dm_${u.id}',
+      nickname: u.nickname,
+      userId: u.userId,
+      avatarAsset: u.avatarAsset,
+      avatarUrl: u.avatarUrl,
+      isMale: u.isMale,
+      age: u.age,
+      momentAssets: ChatUserProfile.demoMomentAssets,
+      relation: relation,
+    );
   }
 
-  void _submit(String raw) {
+  Future<void> _submit(String raw) async {
     final query = raw.trim();
     if (query.isEmpty) return;
 
@@ -227,23 +194,84 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
       if (_history.length > 20) {
         _history.removeRange(20, _history.length);
       }
-      _result = _userForId(query);
+      _searching = true;
       _hasSearched = true;
+      _result = null;
     });
+
+    try {
+      final res = await NetworkBootstrap.api.searchUsers(query);
+      if (!mounted) return;
+
+      if (!res.success) {
+        setState(() => _searching = false);
+        showCenterToast(
+          context,
+          message: res.message.isEmpty ? 'Search failed' : res.message,
+        );
+        return;
+      }
+
+      final users = FriendDto.parseList(
+        res,
+        relation: FriendRelation.follower,
+      );
+      _SearchUser? hit;
+      for (final u in users) {
+        if (u.userId == query || u.id == query) {
+          hit = _fromFriend(u);
+          break;
+        }
+      }
+      hit ??= users.isEmpty ? null : _fromFriend(users.first);
+
+      if (hit != null &&
+          _selfUserId != null &&
+          hit.userId == _selfUserId) {
+        hit = hit.copyWith(relation: _SearchRelation.self);
+      }
+
+      setState(() {
+        _result = hit;
+        _searching = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _searching = false);
+      showCenterToast(context, message: 'Search failed: $error');
+    }
   }
 
   void _onHistoryTap(String item) {
     if (_editingHistory) return;
     _controller.text = item;
     _controller.selection = TextSelection.collapsed(offset: item.length);
-    _submit(item);
+    unawaited(_submit(item));
   }
 
-  void _follow(_SearchUser user) {
+  Future<void> _follow(_SearchUser user) async {
     setState(() {
-      _followingIds.add(user.userId);
       _result = user.copyWith(relation: _SearchRelation.following);
     });
+    try {
+      final res = await NetworkBootstrap.api.followUser(user.userId);
+      if (!mounted) return;
+      if (!res.success) {
+        setState(() {
+          _result = user.copyWith(relation: _SearchRelation.notFollowing);
+        });
+        showCenterToast(
+          context,
+          message: res.message.isEmpty ? 'Follow failed' : res.message,
+        );
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _result = user.copyWith(relation: _SearchRelation.notFollowing);
+      });
+      showCenterToast(context, message: 'Follow failed: $error');
+    }
   }
 
   void _openChat(_SearchUser user) {
@@ -251,6 +279,7 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
       id: user.id,
       title: user.nickname,
       avatarAsset: user.avatarAsset,
+      avatarUrl: user.avatarUrl,
       lastMessage: '',
       timeLabel: 'Just',
       isMale: user.isMale,
@@ -271,7 +300,7 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
   @override
   Widget build(BuildContext context) {
     final hasText = _controller.text.isNotEmpty;
-    final showResults = _hasSearched && _result != null;
+    final showResults = _hasSearched && (_result != null || _searching);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -314,7 +343,7 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
                               inputFormatters: [
                                 LengthLimitingTextInputFormatter(64),
                               ],
-                              onSubmitted: _submit,
+                              onSubmitted: (v) => unawaited(_submit(v)),
                               decoration: const InputDecoration(
                                 isDense: true,
                                 border: InputBorder.none,
@@ -364,11 +393,29 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
             ),
             if (showResults)
               Expanded(
-                child: _UsersResult(
-                  user: _result!,
-                  onFollow: () => _follow(_result!),
-                  onChat: () => _openChat(_result!),
-                ),
+                child: _searching
+                    ? const Center(
+                        child: SizedBox(
+                          width: 28,
+                          height: 28,
+                          child: CircularProgressIndicator(strokeWidth: 2.4),
+                        ),
+                      )
+                    : _result == null
+                        ? const Center(
+                            child: Text(
+                              'No users found',
+                              style: TextStyle(
+                                color: AppColors.textTertiary,
+                                fontSize: 14,
+                              ),
+                            ),
+                          )
+                        : _UsersResult(
+                            user: _result!,
+                            onFollow: () => unawaited(_follow(_result!)),
+                            onChat: () => _openChat(_result!),
+                          ),
               )
             else ...[
               Padding(
@@ -501,11 +548,11 @@ class _UsersResult extends StatelessWidget {
         Row(
           children: [
             ClipOval(
-              child: Image.asset(
-                user.avatarAsset,
+              child: NetworkOrAssetAvatar(
+                asset: user.avatarAsset,
+                url: user.avatarUrl,
                 width: 52,
                 height: 52,
-                fit: BoxFit.cover,
               ),
             ),
             const SizedBox(width: 12),

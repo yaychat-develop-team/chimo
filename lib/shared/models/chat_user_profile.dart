@@ -13,16 +13,22 @@ class ChatUserProfile {
     required this.zodiac,
     required this.level,
     required this.bio,
+    this.avatarUrl,
     this.voiceSeconds,
-    this.giftUnlocked = 12,
-    this.giftTotal = 58,
+    this.giftUnlocked = 0,
+    this.giftTotal = 0,
     this.momentAssets = const [],
+    this.momentUrls = const [],
+    this.tags = const [],
+    this.isFollowing = false,
+    this.inPartyName,
   });
 
   final String id;
   final String nickname;
   final String userId;
   final String avatarAsset;
+  final String? avatarUrl;
   final bool isMale;
   final int age;
   final String zodiac;
@@ -34,6 +40,10 @@ class ChatUserProfile {
   final int giftUnlocked;
   final int giftTotal;
   final List<String> momentAssets;
+  final List<String> momentUrls;
+  final List<String> tags;
+  final bool isFollowing;
+  final String? inPartyName;
 
   static const List<String> demoMomentAssets = [
     AppAssets.launchBg,
@@ -60,16 +70,58 @@ class ChatUserProfile {
     return ChatUserProfile(
       id: member.id,
       nickname: member.nickname,
-      userId: '47571${member.id.padLeft(5, '0')}',
+      userId: member.id,
       avatarAsset: member.avatarAsset,
+      avatarUrl: member.avatarUrl,
       isMale: member.isMale,
       age: member.isMale ? 24 : 22,
       zodiac: member.isMale ? 'Leo' : 'Capricornus',
-      level: 16,
-      bio:
-          'I love listening to songs and playing gaes. Hope to find a good friend.',
-      voiceSeconds: 12,
-      momentAssets: demoMomentAssets,
+      level: 1,
+      bio: '',
+    );
+  }
+
+  ChatUserProfile copyWith({
+    String? id,
+    String? nickname,
+    String? userId,
+    String? avatarAsset,
+    String? avatarUrl,
+    bool? isMale,
+    int? age,
+    String? zodiac,
+    int? level,
+    String? bio,
+    int? voiceSeconds,
+    bool clearVoice = false,
+    int? giftUnlocked,
+    int? giftTotal,
+    List<String>? momentAssets,
+    List<String>? momentUrls,
+    List<String>? tags,
+    bool? isFollowing,
+    String? inPartyName,
+    bool clearInParty = false,
+  }) {
+    return ChatUserProfile(
+      id: id ?? this.id,
+      nickname: nickname ?? this.nickname,
+      userId: userId ?? this.userId,
+      avatarAsset: avatarAsset ?? this.avatarAsset,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      isMale: isMale ?? this.isMale,
+      age: age ?? this.age,
+      zodiac: zodiac ?? this.zodiac,
+      level: level ?? this.level,
+      bio: bio ?? this.bio,
+      voiceSeconds: clearVoice ? null : (voiceSeconds ?? this.voiceSeconds),
+      giftUnlocked: giftUnlocked ?? this.giftUnlocked,
+      giftTotal: giftTotal ?? this.giftTotal,
+      momentAssets: momentAssets ?? this.momentAssets,
+      momentUrls: momentUrls ?? this.momentUrls,
+      tags: tags ?? this.tags,
+      isFollowing: isFollowing ?? this.isFollowing,
+      inPartyName: clearInParty ? null : (inPartyName ?? this.inPartyName),
     );
   }
 }

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/app_router.dart';
 import '../../core/constants/app_assets.dart';
+import '../../core/network/network_bootstrap.dart';
 import '../../core/theme/app_colors.dart';
 
 /// Phone login page (white background design).
@@ -17,6 +18,7 @@ class PhoneLoginPage extends StatefulWidget {
 
 class _PhoneLoginPageState extends State<PhoneLoginPage> {
   final TextEditingController _phoneController = TextEditingController();
+  bool _sending = false;
 
   /// Mainland China phone: starts with 1, second digit 3–9, 11 digits total.
   static final RegExp _phoneRegExp = RegExp(r'^1[3-9]\d{9}$');
@@ -25,7 +27,7 @@ class _PhoneLoginPageState extends State<PhoneLoginPage> {
 
   bool get _isValidPhone => _phoneRegExp.hasMatch(_phone);
 
-  bool get _canLogin => _isValidPhone;
+  bool get _canLogin => _isValidPhone && !_sending;
 
   String? get _errorText {
     if (_phone.isEmpty || _phone.length < 11) return null;
@@ -39,17 +41,44 @@ class _PhoneLoginPageState extends State<PhoneLoginPage> {
     super.dispose();
   }
 
-  void _onLogin() {
-    if (!_isValidPhone) {
+  Future<void> _onLogin() async {
+    if (!_isValidPhone || _sending) {
+      if (!_isValidPhone) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please enter a valid phone number'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+
+    setState(() => _sending = true);
+    try {
+      final res = await NetworkBootstrap.api.sendSms(phone: _phone);
+      if (!mounted) return;
+      if (!res.success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(res.message.isEmpty ? 'SMS send failed' : res.message),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+      context.push(AppRoutes.verifyPath(_phone));
+    } catch (error) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter a valid phone number'),
+        SnackBar(
+          content: Text('SMS send failed: $error'),
           behavior: SnackBarBehavior.floating,
         ),
       );
-      return;
+    } finally {
+      if (mounted) setState(() => _sending = false);
     }
-    context.push(AppRoutes.verifyPath(_phone));
   }
 
   @override
@@ -163,16 +192,25 @@ class _PhoneLoginPageState extends State<PhoneLoginPage> {
                     child: SizedBox(
                       height: 54,
                       child: Center(
-                        child: Text(
-                          'Login',
-                          style: TextStyle(
-                            color: _canLogin
-                                ? Colors.black
-                                : const Color(0xFFB0B0B0),
-                            fontSize: 17,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
+                        child: _sending
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.2,
+                                  color: Colors.black54,
+                                ),
+                              )
+                            : Text(
+                                'Login',
+                                style: TextStyle(
+                                  color: _canLogin
+                                      ? Colors.black
+                                      : const Color(0xFFB0B0B0),
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
                       ),
                     ),
                   ),

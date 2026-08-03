@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../../core/auth/auth_session.dart';
 import '../../core/constants/app_assets.dart';
+import '../../core/network/network_bootstrap.dart';
 import '../../core/theme/app_colors.dart';
 import '../debug/debug_page.dart';
 import '../friends/friends_page.dart';
@@ -11,6 +15,7 @@ import '../wallet/wallet_page.dart';
 import 'about_us_page.dart';
 import 'bind_email_page.dart';
 import 'data/me_mock_data.dart';
+import 'data/user_dto.dart';
 import 'help_page.dart';
 import 'models/me_models.dart';
 import 'settings_page.dart';
@@ -29,6 +34,75 @@ class MePage extends StatefulWidget {
 
 class _MePageState extends State<MePage> {
   MeProfile _profile = MeMockData.profile;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_loadProfile());
+    });
+  }
+
+  /// Compact social count (e.g. 208, 1.2K, 88K).
+  static String _formatCount(int value) {
+    if (value < 1000) return '$value';
+    if (value < 10000) {
+      final k = value / 1000;
+      final text =
+          k == k.roundToDouble() ? '${k.toInt()}' : k.toStringAsFixed(1);
+      return '${text}K';
+    }
+    if (value < 1000000) return '${value ~/ 1000}K';
+    final m = value / 1000000;
+    final text =
+        m == m.roundToDouble() ? '${m.toInt()}' : m.toStringAsFixed(1);
+    return '${text}M';
+  }
+
+  List<MeStatItem> get _stats => [
+        MeStatItem(label: 'Friends', value: _formatCount(_profile.friends)),
+        MeStatItem(label: 'Fans', value: _formatCount(_profile.fans)),
+        MeStatItem(label: 'Follows', value: _formatCount(_profile.follows)),
+        MeStatItem(label: 'Visitors', value: _formatCount(_profile.visitors)),
+      ];
+
+  Future<void> _loadProfile() async {
+    try {
+      final res = await NetworkBootstrap.api.userInfo();
+      if (!mounted) return;
+      final parsed = UserDto.parseProfile(res);
+      if (parsed == null) {
+        setState(() => _loading = false);
+        if (res.message == 'user.not.login') {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please log in again to load profile'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+        return;
+      }
+      setState(() {
+        _profile = parsed;
+        _loading = false;
+      });
+      await AuthSession.markLoggedIn(
+        nickname: parsed.displayName,
+        avatarUrl: parsed.avatarUrl,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to load profile: $error'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
 
   Future<void> _openPersonalProfile() async {
     final updated = await Navigator.of(context).push<MeProfile>(
@@ -81,73 +155,87 @@ class _MePageState extends State<MePage> {
           ),
           SafeArea(
             bottom: false,
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 80, 16, 24),
-              children: [
-                MeProfileHeader(
-                  profile: _profile,
-                  onAvatarTap: _openPersonalProfile,
-                  onProfileTap: _openEditProfile,
-                ),
-                const SizedBox(height: 20),
-                MeStatsRow(stats: MeMockData.stats, onStatTap: _openStatPage),
-                const SizedBox(height: 16),
-                MeActionCards(
-                  onWalletTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const WalletPage(),
+            child: RefreshIndicator(
+              color: AppColors.primaryBright,
+              onRefresh: _loadProfile,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(16, 80, 16, 24),
+                children: [
+                  if (_loading)
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 16),
+                      child: LinearProgressIndicator(
+                        minHeight: 2,
+                        color: AppColors.primaryBright,
+                        backgroundColor: Colors.transparent,
                       ),
-                    );
-                  },
-                  onLevelTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const LevelPage(),
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 24),
-                MeQuickAccessSection(
-                  items: MeMockData.quickAccess,
-                  onItemTap: (item) async {
-                    if (item.id == 'debug') {
+                    ),
+                  MeProfileHeader(
+                    profile: _profile,
+                    onAvatarTap: _openPersonalProfile,
+                    onProfileTap: _openEditProfile,
+                  ),
+                  const SizedBox(height: 20),
+                  MeStatsRow(stats: _stats, onStatTap: _openStatPage),
+                  const SizedBox(height: 16),
+                  MeActionCards(
+                    onWalletTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute<void>(
-                          builder: (_) => const DebugPage(),
+                          builder: (_) => const WalletPage(),
                         ),
                       );
-                    } else if (item.id == 'bind_email') {
+                    },
+                    onLevelTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute<void>(
-                          builder: (_) => const BindEmailPage(),
+                          builder: (_) => const LevelPage(),
                         ),
                       );
-                    } else if (item.id == 'about') {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const AboutUsPage(),
-                        ),
-                      );
-                    } else if (item.id == 'information') {
-                      await _openEditProfile();
-                    } else if (item.id == 'help') {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const HelpPage(),
-                        ),
-                      );
-                    } else if (item.id == 'settings') {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const SettingsPage(),
-                        ),
-                      );
-                    }
-                  },
-                ),
-              ],
+                    },
+                  ),
+                  const SizedBox(height: 24),
+                  MeQuickAccessSection(
+                    items: MeMockData.quickAccess,
+                    onItemTap: (item) async {
+                      if (item.id == 'debug') {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const DebugPage(),
+                          ),
+                        );
+                      } else if (item.id == 'bind_email') {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const BindEmailPage(),
+                          ),
+                        );
+                      } else if (item.id == 'about') {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const AboutUsPage(),
+                          ),
+                        );
+                      } else if (item.id == 'information') {
+                        await _openEditProfile();
+                      } else if (item.id == 'help') {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const HelpPage(),
+                          ),
+                        );
+                      } else if (item.id == 'settings') {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const SettingsPage(),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
         ],

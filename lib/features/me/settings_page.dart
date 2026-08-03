@@ -3,8 +3,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/app_router.dart';
-import '../../core/auth/auth_session.dart';
 import '../../core/constants/app_assets.dart';
+import '../../core/network/network_bootstrap.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_tip_dialog.dart';
 
@@ -35,7 +35,7 @@ class SettingsPage extends StatelessWidget {
     );
     if (!context.mounted || !confirmed) return;
 
-    await AuthSession.clear();
+    await NetworkBootstrap.clearSession();
     if (!context.mounted) return;
     context.go(AppRoutes.login);
   }

@@ -25,5 +25,15 @@ abstract class GroupRepository {
 
 /// Social graph (friends / follows).
 abstract class UserRepository {
+  /// Mutual follows only — Friends tab.
   List<FriendUser> friends();
+
+  /// Everyone I follow (mutual + one-way) — Follow tab.
+  List<FriendUser> following();
+
+  /// Everyone who follows me (mutual + one-way) — Followers tab.
+  List<FriendUser> followers();
+
+  /// Full graph for the contacts screen (all three relations).
+  List<FriendUser> allRelations();
 }

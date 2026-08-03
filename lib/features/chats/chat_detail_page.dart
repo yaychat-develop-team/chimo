@@ -70,6 +70,38 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       side: _ChatSide.peer,
       text: 'I love taking sunset shots 🌅\nHow about you?',
     ),
+    const _ChatLine(
+      side: _ChatSide.peer,
+      kind: _ChatLineKind.gift,
+      giftId: 417,
+      giftQty: 141,
+      giftEmoji: '🫶',
+      giftName: 'Heart Hands',
+    ),
+    const _ChatLine(
+      side: _ChatSide.peer,
+      kind: _ChatLineKind.gift,
+      giftId: 424,
+      giftQty: 32,
+      giftEmoji: '🚚',
+      giftName: 'Flower Truck',
+    ),
+    const _ChatLine(
+      side: _ChatSide.peer,
+      kind: _ChatLineKind.gift,
+      giftId: 423,
+      giftQty: 46,
+      giftEmoji: '🌹',
+      giftName: 'Rose Moon',
+    ),
+    const _ChatLine(
+      side: _ChatSide.peer,
+      kind: _ChatLineKind.gift,
+      giftId: 419,
+      giftQty: 9,
+      giftEmoji: '🥇',
+      giftName: 'Gold Bars',
+    ),
   ];
 
   ChatConversation get _conversation => widget.conversation;
@@ -151,6 +183,22 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     });
     final n = assets.length;
     _afterSend(n <= 1 ? '[Image]' : '[Image ×$n]');
+  }
+
+  void _sendGift(_GiftSendResult gift) {
+    setState(() {
+      _messages.add(
+        _ChatLine(
+          side: _ChatSide.self,
+          kind: _ChatLineKind.gift,
+          giftId: gift.id,
+          giftQty: gift.qty,
+          giftEmoji: gift.emoji,
+          giftName: gift.name,
+        ),
+      );
+    });
+    _afterSend('[Gift] ${gift.id} x${gift.qty}');
   }
 
   void _afterSend(String lastMessage) {
@@ -289,6 +337,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
             onSend: _sendMessage,
             onSendVoice: _sendVoice,
             onSendImages: _sendImages,
+            onSendGift: _sendGift,
           ),
         ],
       ),

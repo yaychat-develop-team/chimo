@@ -2,7 +2,7 @@ part of '../chat_detail_page.dart';
 
 enum _ChatSide { peer, self }
 
-enum _ChatLineKind { text, voice, image }
+enum _ChatLineKind { text, voice, image, gift }
 
 class _ChatLine {
   const _ChatLine({
@@ -11,6 +11,10 @@ class _ChatLine {
     this.text = '',
     this.voiceSeconds = 0,
     this.imageAssets = const [],
+    this.giftId = 0,
+    this.giftQty = 1,
+    this.giftEmoji = '',
+    this.giftName = '',
   });
 
   final _ChatSide side;
@@ -18,12 +22,19 @@ class _ChatLine {
   final String text;
   final int voiceSeconds;
   final List<String> imageAssets;
+  final int giftId;
+  final int giftQty;
+  final String giftEmoji;
+  final String giftName;
 
   String get listPreview {
-    if (kind == _ChatLineKind.voice) return '[Voice] ${voiceSeconds}"';
+    if (kind == _ChatLineKind.voice) return '[Voice] $voiceSeconds"';
     if (kind == _ChatLineKind.image) {
       final n = imageAssets.length;
       return n <= 1 ? '[Image]' : '[Image ×$n]';
+    }
+    if (kind == _ChatLineKind.gift) {
+      return '[Gift] $giftId x$giftQty';
     }
     return text;
   }
@@ -54,6 +65,21 @@ abstract final class _BubbleLayout {
     fontWeight: FontWeight.w600,
     height: 20 / 14,
   );
+}
+
+/// Result from gift sheet → chat stream.
+class _GiftSendResult {
+  const _GiftSendResult({
+    required this.id,
+    required this.emoji,
+    required this.name,
+    required this.qty,
+  });
+
+  final int id;
+  final String emoji;
+  final String name;
+  final int qty;
 }
 
 /// DM detail: black app bar + white message area (drag handle) + input bar.

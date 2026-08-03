@@ -8,6 +8,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/constants/app_assets.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/center_toast.dart';
+import '../../../core/widgets/network_or_asset_avatar.dart';
 
 /// Flavor tag (emoji + label).
 class ProfileFlavorTag {
@@ -55,9 +56,11 @@ class UserProfileScaffold extends StatelessWidget {
     required this.level,
     required this.bio,
     required this.bottomBar,
+    this.avatarUrl,
     this.voiceSeconds,
     this.momentAssets = const [],
-    this.flavors = const [],
+    this.momentUrls = const [],
+    this.flavors,
     this.giftUnlocked = 12,
     this.giftTotal = 58,
     this.inPartyName,
@@ -70,6 +73,7 @@ class UserProfileScaffold extends StatelessWidget {
   final String nickname;
   final String userId;
   final String avatarAsset;
+  final String? avatarUrl;
   final bool isMale;
   final int age;
   final String zodiac;
@@ -79,7 +83,10 @@ class UserProfileScaffold extends StatelessWidget {
   /// Matches Edit Profile Voice Note; hides player when no recording.
   final int? voiceSeconds;
   final List<String> momentAssets;
-  final List<ProfileFlavorTag> flavors;
+  final List<String> momentUrls;
+
+  /// `null` → show default mock tags; empty → hide tags section.
+  final List<ProfileFlavorTag>? flavors;
   final int giftUnlocked;
   final int giftTotal;
 
@@ -101,11 +108,15 @@ class UserProfileScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     final topPadding = MediaQuery.paddingOf(context).top;
     final bottomPadding = MediaQuery.paddingOf(context).bottom;
-    final moments = momentAssets.isEmpty
-        ? List<String>.filled(4, avatarAsset)
-        : momentAssets.take(4).toList();
-    final flavorTags =
-        flavors.isEmpty ? ProfileFlavorTag.defaults : flavors;
+    final remoteMoments = momentUrls.where((u) => u.trim().isNotEmpty).toList();
+    final localMoments = momentAssets.where((u) => u.trim().isNotEmpty).toList();
+    final hasRemoteMoments = remoteMoments.isNotEmpty;
+    final moments = hasRemoteMoments
+        ? remoteMoments.take(4).toList()
+        : (localMoments.isEmpty
+            ? List<String>.filled(4, avatarAsset)
+            : localMoments.take(4).toList());
+    final flavorTags = flavors ?? ProfileFlavorTag.defaults;
 
     // Design: avatar top at y=289; status 44 + button area ~48 → spacer below top bar.
     final avatarTop = 289.0 - topPadding - 48;
@@ -208,9 +219,9 @@ class UserProfileScaffold extends StatelessWidget {
                                   ),
                                 ),
                                 child: ClipOval(
-                                  child: Image.asset(
-                                    avatarAsset,
-                                    fit: BoxFit.cover,
+                                  child: NetworkOrAssetAvatar(
+                                    asset: avatarAsset,
+                                    url: avatarUrl,
                                   ),
                                 ),
                               ),
@@ -372,41 +383,59 @@ class UserProfileScaffold extends StatelessWidget {
                             separatorBuilder: (_, _) =>
                                 const SizedBox(width: 6),
                             itemBuilder: (context, index) {
+                              final src = moments[index];
                               return ClipRRect(
                                 borderRadius: BorderRadius.circular(10),
-                                child: Image.asset(
-                                  moments[index],
-                                  width: 90,
-                                  height: 89,
-                                  fit: BoxFit.cover,
-                                ),
+                                child: hasRemoteMoments ||
+                                        src.startsWith('http')
+                                    ? Image.network(
+                                        src,
+                                        width: 90,
+                                        height: 89,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, error, stack) =>
+                                            Image.asset(
+                                          avatarAsset,
+                                          width: 90,
+                                          height: 89,
+                                          fit: BoxFit.cover,
+                                        ),
+                                      )
+                                    : Image.asset(
+                                        src,
+                                        width: 90,
+                                        height: 89,
+                                        fit: BoxFit.cover,
+                                      ),
                               );
                             },
                           ),
                         ),
                         const SizedBox(height: 28),
-                        const Text(
-                          'My Flavor',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            height: 21 / 14,
+                        if (flavorTags.isNotEmpty) ...[
+                          const Text(
+                            'My Flavor',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              height: 21 / 14,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            for (final tag in flavorTags)
-                              _FlavorChip(
-                                label: tag.label,
-                                emoji: tag.emoji,
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 28),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              for (final tag in flavorTags)
+                                _FlavorChip(
+                                  label: tag.label,
+                                  emoji: tag.emoji,
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 28),
+                        ],
                         _FullGiftWallCard(
                           unlocked: giftUnlocked,
                           total: giftTotal,

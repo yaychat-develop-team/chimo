@@ -1,24 +1,29 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_assets.dart';
+import '../../../core/network/network_bootstrap.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_asset_image.dart';
-import '../data/group_members_mock_data.dart';
+import '../../../core/widgets/network_or_asset_avatar.dart';
+import '../../../shared/models/group_member.dart';
+import '../data/group_member_dto.dart';
 
-/// Group members bottom sheet with fuzzy nickname search.
+/// Group members bottom sheet with nickname search (API-backed).
 class GroupMembersSheet extends StatefulWidget {
   const GroupMembersSheet({
     super.key,
-    this.members = GroupMembersMockData.members,
+    required this.groupId,
     this.onMemberTap,
   });
 
-  final List<GroupMember> members;
+  final String groupId;
   final ValueChanged<GroupMember>? onMemberTap;
 
   static Future<void> show(
     BuildContext context, {
-    List<GroupMember>? members,
+    required String groupId,
     ValueChanged<GroupMember>? onMemberTap,
   }) {
     return showModalBottomSheet<void>(
@@ -27,7 +32,7 @@ class GroupMembersSheet extends StatefulWidget {
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withValues(alpha: 0.55),
       builder: (context) => GroupMembersSheet(
-        members: members ?? GroupMembersMockData.members,
+        groupId: groupId,
         onMemberTap: onMemberTap,
       ),
     );
@@ -39,41 +44,71 @@ class GroupMembersSheet extends StatefulWidget {
 
 class _GroupMembersSheetState extends State<GroupMembersSheet> {
   final TextEditingController _searchController = TextEditingController();
+  Timer? _debounce;
+  List<GroupMember> _members = const [];
+  bool _loading = true;
+  String? _error;
   String _query = '';
 
   @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
+
+  @override
   void dispose() {
+    _debounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
-  /// Fuzzy match: ignore case/spaces; supports substring contains.
-  bool _matches(GroupMember member, String rawQuery) {
-    final query = rawQuery.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '');
-    if (query.isEmpty) return true;
-    final name = member.nickname.toLowerCase().replaceAll(RegExp(r'\s+'), '');
-    if (name.contains(query)) return true;
-    // Simple subsequence: query chars appear in order in nickname.
-    var i = 0;
-    for (final code in name.codeUnits) {
-      if (code == query.codeUnitAt(i)) {
-        i++;
-        if (i >= query.length) return true;
+  Future<void> _load({String searchKey = ''}) async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final res = await NetworkBootstrap.api.groupMembers(
+        widget.groupId,
+        searchKey: searchKey,
+      );
+      if (!mounted) return;
+      if (!res.success) {
+        setState(() {
+          _loading = false;
+          _members = const [];
+          _error = res.message.isEmpty ? 'Failed to load members' : res.message;
+        });
+        return;
       }
+      setState(() {
+        _members = GroupMemberDto.parseList(res);
+        _loading = false;
+        _error = null;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _members = const [];
+        _error = '$error';
+      });
     }
-    return false;
   }
 
-  List<GroupMember> get _filtered => [
-        for (final m in widget.members)
-          if (_matches(m, _query)) m,
-      ];
+  void _onQueryChanged(String value) {
+    setState(() => _query = value);
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 320), () {
+      unawaited(_load(searchKey: value.trim()));
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.paddingOf(context).bottom;
     final height = MediaQuery.sizeOf(context).height * 0.72;
-    final filtered = _filtered;
 
     return Align(
       alignment: Alignment.bottomCenter,
@@ -119,7 +154,7 @@ class _GroupMembersSheetState extends State<GroupMembersSheet> {
                       Expanded(
                         child: TextField(
                           controller: _searchController,
-                          onChanged: (v) => setState(() => _query = v),
+                          onChanged: _onQueryChanged,
                           style: const TextStyle(
                             color: AppColors.textPrimary,
                             fontSize: 15,
@@ -144,30 +179,56 @@ class _GroupMembersSheetState extends State<GroupMembersSheet> {
               ),
               const SizedBox(height: 8),
               Expanded(
-                child: filtered.isEmpty
+                child: _loading
                     ? const Center(
-                        child: Text(
-                          'No members found',
-                          style: TextStyle(
-                            color: AppColors.textTertiary,
-                            fontSize: 14,
-                          ),
+                        child: SizedBox(
+                          width: 28,
+                          height: 28,
+                          child: CircularProgressIndicator(strokeWidth: 2.4),
                         ),
                       )
-                    : ListView.separated(
-                        padding: EdgeInsets.fromLTRB(16, 8, 16, 16 + bottom),
-                        itemCount: filtered.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: 18),
-                        itemBuilder: (context, index) {
-                          final member = filtered[index];
-                          return _MemberRow(
-                            member: member,
-                            onTap: widget.onMemberTap == null
-                                ? null
-                                : () => widget.onMemberTap!(member),
-                          );
-                        },
-                      ),
+                    : _error != null
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 24),
+                              child: Text(
+                                _error!,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: AppColors.textTertiary,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          )
+                        : _members.isEmpty
+                            ? Center(
+                                child: Text(
+                                  _query.trim().isEmpty
+                                      ? 'No members'
+                                      : 'No members found',
+                                  style: const TextStyle(
+                                    color: AppColors.textTertiary,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              )
+                            : ListView.separated(
+                                padding:
+                                    EdgeInsets.fromLTRB(16, 8, 16, 16 + bottom),
+                                itemCount: _members.length,
+                                separatorBuilder: (_, _) =>
+                                    const SizedBox(height: 18),
+                                itemBuilder: (context, index) {
+                                  final member = _members[index];
+                                  return _MemberRow(
+                                    member: member,
+                                    onTap: widget.onMemberTap == null
+                                        ? null
+                                        : () => widget.onMemberTap!(member),
+                                  );
+                                },
+                              ),
               ),
             ],
           ),
@@ -191,11 +252,11 @@ class _MemberRow extends StatelessWidget {
       child: Row(
         children: [
           ClipOval(
-            child: Image.asset(
-              member.avatarAsset,
+            child: NetworkOrAssetAvatar(
+              asset: member.avatarAsset,
+              url: member.avatarUrl,
               width: 48,
               height: 48,
-              fit: BoxFit.cover,
             ),
           ),
           const SizedBox(width: 12),

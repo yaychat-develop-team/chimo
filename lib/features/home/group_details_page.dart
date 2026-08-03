@@ -1,11 +1,15 @@
+import 'dart:async';
+import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../core/constants/app_assets.dart';
+import '../../core/network/network_bootstrap.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_tip_dialog.dart';
+import '../../core/widgets/network_or_asset_avatar.dart';
 import '../chats/data/chats_list_controller.dart';
 import '../chats/models/chat_conversation.dart';
 import '../report/report_page.dart';
@@ -14,6 +18,7 @@ import 'data/group_members_mock_data.dart';
 import 'models/chat_user_profile.dart';
 import 'models/group_item.dart';
 import 'widgets/chat_user_profile_sheet.dart';
+import 'widgets/group_chat_input_bar.dart';
 import 'widgets/group_level_badge.dart';
 import 'widgets/group_members_sheet.dart';
 
@@ -44,17 +49,55 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
   int _tabIndex = 0;
   final TextEditingController _inputController = TextEditingController();
   final ScrollController _messagesScroll = ScrollController();
-  final List<String> _sentMessages = [];
-  late final List<String> _photoAssets = [
-    _group.avatarAsset,
-    AppAssets.personalBg,
-    AppAssets.homeRoomBg,
-    AppAssets.launchBg,
-    AppAssets.genderFemaleImg,
-    AppAssets.genderMaleImg,
-  ];
+  final List<_OutgoingMessage> _sentMessages = [];
+  List<String> _photoAssets = const [];
 
   PopularGroupItem get _group => widget.group;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadPhotos());
+  }
+
+  Future<void> _loadPhotos() async {
+    try {
+      final res = await NetworkBootstrap.api.groupPhotos(_group.id);
+      if (!mounted || !res.success) return;
+      final urls = _parsePhotoUrls(res.data);
+      if (urls.isEmpty) return;
+      setState(() => _photoAssets = urls);
+    } catch (_) {}
+  }
+
+  static List<String> _parsePhotoUrls(Object? data) {
+    if (data is! Map) return const [];
+    final list = data['groupPhotoList'] ?? data['photoList'] ?? data['list'];
+    if (list is! List) return const [];
+    final urls = <String>[];
+    for (final item in list) {
+      if (item is String) {
+        final s = item.trim();
+        if (s.isNotEmpty) urls.add(s);
+        continue;
+      }
+      if (item is! Map) continue;
+      final map = Map<String, dynamic>.from(item);
+      final nested = map['photoList'];
+      if (nested is List) {
+        for (final p in nested) {
+          final s = '$p'.trim();
+          if (s.isNotEmpty) urls.add(s);
+        }
+        continue;
+      }
+      final url =
+          '${map['url'] ?? map['photo'] ?? map['img'] ?? map['image'] ?? ''}'
+              .trim();
+      if (url.isNotEmpty) urls.add(url);
+    }
+    return urls;
+  }
 
   @override
   void dispose() {
@@ -63,39 +106,76 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
     super.dispose();
   }
 
-  void _join() {
+  Future<void> _join() async {
     if (_isJoined) return;
     setState(() => _isJoined = true);
     final joined = _group.copyWith(isJoined: true);
     widget.chatsController?.joinGroup(joined);
     widget.onMembershipChanged?.call(true);
+    try {
+      final res = await NetworkBootstrap.api.joinGroup([_group.id]);
+      if (!mounted) return;
+      if (!res.success) {
+        setState(() => _isJoined = false);
+        widget.chatsController?.leaveGroup(_group.id);
+        widget.onMembershipChanged?.call(false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(res.message.isEmpty ? 'Join failed' : res.message),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _isJoined = false);
+      widget.chatsController?.leaveGroup(_group.id);
+      widget.onMembershipChanged?.call(false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Join failed: $error'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
-  void _leave() {
+  Future<void> _leave() async {
     if (!_isJoined) return;
     setState(() => _isJoined = false);
-    // Leaving a group does not delete the chat session.
     widget.chatsController?.leaveGroup(_group.id);
     widget.onMembershipChanged?.call(false);
-    Navigator.of(context).pop();
+    try {
+      final res = await NetworkBootstrap.api.leaveGroup(_group.id);
+      if (!mounted) return;
+      if (!res.success) {
+        setState(() => _isJoined = true);
+        widget.chatsController?.joinGroup(_group.copyWith(isJoined: true));
+        widget.onMembershipChanged?.call(true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(res.message.isEmpty ? 'Leave failed' : res.message),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+      Navigator.of(context).pop();
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _isJoined = true);
+      widget.chatsController?.joinGroup(_group.copyWith(isJoined: true));
+      widget.onMembershipChanged?.call(true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Leave failed: $error'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
-  void _sendMessage([String? raw]) {
-    final text = (raw ?? _inputController.text).trim();
-    if (text.isEmpty || !_isJoined) return;
-    setState(() {
-      _sentMessages.add(text);
-      _tabIndex = 0;
-    });
-    _inputController.clear();
-    // After swipe-delete, a new message brings the session back to the list.
-    widget.chatsController?.onNewMessage(
-      id: _group.id,
-      title: _group.name,
-      avatarAsset: _group.avatarAsset,
-      lastMessage: text,
-      badge: ChatBadgeType.group,
-    );
+  void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_messagesScroll.hasClients) return;
       _messagesScroll.animateTo(
@@ -104,6 +184,51 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
         curve: Curves.easeOut,
       );
     });
+  }
+
+  void _notifyNewMessage(String preview) {
+    widget.chatsController?.onNewMessage(
+      id: _group.id,
+      title: _group.name,
+      avatarAsset: _group.avatarAsset,
+      lastMessage: preview,
+      badge: ChatBadgeType.group,
+    );
+  }
+
+  void _sendMessage([String? raw]) {
+    final text = (raw ?? _inputController.text).trim();
+    if (text.isEmpty || !_isJoined) return;
+    setState(() {
+      _sentMessages.add(_OutgoingMessage.text(text));
+      _tabIndex = 0;
+    });
+    _inputController.clear();
+    _notifyNewMessage(text);
+    _scrollToBottom();
+  }
+
+  void _sendVoice(int seconds) {
+    if (!_isJoined || seconds <= 0) return;
+    setState(() {
+      _sentMessages.add(_OutgoingMessage.voice(seconds));
+      _tabIndex = 0;
+    });
+    _notifyNewMessage('[Voice] ${seconds}s');
+    _scrollToBottom();
+  }
+
+  void _sendImages(List<String> paths) {
+    if (!_isJoined || paths.isEmpty) return;
+    final now = DateTime.now();
+    setState(() {
+      for (final path in paths) {
+        _sentMessages.add(_OutgoingMessage.image(path, at: now));
+      }
+      _tabIndex = 0;
+    });
+    _notifyNewMessage(paths.length == 1 ? '[Image]' : '[Image] x${paths.length}');
+    _scrollToBottom();
   }
 
   Future<void> _openMoreMenu() async {
@@ -136,6 +261,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
   void _openMembersSheet() {
     GroupMembersSheet.show(
       context,
+      groupId: _group.id,
       onMemberTap: (member) {
         Navigator.of(context).pop();
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -179,12 +305,12 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
             left: 0,
             right: 0,
             height: 260 + topPadding,
-            child: ImageFiltered(
+              child: ImageFiltered(
               imageFilter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-              child: Image.asset(
-                _group.avatarAsset,
+              child: NetworkOrAssetAvatar(
+                asset: _group.avatarAsset,
+                url: _group.avatarUrl,
                 fit: BoxFit.cover,
-                alignment: Alignment.topCenter,
               ),
             ),
           ),
@@ -249,10 +375,12 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
                 ),
               ),
               if (_isJoined)
-                _ChatInputBar(
+                GroupChatInputBar(
                   bottomInset: bottomPadding,
                   controller: _inputController,
-                  onSend: _sendMessage,
+                  onSendText: _sendMessage,
+                  onSendVoice: _sendVoice,
+                  onSendImages: _sendImages,
                 )
               else
                 _JoinCommunityBar(
@@ -323,11 +451,14 @@ class _DetailsAppBar extends StatelessWidget {
           const Spacer(),
           IconButton(
             onPressed: onMoreTap,
-            icon: Image.asset(
+            icon: SvgPicture.asset(
               AppAssets.msgMore,
               width: 22,
               height: 22,
-              color: AppColors.textPrimary,
+              colorFilter: const ColorFilter.mode(
+                AppColors.textPrimary,
+                BlendMode.srcIn,
+              ),
             ),
           ),
         ],
@@ -495,11 +626,11 @@ class _ProfileHeader extends StatelessWidget {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(16),
-                child: Image.asset(
-                  group.avatarAsset,
+                child: NetworkOrAssetAvatar(
+                  asset: group.avatarAsset,
+                  url: group.avatarUrl,
                   width: 72,
                   height: 72,
-                  fit: BoxFit.cover,
                 ),
               ),
               const SizedBox(width: 12),
@@ -655,7 +786,7 @@ class _ChatBody extends StatelessWidget {
 
   final int tabIndex;
   final bool isJoined;
-  final List<String> sentMessages;
+  final List<_OutgoingMessage> sentMessages;
   final List<String> photos;
   final ScrollController messagesScroll;
   final ValueChanged<int> onTabChanged;
@@ -764,7 +895,7 @@ class _MessagesFeed extends StatelessWidget {
   });
 
   final bool isJoined;
-  final List<String> sentMessages;
+  final List<_OutgoingMessage> sentMessages;
   final ScrollController scrollController;
   final ValueChanged<ChatUserProfile> onPeerAvatarTap;
 
@@ -781,7 +912,7 @@ class _MessagesFeed extends StatelessWidget {
       controller: scrollController,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
       children: [
-        const _TimestampLabel('yesterday 6:01 AM'),
+        const _TimestampLabel('Jul 29 6:01 AM'),
         const SizedBox(height: 12),
         _PeerMessageBubble(
           profile: _candy,
@@ -810,13 +941,22 @@ class _MessagesFeed extends StatelessWidget {
         const _SelfMessageBubble(text: '1'),
         if (isJoined) ...[
           const SizedBox(height: 16),
-          const _TimestampLabel('1:35 AM'),
+          const _TimestampLabel('Jul 30 1:35 AM'),
           const SizedBox(height: 10),
           const _SystemJoinNotice(name: 'P-2083172'),
         ],
         for (var i = 0; i < sentMessages.length; i++) ...[
-          SizedBox(height: i == 0 ? 16 : 4),
-          _SelfMessageBubble(text: sentMessages[i], showAvatar: i == 0),
+          if (_shouldShowOutgoingTimestamp(sentMessages, i)) ...[
+            SizedBox(height: i == 0 ? 16 : 14),
+            _TimestampLabel(_formatChatTimestamp(sentMessages[i].sentAt)),
+            const SizedBox(height: 10),
+          ] else
+            SizedBox(height: i == 0 ? 16 : 10),
+          _SelfOutgoingBubble(
+            message: sentMessages[i],
+            showAvatar: i == 0 ||
+                sentMessages[i].kind != sentMessages[i - 1].kind,
+          ),
         ],
       ],
     );
@@ -830,12 +970,17 @@ class _TimestampLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      text,
-      textAlign: TextAlign.center,
-      style: const TextStyle(
-        color: AppColors.textTertiary,
-        fontSize: 12,
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Text(
+        text,
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          color: Color(0xFFAEAEAE),
+          fontSize: 12,
+          fontWeight: FontWeight.w400,
+          height: 1.2,
+        ),
       ),
     );
   }
@@ -1075,10 +1220,82 @@ class _PeerLockedImageBubble extends StatelessWidget {
   }
 }
 
-class _SelfMessageBubble extends StatelessWidget {
-  const _SelfMessageBubble({required this.text, this.showAvatar = true});
+class _OutgoingKind { static const text = 0; static const voice = 1; static const image = 2; }
 
-  final String text;
+/// Show a time divider when first message or gap ≥ 5 minutes.
+bool _shouldShowOutgoingTimestamp(List<_OutgoingMessage> list, int index) {
+  if (index <= 0) return true;
+  final prev = list[index - 1].sentAt;
+  final curr = list[index].sentAt;
+  return curr.difference(prev).abs() >= const Duration(minutes: 5);
+}
+
+String _formatChatTimestamp(DateTime time) {
+  const months = <String>[
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+  final now = DateTime.now();
+  final local = time.toLocal();
+  final hour24 = local.hour;
+  final period = hour24 >= 12 ? 'PM' : 'AM';
+  final hour12 = hour24 % 12 == 0 ? 12 : hour24 % 12;
+  final minute = local.minute.toString().padLeft(2, '0');
+  final clock = '$hour12:$minute $period';
+
+  final today = DateTime(now.year, now.month, now.day);
+  final day = DateTime(local.year, local.month, local.day);
+  final diffDays = today.difference(day).inDays;
+
+  if (diffDays == 0) return clock;
+  if (diffDays == 1) return 'Yesterday $clock';
+  return '${months[local.month - 1]} ${local.day} $clock';
+}
+
+class _OutgoingMessage {
+  const _OutgoingMessage._({
+    required this.kind,
+    required this.sentAt,
+    this.text,
+    this.voiceSeconds,
+    this.imagePath,
+  });
+
+  factory _OutgoingMessage.text(String text, {DateTime? at}) =>
+      _OutgoingMessage._(
+        kind: _OutgoingKind.text,
+        text: text,
+        sentAt: at ?? DateTime.now(),
+      );
+
+  factory _OutgoingMessage.voice(int seconds, {DateTime? at}) =>
+      _OutgoingMessage._(
+        kind: _OutgoingKind.voice,
+        voiceSeconds: seconds,
+        sentAt: at ?? DateTime.now(),
+      );
+
+  factory _OutgoingMessage.image(String path, {DateTime? at}) =>
+      _OutgoingMessage._(
+        kind: _OutgoingKind.image,
+        imagePath: path,
+        sentAt: at ?? DateTime.now(),
+      );
+
+  final int kind;
+  final DateTime sentAt;
+  final String? text;
+  final int? voiceSeconds;
+  final String? imagePath;
+}
+
+class _SelfOutgoingBubble extends StatelessWidget {
+  const _SelfOutgoingBubble({
+    required this.message,
+    this.showAvatar = true,
+  });
+
+  final _OutgoingMessage message;
   final bool showAvatar;
 
   static const double _avatar = 40;
@@ -1093,27 +1310,41 @@ class _SelfMessageBubble extends StatelessWidget {
       children: [
         ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: _bubbleMax),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-            decoration: const BoxDecoration(
-              color: Color(0xFFB8FF6A),
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(18),
-                topRight: Radius.circular(4),
-                bottomLeft: Radius.circular(18),
-                bottomRight: Radius.circular(18),
+          child: switch (message.kind) {
+            _OutgoingKind.voice => _SelfVoiceBubble(
+                seconds: message.voiceSeconds ?? 0,
               ),
-            ),
-            child: Text(
-              text,
-              style: const TextStyle(
-                color: Color(0xFF111111),
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
-                height: 20 / 15,
+            _OutgoingKind.image => ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(18),
+                  topRight: Radius.circular(4),
+                  bottomLeft: Radius.circular(18),
+                  bottomRight: Radius.circular(18),
+                ),
+                child: _OutgoingImage(path: message.imagePath!),
               ),
-            ),
-          ),
+            _ => Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFB8FF6A),
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(18),
+                    topRight: Radius.circular(4),
+                    bottomLeft: Radius.circular(18),
+                    bottomRight: Radius.circular(18),
+                  ),
+                ),
+                child: Text(
+                  message.text ?? '',
+                  style: const TextStyle(
+                    color: Color(0xFF111111),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    height: 20 / 15,
+                  ),
+                ),
+              ),
+          },
         ),
         const SizedBox(width: _avatarGap),
         if (showAvatar)
@@ -1129,6 +1360,150 @@ class _SelfMessageBubble extends StatelessWidget {
         else
           const SizedBox(width: _avatar),
       ],
+    );
+  }
+}
+
+class _OutgoingImage extends StatelessWidget {
+  const _OutgoingImage({required this.path});
+
+  final String path;
+
+  bool get _isAsset => path.startsWith('assets/');
+
+  @override
+  Widget build(BuildContext context) {
+    final error = Container(
+      width: 180,
+      height: 180,
+      color: const Color(0xFFE8E8E8),
+      alignment: Alignment.center,
+      child: const Icon(Icons.broken_image_outlined),
+    );
+    if (_isAsset) {
+      return Image.asset(
+        path,
+        width: 180,
+        height: 180,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => error,
+      );
+    }
+    return Image.file(
+      File(path),
+      width: 180,
+      height: 180,
+      fit: BoxFit.cover,
+      errorBuilder: (_, _, _) => error,
+    );
+  }
+}
+
+class _SelfVoiceBubble extends StatefulWidget {
+  const _SelfVoiceBubble({required this.seconds});
+
+  final int seconds;
+
+  @override
+  State<_SelfVoiceBubble> createState() => _SelfVoiceBubbleState();
+}
+
+class _SelfVoiceBubbleState extends State<_SelfVoiceBubble> {
+  bool _playing = false;
+  int _remaining = 0;
+  Timer? _timer;
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _toggle() {
+    if (widget.seconds <= 0) return;
+    if (_playing) {
+      _timer?.cancel();
+      setState(() {
+        _playing = false;
+        _remaining = 0;
+      });
+      return;
+    }
+    setState(() {
+      _playing = true;
+      _remaining = widget.seconds;
+    });
+    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) {
+        t.cancel();
+        return;
+      }
+      if (_remaining <= 1) {
+        t.cancel();
+        setState(() {
+          _playing = false;
+          _remaining = 0;
+        });
+        return;
+      }
+      setState(() => _remaining -= 1);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sec = _playing ? _remaining : widget.seconds;
+    return GestureDetector(
+      onTap: _toggle,
+      child: Container(
+        constraints: BoxConstraints(
+          minWidth: 88,
+          maxWidth: 88 + (widget.seconds.clamp(1, 60) * 1.6),
+        ),
+        height: 44,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: const BoxDecoration(
+          color: Color(0xFFB8FF6A),
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(18),
+            topRight: Radius.circular(4),
+            bottomLeft: Radius.circular(18),
+            bottomRight: Radius.circular(18),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              _playing ? Icons.stop_rounded : Icons.play_arrow_rounded,
+              size: 22,
+              color: const Color(0xFF111111),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              '$sec"',
+              style: const TextStyle(
+                color: Color(0xFF111111),
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SelfMessageBubble extends StatelessWidget {
+  const _SelfMessageBubble({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return _SelfOutgoingBubble(
+      message: _OutgoingMessage.text(text),
     );
   }
 }
@@ -1193,10 +1568,7 @@ class _PhotosGrid extends StatelessWidget {
             onTap: () => onPhotoTap(index),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: Image.asset(
-                photos[index],
-                fit: BoxFit.cover,
-              ),
+              child: _GroupPhotoImage(src: photos[index]),
             ),
           );
         },
@@ -1276,10 +1648,9 @@ class _GroupPhotoViewerPageState extends State<_GroupPhotoViewerPage> {
                 minScale: 1,
                 maxScale: 4,
                 child: Center(
-                  child: Image.asset(
-                    widget.photos[index],
+                  child: _GroupPhotoImage(
+                    src: widget.photos[index],
                     fit: BoxFit.contain,
-                    errorBuilder: (_, _, _) => const SizedBox.shrink(),
                   ),
                 ),
               );
@@ -1364,129 +1735,33 @@ class _JoinCommunityBar extends StatelessWidget {
   }
 }
 
-class _ChatInputBar extends StatefulWidget {
-  const _ChatInputBar({
-    required this.bottomInset,
-    required this.controller,
-    required this.onSend,
+class _GroupPhotoImage extends StatelessWidget {
+  const _GroupPhotoImage({
+    required this.src,
+    this.fit = BoxFit.cover,
   });
 
-  final double bottomInset;
-  final TextEditingController controller;
-  final ValueChanged<String> onSend;
+  final String src;
+  final BoxFit fit;
 
-  @override
-  State<_ChatInputBar> createState() => _ChatInputBarState();
-}
-
-class _ChatInputBarState extends State<_ChatInputBar> {
-  /// Black-bg gray-line asset: use luminance as alpha so `color` won't fill black as solid.
-  static const ColorFilter _iconFilter = ColorFilter.matrix(<double>[
-    0, 0, 0, 0, 90,
-    0, 0, 0, 0, 90,
-    0, 0, 0, 0, 90,
-    0.333, 0.333, 0.333, 0, 0,
-  ]);
-
-  bool get _hasText => widget.controller.text.trim().isNotEmpty;
-
-  @override
-  void initState() {
-    super.initState();
-    widget.controller.addListener(_onTextChanged);
-  }
-
-  @override
-  void dispose() {
-    widget.controller.removeListener(_onTextChanged);
-    super.dispose();
-  }
-
-  void _onTextChanged() => setState(() {});
-
-  Widget _icon(String asset) {
-    return ColorFiltered(
-      colorFilter: _iconFilter,
-      child: Image.asset(
-        asset,
-        width: 22,
-        height: 22,
-        fit: BoxFit.contain,
-      ),
-    );
-  }
-
-  void _submit() => widget.onSend(widget.controller.text);
+  bool get _isNetwork =>
+      src.startsWith('http://') || src.startsWith('https://');
 
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
-      color: Colors.white,
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(12, 8, 12, 8 + widget.bottomInset),
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 48),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF0F0F0),
-            borderRadius: BorderRadius.circular(24),
-          ),
-          child: Row(
-            children: [
-              _icon(AppAssets.inputVoice),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextField(
-                  controller: widget.controller,
-                  minLines: 1,
-                  maxLines: 4,
-                  textInputAction: TextInputAction.send,
-                  onSubmitted: (_) => _submit(),
-                  style: const TextStyle(
-                    color: Color(0xFF111111),
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  decoration: const InputDecoration(
-                    isDense: true,
-                    hintText: 'Please type here...',
-                    hintStyle: TextStyle(
-                      color: Color(0xFF9A9A9A),
-                      fontSize: 15,
-                      fontWeight: FontWeight.w400,
-                    ),
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(vertical: 10),
-                  ),
-                ),
-              ),
-              if (_hasText) ...[
-                const SizedBox(width: 4),
-                GestureDetector(
-                  onTap: _submit,
-                  child: Container(
-                    width: 32,
-                    height: 32,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF1CFF8A),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.arrow_upward_rounded,
-                      size: 18,
-                      color: Colors.black,
-                    ),
-                  ),
-                ),
-              ] else ...[
-                _icon(AppAssets.inputImage),
-                const SizedBox(width: 10),
-                _icon(AppAssets.inputEmoji),
-              ],
-            ],
-          ),
-        ),
-      ),
+    if (_isNetwork) {
+      return Image.network(
+        src,
+        fit: fit,
+        width: double.infinity,
+        height: double.infinity,
+        errorBuilder: (_, _, _) => const ColoredBox(color: Color(0xFF2C2C2E)),
+      );
+    }
+    return Image.asset(
+      src,
+      fit: fit,
+      errorBuilder: (_, _, _) => const SizedBox.shrink(),
     );
   }
 }

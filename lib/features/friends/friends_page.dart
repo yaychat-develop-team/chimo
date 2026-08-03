@@ -1,20 +1,23 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_assets.dart';
+import '../../core/network/network_bootstrap.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_asset_image.dart';
+import '../../core/widgets/network_or_asset_avatar.dart';
 import '../chats/chat_detail_page.dart';
 import '../chats/models/chat_conversation.dart';
 import '../home/chat_user_profile_page.dart';
 import '../home/models/chat_user_profile.dart';
-import 'data/friends_mock_data.dart';
+import 'data/friend_dto.dart';
 import 'models/friend_user.dart';
 
 /// Friends page tabs.
 enum FriendsTab { friends, follow, followers }
 
-/// Friends / following / followers list (messages contacts entry).
-/// Friends = mutual; Follow = following; Followers = followers.
+/// Contacts: Friends (mutual) / Follow (I follow) / Followers (follow me).
 class FriendsPage extends StatefulWidget {
   const FriendsPage({super.key, this.initialTab = FriendsTab.friends});
 
@@ -27,28 +30,100 @@ class FriendsPage extends StatefulWidget {
 class _FriendsPageState extends State<FriendsPage> {
   late FriendsTab _tab = widget.initialTab;
   final TextEditingController _searchController = TextEditingController();
-  late List<FriendUser> _users = List<FriendUser>.of(FriendsMockData.all);
+  List<FriendUser> _users = const [];
   String _query = '';
+  bool _loading = true;
+  String? _error;
+  Timer? _searchDebounce;
 
   @override
   void initState() {
     super.initState();
-    _searchController.addListener(() {
-      setState(() => _query = _searchController.text.trim().toLowerCase());
+    _searchController.addListener(_onSearchChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_loadRelations());
     });
   }
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     super.dispose();
   }
 
-  FriendRelation get _relation => switch (_tab) {
-        FriendsTab.friends => FriendRelation.mutual,
-        FriendsTab.follow => FriendRelation.following,
-        FriendsTab.followers => FriendRelation.follower,
-      };
+  void _onSearchChanged() {
+    final next = _searchController.text.trim().toLowerCase();
+    setState(() => _query = next);
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+      unawaited(_loadRelations(keyword: _searchController.text.trim()));
+    });
+  }
+
+  Future<void> _loadRelations({String keyword = ''}) async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final api = NetworkBootstrap.api;
+      final results = await Future.wait([
+        api.searchFriends(keyword: keyword),
+        api.searchFollowing(keyword: keyword),
+        api.searchFans(keyword: keyword),
+      ]);
+      if (!mounted) return;
+
+      final friends = FriendDto.parseList(
+        results[0],
+        relation: FriendRelation.mutual,
+      );
+      final following = FriendDto.parseList(
+        results[1],
+        relation: FriendRelation.following,
+      );
+      final fans = FriendDto.parseList(
+        results[2],
+        relation: FriendRelation.follower,
+      );
+
+      final anyFail = results.any((r) => !r.success);
+      setState(() {
+        _users = FriendDto.mergeGraphs(
+          friends: friends,
+          following: following,
+          fans: fans,
+        );
+        _loading = false;
+        if (anyFail && _users.isEmpty) {
+          final msg = results
+              .firstWhere((r) => !r.success, orElse: () => results.first)
+              .message;
+          _error = msg.isEmpty ? 'Failed to load contacts' : msg;
+        }
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = '$error';
+      });
+    }
+  }
+
+  bool _matchesTab(FriendUser user) {
+    return switch (_tab) {
+      FriendsTab.friends => user.relation == FriendRelation.mutual,
+      FriendsTab.follow =>
+        user.relation == FriendRelation.mutual ||
+            user.relation == FriendRelation.following,
+      FriendsTab.followers =>
+        user.relation == FriendRelation.mutual ||
+            user.relation == FriendRelation.follower,
+    };
+  }
 
   String get _emptyTitle => switch (_tab) {
         FriendsTab.friends => 'No friends yet~',
@@ -63,7 +138,7 @@ class _FriendsPageState extends State<FriendsPage> {
       };
 
   List<FriendUser> get _filtered {
-    final list = _users.where((u) => u.relation == _relation).toList();
+    final list = _users.where(_matchesTab).toList();
     if (_query.isEmpty) return list;
     return list
         .where(
@@ -74,27 +149,37 @@ class _FriendsPageState extends State<FriendsPage> {
         .toList(growable: false);
   }
 
-  void _followBack(FriendUser user) {
-    setState(() {
-      _users = [
-        for (final u in _users)
-          if (u.id == user.id)
-            FriendUser(
-              id: u.id,
-              nickname: u.nickname,
-              userId: u.userId,
-              avatarAsset: u.avatarAsset,
-              isMale: u.isMale,
-              age: u.age,
-              relation: FriendRelation.mutual,
-              zodiac: u.zodiac,
-              bio: u.bio,
-              momentAssets: u.momentAssets,
-            )
-          else
-            u,
-      ];
-    });
+  Future<void> _followBack(FriendUser user) async {
+    try {
+      final res = await NetworkBootstrap.api.followUser(user.id);
+      if (!mounted) return;
+      if (!res.success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(res.message.isEmpty ? 'Follow failed' : res.message),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+      setState(() {
+        _users = [
+          for (final u in _users)
+            if (u.id == user.id)
+              u.copyWith(relation: FriendRelation.mutual)
+            else
+              u,
+        ];
+      });
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Follow failed: $error'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   void _openProfile(FriendUser user) {
@@ -103,13 +188,14 @@ class _FriendsPageState extends State<FriendsPage> {
       nickname: user.nickname,
       userId: user.userId,
       avatarAsset: user.avatarAsset,
+      avatarUrl: user.avatarUrl,
       isMale: user.isMale,
       age: user.age,
       zodiac: user.zodiac,
-      level: 16,
+      level: 1,
       bio: user.bio,
-      voiceSeconds: 12,
-      momentAssets: user.momentAssets,
+      isFollowing: user.relation == FriendRelation.mutual ||
+          user.relation == FriendRelation.following,
     );
     Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -160,25 +246,77 @@ class _FriendsPageState extends State<FriendsPage> {
                 hintText: _searchHint,
               ),
             ),
+            if (_loading)
+              const LinearProgressIndicator(
+                minHeight: 2,
+                color: AppColors.primaryBright,
+                backgroundColor: Colors.transparent,
+              ),
             Expanded(
-              child: users.isEmpty
-                  ? _FriendsEmptyState(title: _emptyTitle)
-                  : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                      itemCount: users.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 18),
-                      itemBuilder: (context, index) {
-                        final user = users[index];
-                        return _FriendTile(
-                          user: user,
-                          onTap: () => _openProfile(user),
-                          onChat: () => _openChat(user),
-                          onFollow: user.relation == FriendRelation.follower
-                              ? () => _followBack(user)
-                              : null,
-                        );
-                      },
-                    ),
+              child: RefreshIndicator(
+                color: AppColors.primaryBright,
+                onRefresh: () => _loadRelations(
+                  keyword: _searchController.text.trim(),
+                ),
+                child: _error != null && users.isEmpty
+                    ? ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        children: [
+                          const SizedBox(height: 120),
+                          Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: Column(
+                                children: [
+                                  Text(
+                                    _error!,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  TextButton(
+                                    onPressed: () => unawaited(_loadRelations()),
+                                    child: const Text('Retry'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    : users.isEmpty && !_loading
+                        ? ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            children: [
+                              SizedBox(
+                                height: MediaQuery.sizeOf(context).height * 0.55,
+                                child: _FriendsEmptyState(title: _emptyTitle),
+                              ),
+                            ],
+                          )
+                        : ListView.separated(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                            itemCount: users.length,
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(height: 18),
+                            itemBuilder: (context, index) {
+                              final user = users[index];
+                              return _FriendTile(
+                                user: user,
+                                onTap: () => _openProfile(user),
+                                onChat: () => _openChat(user),
+                                onFollow:
+                                    user.relation == FriendRelation.follower
+                                        ? () => unawaited(_followBack(user))
+                                        : null,
+                              );
+                            },
+                          ),
+              ),
             ),
           ],
         ),
@@ -229,7 +367,6 @@ class _FriendsHeader extends StatelessWidget {
               ],
             ),
           ),
-          // Spacer mirroring back button so tabs stay centered.
           const SizedBox(width: 48),
         ],
       ),
@@ -387,7 +524,8 @@ class _FriendTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final showFollow = user.relation == FriendRelation.follower && onFollow != null;
+    final showFollow =
+        user.relation == FriendRelation.follower && onFollow != null;
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -395,11 +533,11 @@ class _FriendTile extends StatelessWidget {
       child: Row(
         children: [
           ClipOval(
-            child: Image.asset(
-              user.avatarAsset,
+            child: NetworkOrAssetAvatar(
+              asset: user.avatarAsset,
+              url: user.avatarUrl,
               width: 52,
               height: 52,
-              fit: BoxFit.cover,
             ),
           ),
           const SizedBox(width: 12),

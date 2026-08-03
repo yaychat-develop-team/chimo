@@ -7,6 +7,7 @@ class _DmInputBar extends StatefulWidget {
     required this.onSend,
     required this.onSendVoice,
     required this.onSendImages,
+    required this.onSendGift,
   });
 
   final double bottomInset;
@@ -14,6 +15,7 @@ class _DmInputBar extends StatefulWidget {
   final ValueChanged<String?> onSend;
   final ValueChanged<int> onSendVoice;
   final ValueChanged<List<String>> onSendImages;
+  final ValueChanged<_GiftSendResult> onSendGift;
 
   @override
   State<_DmInputBar> createState() => _DmInputBarState();
@@ -25,7 +27,6 @@ enum _DmPanel { none, voice, photo, emoji }
 
 class _DmInputBarState extends State<_DmInputBar> {
   static const int _maxVoiceSeconds = 60;
-  static const Color _accentGreen = Color(0xFF00F875);
 
   /// Voice / photo panels share the same bottom area height (excl. safe inset).
   static const double _panelHeight = 290;
@@ -314,18 +315,20 @@ class _DmInputBarState extends State<_DmInputBar> {
     );
   }
 
-  void _showGiftSheet() {
+  Future<void> _showGiftSheet() async {
     _dismissKeyboard();
     if (_panel != _DmPanel.none) {
       setState(() => _panel = _DmPanel.none);
     }
-    showModalBottomSheet<void>(
+    final result = await showModalBottomSheet<_GiftSendResult>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withValues(alpha: 0.55),
       builder: (_) => const _GiftSheet(),
     );
+    if (!mounted || result == null) return;
+    widget.onSendGift(result);
   }
 
   void _showPlaceholder(String message) {

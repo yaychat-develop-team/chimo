@@ -23,6 +23,7 @@ class ChatConversation {
     required this.avatarAsset,
     required this.lastMessage,
     required this.timeLabel,
+    this.avatarUrl,
     this.unreadCount = 0,
     this.badge = ChatBadgeType.none,
     this.isOnline = false,
@@ -38,6 +39,7 @@ class ChatConversation {
   final String id;
   final String title;
   final String avatarAsset;
+  final String? avatarUrl;
   final String lastMessage;
   final String timeLabel;
   final int unreadCount;
@@ -78,6 +80,7 @@ class ChatConversation {
     String? id,
     String? title,
     String? avatarAsset,
+    String? avatarUrl,
     String? lastMessage,
     String? timeLabel,
     int? unreadCount,
@@ -95,6 +98,7 @@ class ChatConversation {
       id: id ?? this.id,
       title: title ?? this.title,
       avatarAsset: avatarAsset ?? this.avatarAsset,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
       lastMessage: lastMessage ?? this.lastMessage,
       timeLabel: timeLabel ?? this.timeLabel,
       unreadCount: unreadCount ?? this.unreadCount,

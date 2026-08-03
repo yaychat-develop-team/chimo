@@ -168,8 +168,8 @@ abstract final class AppAssets {
   static const String emptyNoSearch = '$_forya/empty_no_search.webp';
   static const String emptyNoWifi = '$_forya/empty_no_wifi.webp';
 
-  /// Chats app bar more.
-  static const String msgMore = msgSearch;
+  /// Chats / group app bar more (⋯).
+  static const String msgMore = '$_forya/chat_dm_more.svg';
 
   /// Gender badge icons.
   static const String genderMan = '$_forya/man.webp';

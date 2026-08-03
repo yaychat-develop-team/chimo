@@ -8,6 +8,7 @@ class MeProfile {
     required this.fans,
     required this.follows,
     required this.visitors,
+    this.avatarUrl,
     this.gender = 'Male',
     this.birthday = '1995-01-01',
     this.height,
@@ -16,6 +17,8 @@ class MeProfile {
     this.tags = const [],
     this.voiceSeconds,
     this.nicknameChangedOnce = false,
+    this.vipLevel = 1,
+    this.momentUrls = const [],
   });
 
   /// Display nickname.
@@ -24,8 +27,11 @@ class MeProfile {
   /// User ID (for copy).
   final String userId;
 
-  /// Local avatar asset path.
+  /// Local avatar asset path (fallback).
   final String avatarAsset;
+
+  /// Remote avatar URL from API when available.
+  final String? avatarUrl;
 
   /// Friend count.
   final int friends;
@@ -47,6 +53,8 @@ class MeProfile {
   final List<String> tags;
   final int? voiceSeconds;
   final bool nicknameChangedOnce;
+  final int vipLevel;
+  final List<String> momentUrls;
 
   bool get isMale => gender == 'Male';
 
@@ -54,6 +62,7 @@ class MeProfile {
     String? displayName,
     String? userId,
     String? avatarAsset,
+    String? avatarUrl,
     int? friends,
     int? fans,
     int? follows,
@@ -69,11 +78,14 @@ class MeProfile {
     int? voiceSeconds,
     bool clearVoice = false,
     bool? nicknameChangedOnce,
+    int? vipLevel,
+    List<String>? momentUrls,
   }) {
     return MeProfile(
       displayName: displayName ?? this.displayName,
       userId: userId ?? this.userId,
       avatarAsset: avatarAsset ?? this.avatarAsset,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
       friends: friends ?? this.friends,
       fans: fans ?? this.fans,
       follows: follows ?? this.follows,
@@ -86,6 +98,8 @@ class MeProfile {
       tags: tags ?? this.tags,
       voiceSeconds: clearVoice ? null : (voiceSeconds ?? this.voiceSeconds),
       nicknameChangedOnce: nicknameChangedOnce ?? this.nicknameChangedOnce,
+      vipLevel: vipLevel ?? this.vipLevel,
+      momentUrls: momentUrls ?? this.momentUrls,
     );
   }
 }

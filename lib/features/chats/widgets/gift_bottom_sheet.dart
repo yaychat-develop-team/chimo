@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_assets.dart';
+import '../../../core/widgets/center_toast.dart';
 import '../../wallet/wallet_page.dart';
 
 Future<void> showGiftBottomSheet(BuildContext context) {
@@ -95,6 +96,10 @@ class _GiftBottomSheetState extends State<GiftBottomSheet> {
   void _sendSelected() {
     final item = _gifts[_selected];
     final total = item.cost * _qty;
+    if (_balance < total) {
+      showCenterToast(context, message: 'Insufficient balance.');
+      return;
+    }
     Navigator.of(context).pop();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(

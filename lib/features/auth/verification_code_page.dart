@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../app/app_router.dart';
 import '../../core/auth/auth_session.dart';
 import '../../core/constants/app_assets.dart';
+import '../../core/network/network_bootstrap.dart';
 import '../../core/theme/app_colors.dart';
 
 /// Phone verification code page (white background design).
@@ -23,6 +24,7 @@ class _VerificationCodePageState extends State<VerificationCodePage> {
 
   final TextEditingController _controller = TextEditingController();
   final FocusNode _focusNode = FocusNode();
+  bool _submitting = false;
 
   String get _maskedPhone {
     final p = widget.phone;
@@ -48,14 +50,71 @@ class _VerificationCodePageState extends State<VerificationCodePage> {
   void _onChanged(String value) {
     setState(() {});
     if (value.length == _codeLength) {
-      _goProfileSetup();
+      _submitCode(value);
     }
   }
 
-  Future<void> _goProfileSetup() async {
-    await AuthSession.markLoggedIn(method: 'phone', phone: widget.phone);
-    if (!mounted) return;
-    context.go(AppRoutes.profileSetup);
+  Future<void> _submitCode(String code) async {
+    if (_submitting) return;
+    setState(() => _submitting = true);
+    try {
+      final res = await NetworkBootstrap.api.smsAuth(
+        phone: widget.phone,
+        code: code,
+      );
+      if (!mounted) return;
+      if (!res.success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              res.message.isEmpty ? 'Verification failed' : res.message,
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        _controller.clear();
+        setState(() {});
+        _focusNode.requestFocus();
+        return;
+      }
+
+      final data = res.data;
+      final map = data is Map ? Map<String, dynamic>.from(data) : const {};
+      final token = '${map['token'] ?? ''}';
+      if (token.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Login succeeded but token missing'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+
+      await AuthSession.markLoggedIn(
+        method: 'phone',
+        phone: widget.phone,
+        token: token,
+        nickname: '${map['nickName'] ?? map['nickname'] ?? ''}',
+        avatarUrl: '${map['avatar'] ?? map['avatarUrl'] ?? ''}',
+      );
+      await NetworkBootstrap.applySessionToken(token);
+      if (!mounted) return;
+      context.go(AppRoutes.profileSetup);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Verification failed: $error'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      _controller.clear();
+      setState(() {});
+      _focusNode.requestFocus();
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   @override
@@ -125,7 +184,7 @@ class _VerificationCodePageState extends State<VerificationCodePage> {
                       Row(
                         children: List.generate(_codeLength, (i) {
                           final digit = i < code.length ? code[i] : '';
-                          final isActive = i == code.length;
+                          final isActive = i == code.length && !_submitting;
                           return Expanded(
                             child: Padding(
                               padding: EdgeInsets.only(
@@ -144,20 +203,27 @@ class _VerificationCodePageState extends State<VerificationCodePage> {
                                         )
                                       : null,
                                 ),
-                                child: Text(
-                                  digit,
-                                  style: const TextStyle(
-                                    color: Colors.black,
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
+                                child: _submitting && i == 0
+                                    ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : Text(
+                                        digit,
+                                        style: const TextStyle(
+                                          color: Colors.black,
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
                               ),
                             ),
                           );
                         }),
                       ),
-                      // Hidden input field for system numeric keyboard.
                       Opacity(
                         opacity: 0,
                         child: TextField(
@@ -165,6 +231,7 @@ class _VerificationCodePageState extends State<VerificationCodePage> {
                           focusNode: _focusNode,
                           keyboardType: TextInputType.number,
                           autofocus: true,
+                          enabled: !_submitting,
                           showCursor: false,
                           enableInteractiveSelection: false,
                           inputFormatters: [

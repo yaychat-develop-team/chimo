@@ -1,27 +1,31 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/repositories/mock_chat_repository.dart';
+import '../../../core/network/group_dto.dart';
+import '../../../core/network/network_bootstrap.dart';
 import '../../../core/repositories/repositories.dart';
 import '../../../shared/models/chat_conversation.dart';
 import '../../../shared/models/group_item.dart';
+import '../../friends/data/friend_dto.dart';
+import '../../friends/models/friend_user.dart';
 
 /// Shared chats list state for chats page and nav unread badge.
 ///
-/// - Join group → upsert conversation
-/// - Leave group → keep conversation (membership only)
-/// - Swipe-delete conversation → does not leave group
-/// - Open/send DM → upsert private chat
+/// Session list comes from backend groups + friends (no IM SDK yet).
+/// Join / leave / pin / delete still work locally on top of that.
 class ChatsListController extends ChangeNotifier {
   ChatsListController({ChatRepository? chatRepository})
-      : _chatRepository = chatRepository ?? MockChatRepository() {
-    _conversations.addAll(_chatRepository.seedConversations());
-  }
+      : _chatRepository = chatRepository;
 
-  final ChatRepository _chatRepository;
+  final ChatRepository? _chatRepository;
 
   final List<ChatConversation> _conversations = [];
   final List<String> _pinnedIds = [];
   final Set<String> _joinedGroupIds = {};
+  bool _loading = false;
+  String? _loadError;
+
+  bool get loading => _loading;
+  String? get loadError => _loadError;
 
   List<ChatConversation> get conversations => List.unmodifiable(_conversations);
 
@@ -52,6 +56,99 @@ class ChatsListController extends ChangeNotifier {
     return [...pinned, ...unpinned];
   }
 
+  /// Load my groups + friends from API and rebuild list (keeps pin/unread).
+  Future<void> refreshFromApi() async {
+    _loading = true;
+    _loadError = null;
+    notifyListeners();
+    try {
+      final api = NetworkBootstrap.api;
+      final results = await Future.wait([
+        api.myGroups(),
+        api.searchFriends(pageSize: 50),
+      ]);
+      final groups = GroupDto.parseList(results[0]);
+      final friends = FriendDto.parseList(
+        results[1],
+        relation: FriendRelation.mutual,
+      );
+
+      final prevById = {for (final c in _conversations) c.id: c};
+      final next = <ChatConversation>[];
+      final nextJoined = <String>{};
+
+      for (final g in groups) {
+        nextJoined.add(g.id);
+        final prev = prevById[g.id];
+        next.add(
+          ChatConversation(
+            id: g.id,
+            title: g.name,
+            avatarAsset: g.avatarAsset,
+            avatarUrl: g.avatarUrl,
+            lastMessage: g.description.isEmpty ? 'Group chat' : g.description,
+            timeLabel: prev?.timeLabel ?? 'Just',
+            badge: ChatBadgeType.group,
+            unreadCount: prev?.unreadCount ?? 0,
+            isPinned: prev?.isPinned ?? false,
+          ),
+        );
+      }
+
+      for (final f in friends) {
+        final id = 'dm_${f.id}';
+        final prev = prevById[id] ?? prevById[f.id];
+        next.add(
+          ChatConversation(
+            id: id,
+            title: f.nickname.isEmpty ? 'User' : f.nickname,
+            avatarAsset: f.avatarAsset,
+            avatarUrl: f.avatarUrl,
+            lastMessage: f.bio.isEmpty ? 'Say hi~' : f.bio,
+            timeLabel: prev?.timeLabel ?? 'Just',
+            unreadCount: prev?.unreadCount ?? 0,
+            isPinned: prev?.isPinned ?? false,
+            isMale: f.isMale,
+            signature: f.bio,
+            zodiac: f.zodiac,
+            isFollowing: true,
+            isOnline: false,
+          ),
+        );
+      }
+
+      // Keep any local-only rows (e.g. system) that were pinned/opened.
+      for (final c in _conversations) {
+        if (next.any((n) => n.id == c.id)) continue;
+        if (c.badge == ChatBadgeType.group) continue;
+        if (c.id.startsWith('dm_')) continue;
+        next.add(c);
+      }
+
+      _conversations
+        ..clear()
+        ..addAll(next);
+      _joinedGroupIds
+        ..clear()
+        ..addAll(nextJoined);
+      _loading = false;
+      if (!results[0].success && !results[1].success && next.isEmpty) {
+        _loadError = results[0].message.isNotEmpty
+            ? results[0].message
+            : 'Failed to load chats';
+      }
+      notifyListeners();
+    } catch (error) {
+      _loading = false;
+      _loadError = '$error';
+      // Optional one-time mock seed if completely empty and repo provided.
+      if (_conversations.isEmpty && _chatRepository != null) {
+        _conversations.addAll(_chatRepository.seedConversations());
+      }
+      notifyListeners();
+    }
+  }
+
   void togglePin(String id) {
     if (_pinnedIds.contains(id)) {
       _pinnedIds.remove(id);
@@ -62,14 +159,12 @@ class ChatsListController extends ChangeNotifier {
   }
 
   /// Remove conversation only; group join state unchanged.
-  /// Reappears via [onNewMessage] if new messages arrive.
   void delete(String id) {
     _conversations.removeWhere((c) => c.id == id);
     _pinnedIds.remove(id);
     notifyListeners();
   }
 
-  /// Clear unread when the user opens a conversation.
   void markRead(String id) {
     final index = _conversations.indexWhere((c) => c.id == id);
     if (index < 0) return;
@@ -79,26 +174,22 @@ class ChatsListController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Join group: record membership and ensure list row exists.
   void joinGroup(PopularGroupItem group) {
     _joinedGroupIds.add(group.id);
     _upsertConversation(group);
     notifyListeners();
   }
 
-  /// Leave group: update membership only; keep list row.
   void leaveGroup(String groupId) {
-    if (!_joinedGroupIds.remove(groupId)) return;
+    _joinedGroupIds.remove(groupId);
     notifyListeners();
   }
 
-  /// Upsert group row display (does not change join state).
   void upsertJoinedGroup(PopularGroupItem group) {
     _upsertConversation(group);
     notifyListeners();
   }
 
-  /// Open DM: ensure row exists (no unread bump).
   void upsertPrivateChat(ChatConversation conversation) {
     final dm = conversation.copyWith(
       badge: conversation.badge == ChatBadgeType.group
@@ -115,6 +206,7 @@ class ChatsListController extends ChangeNotifier {
             ? dm.lastMessage
             : prev.lastMessage,
         timeLabel: dm.lastMessage.isNotEmpty ? dm.timeLabel : prev.timeLabel,
+        avatarUrl: dm.avatarUrl ?? prev.avatarUrl,
       );
     } else {
       _conversations.insert(0, dm);
@@ -122,12 +214,12 @@ class ChatsListController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// New message: update preview, move to top; restore if swipe-deleted.
   void onNewMessage({
     required String id,
     required String title,
     required String avatarAsset,
     required String lastMessage,
+    String? avatarUrl,
     ChatBadgeType badge = ChatBadgeType.none,
     int unreadDelta = 0,
     bool? isMale,
@@ -144,6 +236,7 @@ class ChatsListController extends ChangeNotifier {
         prev.copyWith(
           title: title,
           avatarAsset: avatarAsset,
+          avatarUrl: avatarUrl,
           lastMessage: lastMessage,
           timeLabel: 'Just',
           badge: badge,
@@ -162,6 +255,7 @@ class ChatsListController extends ChangeNotifier {
           id: id,
           title: title,
           avatarAsset: avatarAsset,
+          avatarUrl: avatarUrl,
           lastMessage: lastMessage,
           timeLabel: 'Just',
           badge: badge,
@@ -182,6 +276,7 @@ class ChatsListController extends ChangeNotifier {
       id: group.id,
       title: group.name,
       avatarAsset: group.avatarAsset,
+      avatarUrl: group.avatarUrl,
       lastMessage: group.description,
       timeLabel: 'Just',
       badge: ChatBadgeType.group,

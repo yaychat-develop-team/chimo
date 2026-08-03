@@ -1,13 +1,19 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../core/constants/app_assets.dart';
+import '../../core/network/network_bootstrap.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/network_or_asset_avatar.dart';
+import '../me/data/user_dto.dart';
 import '../me/models/me_models.dart';
 import 'body_metric_page.dart';
+import 'album_photo_viewer_page.dart';
 import 'my_picture_page.dart';
 import 'my_tags_page.dart';
 import 'nickname_page.dart';
@@ -20,13 +26,9 @@ class EditProfilePage extends StatefulWidget {
   const EditProfilePage({
     super.key,
     required this.profile,
-    this.completionPercent = 15,
-    this.photoCount = 0,
   });
 
   final MeProfile profile;
-  final int completionPercent;
-  final int photoCount;
 
   static const int maxPhotos = 9;
 
@@ -35,6 +37,7 @@ class EditProfilePage extends StatefulWidget {
 }
 
 class _EditProfilePageState extends State<EditProfilePage> {
+  late MeProfile _profile;
   String _signature = '';
   String _nickname = '';
   String _gender = 'Male';
@@ -44,11 +47,23 @@ class _EditProfilePageState extends State<EditProfilePage> {
   int? _voiceSeconds;
   List<String> _tags = const [];
   bool _nicknameChangedOnce = false;
+  final List<String> _photoPaths = [];
+  bool _loading = true;
+  bool _saving = false;
+
+  int get _photoCount => _photoPaths.length;
 
   @override
   void initState() {
     super.initState();
-    final p = widget.profile;
+    _applyProfile(widget.profile);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_loadFromApi());
+    });
+  }
+
+  void _applyProfile(MeProfile p) {
+    _profile = p;
     _signature = p.signature;
     _nickname = p.displayName;
     _gender = p.gender;
@@ -58,10 +73,28 @@ class _EditProfilePageState extends State<EditProfilePage> {
     _voiceSeconds = p.voiceSeconds;
     _tags = List<String>.from(p.tags);
     _nicknameChangedOnce = p.nicknameChangedOnce;
+    _photoPaths
+      ..clear()
+      ..addAll(p.momentUrls);
+  }
+
+  Future<void> _loadFromApi() async {
+    try {
+      final res = await NetworkBootstrap.api.userInfo();
+      if (!mounted) return;
+      final parsed = UserDto.parseProfile(res);
+      if (parsed != null) {
+        setState(() => _applyProfile(parsed));
+      }
+    } catch (_) {
+      // Keep seed profile if refresh fails.
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   MeProfile _buildResult() {
-    return widget.profile.copyWith(
+    return _profile.copyWith(
       displayName: _nickname,
       gender: _gender,
       birthday: _birthday,
@@ -74,11 +107,116 @@ class _EditProfilePageState extends State<EditProfilePage> {
       voiceSeconds: _voiceSeconds,
       clearVoice: _voiceSeconds == null,
       nicknameChangedOnce: _nicknameChangedOnce,
+      momentUrls: List<String>.from(_photoPaths),
+      avatarUrl: _profile.avatarUrl,
     );
   }
 
   void _popWithResult() {
     Navigator.of(context).pop(_buildResult());
+  }
+
+  Future<void> _save() async {
+    if (_saving) return;
+    setState(() => _saving = true);
+    try {
+      final genderApi = _gender.toLowerCase() == 'female' ? 'female' : 'male';
+      final fields = <String, dynamic>{
+        'nickname': _nickname.trim(),
+        'birthday': _birthday,
+        'gender': genderApi,
+        'personalSignature': _signature.trim(),
+      };
+      if (_height != null) {
+        fields['height'] = _height;
+      } else {
+        fields['deleteHeight'] = true;
+      }
+      if (_weight != null) {
+        fields['weight'] = _weight;
+      } else {
+        fields['deleteWeight'] = true;
+      }
+      if (_voiceSeconds == null) {
+        fields['deleteVoice'] = true;
+      }
+
+      final res = await NetworkBootstrap.api.updateUserInfo(fields);
+      if (!mounted) return;
+      if (!res.success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(res.message.isEmpty ? 'Save failed' : res.message),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+      _popWithResult();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Save failed: $error'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  /// Profile fill progress for the app bar (0–100).
+  int get _completionPercent {
+    var filled = 0;
+    const total = 10;
+    if ((_profile.avatarUrl ?? '').isNotEmpty ||
+        _profile.avatarAsset.isNotEmpty) {
+      filled++;
+    }
+    if (_photoCount > 0) filled++;
+    if (_signature.trim().isNotEmpty) filled++;
+    if (_voiceSeconds != null && _voiceSeconds! > 0) filled++;
+    if (_tags.isNotEmpty) filled++;
+    if (_nickname.trim().isNotEmpty) filled++;
+    if (_gender.trim().isNotEmpty) filled++;
+    if (_birthday.trim().isNotEmpty) filled++;
+    if (_height != null) filled++;
+    if (_weight != null) filled++;
+    return ((filled / total) * 100).round().clamp(0, 100);
+  }
+
+  Future<void> _pickPhoto({required bool forAlbum}) async {
+    final action = await showPhotoPickSheet(context);
+    if (!mounted || action == null) return;
+
+    final source = switch (action) {
+      PhotoPickAction.takePhoto => ImageSource.camera,
+      PhotoPickAction.gallery => ImageSource.gallery,
+    };
+
+    final file = await ImagePicker().pickImage(
+      source: source,
+      imageQuality: 85,
+      maxWidth: 1920,
+    );
+    if (!mounted || file == null) return;
+
+    if (forAlbum && _photoCount < EditProfilePage.maxPhotos) {
+      setState(() => _photoPaths.add(file.path));
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          action == PhotoPickAction.takePhoto
+              ? 'Photo captured'
+              : 'Photo selected',
+        ),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 1),
+      ),
+    );
   }
 
   Future<void> _openSignature() async {
@@ -275,25 +413,51 @@ class _EditProfilePageState extends State<EditProfilePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _EditProfileAppBar(onBack: _popWithResult),
+              _EditProfileAppBar(
+                onBack: _popWithResult,
+                completionPercent: _completionPercent,
+              ),
+              if (_loading)
+                const LinearProgressIndicator(
+                  minHeight: 2,
+                  color: Color(0xFFB6FF2E),
+                  backgroundColor: Colors.transparent,
+                ),
               Expanded(
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                   children: [
                     _AvatarCard(
-                      avatarAsset: widget.profile.avatarAsset,
+                      avatarAsset: _profile.avatarAsset,
+                      avatarUrl: _profile.avatarUrl,
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute<void>(
                             builder: (_) => MyPicturePage(
-                              avatarAsset: widget.profile.avatarAsset,
+                              avatarAsset: _profile.avatarAsset,
                             ),
                           ),
                         );
                       },
                     ),
                     const SizedBox(height: 16),
-                    _PhotoCard(count: widget.photoCount),
+                    _PhotoCard(
+                      paths: _photoPaths,
+                      onAdd: () => _pickPhoto(forAlbum: true),
+                      onRemove: (index) {
+                        setState(() => _photoPaths.removeAt(index));
+                      },
+                      onOpen: (index) {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => AlbumPhotoViewerPage(
+                              paths: List<String>.from(_photoPaths),
+                              initialIndex: index,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
                     const SizedBox(height: 16),
                     _PromptCard(
                       title: 'My Signature',
@@ -330,7 +494,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 child: Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    onTap: _popWithResult,
+                    onTap: _saving ? null : _save,
                     borderRadius: BorderRadius.circular(24),
                     child: Ink(
                       height: 48,
@@ -338,15 +502,24 @@ class _EditProfilePageState extends State<EditProfilePage> {
                         borderRadius: BorderRadius.circular(24),
                         gradient: AppColors.promoBannerGradient,
                       ),
-                      child: const Center(
-                        child: Text(
-                          'Save',
-                          style: TextStyle(
-                            color: AppColors.promoText,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                      child: Center(
+                        child: _saving
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.2,
+                                  color: AppColors.promoText,
+                                ),
+                              )
+                            : const Text(
+                                'Save',
+                                style: TextStyle(
+                                  color: AppColors.promoText,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                       ),
                     ),
                   ),
@@ -361,9 +534,13 @@ class _EditProfilePageState extends State<EditProfilePage> {
 }
 
 class _EditProfileAppBar extends StatelessWidget {
-  const _EditProfileAppBar({required this.onBack});
+  const _EditProfileAppBar({
+    required this.onBack,
+    required this.completionPercent,
+  });
 
   final VoidCallback onBack;
+  final int completionPercent;
 
   @override
   Widget build(BuildContext context) {
@@ -387,13 +564,35 @@ class _EditProfileAppBar extends StatelessWidget {
               ),
             ),
           ),
-          const Text(
-            'Edit Profile',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Edit Profile',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '$completionPercent%',
+                  style: const TextStyle(
+                    color: Colors.black,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    height: 1.1,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -427,25 +626,35 @@ class _SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final content = Padding(
+      padding: padding ?? const EdgeInsets.fromLTRB(14, 14, 14, 14),
+      child: child,
+    );
+
     return Material(
       color: const Color(0xFF1C1C1E),
       borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: padding ?? const EdgeInsets.fromLTRB(14, 14, 14, 14),
-          child: child,
-        ),
-      ),
+      clipBehavior: Clip.antiAlias,
+      child: onTap == null
+          ? content
+          : InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(16),
+              child: content,
+            ),
     );
   }
 }
 
 class _AvatarCard extends StatelessWidget {
-  const _AvatarCard({required this.avatarAsset, required this.onTap});
+  const _AvatarCard({
+    required this.avatarAsset,
+    required this.onTap,
+    this.avatarUrl,
+  });
 
   final String avatarAsset;
+  final String? avatarUrl;
   final VoidCallback onTap;
 
   @override
@@ -459,11 +668,11 @@ class _AvatarCard extends StatelessWidget {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: Image.asset(
-                avatarAsset,
+              child: NetworkOrAssetAvatar(
+                asset: avatarAsset,
+                url: avatarUrl,
                 width: 96,
                 height: 96,
-                fit: BoxFit.cover,
               ),
             ),
             const SizedBox(width: 12),
@@ -495,28 +704,23 @@ class _AvatarCard extends StatelessWidget {
 }
 
 class _PhotoCard extends StatelessWidget {
-  const _PhotoCard({required this.count});
+  const _PhotoCard({
+    required this.paths,
+    required this.onAdd,
+    required this.onRemove,
+    required this.onOpen,
+  });
 
-  final int count;
-
-  Future<void> _onAdd(BuildContext context) async {
-    final action = await showPhotoPickSheet(context);
-    if (!context.mounted || action == null) return;
-    final tip = switch (action) {
-      PhotoPickAction.takePhoto => 'Camera',
-      PhotoPickAction.gallery => 'Choose from the phone album',
-    };
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(tip),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 1),
-      ),
-    );
-  }
+  final List<String> paths;
+  final VoidCallback onAdd;
+  final ValueChanged<int> onRemove;
+  final ValueChanged<int> onOpen;
 
   @override
   Widget build(BuildContext context) {
+    final count = paths.length;
+    final canAdd = count < EditProfilePage.maxPhotos;
+
     return _SectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -537,24 +741,113 @@ class _PhotoCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          GestureDetector(
-            onTap: () => _onAdd(context),
-            child: Container(
-              width: 98,
-              height: 98,
-              decoration: BoxDecoration(
-                color: const Color(0xFF2C2C2E),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(
-                Icons.add_rounded,
-                color: Colors.white,
-                size: 28,
-              ),
-            ),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              if (canAdd)
+                Material(
+                  color: const Color(0xFF2C2C2E),
+                  borderRadius: BorderRadius.circular(12),
+                  child: InkWell(
+                    onTap: onAdd,
+                    borderRadius: BorderRadius.circular(12),
+                    child: const SizedBox(
+                      width: 98,
+                      height: 98,
+                      child: Icon(
+                        Icons.add_rounded,
+                        color: Colors.white,
+                        size: 28,
+                      ),
+                    ),
+                  ),
+                ),
+              for (var i = 0; i < paths.length; i++)
+                _PhotoThumb(
+                  path: paths[i],
+                  onTap: () => onOpen(i),
+                  onRemove: () => onRemove(i),
+                ),
+            ],
           ),
         ],
       ),
+    );
+  }
+}
+
+class _PhotoThumb extends StatelessWidget {
+  const _PhotoThumb({
+    required this.path,
+    required this.onTap,
+    required this.onRemove,
+  });
+
+  final String path;
+  final VoidCallback onTap;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        GestureDetector(
+          onTap: onTap,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: path.startsWith('http')
+                ? Image.network(
+                    path,
+                    width: 98,
+                    height: 98,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, error, stack) => Container(
+                      width: 98,
+                      height: 98,
+                      color: const Color(0xFF2C2C2E),
+                      alignment: Alignment.center,
+                      child: const Icon(
+                        Icons.broken_image_outlined,
+                        color: Colors.white54,
+                      ),
+                    ),
+                  )
+                : Image.file(
+                    File(path),
+                    width: 98,
+                    height: 98,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, error, stack) => Container(
+                      width: 98,
+                      height: 98,
+                      color: const Color(0xFF2C2C2E),
+                      alignment: Alignment.center,
+                      child: const Icon(
+                        Icons.broken_image_outlined,
+                        color: Colors.white54,
+                      ),
+                    ),
+                  ),
+          ),
+        ),
+        Positioned(
+          top: 4,
+          right: 4,
+          child: GestureDetector(
+            onTap: onRemove,
+            child: Container(
+              width: 22,
+              height: 22,
+              decoration: const BoxDecoration(
+                color: Color(0xCC000000),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.close, size: 14, color: Colors.white),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -597,6 +890,8 @@ class _PromptCard extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             hint,
+            maxLines: 4,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: hintAsValue
                   ? const Color(0xFFB0B0B0)
@@ -929,7 +1224,7 @@ class _BasicInfoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _SectionCard(
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
+      padding: const EdgeInsets.fromLTRB(14, 16, 14, 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -941,7 +1236,7 @@ class _BasicInfoCard extends StatelessWidget {
               fontWeight: FontWeight.w500,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           _InfoRow(
             label: 'NickName',
             value: nickname,
@@ -994,7 +1289,7 @@ class _InfoRow extends StatelessWidget {
         InkWell(
           onTap: onTap ?? () {},
           child: SizedBox(
-            height: 37,
+            height: 52,
             child: Row(
               children: [
                 Text(
