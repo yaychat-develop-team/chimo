@@ -58,6 +58,7 @@ abstract final class UserDto {
       weight: _asIntOrNull(json['weight']),
       tags: _parseTags(json['makeFriendsLabel']),
       vipLevel: _asInt(json['vipLevel'], fallback: 1),
+      experience: _asInt(json['experience'] ?? json['exp'] ?? 0),
       momentUrls: _parsePicUrls(json['picList']),
       voiceSeconds: _asIntOrNull(json['voiceDuration']),
     );
@@ -103,6 +104,7 @@ abstract final class UserDto {
       tags: _parseTags(json['makeFriendsLabel']),
       isFollowing: isFollowing,
       inPartyName: inParty,
+      emUsername: '${json['emUsername'] ?? json['emUserName'] ?? ''}'.trim(),
     );
   }
 
@@ -123,12 +125,18 @@ abstract final class UserDto {
         continue;
       }
       if (item is Map) {
-        final content = '${item['content'] ?? item['url'] ?? ''}'.trim();
-        final ok = item['ok'];
-        if (content.isNotEmpty && ok != false) urls.add(content);
+        // AuditItem: { content, ok, ... } — show pending (ok:false) too.
+        final content =
+            '${item['content'] ?? item['url'] ?? item['value'] ?? ''}'.trim();
+        if (content.isNotEmpty) urls.add(content);
       }
     }
-    return urls;
+    // de-dupe keep order
+    final seen = <String>{};
+    return [
+      for (final u in urls)
+        if (seen.add(u)) u,
+    ];
   }
 
   static int _asInt(Object? value, {int fallback = 0}) {

@@ -1,7 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../app/app_router.dart';
 import '../../../core/constants/app_assets.dart';
 import '../../../core/network/network_bootstrap.dart';
 import '../../../core/theme/app_colors.dart';
@@ -48,6 +50,7 @@ class _GroupMembersSheetState extends State<GroupMembersSheet> {
   List<GroupMember> _members = const [];
   bool _loading = true;
   String? _error;
+  bool _needsLogin = false;
   String _query = '';
 
   @override
@@ -67,18 +70,28 @@ class _GroupMembersSheetState extends State<GroupMembersSheet> {
     setState(() {
       _loading = true;
       _error = null;
+      _needsLogin = false;
     });
     try {
-      final res = await NetworkBootstrap.api.groupMembers(
-        widget.groupId,
-        searchKey: searchKey,
+      final res = await NetworkBootstrap.withSessionRetry(
+        () => NetworkBootstrap.api.groupMembers(
+          widget.groupId,
+          searchKey: searchKey,
+        ),
       );
       if (!mounted) return;
       if (!res.success) {
+        final notLogin = res.message == 'user.not.login';
+        if (notLogin) {
+          await NetworkBootstrap.handleNotLogin();
+        }
         setState(() {
           _loading = false;
           _members = const [];
-          _error = res.message.isEmpty ? 'Failed to load members' : res.message;
+          _needsLogin = notLogin;
+          _error = notLogin
+              ? 'Session expired. Please log in again.'
+              : (res.message.isEmpty ? 'Failed to load members' : res.message);
         });
         return;
       }
@@ -86,6 +99,7 @@ class _GroupMembersSheetState extends State<GroupMembersSheet> {
         _members = GroupMemberDto.parseList(res);
         _loading = false;
         _error = null;
+        _needsLogin = false;
       });
     } catch (error) {
       if (!mounted) return;
@@ -103,6 +117,11 @@ class _GroupMembersSheetState extends State<GroupMembersSheet> {
     _debounce = Timer(const Duration(milliseconds: 320), () {
       unawaited(_load(searchKey: value.trim()));
     });
+  }
+
+  void _goLogin() {
+    Navigator.of(context).pop();
+    context.go(AppRoutes.login);
   }
 
   @override
@@ -178,62 +197,80 @@ class _GroupMembersSheetState extends State<GroupMembersSheet> {
                 ),
               ),
               const SizedBox(height: 8),
-              Expanded(
-                child: _loading
-                    ? const Center(
-                        child: SizedBox(
-                          width: 28,
-                          height: 28,
-                          child: CircularProgressIndicator(strokeWidth: 2.4),
-                        ),
-                      )
-                    : _error != null
-                        ? Center(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 24),
-                              child: Text(
-                                _error!,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  color: AppColors.textTertiary,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ),
-                          )
-                        : _members.isEmpty
-                            ? Center(
-                                child: Text(
-                                  _query.trim().isEmpty
-                                      ? 'No members'
-                                      : 'No members found',
-                                  style: const TextStyle(
-                                    color: AppColors.textTertiary,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              )
-                            : ListView.separated(
-                                padding:
-                                    EdgeInsets.fromLTRB(16, 8, 16, 16 + bottom),
-                                itemCount: _members.length,
-                                separatorBuilder: (_, _) =>
-                                    const SizedBox(height: 18),
-                                itemBuilder: (context, index) {
-                                  final member = _members[index];
-                                  return _MemberRow(
-                                    member: member,
-                                    onTap: widget.onMemberTap == null
-                                        ? null
-                                        : () => widget.onMemberTap!(member),
-                                  );
-                                },
-                              ),
-              ),
+              Expanded(child: _buildBody(bottom)),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildBody(double bottom) {
+    if (_loading) {
+      return const Center(
+        child: SizedBox(
+          width: 28,
+          height: 28,
+          child: CircularProgressIndicator(strokeWidth: 2.4),
+        ),
+      );
+    }
+    if (_error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: AppColors.textTertiary,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 16),
+              if (_needsLogin)
+                TextButton(
+                  onPressed: _goLogin,
+                  child: const Text('Log in'),
+                )
+              else
+                TextButton(
+                  onPressed: () =>
+                      unawaited(_load(searchKey: _query.trim())),
+                  child: const Text('Retry'),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
+    if (_members.isEmpty) {
+      return Center(
+        child: Text(
+          _query.trim().isEmpty ? 'No members' : 'No members found',
+          style: const TextStyle(
+            color: AppColors.textTertiary,
+            fontSize: 14,
+          ),
+        ),
+      );
+    }
+    return ListView.separated(
+      padding: EdgeInsets.fromLTRB(16, 8, 16, 16 + bottom),
+      itemCount: _members.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 18),
+      itemBuilder: (context, index) {
+        final member = _members[index];
+        return _MemberRow(
+          member: member,
+          onTap: widget.onMemberTap == null
+              ? null
+              : () => widget.onMemberTap!(member),
+        );
+      },
     );
   }
 }

@@ -286,8 +286,6 @@ class _ChatUserProfileSheetState extends State<ChatUserProfileSheet> {
                       fontWeight: FontWeight.w400,
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  const _GiftWallCard(),
                   const SizedBox(height: 18),
                   _following
                       ? Row(
@@ -416,82 +414,6 @@ class _TagChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
       ),
       child: child,
-    );
-  }
-}
-
-class _GiftWallCard extends StatelessWidget {
-  const _GiftWallCard();
-
-  static const _giftColors = [
-    Color(0xFFFF8A65),
-    Color(0xFFEF5350),
-    Color(0xFFEC407A),
-    Color(0xFFFFA726),
-  ];
-
-  static const _giftIcons = [
-    Icons.mail_rounded,
-    Icons.favorite_rounded,
-    Icons.mood_rounded,
-    Icons.cruelty_free_rounded,
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF2F6BFF), Color(0xFF7B4DFF)],
-        ),
-      ),
-      child: Row(
-        children: [
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Gift Wall',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'Unlocked: 12/58',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          for (var i = 0; i < _giftColors.length; i++) ...[
-            Container(
-              width: 36,
-              height: 36,
-              margin: const EdgeInsets.only(left: 6),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(_giftIcons[i], color: _giftColors[i], size: 20),
-            ),
-          ],
-          const SizedBox(width: 4),
-          Icon(
-            Icons.chevron_right_rounded,
-            color: Colors.white.withValues(alpha: 0.85),
-          ),
-        ],
-      ),
     );
   }
 }

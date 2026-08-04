@@ -7,8 +7,19 @@ abstract final class GroupMemberDto {
   static List<GroupMember> parseList(ApiResponse response) {
     if (!response.success) return const [];
     final data = response.data;
+    // Envelope: { userList: [...] } or bare list.
+    if (data is List) {
+      return [
+        for (final item in data)
+          if (item is Map) fromUserMap(Map<String, dynamic>.from(item)),
+      ];
+    }
     if (data is! Map) return const [];
-    final list = data['userList'] ?? data['list'] ?? data['users'];
+    final list = data['userList'] ??
+        data['list'] ??
+        data['users'] ??
+        data['memberList'] ??
+        data['members'];
     if (list is! List) return const [];
     return [
       for (final item in list)

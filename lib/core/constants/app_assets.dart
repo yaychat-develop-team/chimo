@@ -21,16 +21,20 @@ abstract final class AppAssets {
 
   // Recording
   static const String recordBg = '$_forya/bottom_bg.webp';
+
   /// Record button: idle / recording mic.
   static const String audioRecordIcon = '$_forya/yuyin.png';
+
   /// Record button: preview playback waveform.
   static const String audioPlayingIcon = '$_forya/Group 145.png';
+
   /// Record preview: retry / confirm.
   static const String audioRefreshIcon = '$_forya/Retry.png';
   static const String audioFinishIcon = '$_forya/Affirm.png';
   static const String audioPlayIcon = audioPlayingIcon;
   static const String audioWaveLine = '$_forya/Vector 272.png';
   static const String audioWaveAnim = '$_forya/Group 145.png';
+
   /// Profile voice bar: static waveform.
   static const String voiceWaveLine = '$_forya/ic_voice_line.svg';
   static const String voiceDeleteIcon = '$_forya/delete_icon.webp';
@@ -219,6 +223,7 @@ abstract final class AppAssets {
   /// Chat input bar: voice / image / emoji / gift / Wish (DM Figma).
   static const String inputVoice = '$_forya/input_voice.webp';
   static const String inputImage = '$_forya/input_img.webp';
+
   /// Legacy emoji (group / non-DM); DM uses [chatDmEmoji].
   static const String inputEmoji = '$_forya/input_emoji.webp';
   static const String chatDmEmoji = '$_forya/chat_dm_emoji.svg';

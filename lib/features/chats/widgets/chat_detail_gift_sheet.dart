@@ -1,95 +1,69 @@
 part of '../chat_detail_page.dart';
 
 class _GiftSheet extends StatefulWidget {
-  const _GiftSheet();
+  const _GiftSheet({this.receiverUid = ''});
+
+  final String receiverUid;
 
   @override
   State<_GiftSheet> createState() => _GiftSheetState();
 }
 
-class _GiftItem {
-  const _GiftItem({
-    required this.id,
-    required this.name,
-    required this.emoji,
-    required this.cost,
-    required this.color,
-  });
-
-  final int id;
-  final String name;
-  final String emoji;
-  final int cost;
-  final Color color;
-}
-
 class _GiftSheetState extends State<_GiftSheet> {
   static const _green = Color(0xFF00F875);
   static const _darkBg = Color(0xFF1A1A1D);
-  static const _balance = 0;
   static const _qtyOptions = [1, 3, 10, 40, 100, 999];
 
-  final List<_GiftItem> _gifts = const [
-    _GiftItem(
-      id: 423,
-      name: 'Rose Moon',
-      emoji: '🌹',
-      cost: 3000,
-      color: Color(0xFFEF5350),
-    ),
-    _GiftItem(
-      id: 426,
-      name: 'Love Chest',
-      emoji: '💝',
-      cost: 10,
-      color: Color(0xFFFF5BA8),
-    ),
-    _GiftItem(
-      id: 421,
-      name: 'Sunflower',
-      emoji: '🌻',
-      cost: 10,
-      color: Color(0xFFFFA726),
-    ),
-    _GiftItem(
-      id: 424,
-      name: 'Flower Truck',
-      emoji: '🚚',
-      cost: 40000,
-      color: Color(0xFFFF5BA8),
-    ),
-    _GiftItem(
-      id: 430,
-      name: 'Spellbook',
-      emoji: '📕',
-      cost: 60,
-      color: Color(0xFFEF5350),
-    ),
-    _GiftItem(
-      id: 431,
-      name: 'Fortune Cook...',
-      emoji: '🍳',
-      cost: 100,
-      color: Color(0xFF2F6BFF),
-    ),
-    _GiftItem(
-      id: 432,
-      name: 'Doughnut',
-      emoji: '🍩',
-      cost: 60,
-      color: Color(0xFFFFA726),
-    ),
-    _GiftItem(
-      id: 433,
-      name: 'Flutter',
-      emoji: '🦋',
-      cost: 120,
-      color: Color(0xFFFF5BA8),
-    ),
-  ];
+  int _balance = 0;
+  bool _loading = true;
+  bool _sending = false;
+  String? _loadError;
+  List<CashGiftItem> _gifts = const [];
 
   int _selected = 0;
   int _qty = 1;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
+    try {
+      final api = NetworkBootstrap.api;
+      final results = await Future.wait([
+        api.cashItems(),
+        api.cashCurrent(),
+      ]);
+      if (!mounted) return;
+      final items = CashGiftDto.parseItems(results[0])
+          .where((g) => g.canBuy)
+          .toList(growable: false);
+      final balance = CashGiftDto.parseBalance(results[1]);
+      setState(() {
+        _gifts = items;
+        _balance = balance;
+        _selected = items.isEmpty ? 0 : 0;
+        _loading = false;
+        if (items.isEmpty && !results[0].success) {
+          _loadError = results[0].message.isEmpty
+              ? 'Failed to load gifts'
+              : results[0].message;
+        }
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _loadError = '$error';
+      });
+    }
+  }
 
   void _showQtyPicker() {
     final RenderBox box = context.findRenderObject()! as RenderBox;
@@ -129,21 +103,75 @@ class _GiftSheetState extends State<_GiftSheet> {
     });
   }
 
-  void _sendSelected() {
-    final item = _gifts[_selected];
-    final total = item.cost * _qty;
+  Future<void> _sendSelected() async {
+    if (_sending || _gifts.isEmpty) return;
+    final item = _gifts[_selected.clamp(0, _gifts.length - 1)];
+    final total = item.price * _qty;
     if (_balance < total) {
       showCenterToast(context, message: 'Insufficient balance.');
       return;
     }
-    Navigator.of(context).pop(
-      _GiftSendResult(
-        id: item.id,
-        emoji: item.emoji,
-        name: item.name,
-        qty: _qty,
-      ),
-    );
+
+    final uid = widget.receiverUid.trim();
+    if (uid.isEmpty) {
+      showCenterToast(context, message: 'Invalid receiver.');
+      return;
+    }
+
+    setState(() => _sending = true);
+    try {
+      final res = await NetworkBootstrap.api.cashGift(
+        receiverIds: [uid],
+        itemId: item.id,
+        count: _qty,
+      );
+      if (!mounted) return;
+      if (!res.success) {
+        setState(() => _sending = false);
+        showCenterToast(
+          context,
+          message: res.message.isEmpty ? 'Gift failed' : res.message,
+        );
+        return;
+      }
+
+      // Refresh balance after successful spend.
+      try {
+        final bal = await NetworkBootstrap.api.cashCurrent();
+        if (mounted) {
+          setState(() => _balance = CashGiftDto.parseBalance(bal));
+        }
+      } catch (_) {}
+
+      if (!mounted) return;
+      Navigator.of(context).pop(
+        _GiftSendResult(
+          id: int.tryParse(item.id) ?? 0,
+          name: item.name,
+          qty: _qty,
+          iconUrl: item.iconUrl,
+          cost: item.price,
+          emoji: '',
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _sending = false);
+      showCenterToast(context, message: 'Gift failed: $error');
+    }
+  }
+
+  Widget _giftIcon(CashGiftItem g) {
+    if (g.iconUrl.isNotEmpty) {
+      return Image.network(
+        g.iconUrl,
+        width: 40,
+        height: 40,
+        fit: BoxFit.contain,
+        errorBuilder: (_, _, _) => const Text('🎁', style: TextStyle(fontSize: 28)),
+      );
+    }
+    return const Text('🎁', style: TextStyle(fontSize: 28));
   }
 
   @override
@@ -175,85 +203,130 @@ class _GiftSheetState extends State<_GiftSheet> {
               const SizedBox(height: 14),
               SizedBox(
                 height: 300,
-                child: GridView.builder(
-                  padding: EdgeInsets.zero,
-                  itemCount: _gifts.length,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 4,
-                    mainAxisSpacing: 14,
-                    crossAxisSpacing: 10,
-                    childAspectRatio: 0.72,
-                  ),
-                  itemBuilder: (context, index) {
-                    final g = _gifts[index];
-                    final sel = index == _selected;
-                    return GestureDetector(
-                      onTap: () => setState(() => _selected = index),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Expanded(
-                            child: Container(
-                              width: double.infinity,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF2A2A2D),
-                                borderRadius: BorderRadius.circular(16),
-                                border: sel
-                                    ? Border.all(color: _green, width: 2)
-                                    : null,
-                              ),
-                              alignment: Alignment.center,
-                              child: Text(
-                                g.emoji,
-                                style: const TextStyle(fontSize: 28),
-                              ),
-                            ),
+                child: _loading
+                    ? const Center(
+                        child: SizedBox(
+                          width: 28,
+                          height: 28,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.4,
+                            color: _green,
                           ),
-                          const SizedBox(height: 6),
-                          Text(
-                            g.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Image.asset(
-                                AppAssets.coin,
-                                width: 12,
-                                height: 12,
-                              ),
-                              const SizedBox(width: 3),
-                              Text(
-                                '${g.cost}',
-                                style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
+                        ),
+                      )
+                    : _loadError != null
+                        ? Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  _loadError!,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 13,
+                                  ),
                                 ),
+                                const SizedBox(height: 12),
+                                TextButton(
+                                  onPressed: () => unawaited(_load()),
+                                  child: const Text('Retry'),
+                                ),
+                              ],
+                            ),
+                          )
+                        : _gifts.isEmpty
+                            ? const Center(
+                                child: Text(
+                                  'No gifts available',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              )
+                            : GridView.builder(
+                                padding: EdgeInsets.zero,
+                                itemCount: _gifts.length,
+                                gridDelegate:
+                                    const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 4,
+                                  mainAxisSpacing: 14,
+                                  crossAxisSpacing: 10,
+                                  childAspectRatio: 0.72,
+                                ),
+                                itemBuilder: (context, index) {
+                                  final g = _gifts[index];
+                                  final sel = index == _selected;
+                                  return GestureDetector(
+                                    onTap: () =>
+                                        setState(() => _selected = index),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Expanded(
+                                          child: Container(
+                                            width: double.infinity,
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF2A2A2D),
+                                              borderRadius:
+                                                  BorderRadius.circular(16),
+                                              border: sel
+                                                  ? Border.all(
+                                                      color: _green,
+                                                      width: 2,
+                                                    )
+                                                  : null,
+                                            ),
+                                            alignment: Alignment.center,
+                                            child: _giftIcon(g),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          g.name,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Image.asset(
+                                              AppAssets.coin,
+                                              width: 12,
+                                              height: 12,
+                                            ),
+                                            const SizedBox(width: 3),
+                                            Text(
+                                              '${g.price}',
+                                              style: const TextStyle(
+                                                color: Colors.white70,
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
                               ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
               ),
               const SizedBox(height: 10),
               Row(
                 children: [
                   Image.asset(AppAssets.coin, width: 16, height: 16),
                   const SizedBox(width: 6),
-                  const Text(
-                    '$_balance',
-                    style: TextStyle(
+                  Text(
+                    _loading ? '…' : '$_balance',
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 16,
                       fontWeight: FontWeight.w900,
@@ -288,7 +361,7 @@ class _GiftSheetState extends State<_GiftSheet> {
                   ),
                   const Spacer(),
                   GestureDetector(
-                    onTap: _showQtyPicker,
+                    onTap: _gifts.isEmpty ? null : _showQtyPicker,
                     child: Container(
                       height: 40,
                       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -319,37 +392,39 @@ class _GiftSheetState extends State<_GiftSheet> {
                   ),
                   const SizedBox(width: 10),
                   GestureDetector(
-                    onTap: _sendSelected,
+                    onTap: (_sending || _gifts.isEmpty)
+                        ? null
+                        : () => unawaited(_sendSelected()),
                     child: Container(
                       height: 40,
                       padding: const EdgeInsets.symmetric(horizontal: 28),
                       decoration: BoxDecoration(
-                        color: _green,
+                        color: _sending || _gifts.isEmpty
+                            ? _green.withValues(alpha: 0.5)
+                            : _green,
                         borderRadius: BorderRadius.circular(20),
                       ),
                       alignment: Alignment.center,
-                      child: const Text(
-                        'Gift',
-                        style: TextStyle(
-                          color: Colors.black,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
+                      child: _sending
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.black,
+                              ),
+                            )
+                          : const Text(
+                              'Gift',
+                              style: TextStyle(
+                                color: Colors.black,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
                     ),
                   ),
                 ],
-              ),
-              const SizedBox(height: 12),
-              Center(
-                child: Container(
-                  width: 60,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.6),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
               ),
             ],
           ),

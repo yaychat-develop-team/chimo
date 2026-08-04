@@ -233,7 +233,7 @@ class _ChatsConversationTileState extends State<ChatsConversationTile> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  conversation.lastMessage,
+                                  conversation.listSubtitle,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(

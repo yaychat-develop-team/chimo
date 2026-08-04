@@ -10,6 +10,7 @@ class _DmAppBar extends StatelessWidget {
     required this.onFollowTap,
     required this.onAvatarTap,
     required this.onMoreTap,
+    this.loading = false,
   });
 
   final ChatConversation conversation;
@@ -20,6 +21,7 @@ class _DmAppBar extends StatelessWidget {
   final VoidCallback onFollowTap;
   final VoidCallback onAvatarTap;
   final VoidCallback onMoreTap;
+  final bool loading;
 
   @override
   Widget build(BuildContext context) {
@@ -52,11 +54,11 @@ class _DmAppBar extends StatelessWidget {
                 GestureDetector(
                   onTap: onAvatarTap,
                   child: ClipOval(
-                    child: Image.asset(
-                      conversation.avatarAsset,
+                    child: NetworkOrAssetAvatar(
+                      asset: conversation.avatarAsset,
+                      url: conversation.avatarUrl,
                       width: 36,
                       height: 36,
-                      fit: BoxFit.cover,
                     ),
                   ),
                 ),
@@ -204,7 +206,40 @@ class _DmAppBar extends StatelessWidget {
                           _ProfileTag(label: '♑ ${conversation.zodiac}'),
                         ],
                       ),
-                      if (conversation.momentAssets.isNotEmpty) ...[
+                      if (loading) ...[
+                        const SizedBox(height: 10),
+                        const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white54,
+                          ),
+                        ),
+                      ],
+                      if (conversation.momentUrls.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          height: 72,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: conversation.momentUrls.length,
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(width: 6),
+                            itemBuilder: (context, i) {
+                              return ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: NetworkOrAssetAvatar(
+                                  asset: AppAssets.avatarPlace,
+                                  url: conversation.momentUrls[i],
+                                  width: 72,
+                                  height: 72,
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ] else if (conversation.momentAssets.isNotEmpty) ...[
                         const SizedBox(height: 12),
                         SizedBox(
                           height: 72,

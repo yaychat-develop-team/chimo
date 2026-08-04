@@ -7,10 +7,14 @@ class _DmChatBody extends StatelessWidget {
     required this.messagesScroll,
     required this.onHandleDragUpdate,
     required this.onHandleDragEnd,
+    this.peerAvatarUrl,
+    this.selfAvatarUrl,
   });
 
   final List<_ChatLine> messages;
   final String peerAvatar;
+  final String? peerAvatarUrl;
+  final String? selfAvatarUrl;
   final ScrollController messagesScroll;
   final GestureDragUpdateCallback onHandleDragUpdate;
   final GestureDragEndCallback onHandleDragEnd;
@@ -51,6 +55,8 @@ class _DmChatBody extends StatelessWidget {
             child: _DmMessagesFeed(
               messages: messages,
               peerAvatar: peerAvatar,
+              peerAvatarUrl: peerAvatarUrl,
+              selfAvatarUrl: selfAvatarUrl,
               scrollController: messagesScroll,
             ),
           ),
@@ -65,10 +71,14 @@ class _DmMessagesFeed extends StatelessWidget {
     required this.messages,
     required this.peerAvatar,
     required this.scrollController,
+    this.peerAvatarUrl,
+    this.selfAvatarUrl,
   });
 
   final List<_ChatLine> messages;
   final String peerAvatar;
+  final String? peerAvatarUrl;
+  final String? selfAvatarUrl;
   final ScrollController scrollController;
 
   bool _showAvatar(int index) {
@@ -76,71 +86,128 @@ class _DmMessagesFeed extends StatelessWidget {
     return messages[index].side != messages[index - 1].side;
   }
 
+  bool _isMedia(int index) {
+    final k = messages[index].kind;
+    return k == _ChatLineKind.image || k == _ChatLineKind.voice;
+  }
+
   double _topGap(int index) {
     if (index == 0) return 0;
-    return messages[index].side == messages[index - 1].side
-        ? _BubbleLayout.sameGap
-        : _BubbleLayout.otherGap;
+    final sameSide = messages[index].side == messages[index - 1].side;
+    if (!sameSide) return _BubbleLayout.otherGap;
+    // Tighter when stacking media → media / media → voice.
+    if (_isMedia(index) && _isMedia(index - 1)) {
+      return _BubbleLayout.sameMediaGap;
+    }
+    return _BubbleLayout.sameGap;
+  }
+
+  bool _showTimeLabel(int index) {
+    final t = messages[index].serverTimeMs;
+    if (t <= 0) return index == 0;
+    if (index == 0) return true;
+    final prev = messages[index - 1].serverTimeMs;
+    if (prev <= 0) return true;
+    // Show when gap ≥ 5 minutes (matches common IM rhythm).
+    return (t - prev).abs() >= 5 * 60 * 1000;
+  }
+
+  String _formatTime(int ms) {
+    final dt = DateTime.fromMillisecondsSinceEpoch(ms);
+    final h24 = dt.hour;
+    final m = dt.minute.toString().padLeft(2, '0');
+    final period = h24 >= 12 ? 'PM' : 'AM';
+    final h12 = h24 % 12 == 0 ? 12 : h24 % 12;
+    return '$h12:$m $period';
   }
 
   @override
   Widget build(BuildContext context) {
+    if (messages.isEmpty) {
+      return const Center(
+        child: Text(
+          'No messages yet',
+          style: TextStyle(
+            color: Color(0xFFC9C9C9),
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      );
+    }
+
     return ListView.builder(
       controller: scrollController,
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
-      itemCount: messages.length + 1,
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 24),
+      itemCount: messages.length,
       itemBuilder: (context, index) {
-        if (index == 0) {
-          return const Padding(
-            padding: EdgeInsets.only(bottom: 16),
-            child: Center(
-              child: Text(
-                '18:07',
-                style: TextStyle(
-                  color: Color(0xFFC9C9C9),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
+        final line = messages[index];
+        final showAvatar = _showAvatar(index);
+        final showTime = _showTimeLabel(index);
+        final bubble = switch (line.kind) {
+          _ChatLineKind.voice => _VoiceBubble(
+            side: line.side,
+            seconds: line.voiceSeconds,
+            mediaSource: line.mediaSource,
+            peerAvatar: peerAvatar,
+            peerAvatarUrl: peerAvatarUrl,
+            selfAvatarUrl: selfAvatarUrl,
+            showAvatar: showAvatar,
+          ),
+          _ChatLineKind.image => _ImageBubble(
+            side: line.side,
+            source: line.displayMedia,
+            locked: false,
+            peerAvatar: peerAvatar,
+            peerAvatarUrl: peerAvatarUrl,
+            selfAvatarUrl: selfAvatarUrl,
+            showAvatar: showAvatar,
+          ),
+          _ChatLineKind.gift => _GiftMessageCard(
+            side: line.side,
+            giftId: line.giftId,
+            qty: line.giftQty,
+            emoji: line.giftEmoji,
+            giftName: line.giftName,
+            giftIconUrl: line.giftIconUrl,
+            peerAvatar: peerAvatar,
+            peerAvatarUrl: peerAvatarUrl,
+            selfAvatarUrl: selfAvatarUrl,
+            showAvatar: showAvatar,
+          ),
+          _ChatLineKind.text => line.side == _ChatSide.self
+              ? _SelfBubble(
+                  text: line.text,
+                  showAvatar: showAvatar,
+                  avatarUrl: selfAvatarUrl,
+                )
+              : _PeerBubble(
+                  text: line.text,
+                  avatarAsset: peerAvatar,
+                  avatarUrl: peerAvatarUrl,
+                  showAvatar: showAvatar,
                 ),
-              ),
-            ),
-          );
-        }
-        final msgIndex = index - 1;
-        final line = messages[msgIndex];
-        final showAvatar = _showAvatar(msgIndex);
+        };
+
         return Padding(
-          padding: EdgeInsets.only(top: _topGap(msgIndex)),
-          child: switch (line.kind) {
-            _ChatLineKind.voice => _VoiceBubble(
-              side: line.side,
-              seconds: line.voiceSeconds,
-              peerAvatar: peerAvatar,
-              showAvatar: showAvatar,
-            ),
-            _ChatLineKind.image => _ImageBubble(
-              side: line.side,
-              asset: line.imageAssets.first,
-              locked: false,
-              peerAvatar: peerAvatar,
-              showAvatar: showAvatar,
-            ),
-            _ChatLineKind.gift => _GiftMessageCard(
-              side: line.side,
-              giftId: line.giftId,
-              qty: line.giftQty,
-              emoji: line.giftEmoji,
-              peerAvatar: peerAvatar,
-              showAvatar: showAvatar,
-            ),
-            _ChatLineKind.text =>
-              line.side == _ChatSide.self
-                  ? _SelfBubble(text: line.text, showAvatar: showAvatar)
-                  : _PeerBubble(
-                      text: line.text,
-                      avatarAsset: peerAvatar,
-                      showAvatar: showAvatar,
+          padding: EdgeInsets.only(top: showTime ? 12 : _topGap(index)),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (showTime && line.serverTimeMs > 0) ...[
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Text(
+                      _formatTime(line.serverTimeMs),
+                      style: _BubbleLayout.timeStyle,
                     ),
-          },
+                  ),
+                ),
+              ],
+              bubble,
+            ],
+          ),
         );
       },
     );
@@ -148,19 +215,80 @@ class _DmMessagesFeed extends StatelessWidget {
 }
 
 class _ChatAvatar extends StatelessWidget {
-  const _ChatAvatar({required this.asset});
+  const _ChatAvatar({required this.asset, this.url});
 
   final String asset;
+  final String? url;
 
   @override
   Widget build(BuildContext context) {
     return ClipOval(
-      child: Image.asset(
-        asset,
+      child: NetworkOrAssetAvatar(
+        asset: asset,
+        url: url,
         width: _BubbleLayout.avatar,
         height: _BubbleLayout.avatar,
-        fit: BoxFit.cover,
       ),
+    );
+  }
+}
+
+/// Shared left/right row so text / image / voice share the same column rhythm.
+class _ChatRow extends StatelessWidget {
+  const _ChatRow({
+    required this.isSelf,
+    required this.showAvatar,
+    required this.child,
+    required this.peerAvatar,
+    this.peerAvatarUrl,
+    this.selfAvatarUrl,
+  });
+
+  final bool isSelf;
+  final bool showAvatar;
+  final Widget child;
+  final String peerAvatar;
+  final String? peerAvatarUrl;
+  final String? selfAvatarUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    final avatar = showAvatar
+        ? _ChatAvatar(
+            asset: isSelf ? AppAssets.avatarPlace : peerAvatar,
+            url: isSelf ? selfAvatarUrl : peerAvatarUrl,
+          )
+        : const SizedBox(width: _BubbleLayout.avatar);
+
+    if (isSelf) {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Flexible(
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: child,
+            ),
+          ),
+          const SizedBox(width: _BubbleLayout.avatarGap),
+          avatar,
+        ],
+      );
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        avatar,
+        const SizedBox(width: _BubbleLayout.avatarGap),
+        Flexible(
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: child,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -170,83 +298,81 @@ class _PeerBubble extends StatelessWidget {
     required this.text,
     required this.avatarAsset,
     required this.showAvatar,
+    this.avatarUrl,
   });
 
   final String text;
   final String avatarAsset;
+  final String? avatarUrl;
   final bool showAvatar;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (showAvatar)
-          _ChatAvatar(asset: avatarAsset)
-        else
-          const SizedBox(width: _BubbleLayout.avatar),
-        const SizedBox(width: _BubbleLayout.avatarGap),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: _BubbleLayout.peerMax),
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: _BubbleLayout.padH,
-              vertical: _BubbleLayout.padV,
-            ),
-            decoration: const BoxDecoration(
-              color: _BubbleLayout.peerColor,
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(4),
-                topRight: Radius.circular(18),
-                bottomLeft: Radius.circular(18),
-                bottomRight: Radius.circular(18),
-              ),
-            ),
-            child: Text(text, style: _BubbleLayout.peerTextStyle),
+    return _ChatRow(
+      isSelf: false,
+      showAvatar: showAvatar,
+      peerAvatar: avatarAsset,
+      peerAvatarUrl: avatarUrl,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: _BubbleLayout.peerMax),
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: _BubbleLayout.padH,
+            vertical: _BubbleLayout.padV,
           ),
+          decoration: const BoxDecoration(
+            color: _BubbleLayout.peerColor,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(4),
+              topRight: Radius.circular(18),
+              bottomLeft: Radius.circular(18),
+              bottomRight: Radius.circular(18),
+            ),
+          ),
+          child: Text(text, style: _BubbleLayout.peerTextStyle),
         ),
-      ],
+      ),
     );
   }
 }
 
 class _SelfBubble extends StatelessWidget {
-  const _SelfBubble({required this.text, required this.showAvatar});
+  const _SelfBubble({
+    required this.text,
+    required this.showAvatar,
+    this.avatarUrl,
+  });
 
   final String text;
   final bool showAvatar;
+  final String? avatarUrl;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: _BubbleLayout.selfMax),
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: _BubbleLayout.padH,
-              vertical: _BubbleLayout.padV,
-            ),
-            decoration: const BoxDecoration(
-              color: _BubbleLayout.selfColor,
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(18),
-                topRight: Radius.circular(4),
-                bottomLeft: Radius.circular(18),
-                bottomRight: Radius.circular(18),
-              ),
-            ),
-            child: Text(text, style: _BubbleLayout.textStyle),
+    return _ChatRow(
+      isSelf: true,
+      showAvatar: showAvatar,
+      peerAvatar: AppAssets.avatarPlace,
+      selfAvatarUrl: avatarUrl,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: _BubbleLayout.selfMax),
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: _BubbleLayout.padH,
+            vertical: _BubbleLayout.padV,
           ),
+          decoration: const BoxDecoration(
+            color: _BubbleLayout.selfColor,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(18),
+              topRight: Radius.circular(4),
+              bottomLeft: Radius.circular(18),
+              bottomRight: Radius.circular(18),
+            ),
+          ),
+          child: Text(text, style: _BubbleLayout.textStyle),
         ),
-        const SizedBox(width: _BubbleLayout.avatarGap),
-        if (showAvatar)
-          const _ChatAvatar(asset: AppAssets.avatarPlace)
-        else
-          const SizedBox(width: _BubbleLayout.avatar),
-      ],
+      ),
     );
   }
 }
@@ -257,11 +383,17 @@ class _VoiceBubble extends StatefulWidget {
     required this.seconds,
     required this.peerAvatar,
     required this.showAvatar,
+    this.mediaSource = '',
+    this.peerAvatarUrl,
+    this.selfAvatarUrl,
   });
 
   final _ChatSide side;
   final int seconds;
+  final String mediaSource;
   final String peerAvatar;
+  final String? peerAvatarUrl;
+  final String? selfAvatarUrl;
   final bool showAvatar;
 
   @override
@@ -272,13 +404,17 @@ class _VoiceBubbleState extends State<_VoiceBubble>
     with SingleTickerProviderStateMixin {
   /// Only one voice message may play at a time.
   static VoidCallback? _activeStop;
+  static final AudioPlayer _player = AudioPlayer();
 
   bool _playing = false;
   int _remaining = 0;
   Timer? _playTimer;
+  StreamSubscription<void>? _completeSub;
   late final AnimationController _waveController;
 
   bool get _isSelf => widget.side == _ChatSide.self;
+
+  String get _source => widget.mediaSource.trim();
 
   @override
   void initState() {
@@ -293,7 +429,9 @@ class _VoiceBubbleState extends State<_VoiceBubble>
   void dispose() {
     if (_activeStop == _stopPlay) {
       _activeStop = null;
+      unawaited(_player.stop());
     }
+    _completeSub?.cancel();
     _playTimer?.cancel();
     _waveController.dispose();
     super.dispose();
@@ -302,6 +440,9 @@ class _VoiceBubbleState extends State<_VoiceBubble>
   void _stopPlay() {
     _playTimer?.cancel();
     _playTimer = null;
+    unawaited(_completeSub?.cancel() ?? Future<void>.value());
+    _completeSub = null;
+    unawaited(_player.stop());
     _waveController.stop();
     _waveController.reset();
     if (_activeStop == _stopPlay) {
@@ -318,8 +459,8 @@ class _VoiceBubbleState extends State<_VoiceBubble>
     });
   }
 
-  void _togglePlay() {
-    if (widget.seconds <= 0) return;
+  Future<void> _togglePlay() async {
+    if (widget.seconds <= 0 && _source.isEmpty) return;
     if (_playing) {
       _stopPlay();
       return;
@@ -328,94 +469,113 @@ class _VoiceBubbleState extends State<_VoiceBubble>
     _activeStop = _stopPlay;
     setState(() {
       _playing = true;
-      _remaining = widget.seconds;
+      _remaining = widget.seconds > 0 ? widget.seconds : 1;
     });
     _waveController.repeat();
+
+    final src = _source;
+    if (src.isNotEmpty) {
+      try {
+        if (src.startsWith('http://') || src.startsWith('https://')) {
+          await _player.play(UrlSource(src));
+        } else if (File(src).existsSync()) {
+          await _player.play(DeviceFileSource(src));
+        } else {
+          // Unknown path — fall through to tick timer only.
+        }
+        await _completeSub?.cancel();
+        _completeSub = _player.onPlayerComplete.listen((_) {
+          if (mounted) _stopPlay();
+        });
+      } catch (error) {
+        debugPrint('Voice play failed: $error');
+      }
+    }
+
+    // UI countdown even if audio fails (keeps bars animating).
     _playTimer?.cancel();
-    _playTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-      if (_remaining <= 1) {
-        timer.cancel();
-        _playTimer = null;
-        _stopPlay();
-        return;
-      }
-      setState(() => _remaining -= 1);
-    });
+    if (widget.seconds > 0) {
+      _playTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (!mounted) {
+          timer.cancel();
+          return;
+        }
+        if (_remaining <= 1) {
+          timer.cancel();
+          _playTimer = null;
+          _stopPlay();
+          return;
+        }
+        setState(() => _remaining -= 1);
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final displaySeconds = _playing ? _remaining : widget.seconds;
+    final expired = _source.isEmpty && widget.seconds <= 0;
+    final secs = widget.seconds.clamp(1, 60);
 
     final bubble = GestureDetector(
-      onTap: _togglePlay,
+      onTap: expired ? null : _togglePlay,
       behavior: HitTestBehavior.opaque,
       child: Container(
-        constraints: BoxConstraints(
-          minWidth: 88,
-          maxWidth: 88 + (widget.seconds.clamp(1, 60) * 1.6),
-        ),
-        height: 44,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
+        width: expired
+            ? 140
+            : (80 + secs * (200 - 80) / 60).clamp(80.0, 200.0),
+        height: 40,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
           color: _isSelf ? _BubbleLayout.selfColor : _BubbleLayout.peerColor,
           borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(_isSelf ? 18 : 4),
-            topRight: Radius.circular(_isSelf ? 4 : 18),
-            bottomLeft: const Radius.circular(18),
-            bottomRight: const Radius.circular(18),
+            topLeft: Radius.circular(_isSelf ? 16 : 4),
+            topRight: Radius.circular(_isSelf ? 4 : 16),
+            bottomLeft: const Radius.circular(16),
+            bottomRight: const Radius.circular(16),
           ),
         ),
+        // Match forya: waveform left, duration right (spaceBetween).
         child: Row(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            _VoiceBarsIcon(
-              playing: _playing,
-              animation: _waveController,
-            ),
-            const SizedBox(width: 10),
-            Text(
-              '${displaySeconds}s',
-              style: const TextStyle(
-                color: Color(0xFF111111),
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
+            if (expired)
+              const Expanded(
+                child: Text(
+                  'Voice expired',
+                  style: TextStyle(
+                    color: Color(0xFF666666),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              )
+            else ...[
+              _VoiceBarsIcon(
+                playing: _playing,
+                animation: _waveController,
               ),
-            ),
+              Text(
+                '${displaySeconds > 0 ? displaySeconds : widget.seconds}s',
+                style: const TextStyle(
+                  color: Color(0xFF111111),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
           ],
         ),
       ),
     );
 
-    final avatar = widget.showAvatar
-        ? _ChatAvatar(
-            asset: _isSelf ? AppAssets.avatarPlace : widget.peerAvatar,
-          )
-        : const SizedBox(width: _BubbleLayout.avatar);
-
-    if (_isSelf) {
-      return Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          bubble,
-          const SizedBox(width: _BubbleLayout.avatarGap),
-          avatar,
-        ],
-      );
-    }
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        avatar,
-        const SizedBox(width: _BubbleLayout.avatarGap),
-        bubble,
-      ],
+    return _ChatRow(
+      isSelf: _isSelf,
+      showAvatar: widget.showAvatar,
+      peerAvatar: widget.peerAvatar,
+      peerAvatarUrl: widget.peerAvatarUrl,
+      selfAvatarUrl: widget.selfAvatarUrl,
+      child: bubble,
     );
   }
 }
@@ -497,108 +657,178 @@ class _VoiceBarsPainter extends CustomPainter {
   }
 }
 
-/// Image message: clear image / locked blur + Join to view.
+/// Image message: network / file / asset; optional locked blur + Join to view.
 class _ImageBubble extends StatelessWidget {
   const _ImageBubble({
     required this.side,
-    required this.asset,
+    required this.source,
     required this.locked,
     required this.peerAvatar,
     required this.showAvatar,
+    this.peerAvatarUrl,
+    this.selfAvatarUrl,
   });
 
   final _ChatSide side;
-  final String asset;
+  final String source;
   final bool locked;
   final String peerAvatar;
+  final String? peerAvatarUrl;
+  final String? selfAvatarUrl;
   final bool showAvatar;
-
-  static const double _size = 180;
 
   bool get _isSelf => side == _ChatSide.self;
 
+  Widget _imageChild() {
+    final src = source.trim();
+    if (src.isEmpty) {
+      return Container(
+        color: const Color(0xFF262624),
+        alignment: Alignment.center,
+        child: const Text(
+          'Picture expired',
+          style: TextStyle(
+            color: Color(0xFF666666),
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
+    }
+    if (src.startsWith('http://') || src.startsWith('https://')) {
+      return Image.network(
+        src,
+        fit: BoxFit.cover,
+        gaplessPlayback: true,
+        loadingBuilder: (context, child, progress) {
+          if (progress == null) return child;
+          return const ColoredBox(
+            color: Color(0xFFF3F3F3),
+            child: Center(
+              child: SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          );
+        },
+        errorBuilder: (_, _, _) => Container(
+          color: const Color(0xFF262624),
+          alignment: Alignment.center,
+          child: const Text(
+            'Picture expired',
+            style: TextStyle(
+              color: Color(0xFF666666),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      );
+    }
+    if (src.startsWith('assets/') || !src.contains(RegExp(r'[/\\]'))) {
+      return Image.asset(
+        src,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => Container(
+          color: const Color(0xFFE8E8E8),
+          alignment: Alignment.center,
+          child: const Icon(Icons.broken_image_outlined, color: Color(0xFF999999)),
+        ),
+      );
+    }
+    final file = File(src);
+    if (file.existsSync()) {
+      return Image.file(file, fit: BoxFit.cover);
+    }
+    return Container(
+      color: const Color(0xFF262624),
+      alignment: Alignment.center,
+      child: const Text(
+        'Picture expired',
+        style: TextStyle(
+          color: Color(0xFF666666),
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final radius = BorderRadius.only(
-      topLeft: Radius.circular(_isSelf ? 16 : 4),
-      topRight: Radius.circular(_isSelf ? 4 : 16),
-      bottomLeft: const Radius.circular(16),
-      bottomRight: const Radius.circular(16),
-    );
+    final radius = BorderRadius.circular(_BubbleLayout.imageRadius);
 
-    final bubble = ClipRRect(
-      borderRadius: radius,
-      child: SizedBox(
-        width: _size,
-        height: _size,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            if (locked)
-              ImageFiltered(
-                imageFilter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-                child: Transform.scale(
-                  scale: 1.08,
-                  child: Image.asset(asset, fit: BoxFit.cover),
-                ),
-              )
-            else
-              Image.asset(asset, fit: BoxFit.cover),
-            if (locked)
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: ColoredBox(
-                  color: Colors.black.withValues(alpha: 0.48),
-                  child: const SizedBox(
-                    height: 40,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _LockIcon(),
-                        SizedBox(width: 6),
-                        Text(
-                          'Join to view',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
+    final bubble = DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: radius,
+        child: SizedBox(
+          width: _BubbleLayout.imageW,
+          height: _BubbleLayout.imageH,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (locked)
+                ImageFiltered(
+                  imageFilter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                  child: Transform.scale(
+                    scale: 1.08,
+                    child: _imageChild(),
+                  ),
+                )
+              else
+                _imageChild(),
+              if (locked)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: ColoredBox(
+                    color: Colors.black.withValues(alpha: 0.48),
+                    child: const SizedBox(
+                      height: 40,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _LockIcon(),
+                          SizedBox(width: 6),
+                          Text(
+                            'Join to view',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
 
-    final avatar = showAvatar
-        ? _ChatAvatar(asset: _isSelf ? AppAssets.avatarPlace : peerAvatar)
-        : const SizedBox(width: _BubbleLayout.avatar);
-
-    if (_isSelf) {
-      return Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          bubble,
-          const SizedBox(width: _BubbleLayout.avatarGap),
-          avatar,
-        ],
-      );
-    }
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        avatar,
-        const SizedBox(width: _BubbleLayout.avatarGap),
-        bubble,
-      ],
+    return _ChatRow(
+      isSelf: _isSelf,
+      showAvatar: showAvatar,
+      peerAvatar: peerAvatar,
+      peerAvatarUrl: peerAvatarUrl,
+      selfAvatarUrl: selfAvatarUrl,
+      child: bubble,
     );
   }
 }
@@ -611,13 +841,21 @@ class _GiftMessageCard extends StatelessWidget {
     required this.emoji,
     required this.peerAvatar,
     required this.showAvatar,
+    this.giftName = '',
+    this.giftIconUrl = '',
+    this.peerAvatarUrl,
+    this.selfAvatarUrl,
   });
 
   final _ChatSide side;
   final int giftId;
   final int qty;
   final String emoji;
+  final String giftName;
+  final String giftIconUrl;
   final String peerAvatar;
+  final String? peerAvatarUrl;
+  final String? selfAvatarUrl;
   final bool showAvatar;
 
   /// Design: pink→peach gift strip with corner chest badge.
@@ -629,9 +867,10 @@ class _GiftMessageCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isSelf = side == _ChatSide.self;
     final avatar = showAvatar
-        ? (isSelf
-            ? const SizedBox(width: _BubbleLayout.avatar)
-            : _ChatAvatar(asset: peerAvatar))
+        ? _ChatAvatar(
+            asset: isSelf ? AppAssets.avatarPlace : peerAvatar,
+            url: isSelf ? selfAvatarUrl : peerAvatarUrl,
+          )
         : const SizedBox(width: _BubbleLayout.avatar);
 
     final card = ConstrainedBox(
@@ -674,10 +913,24 @@ class _GiftMessageCard extends StatelessWidget {
                         width: 66,
                         height: 66,
                         child: Center(
-                          child: Text(
-                            emoji.isEmpty ? '🎁' : emoji,
-                            style: const TextStyle(fontSize: 44, height: 1),
-                          ),
+                          child: giftIconUrl.isNotEmpty
+                              ? Image.network(
+                                  giftIconUrl,
+                                  width: 52,
+                                  height: 52,
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (_, _, _) => Text(
+                                    emoji.isEmpty ? '🎁' : emoji,
+                                    style: const TextStyle(
+                                      fontSize: 44,
+                                      height: 1,
+                                    ),
+                                  ),
+                                )
+                              : Text(
+                                  emoji.isEmpty ? '🎁' : emoji,
+                                  style: const TextStyle(fontSize: 44, height: 1),
+                                ),
                         ),
                       ),
                       const SizedBox(width: 6),
@@ -686,9 +939,9 @@ class _GiftMessageCard extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.center,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              'Gift to you',
-                              style: TextStyle(
+                            Text(
+                              isSelf ? 'You sent' : 'Gift to you',
+                              style: const TextStyle(
                                 color: Color(0xFF1A1A1A),
                                 fontSize: 15,
                                 fontWeight: FontWeight.w700,
@@ -699,13 +952,19 @@ class _GiftMessageCard extends StatelessWidget {
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
-                                Text(
-                                  '$giftId',
-                                  style: const TextStyle(
-                                    color: Color(0xFF1A1A1A),
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.w800,
-                                    height: 1.1,
+                                Flexible(
+                                  child: Text(
+                                    giftName.isNotEmpty
+                                        ? giftName
+                                        : (giftId > 0 ? '$giftId' : 'Gift'),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: Color(0xFF1A1A1A),
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.w800,
+                                      height: 1.1,
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(width: 6),

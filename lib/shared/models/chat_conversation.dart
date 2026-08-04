@@ -34,12 +34,21 @@ class ChatConversation {
     this.zodiac = 'Capricorn',
     this.isFollowing = false,
     this.momentAssets = const [],
+    this.momentUrls = const [],
+    this.groupDescription = '',
+    this.category = '',
+    this.memberCount = 0,
+    this.postCount = 0,
+    this.level = 1,
+    this.emUserName = '',
   });
 
   final String id;
   final String title;
   final String avatarAsset;
   final String? avatarUrl;
+
+  /// Last chat preview. Empty until IM / local send provides one.
   final String lastMessage;
   final String timeLabel;
   final int unreadCount;
@@ -66,14 +75,38 @@ class ChatConversation {
   /// Whether following (DM app bar Follow).
   final bool isFollowing;
 
-  /// Profile Moments images for DM header preview.
+  /// Profile Moments local assets for DM header preview.
   final List<String> momentAssets;
+
+  /// Profile Moments remote URLs for DM header preview.
+  final List<String> momentUrls;
+
+  /// Group profile fields from `/chat/group/*` (not last message).
+  final String groupDescription;
+  final String category;
+  final int memberCount;
+  final int postCount;
+  final int level;
+
+  /// Peer EaseMob username for 1v1 (empty for groups).
+  final String emUserName;
 
   String get signatureDisplay {
     if (signature.trim().isNotEmpty) return signature.trim();
     return isMale
         ? "He doesn't have a signature yet."
         : "She doesn't have a signature yet.";
+  }
+
+  /// Subtitle under the title for list rows.
+  String get listSubtitle {
+    if (lastMessage.trim().isNotEmpty) return lastMessage.trim();
+    if (badge == ChatBadgeType.group) {
+      if (memberCount > 0) return '$memberCount members';
+      if (groupDescription.trim().isNotEmpty) return groupDescription.trim();
+      return 'Group chat';
+    }
+    return 'Say hi~';
   }
 
   ChatConversation copyWith({
@@ -93,6 +126,13 @@ class ChatConversation {
     String? zodiac,
     bool? isFollowing,
     List<String>? momentAssets,
+    List<String>? momentUrls,
+    String? groupDescription,
+    String? category,
+    int? memberCount,
+    int? postCount,
+    int? level,
+    String? emUserName,
   }) {
     return ChatConversation(
       id: id ?? this.id,
@@ -111,6 +151,13 @@ class ChatConversation {
       zodiac: zodiac ?? this.zodiac,
       isFollowing: isFollowing ?? this.isFollowing,
       momentAssets: momentAssets ?? this.momentAssets,
+      momentUrls: momentUrls ?? this.momentUrls,
+      groupDescription: groupDescription ?? this.groupDescription,
+      category: category ?? this.category,
+      memberCount: memberCount ?? this.memberCount,
+      postCount: postCount ?? this.postCount,
+      level: level ?? this.level,
+      emUserName: emUserName ?? this.emUserName,
     );
   }
 }

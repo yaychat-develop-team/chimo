@@ -1,26 +1,74 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../core/constants/app_assets.dart';
+import '../../core/network/network_bootstrap.dart';
+import '../me/data/user_dto.dart';
 import '../me/levels_help_page.dart';
 
-/// My level: current level card + privilege list (from design assets).
-class LevelPage extends StatelessWidget {
+/// My level: current level from `/user/info` + privilege list.
+class LevelPage extends StatefulWidget {
   const LevelPage({
     super.key,
-    this.level = 1,
-    this.experience = 2063,
-    this.pointsToLevelUp = 1568,
+    this.initialLevel = 1,
+    this.initialExperience = 0,
   });
 
-  final int level;
-  final int experience;
-  final int pointsToLevelUp;
+  final int initialLevel;
+  final int initialExperience;
+
+  @override
+  State<LevelPage> createState() => _LevelPageState();
+}
+
+class _LevelPageState extends State<LevelPage> {
+  late int _level = widget.initialLevel;
+  late int _experience = widget.initialExperience;
+  late int _pointsToLevelUp = _estimatePointsToNext(_level, _experience);
+  bool _loading = true;
 
   double get _progress {
-    final total = experience + pointsToLevelUp;
+    final total = _experience + _pointsToLevelUp;
     if (total <= 0) return 0;
-    return (experience / total).clamp(0.0, 1.0);
+    return (_experience / total).clamp(0.0, 1.0);
+  }
+
+  static int _estimatePointsToNext(int level, int experience) {
+    final step = 1000 * (level.clamp(1, 100));
+    final into = experience % step;
+    final remaining = step - into;
+    return remaining <= 0 ? step : remaining;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_load());
+    });
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    try {
+      final res = await NetworkBootstrap.api.userInfo();
+      if (!mounted) return;
+      final profile = UserDto.parseProfile(res);
+      if (profile != null) {
+        setState(() {
+          _level = profile.vipLevel <= 0 ? 1 : profile.vipLevel;
+          _experience = profile.experience;
+          _pointsToLevelUp = _estimatePointsToNext(_level, _experience);
+          _loading = false;
+        });
+      } else {
+        setState(() => _loading = false);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   void _openIntroduction(BuildContext context) {
@@ -58,43 +106,54 @@ class LevelPage extends StatelessWidget {
               _LevelAppBar(
                 onHelp: () => _openIntroduction(context),
               ),
+              if (_loading)
+                const LinearProgressIndicator(
+                  minHeight: 2,
+                  color: Color(0xFFFFD56A),
+                  backgroundColor: Colors.transparent,
+                ),
               Expanded(
-                child: ListView(
-                  padding: EdgeInsets.fromLTRB(16, 20, 16, 24 + bottom),
-                  children: [
-                    _CurrentLevelCard(
-                      level: level,
-                      experience: experience,
-                      pointsToLevelUp: pointsToLevelUp,
-                      progress: _progress,
-                    ),
-                    const SizedBox(height: 28),
-                    const _SectionTitle(),
-                    const SizedBox(height: 14),
-                    const _PrivilegeCard(
-                      iconAsset: AppAssets.levelPrivilegeBadge,
-                      title: 'Level Badge',
-                      unlockLevel: 40,
-                      description:
-                          'Your personal homepage and room public screen display your level badges. The higher your level is, the more splendid the badge becomes.',
-                    ),
-                    const SizedBox(height: 12),
-                    const _PrivilegeCard(
-                      iconAsset: AppAssets.levelPrivilegeAssist,
-                      title: 'Exclusive Assistance',
-                      unlockLevel: 40,
-                      description:
-                          'Own exclusive assistance, 1-on-1 problem-solving, priority registration for activities.',
-                    ),
-                    const SizedBox(height: 12),
-                    const _PrivilegeCard(
-                      iconAsset: AppAssets.levelPrivilegeCar,
-                      title: 'Exclusively Custom-made car',
-                      unlockLevel: 40,
-                      description:
-                          'Own exclusive cars, and you can drive them into the room to show them off.',
-                    ),
-                  ],
+                child: RefreshIndicator(
+                  color: const Color(0xFFFFD56A),
+                  onRefresh: _load,
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: EdgeInsets.fromLTRB(16, 20, 16, 24 + bottom),
+                    children: [
+                      _CurrentLevelCard(
+                        level: _level,
+                        experience: _experience,
+                        pointsToLevelUp: _pointsToLevelUp,
+                        progress: _progress,
+                      ),
+                      const SizedBox(height: 28),
+                      const _SectionTitle(),
+                      const SizedBox(height: 14),
+                      const _PrivilegeCard(
+                        iconAsset: AppAssets.levelPrivilegeBadge,
+                        title: 'Level Badge',
+                        unlockLevel: 40,
+                        description:
+                            'Your personal homepage and room public screen display your level badges. The higher your level is, the more splendid the badge becomes.',
+                      ),
+                      const SizedBox(height: 12),
+                      const _PrivilegeCard(
+                        iconAsset: AppAssets.levelPrivilegeAssist,
+                        title: 'Exclusive Assistance',
+                        unlockLevel: 40,
+                        description:
+                            'Own exclusive assistance, 1-on-1 problem-solving, priority registration for activities.',
+                      ),
+                      const SizedBox(height: 12),
+                      const _PrivilegeCard(
+                        iconAsset: AppAssets.levelPrivilegeCar,
+                        title: 'Exclusively Custom-made car',
+                        unlockLevel: 40,
+                        description:
+                            'Own exclusive cars, and you can drive them into the room to show them off.',
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],

@@ -304,17 +304,6 @@ class _GiftBottomSheetState extends State<GiftBottomSheet> {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              Center(
-                child: Container(
-                  width: 60,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.6),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              ),
             ],
           ),
         ),

@@ -1,7 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../app/app_router.dart';
 import '../../core/auth/auth_session.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/network/network_bootstrap.dart';
@@ -19,6 +21,7 @@ import 'data/user_dto.dart';
 import 'help_page.dart';
 import 'models/me_models.dart';
 import 'settings_page.dart';
+import 'visits_page.dart';
 import 'widgets/me_action_cards.dart';
 import 'widgets/me_profile_header.dart';
 import 'widgets/me_quick_access_section.dart';
@@ -75,12 +78,9 @@ class _MePageState extends State<MePage> {
       if (parsed == null) {
         setState(() => _loading = false);
         if (res.message == 'user.not.login') {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Please log in again to load profile'),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+          await NetworkBootstrap.handleNotLogin();
+          if (!mounted) return;
+          context.go(AppRoutes.login);
         }
         return;
       }
@@ -91,7 +91,10 @@ class _MePageState extends State<MePage> {
       await AuthSession.markLoggedIn(
         nickname: parsed.displayName,
         avatarUrl: parsed.avatarUrl,
+        userId: parsed.userId,
       );
+      // Keep IM online after app-token refresh paths.
+      unawaited(NetworkBootstrap.connectImAfterLogin());
     } catch (error) {
       if (!mounted) return;
       setState(() => _loading = false);
@@ -121,6 +124,12 @@ class _MePageState extends State<MePage> {
   }
 
   void _openStatPage(MeStatItem item) {
+    if (item.label == 'Visitors') {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (_) => const VisitsPage()),
+      );
+      return;
+    }
     final tab = switch (item.label) {
       'Friends' => FriendsTab.friends,
       'Fans' => FriendsTab.followers,
@@ -190,7 +199,10 @@ class _MePageState extends State<MePage> {
                     onLevelTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute<void>(
-                          builder: (_) => const LevelPage(),
+                          builder: (_) => LevelPage(
+                            initialLevel: _profile.vipLevel,
+                            initialExperience: _profile.experience,
+                          ),
                         ),
                       );
                     },

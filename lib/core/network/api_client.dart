@@ -92,7 +92,9 @@ class ApiClient {
     final body = jsonEncode(_wrapBizParam(bizParam ?? const {}));
     // ignore: avoid_print
     print('ApiClient POST $uri body=$body');
-    final response = await _http.post(uri, headers: _headers(), body: body);
+    final response = await _send(
+      () => _http.post(uri, headers: _headers(), body: body),
+    );
     return _decode(response);
   }
 
@@ -103,8 +105,40 @@ class ApiClient {
     final uri = _uri(path, query);
     // ignore: avoid_print
     print('ApiClient GET $uri');
-    final response = await _http.get(uri, headers: _headers());
+    final response = await _send(
+      () => _http.get(uri, headers: _headers()),
+    );
     return _decode(response);
+  }
+
+  /// Retry transient TLS / socket failures (emulator network is flaky).
+  Future<http.Response> _send(
+    Future<http.Response> Function() call, {
+    int maxAttempts = 3,
+  }) async {
+    Object? lastError;
+    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await call();
+      } catch (error) {
+        lastError = error;
+        final text = '$error';
+        final retryable = text.contains('HandshakeException') ||
+            text.contains('Connection terminated') ||
+            text.contains('Connection closed') ||
+            text.contains('SocketException') ||
+            text.contains('ClientException') ||
+            text.contains('Connection reset');
+        // ignore: avoid_print
+        print(
+          'ApiClient transport error attempt=$attempt/$maxAttempts: $error',
+        );
+        if (!retryable || attempt == maxAttempts) rethrow;
+        await Future<void>.delayed(Duration(milliseconds: 350 * attempt));
+      }
+    }
+    // Unreachable; keeps analyzer happy.
+    throw lastError ?? StateError('ApiClient send failed');
   }
 
   ApiResponse _decode(http.Response response) {

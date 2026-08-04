@@ -6,9 +6,18 @@ import '../../shared/models/group_item.dart';
 abstract final class GroupDto {
   static List<PopularGroupItem> parseList(ApiResponse response) {
     if (!response.success) return const [];
-    final data = response.data;
+    return parseData(response.data);
+  }
+
+  static List<PopularGroupItem> parseData(Object? data) {
+    if (data is List) {
+      return [
+        for (final item in data)
+          if (item is Map) fromMap(Map<String, dynamic>.from(item)),
+      ];
+    }
     if (data is! Map) return const [];
-    final list = data['groupList'];
+    final list = data['groupList'] ?? data['myGroups'] ?? data['list'];
     if (list is! List) return const [];
     return [
       for (final item in list)
@@ -17,8 +26,8 @@ abstract final class GroupDto {
   }
 
   static PopularGroupItem fromMap(Map<String, dynamic> json) {
-    final emId = '${json['emGroupId'] ?? ''}';
-    final id = emId.isNotEmpty ? emId : '${json['id'] ?? ''}';
+    final emId = '${json['emGroupId'] ?? ''}'.trim();
+    final id = emId.isNotEmpty ? emId : '${json['id'] ?? ''}'.trim();
     final avatar = '${json['avatar'] ?? ''}';
     return PopularGroupItem(
       id: id,
@@ -30,7 +39,7 @@ abstract final class GroupDto {
       memberCount: _asInt(json['memberCount']),
       postCount: _asInt(json['picCount']),
       level: _asInt(json['level'], fallback: 1),
-      isJoined: json['isJoin'] == true,
+      isJoined: json['isJoin'] == true || json['isJoin'] == 'true',
     );
   }
 

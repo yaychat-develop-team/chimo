@@ -70,9 +70,17 @@ class _PhoneLoginPageState extends State<PhoneLoginPage> {
       context.push(AppRoutes.verifyPath(_phone));
     } catch (error) {
       if (!mounted) return;
+      final text = '$error';
+      final networkish = text.contains('HandshakeException') ||
+          text.contains('SocketException') ||
+          text.contains('ClientException');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('SMS send failed: $error'),
+          content: Text(
+            networkish
+                ? 'Network error. Check emulator internet and try again.'
+                : 'SMS send failed: $error',
+          ),
           behavior: SnackBarBehavior.floating,
         ),
       );

@@ -6,7 +6,7 @@ import '../../../core/widgets/network_or_asset_avatar.dart';
 import '../models/group_item.dart';
 import 'group_level_badge.dart';
 
-/// Popular group large card: fixed 343×148 per design, same visual style.
+/// Popular group large card: fixed height, same visual style as design.
 class PopularGroupCard extends StatelessWidget {
   const PopularGroupCard({
     super.key,
@@ -31,8 +31,10 @@ class PopularGroupCard extends StatelessWidget {
   /// Home Popular list shows join control; My Groups list hides it.
   final bool showJoinAction;
 
-  static const double cardHeight = 148;
+  /// Tall enough for title + tag + 2-line description + stats.
+  static const double cardHeight = 172;
   static const double avatarSize = 72;
+  static const double _joinIconSize = 32;
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +43,7 @@ class PopularGroupCard extends StatelessWidget {
       child: Container(
         height: cardHeight,
         margin: const EdgeInsets.symmetric(horizontal: 16),
-        padding: const EdgeInsets.fromLTRB(14, 14, 12, 14),
+        padding: const EdgeInsets.fromLTRB(14, 14, 10, 14),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(22),
           image: const DecorationImage(
@@ -52,7 +54,6 @@ class PopularGroupCard extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Left rounded avatar
             ClipRRect(
               borderRadius: BorderRadius.circular(18),
               child: NetworkOrAssetAvatar(
@@ -69,7 +70,7 @@ class PopularGroupCard extends StatelessWidget {
                 children: [
                   // Title row: name + level + optional join button
                   Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Expanded(
                         child: Row(
@@ -83,6 +84,7 @@ class PopularGroupCard extends StatelessWidget {
                                   color: AppColors.textPrimary,
                                   fontSize: 16,
                                   fontWeight: FontWeight.w700,
+                                  height: 1.2,
                                 ),
                               ),
                             ),
@@ -92,36 +94,20 @@ class PopularGroupCard extends StatelessWidget {
                         ),
                       ),
                       if (showJoinAction) ...[
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 4),
                         // Joined = status only (not leave). Join = tappable +.
                         if (group.isJoined)
                           IgnorePointer(
                             child: Opacity(
                               opacity: 0.9,
-                              child: Padding(
-                                padding: const EdgeInsets.all(6),
-                                child: Image.asset(
-                                  AppAssets.homeJoined,
-                                  width: 36,
-                                  height: 36,
-                                  fit: BoxFit.contain,
-                                ),
-                              ),
+                              child: _JoinIcon(asset: AppAssets.homeJoined),
                             ),
                           )
                         else
                           GestureDetector(
                             onTap: onJoinTap,
                             behavior: HitTestBehavior.opaque,
-                            child: Padding(
-                              padding: const EdgeInsets.all(6),
-                              child: Image.asset(
-                                AppAssets.homeJoin,
-                                width: 36,
-                                height: 36,
-                                fit: BoxFit.contain,
-                              ),
-                            ),
+                            child: _JoinIcon(asset: AppAssets.homeJoin),
                           ),
                       ],
                     ],
@@ -141,24 +127,23 @@ class PopularGroupCard extends StatelessWidget {
                         color: AppColors.textSecondary,
                         fontSize: 11,
                         fontWeight: FontWeight.w500,
+                        height: 1.2,
                       ),
                     ),
                   ),
                   const SizedBox(height: 8),
-                  // Description
-                  Expanded(
-                    child: Text(
-                      group.description,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 13,
-                        height: 1.35,
-                      ),
+                  // Description: fixed 2-line slot so it never gets half-clipped.
+                  Text(
+                    group.description,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 13,
+                      height: 18 / 13,
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  const Spacer(),
                   // Member count / post count
                   Row(
                     children: [
@@ -181,6 +166,28 @@ class PopularGroupCard extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _JoinIcon extends StatelessWidget {
+  const _JoinIcon({required this.asset});
+
+  final String asset;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: PopularGroupCard._joinIconSize + 8,
+      height: PopularGroupCard._joinIconSize + 8,
+      child: Center(
+        child: Image.asset(
+          asset,
+          width: PopularGroupCard._joinIconSize,
+          height: PopularGroupCard._joinIconSize,
+          fit: BoxFit.contain,
         ),
       ),
     );

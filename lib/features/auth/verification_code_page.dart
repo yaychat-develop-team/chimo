@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -79,7 +81,7 @@ class _VerificationCodePageState extends State<VerificationCodePage> {
       }
 
       final data = res.data;
-      final map = data is Map ? Map<String, dynamic>.from(data) : const {};
+      final map = data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
       final token = '${map['token'] ?? ''}';
       if (token.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -95,12 +97,20 @@ class _VerificationCodePageState extends State<VerificationCodePage> {
         method: 'phone',
         phone: widget.phone,
         token: token,
+        userId: '${map['userId'] ?? map['uid'] ?? map['id'] ?? ''}',
         nickname: '${map['nickName'] ?? map['nickname'] ?? ''}',
         avatarUrl: '${map['avatar'] ?? map['avatarUrl'] ?? ''}',
+        emUsername: '${map['emUsername'] ?? map['emUserName'] ?? ''}',
+        emPassword: '${map['emPwd'] ?? map['emPassword'] ?? ''}',
       );
       await NetworkBootstrap.applySessionToken(token);
+      unawaited(NetworkBootstrap.connectImAfterLogin());
+
+      // Existing accounts (not newUser) skip onboarding → home.
+      // Mirrors forya: AuthRsp.newUser / User.isRegister.
+      final goHome = await _shouldEnterHome(map);
       if (!mounted) return;
-      context.go(AppRoutes.profileSetup);
+      context.go(goHome ? AppRoutes.shell : AppRoutes.profileSetup);
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -115,6 +125,46 @@ class _VerificationCodePageState extends State<VerificationCodePage> {
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
+  }
+
+  /// True when this phone already has a registered profile → skip setup.
+  Future<bool> _shouldEnterHome(Map<String, dynamic> authData) async {
+    final newUserFlag = _readBool(authData['newUser']);
+    if (newUserFlag == true) return false;
+    if (newUserFlag == false) return true;
+
+    try {
+      final infoRes = await NetworkBootstrap.api.userInfo();
+      final info = infoRes.data;
+      if (infoRes.success && info is Map) {
+        final registered = _readBool(info['isRegister']);
+        if (registered == true) return true;
+        if (registered == false) return false;
+
+        final nick =
+            '${info['nickName'] ?? info['nickname'] ?? authData['nickName'] ?? ''}';
+        final gender = '${info['gender'] ?? authData['gender'] ?? ''}';
+        // Profile already filled → treat as existing user.
+        if (nick.trim().isNotEmpty && gender.trim().isNotEmpty) return true;
+      }
+    } catch (_) {
+      // Fall through: prefer onboarding when uncertain.
+    }
+
+    // No clear signal of a completed profile → setup flow.
+    final nick = '${authData['nickName'] ?? authData['nickname'] ?? ''}';
+    final gender = '${authData['gender'] ?? ''}';
+    return nick.trim().isNotEmpty && gender.trim().isNotEmpty;
+  }
+
+  static bool? _readBool(Object? value) {
+    if (value == null) return null;
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    final text = '$value'.trim().toLowerCase();
+    if (text == 'true' || text == '1') return true;
+    if (text == 'false' || text == '0') return false;
+    return null;
   }
 
   @override

@@ -7,6 +7,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/constants/app_assets.dart';
+import '../../core/network/media_upload.dart';
 import '../../core/network/network_bootstrap.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/network_or_asset_avatar.dart';
@@ -50,6 +51,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   final List<String> _photoPaths = [];
   bool _loading = true;
   bool _saving = false;
+  Object? _photoUploadToken;
 
   int get _photoCount => _photoPaths.length;
 
@@ -62,7 +64,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
     });
   }
 
-  void _applyProfile(MeProfile p) {
+  void _applyProfile(MeProfile p, {bool keepLocalPhotosIfRemoteEmpty = false}) {
+    final previousPhotos = List<String>.from(_photoPaths);
     _profile = p;
     _signature = p.signature;
     _nickname = p.displayName;
@@ -76,6 +79,17 @@ class _EditProfilePageState extends State<EditProfilePage> {
     _photoPaths
       ..clear()
       ..addAll(p.momentUrls);
+    // Avoid wiping pics the user just added while user/info was still loading,
+    // or when the backend omits pending-audit items from parse.
+    if (keepLocalPhotosIfRemoteEmpty &&
+        _photoPaths.isEmpty &&
+        previousPhotos.isNotEmpty) {
+      _photoPaths.addAll(previousPhotos);
+    } else if (keepLocalPhotosIfRemoteEmpty && previousPhotos.isNotEmpty) {
+      for (final path in previousPhotos) {
+        if (!_photoPaths.contains(path)) _photoPaths.add(path);
+      }
+    }
   }
 
   Future<void> _loadFromApi() async {
@@ -84,7 +98,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
       if (!mounted) return;
       final parsed = UserDto.parseProfile(res);
       if (parsed != null) {
-        setState(() => _applyProfile(parsed));
+        setState(
+          () => _applyProfile(parsed, keepLocalPhotosIfRemoteEmpty: true),
+        );
       }
     } catch (_) {
       // Keep seed profile if refresh fails.
@@ -195,28 +211,153 @@ class _EditProfilePageState extends State<EditProfilePage> {
       PhotoPickAction.gallery => ImageSource.gallery,
     };
 
-    final file = await ImagePicker().pickImage(
-      source: source,
-      imageQuality: 85,
-      maxWidth: 1920,
-    );
+    XFile? file;
+    try {
+      file = await ImagePicker().pickImage(
+        source: source,
+        imageQuality: 85,
+        maxWidth: 1920,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            source == ImageSource.camera
+                ? 'Camera unavailable. Check app permissions.'
+                : 'Gallery unavailable. Check app permissions.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
     if (!mounted || file == null) return;
 
-    if (forAlbum && _photoCount < EditProfilePage.maxPhotos) {
-      setState(() => _photoPaths.add(file.path));
+    if (file.path.toLowerCase().endsWith('.gif')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('GIF uploads are not supported'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          action == PhotoPickAction.takePhoto
-              ? 'Photo captured'
-              : 'Photo selected',
+    if (!forAlbum) {
+      // Avatar path (profile picture) is handled on its own page for now.
+      return;
+    }
+    if (_photoCount >= EditProfilePage.maxPhotos) return;
+
+    // Optimistic local preview while upload runs.
+    final localPath = file.path;
+    final token = Object();
+    _photoUploadToken = token;
+    setState(() => _photoPaths.add(localPath));
+
+    try {
+      final remote = await MediaUpload.uploadFile(localPath);
+      if (!mounted || !identical(_photoUploadToken, token)) return;
+      if (remote == null) {
+        setState(() => _photoPaths.remove(localPath));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Photo upload failed'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+
+      final res = await NetworkBootstrap.api.updateUserInfo({
+        'newPic': [remote],
+      });
+      if (!mounted || !identical(_photoUploadToken, token)) return;
+      if (!res.success) {
+        setState(() => _photoPaths.remove(localPath));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              res.message.isEmpty ? 'Save photo failed' : res.message,
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+
+      // Prefer server picList from the update response; always keep this URL.
+      final fromServer = UserDto.parseProfile(res)?.momentUrls ?? const [];
+      setState(() {
+        _photoPaths.remove(localPath);
+        if (fromServer.isNotEmpty) {
+          _photoPaths
+            ..clear()
+            ..addAll(fromServer);
+        }
+        if (!_photoPaths.contains(remote)) {
+          _photoPaths.add(remote);
+        }
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Photo saved'),
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 1),
         ),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 1),
-      ),
-    );
+      );
+    } catch (error) {
+      if (!mounted || !identical(_photoUploadToken, token)) return;
+      setState(() => _photoPaths.remove(localPath));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Photo upload failed: $error'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Future<void> _removeAlbumPhoto(int index) async {
+    if (index < 0 || index >= _photoPaths.length) return;
+    final path = _photoPaths[index];
+    setState(() => _photoPaths.removeAt(index));
+
+    if (!path.startsWith('http')) return;
+
+    try {
+      final res = await NetworkBootstrap.api.updateUserInfo({
+        'delPic': [path],
+      });
+      if (!mounted) return;
+      if (!res.success) {
+        setState(() {
+          if (index <= _photoPaths.length) {
+            _photoPaths.insert(index.clamp(0, _photoPaths.length), path);
+          } else {
+            _photoPaths.add(path);
+          }
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              res.message.isEmpty ? 'Delete failed' : res.message,
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _photoPaths.add(path));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Delete failed: $error'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   Future<void> _openSignature() async {
@@ -444,9 +585,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     _PhotoCard(
                       paths: _photoPaths,
                       onAdd: () => _pickPhoto(forAlbum: true),
-                      onRemove: (index) {
-                        setState(() => _photoPaths.removeAt(index));
-                      },
+                      onRemove: (index) => unawaited(_removeAlbumPhoto(index)),
                       onOpen: (index) {
                         Navigator.of(context).push(
                           MaterialPageRoute<void>(
@@ -725,20 +864,13 @@ class _PhotoCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'My Photos（$count/${EditProfilePage.maxPhotos}）',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-              const _Chevron(),
-            ],
+          Text(
+            'My Photos（$count/${EditProfilePage.maxPhotos}）',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
           ),
           const SizedBox(height: 12),
           Wrap(

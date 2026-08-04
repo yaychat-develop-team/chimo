@@ -69,6 +69,27 @@ abstract final class AuthSession {
     return value is String && value.isNotEmpty ? value : null;
   }
 
+  static Future<String?> userId() async {
+    final data = await _read();
+    final value = data['userId'];
+    if (value is String && value.isNotEmpty) return value;
+    if (value != null) {
+      final text = '$value'.trim();
+      if (text.isNotEmpty && text != 'null') return text;
+    }
+    // Recover uid from JWT when missing from session file.
+    final t = data['token'];
+    if (t is String && t.isNotEmpty) {
+      final fromJwt = userIdFromJwt(t);
+      if (fromJwt != null) {
+        data['userId'] = fromJwt;
+        await _write(data);
+        return fromJwt;
+      }
+    }
+    return null;
+  }
+
   static Future<String?> nickname() async {
     final data = await _read();
     final value = data['nickname'];
@@ -81,22 +102,79 @@ abstract final class AuthSession {
     return value is String && value.isNotEmpty ? value : null;
   }
 
+  static Future<String?> emUsername() async {
+    final data = await _read();
+    final value = data['emUsername'];
+    if (value is String && value.isNotEmpty) return value;
+    final text = value == null ? '' : '$value'.trim();
+    return text.isEmpty || text == 'null' ? null : text;
+  }
+
+  static Future<String?> emPassword() async {
+    final data = await _read();
+    final value = data['emPassword'];
+    if (value is String && value.isNotEmpty) return value;
+    final text = value == null ? '' : '$value'.trim();
+    return text.isEmpty || text == 'null' ? null : text;
+  }
+
+  /// True when [otherId] is the logged-in user (group member, search hit…).
+  static Future<bool> isCurrentUser(String? otherId) async {
+    final a = (otherId ?? '').trim();
+    if (a.isEmpty) return false;
+    final me = await userId();
+    if (me == null || me.isEmpty) return false;
+    return me == a;
+  }
+
+  /// Best-effort uid from JWT (forya tokens put `uid` in the protected header).
+  static String? userIdFromJwt(String token) {
+    try {
+      final parts = token.split('.');
+      if (parts.length < 2) return null;
+      for (final part in parts.take(2)) {
+        final normalized = base64Url.normalize(part);
+        final decoded = utf8.decode(base64Url.decode(normalized));
+        final json = jsonDecode(decoded);
+        if (json is! Map) continue;
+        final uid = json['uid'] ?? json['userId'] ?? json['id'];
+        if (uid == null) continue;
+        final text = '$uid'.trim();
+        if (text.isNotEmpty && text != 'null') return text;
+      }
+    } catch (_) {}
+    return null;
+  }
+
   /// [method]: `phone` / `email`.
   static Future<void> markLoggedIn({
     String method = 'phone',
     String? phone,
     String? token,
+    String? userId,
     String? nickname,
     String? avatarUrl,
+    String? emUsername,
+    String? emPassword,
   }) async {
     final data = await _read();
     data['loggedIn'] = true;
     data['method'] = method;
     if (phone != null && phone.isNotEmpty) data['phone'] = phone;
-    if (token != null && token.isNotEmpty) data['token'] = token;
+    if (token != null && token.isNotEmpty) {
+      data['token'] = token;
+      userId ??= userIdFromJwt(token);
+    }
+    if (userId != null && userId.isNotEmpty) data['userId'] = userId;
     if (nickname != null && nickname.isNotEmpty) data['nickname'] = nickname;
     if (avatarUrl != null && avatarUrl.isNotEmpty) {
       data['avatarUrl'] = avatarUrl;
+    }
+    if (emUsername != null && emUsername.isNotEmpty) {
+      data['emUsername'] = emUsername;
+    }
+    if (emPassword != null && emPassword.isNotEmpty) {
+      data['emPassword'] = emPassword;
     }
     await _write(data);
   }

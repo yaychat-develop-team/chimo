@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../app/app_router.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/network/group_dto.dart';
 import '../../core/network/network_bootstrap.dart';
@@ -266,20 +268,9 @@ class _HomePageState extends State<HomePage> {
       if (!mounted) return;
 
       if (!popularRes.success && popularRes.message == 'user.not.login') {
-        setState(() {
-          _initialLoading = false;
-          _loadError = 'Please log in again to load groups';
-          _popularGroups = const [];
-          _joinedGroups = const [];
-        });
-        if (showError) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(_loadError!),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
+        await NetworkBootstrap.handleNotLogin();
+        if (!mounted) return;
+        context.go(AppRoutes.login);
         return;
       }
 

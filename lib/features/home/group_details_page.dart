@@ -14,10 +14,8 @@ import '../chats/data/chats_list_controller.dart';
 import '../chats/models/chat_conversation.dart';
 import '../report/report_page.dart';
 import 'chat_user_profile_page.dart';
-import 'data/group_members_mock_data.dart';
 import 'models/chat_user_profile.dart';
 import 'models/group_item.dart';
-import 'widgets/chat_user_profile_sheet.dart';
 import 'widgets/group_chat_input_bar.dart';
 import 'widgets/group_level_badge.dart';
 import 'widgets/group_members_sheet.dart';
@@ -250,14 +248,6 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
     }
   }
 
-  void _openUserProfile(ChatUserProfile profile) {
-    ChatUserProfileSheet.show(
-      context,
-      profile: profile,
-      chatsController: widget.chatsController,
-    );
-  }
-
   void _openMembersSheet() {
     GroupMembersSheet.show(
       context,
@@ -369,7 +359,6 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
                     photos: _photoAssets,
                     messagesScroll: _messagesScroll,
                     onTabChanged: (i) => setState(() => _tabIndex = i),
-                    onPeerAvatarTap: _openUserProfile,
                     onPhotoTap: _openPhotoViewer,
                   ),
                 ),
@@ -780,7 +769,6 @@ class _ChatBody extends StatelessWidget {
     required this.photos,
     required this.messagesScroll,
     required this.onTabChanged,
-    required this.onPeerAvatarTap,
     required this.onPhotoTap,
   });
 
@@ -790,7 +778,6 @@ class _ChatBody extends StatelessWidget {
   final List<String> photos;
   final ScrollController messagesScroll;
   final ValueChanged<int> onTabChanged;
-  final ValueChanged<ChatUserProfile> onPeerAvatarTap;
   final ValueChanged<int> onPhotoTap;
 
   @override
@@ -830,7 +817,6 @@ class _ChatBody extends StatelessWidget {
                     isJoined: isJoined,
                     sentMessages: sentMessages,
                     scrollController: messagesScroll,
-                    onPeerAvatarTap: onPeerAvatarTap,
                   )
                 : _PhotosGrid(
                     isJoined: isJoined,
@@ -891,67 +877,48 @@ class _MessagesFeed extends StatelessWidget {
     required this.isJoined,
     required this.sentMessages,
     required this.scrollController,
-    required this.onPeerAvatarTap,
   });
 
   final bool isJoined;
   final List<_OutgoingMessage> sentMessages;
   final ScrollController scrollController;
-  final ValueChanged<ChatUserProfile> onPeerAvatarTap;
-
-  static final _candy = ChatUserProfile.fromMember(
-    GroupMembersMockData.members[0],
-  );
-  static final _priya = ChatUserProfile.fromMember(
-    GroupMembersMockData.members[1],
-  );
 
   @override
   Widget build(BuildContext context) {
+    // Group history is IM (EaseMob), not REST. Until SDK is wired, only show
+    // messages composed in this session so the feed is never fake layout data.
+    if (sentMessages.isEmpty) {
+      return ListView(
+        controller: scrollController,
+        padding: const EdgeInsets.fromLTRB(16, 48, 16, 20),
+        children: [
+          Text(
+            isJoined
+                ? 'No messages yet'
+                : 'Join the group to chat.\nHistory loads after IM is connected.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Color(0xFFAEAEAE),
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              height: 1.4,
+            ),
+          ),
+        ],
+      );
+    }
+
     return ListView(
       controller: scrollController,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
       children: [
-        const _TimestampLabel('Jul 29 6:01 AM'),
-        const SizedBox(height: 12),
-        _PeerMessageBubble(
-          profile: _candy,
-          text:
-              'Hey everyone! Just managed to set up my new compost bin. Any pro-tips for a beginner? 🥕',
-          showAvatar: true,
-          onAvatarTap: () => onPeerAvatarTap(_candy),
-        ),
-        const SizedBox(height: 12),
-        _PeerMessageBubble(
-          profile: _priya,
-          text: "That's awesome!",
-          showAvatar: true,
-          onAvatarTap: () => onPeerAvatarTap(_priya),
-        ),
-        if (!isJoined) ...[
-          const SizedBox(height: 12),
-          _PeerLockedImageBubble(
-            profile: _candy,
-            imageAsset: AppAssets.homeRoomBg,
-            showAvatar: true,
-            onAvatarTap: () => onPeerAvatarTap(_candy),
-          ),
-        ],
-        const SizedBox(height: 16),
-        const _SelfMessageBubble(text: '1'),
-        if (isJoined) ...[
-          const SizedBox(height: 16),
-          const _TimestampLabel('Jul 30 1:35 AM'),
-          const SizedBox(height: 10),
-          const _SystemJoinNotice(name: 'P-2083172'),
-        ],
         for (var i = 0; i < sentMessages.length; i++) ...[
           if (_shouldShowOutgoingTimestamp(sentMessages, i)) ...[
-            SizedBox(height: i == 0 ? 16 : 14),
+            SizedBox(height: i == 0 ? 0 : 14),
             _TimestampLabel(_formatChatTimestamp(sentMessages[i].sentAt)),
             const SizedBox(height: 10),
           ] else
-            SizedBox(height: i == 0 ? 16 : 10),
+            SizedBox(height: i == 0 ? 0 : 10),
           _SelfOutgoingBubble(
             message: sentMessages[i],
             showAvatar: i == 0 ||
@@ -986,239 +953,6 @@ class _TimestampLabel extends StatelessWidget {
   }
 }
 
-class _PeerMessageBubble extends StatelessWidget {
-  const _PeerMessageBubble({
-    required this.profile,
-    required this.text,
-    required this.showAvatar,
-    required this.onAvatarTap,
-  });
-
-  final ChatUserProfile profile;
-  final String text;
-  final bool showAvatar;
-  final VoidCallback onAvatarTap;
-
-  static const double _avatar = 40;
-  static const double _avatarGap = 10;
-  static const double _bubbleMax = 243;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (showAvatar)
-          GestureDetector(
-            onTap: onAvatarTap,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.asset(
-                profile.avatarAsset,
-                width: _avatar,
-                height: _avatar,
-                fit: BoxFit.cover,
-              ),
-            ),
-          )
-        else
-          const SizedBox(width: _avatar),
-        const SizedBox(width: _avatarGap),
-        Flexible(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Flexible(
-                    child: Text(
-                      profile.nickname,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Color(0xFF666666),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Image.asset(
-                    profile.isMale
-                        ? AppAssets.genderMan
-                        : AppAssets.genderWoman,
-                    width: 14,
-                    height: 14,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: _bubbleMax),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 14,
-                  ),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFF0F0F0),
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(4),
-                      topRight: Radius.circular(18),
-                      bottomLeft: Radius.circular(18),
-                      bottomRight: Radius.circular(18),
-                    ),
-                  ),
-                  child: Text(
-                    text,
-                    style: const TextStyle(
-                      color: Color(0xFF111111),
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                      height: 20 / 15,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// Not joined: blurred locked image message + Join to view.
-class _PeerLockedImageBubble extends StatelessWidget {
-  const _PeerLockedImageBubble({
-    required this.profile,
-    required this.imageAsset,
-    required this.showAvatar,
-    required this.onAvatarTap,
-  });
-
-  final ChatUserProfile profile;
-  final String imageAsset;
-  final bool showAvatar;
-  final VoidCallback onAvatarTap;
-
-  static const double _avatar = 40;
-  static const double _avatarGap = 10;
-  static const double _size = 180;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (showAvatar)
-          GestureDetector(
-            onTap: onAvatarTap,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.asset(
-                profile.avatarAsset,
-                width: _avatar,
-                height: _avatar,
-                fit: BoxFit.cover,
-              ),
-            ),
-          )
-        else
-          const SizedBox(width: _avatar),
-        const SizedBox(width: _avatarGap),
-        Flexible(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Flexible(
-                    child: Text(
-                      profile.nickname,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Color(0xFF666666),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Image.asset(
-                    profile.isMale
-                        ? AppAssets.genderMan
-                        : AppAssets.genderWoman,
-                    width: 14,
-                    height: 14,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              ClipRRect(
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(4),
-                  topRight: Radius.circular(16),
-                  bottomLeft: Radius.circular(16),
-                  bottomRight: Radius.circular(16),
-                ),
-                child: SizedBox(
-                  width: _size,
-                  height: _size,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      ImageFiltered(
-                        imageFilter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-                        child: Transform.scale(
-                          scale: 1.08,
-                          child: Image.asset(imageAsset, fit: BoxFit.cover),
-                        ),
-                      ),
-                      Positioned(
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        child: ColoredBox(
-                          color: Colors.black.withValues(alpha: 0.48),
-                          child: SizedBox(
-                            height: 40,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                SvgPicture.asset(
-                                  AppAssets.lockIcon,
-                                  width: 13,
-                                  height: 14,
-                                ),
-                                const SizedBox(width: 6),
-                                const Text(
-                                  'Join to view',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
 
 class _OutgoingKind { static const text = 0; static const voice = 1; static const image = 2; }
 
@@ -1495,50 +1229,6 @@ class _SelfVoiceBubbleState extends State<_SelfVoiceBubble> {
   }
 }
 
-class _SelfMessageBubble extends StatelessWidget {
-  const _SelfMessageBubble({required this.text});
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return _SelfOutgoingBubble(
-      message: _OutgoingMessage.text(text),
-    );
-  }
-}
-
-class _SystemJoinNotice extends StatelessWidget {
-  const _SystemJoinNotice({required this.name});
-
-  final String name;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text.rich(
-      TextSpan(
-        style: const TextStyle(fontSize: 13, height: 1.3),
-        children: [
-          TextSpan(
-            text: name,
-            style: const TextStyle(
-              color: Color(0xFF1CFF8A),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const TextSpan(
-            text: ' joined the community',
-            style: TextStyle(
-              color: AppColors.textTertiary,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-      textAlign: TextAlign.center,
-    );
-  }
-}
 
 class _PhotosGrid extends StatelessWidget {
   const _PhotosGrid({

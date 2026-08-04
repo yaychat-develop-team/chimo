@@ -1,17 +1,21 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/constants/app_assets.dart';
+import '../../../core/im/im_service.dart';
 import '../../../core/network/group_dto.dart';
 import '../../../core/network/network_bootstrap.dart';
 import '../../../core/repositories/repositories.dart';
 import '../../../shared/models/chat_conversation.dart';
 import '../../../shared/models/group_item.dart';
-import '../../friends/data/friend_dto.dart';
-import '../../friends/models/friend_user.dart';
 
 /// Shared chats list state for chats page and nav unread badge.
 ///
-/// Session list comes from backend groups + friends (no IM SDK yet).
-/// Join / leave / pin / delete still work locally on top of that.
+/// Session rows for groups come from `GET /chat/group/myGroups`.
+/// Last-message previews need IM (EaseMob); until then we show member count /
+/// group desc as subtitle, and keep any local previews from this device.
 class ChatsListController extends ChangeNotifier {
   ChatsListController({ChatRepository? chatRepository})
       : _chatRepository = chatRepository;
@@ -56,22 +60,14 @@ class ChatsListController extends ChangeNotifier {
     return [...pinned, ...unpinned];
   }
 
-  /// Load my groups + friends from API and rebuild list (keeps pin/unread).
+  /// Load my groups from API and rebuild list (keeps pin/unread/local previews).
   Future<void> refreshFromApi() async {
     _loading = true;
     _loadError = null;
     notifyListeners();
     try {
-      final api = NetworkBootstrap.api;
-      final results = await Future.wait([
-        api.myGroups(),
-        api.searchFriends(pageSize: 50),
-      ]);
-      final groups = GroupDto.parseList(results[0]);
-      final friends = FriendDto.parseList(
-        results[1],
-        relation: FriendRelation.mutual,
-      );
+      final groupsRes = await NetworkBootstrap.api.myGroups();
+      final groups = GroupDto.parseList(groupsRes);
 
       final prevById = {for (final c in _conversations) c.id: c};
       final next = <ChatConversation>[];
@@ -80,49 +76,30 @@ class ChatsListController extends ChangeNotifier {
       for (final g in groups) {
         nextJoined.add(g.id);
         final prev = prevById[g.id];
-        next.add(
-          ChatConversation(
-            id: g.id,
-            title: g.name,
-            avatarAsset: g.avatarAsset,
-            avatarUrl: g.avatarUrl,
-            lastMessage: g.description.isEmpty ? 'Group chat' : g.description,
-            timeLabel: prev?.timeLabel ?? 'Just',
-            badge: ChatBadgeType.group,
-            unreadCount: prev?.unreadCount ?? 0,
-            isPinned: prev?.isPinned ?? false,
-          ),
-        );
+        next.add(_conversationFromGroup(g, prev));
       }
 
-      for (final f in friends) {
-        final id = 'dm_${f.id}';
-        final prev = prevById[id] ?? prevById[f.id];
-        next.add(
-          ChatConversation(
-            id: id,
-            title: f.nickname.isEmpty ? 'User' : f.nickname,
-            avatarAsset: f.avatarAsset,
-            avatarUrl: f.avatarUrl,
-            lastMessage: f.bio.isEmpty ? 'Say hi~' : f.bio,
-            timeLabel: prev?.timeLabel ?? 'Just',
-            unreadCount: prev?.unreadCount ?? 0,
-            isPinned: prev?.isPinned ?? false,
-            isMale: f.isMale,
-            signature: f.bio,
-            zodiac: f.zodiac,
-            isFollowing: true,
-            isOnline: false,
-          ),
-        );
-      }
-
-      // Keep any local-only rows (e.g. system) that were pinned/opened.
+      // Keep non-group rows started in-app (real DMs / system), not bulk friends.
       for (final c in _conversations) {
-        if (next.any((n) => n.id == c.id)) continue;
         if (c.badge == ChatBadgeType.group) continue;
-        if (c.id.startsWith('dm_')) continue;
+        if (next.any((n) => n.id == c.id)) continue;
         next.add(c);
+      }
+
+      // If API myGroups is empty but we locally joined, keep those rows and
+      // re-pull detail so the list still reflects server group cards.
+      for (final id in _joinedGroupIds) {
+        if (nextJoined.contains(id)) continue;
+        final prev = prevById[id];
+        if (prev == null || prev.badge != ChatBadgeType.group) continue;
+        final detail = await _fetchGroupDetail(id);
+        if (detail != null) {
+          nextJoined.add(detail.id);
+          next.add(_conversationFromGroup(detail, prev));
+        } else {
+          nextJoined.add(id);
+          next.add(prev);
+        }
       }
 
       _conversations
@@ -131,22 +108,136 @@ class ChatsListController extends ChangeNotifier {
       _joinedGroupIds
         ..clear()
         ..addAll(nextJoined);
+      await _mergeImDmConversations();
       _loading = false;
-      if (!results[0].success && !results[1].success && next.isEmpty) {
-        _loadError = results[0].message.isNotEmpty
-            ? results[0].message
-            : 'Failed to load chats';
+      if (!groupsRes.success && next.isEmpty) {
+        _loadError = groupsRes.message.isEmpty
+            ? 'Failed to load chats'
+            : groupsRes.message;
       }
       notifyListeners();
     } catch (error) {
       _loading = false;
       _loadError = '$error';
-      // Optional one-time mock seed if completely empty and repo provided.
       if (_conversations.isEmpty && _chatRepository != null) {
         _conversations.addAll(_chatRepository.seedConversations());
       }
       notifyListeners();
     }
+  }
+
+  Future<void> _mergeImDmConversations() async {
+    try {
+      if (!ImService.isConnected) {
+        await ImService.connectFromServer();
+      }
+      final dms = await ImService.loadDmConversations();
+      for (final conv in dms) {
+        final emId = conv.id;
+        if (emId.isEmpty) continue;
+        final listId = 'dm_$emId';
+        final preview = await ImService.previewFor(conv);
+        final unread = await conv.unreadCount();
+        // Prefer existing row by emUserName or id.
+        final index = _conversations.indexWhere(
+          (c) =>
+              c.emUserName == emId ||
+              c.id == listId ||
+              c.id == 'dm_$emId',
+        );
+        if (index >= 0) {
+          final prev = _conversations[index];
+          _conversations[index] = prev.copyWith(
+            lastMessage:
+                preview.isNotEmpty ? preview : prev.lastMessage,
+            timeLabel: preview.isNotEmpty ? 'Just' : prev.timeLabel,
+            unreadCount: unread,
+            emUserName: emId,
+          );
+          continue;
+        }
+        // Resolve profile via msg-user for nickname/avatar.
+        String title = emId;
+        String? avatarUrl;
+        try {
+          final res = await NetworkBootstrap.api.msgUser(emId);
+          if (res.success && res.data is Map) {
+            final data = Map<String, dynamic>.from(res.data as Map);
+            final user = data['user'] is Map
+                ? Map<String, dynamic>.from(data['user'] as Map)
+                : data;
+            final nick =
+                '${user['nickname'] ?? user['nickName'] ?? ''}'.trim();
+            if (nick.isNotEmpty) title = nick;
+            final av = '${user['avatar'] ?? ''}'.trim();
+            if (av.isNotEmpty) avatarUrl = av;
+          }
+        } catch (_) {}
+        _conversations.insert(
+          0,
+          ChatConversation(
+            id: listId,
+            title: title,
+            avatarAsset: AppAssets.avatarPlace,
+            avatarUrl: avatarUrl,
+            lastMessage: preview,
+            timeLabel: preview.isEmpty ? '' : 'Just',
+            unreadCount: unread,
+            emUserName: emId,
+          ),
+        );
+      }
+    } catch (error) {
+      debugPrint('ChatsListController IM merge: $error');
+    }
+  }
+
+  Future<PopularGroupItem?> _fetchGroupDetail(String gid) async {
+    try {
+      final res = await NetworkBootstrap.api.groupDetail(gid);
+      if (!res.success) return null;
+      final data = res.data;
+      if (data is Map) {
+        // Some envelopes nest under group.
+        final nested = data['group'];
+        if (nested is Map) {
+          return GroupDto.fromMap(Map<String, dynamic>.from(nested));
+        }
+        final list = GroupDto.parseData(data);
+        if (list.isNotEmpty) return list.first;
+        if (data.containsKey('name') || data.containsKey('emGroupId')) {
+          return GroupDto.fromMap(Map<String, dynamic>.from(data));
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  ChatConversation _conversationFromGroup(
+    PopularGroupItem g,
+    ChatConversation? prev,
+  ) {
+    final hadLocalPreview =
+        prev != null && prev.lastMessage.trim().isNotEmpty;
+    return ChatConversation(
+      id: g.id,
+      title: g.name.isEmpty ? 'Group' : g.name,
+      avatarAsset: g.avatarAsset,
+      avatarUrl: g.avatarUrl,
+      // Only keep real previews written by onNewMessage / IM later.
+      lastMessage: hadLocalPreview ? prev.lastMessage : '',
+      timeLabel: hadLocalPreview
+          ? (prev.timeLabel.isEmpty ? 'Just' : prev.timeLabel)
+          : '',
+      badge: ChatBadgeType.group,
+      unreadCount: prev?.unreadCount ?? 0,
+      isPinned: prev?.isPinned ?? false,
+      groupDescription: g.description,
+      category: g.category,
+      memberCount: g.memberCount,
+      postCount: g.postCount,
+      level: g.level,
+    );
   }
 
   void togglePin(String id) {
@@ -178,6 +269,16 @@ class ChatsListController extends ChangeNotifier {
     _joinedGroupIds.add(group.id);
     _upsertConversation(group);
     notifyListeners();
+    // Sync list fields from server detail when available.
+    unawaited(_syncJoinedGroup(group.id));
+  }
+
+  Future<void> _syncJoinedGroup(String id) async {
+    final detail = await _fetchGroupDetail(id);
+    if (detail == null) return;
+    _joinedGroupIds.add(detail.id);
+    _upsertConversation(detail.copyWith(isJoined: true));
+    notifyListeners();
   }
 
   void leaveGroup(String groupId) {
@@ -207,6 +308,7 @@ class ChatsListController extends ChangeNotifier {
             : prev.lastMessage,
         timeLabel: dm.lastMessage.isNotEmpty ? dm.timeLabel : prev.timeLabel,
         avatarUrl: dm.avatarUrl ?? prev.avatarUrl,
+        emUserName: dm.emUserName.isNotEmpty ? dm.emUserName : prev.emUserName,
       );
     } else {
       _conversations.insert(0, dm);
@@ -227,6 +329,11 @@ class ChatsListController extends ChangeNotifier {
     String? zodiac,
     bool? isFollowing,
     List<String>? momentAssets,
+    String? groupDescription,
+    String? category,
+    int? memberCount,
+    int? postCount,
+    int? level,
   }) {
     final index = _conversations.indexWhere((c) => c.id == id);
     if (index >= 0) {
@@ -246,6 +353,11 @@ class ChatsListController extends ChangeNotifier {
           zodiac: zodiac,
           isFollowing: isFollowing,
           momentAssets: momentAssets,
+          groupDescription: groupDescription,
+          category: category,
+          memberCount: memberCount,
+          postCount: postCount,
+          level: level,
         ),
       );
     } else {
@@ -265,6 +377,11 @@ class ChatsListController extends ChangeNotifier {
           zodiac: zodiac ?? 'Capricorn',
           isFollowing: isFollowing ?? false,
           momentAssets: momentAssets ?? const [],
+          groupDescription: groupDescription ?? '',
+          category: category ?? '',
+          memberCount: memberCount ?? 0,
+          postCount: postCount ?? 0,
+          level: level ?? 1,
         ),
       );
     }
@@ -272,22 +389,11 @@ class ChatsListController extends ChangeNotifier {
   }
 
   void _upsertConversation(PopularGroupItem group) {
-    final next = ChatConversation(
-      id: group.id,
-      title: group.name,
-      avatarAsset: group.avatarAsset,
-      avatarUrl: group.avatarUrl,
-      lastMessage: group.description,
-      timeLabel: 'Just',
-      badge: ChatBadgeType.group,
-    );
     final index = _conversations.indexWhere((c) => c.id == group.id);
+    final prev = index >= 0 ? _conversations[index] : null;
+    final next = _conversationFromGroup(group, prev);
     if (index >= 0) {
-      final prev = _conversations[index];
-      _conversations[index] = next.copyWith(
-        unreadCount: prev.unreadCount,
-        isPinned: prev.isPinned,
-      );
+      _conversations[index] = next;
     } else {
       _conversations.insert(0, next);
     }

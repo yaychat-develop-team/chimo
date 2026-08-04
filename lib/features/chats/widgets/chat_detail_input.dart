@@ -8,14 +8,17 @@ class _DmInputBar extends StatefulWidget {
     required this.onSendVoice,
     required this.onSendImages,
     required this.onSendGift,
+    this.receiverUid = '',
   });
 
   final double bottomInset;
   final TextEditingController controller;
   final ValueChanged<String?> onSend;
-  final ValueChanged<int> onSendVoice;
+  /// (filePath, durationSeconds) — path empty means local-only mock failed.
+  final void Function(String path, int seconds) onSendVoice;
   final ValueChanged<List<String>> onSendImages;
   final ValueChanged<_GiftSendResult> onSendGift;
+  final String receiverUid;
 
   @override
   State<_DmInputBar> createState() => _DmInputBarState();
@@ -27,26 +30,14 @@ enum _DmPanel { none, voice, photo, emoji }
 
 class _DmInputBarState extends State<_DmInputBar> {
   static const int _maxVoiceSeconds = 60;
+  static const int _albumPageSize = 80;
 
   /// Voice / photo panels share the same bottom area height (excl. safe inset).
   static const double _panelHeight = 290;
 
-  static const List<String> _mockPhotos = [
-    AppAssets.genderFemaleImg,
-    AppAssets.genderMaleImg,
-    AppAssets.personalBg,
-    AppAssets.avatarPlace,
-    AppAssets.homeRoomBg,
-    AppAssets.launchBg,
-    AppAssets.splashLogo,
-    AppAssets.mineBg,
-    AppAssets.genderFemaleSelected,
-    AppAssets.genderMaleSelected,
-    AppAssets.emptyAvatar,
-    AppAssets.defaultAvatar,
-  ];
-
   final FocusNode _inputFocus = FocusNode();
+  final AudioRecorder _recorder = AudioRecorder();
+  final AudioPlayer _previewPlayer = AudioPlayer();
 
   bool get _hasText => widget.controller.text.trim().isNotEmpty;
   _DmPanel _panel = _DmPanel.none;
@@ -55,8 +46,14 @@ class _DmInputBarState extends State<_DmInputBar> {
   double _voiceProgress = 0;
   DateTime? _voiceStartedAt;
   Timer? _voiceTimer;
+  String? _voicePath;
 
-  /// Selection order (photo indices); empty = none selected.
+  /// Device album photos for the grid (excluding camera cell).
+  List<AssetEntity> _albumPhotos = const [];
+  bool _albumLoading = false;
+  String? _albumError;
+
+  /// Selection order (photo indices into [_albumPhotos]); empty = none selected.
   final List<int> _selectedPhotos = [];
   bool _originalPhoto = true;
 
@@ -70,6 +67,8 @@ class _DmInputBarState extends State<_DmInputBar> {
   @override
   void dispose() {
     _voiceTimer?.cancel();
+    unawaited(_recorder.dispose());
+    unawaited(_previewPlayer.dispose());
     _inputFocus.removeListener(_onInputFocusChanged);
     _inputFocus.dispose();
     widget.controller.removeListener(_onChanged);
@@ -93,14 +92,17 @@ class _DmInputBarState extends State<_DmInputBar> {
   /// Close voice/photo panel when input is focused.
   void _closeFunctionPanel() {
     if (_panel == _DmPanel.none) return;
+    unawaited(_stopRecorderIfNeeded(deleteFile: true));
     _voiceTimer?.cancel();
     _voiceTimer = null;
     _voiceStartedAt = null;
+    unawaited(_previewPlayer.stop());
     setState(() {
       _panel = _DmPanel.none;
       _voicePhase = _ChatVoicePhase.idle;
       _voiceSeconds = 0;
       _voiceProgress = 0;
+      _voicePath = null;
       _selectedPhotos.clear();
     });
   }
@@ -118,6 +120,7 @@ class _DmInputBarState extends State<_DmInputBar> {
       return;
     }
     _dismissKeyboard();
+    unawaited(_stopRecorderIfNeeded(deleteFile: true));
     _voiceTimer?.cancel();
     setState(() {
       _panel = _DmPanel.emoji;
@@ -125,6 +128,7 @@ class _DmInputBarState extends State<_DmInputBar> {
       _voiceSeconds = 0;
       _voiceProgress = 0;
       _voiceStartedAt = null;
+      _voicePath = null;
       _selectedPhotos.clear();
     });
   }
@@ -159,16 +163,18 @@ class _DmInputBarState extends State<_DmInputBar> {
 
   void _toggleVoicePanel() {
     if (_panel == _DmPanel.voice) {
-      _closeVoicePanel();
+      unawaited(_closeVoicePanel());
       return;
     }
     _dismissKeyboard();
+    unawaited(_stopRecorderIfNeeded(deleteFile: true));
     _voiceTimer?.cancel();
     setState(() {
       _panel = _DmPanel.voice;
       _voicePhase = _ChatVoicePhase.idle;
       _voiceSeconds = 0;
       _voiceProgress = 0;
+      _voicePath = null;
       _selectedPhotos.clear();
     });
   }
@@ -182,6 +188,7 @@ class _DmInputBarState extends State<_DmInputBar> {
       return;
     }
     _dismissKeyboard();
+    unawaited(_stopRecorderIfNeeded(deleteFile: true));
     _voiceTimer?.cancel();
     setState(() {
       _panel = _DmPanel.photo;
@@ -189,99 +196,284 @@ class _DmInputBarState extends State<_DmInputBar> {
       _voiceSeconds = 0;
       _voiceProgress = 0;
       _voiceStartedAt = null;
+      _voicePath = null;
       _selectedPhotos.clear();
       _originalPhoto = true;
+      _albumError = null;
     });
+    unawaited(_loadAlbumPhotos());
   }
 
-  void _closeVoicePanel() {
+  /// Image-only: default RequestType.common also asks for VIDEO and fails
+  /// when READ_MEDIA_IMAGES is granted but READ_MEDIA_VIDEO is not.
+  static const _albumPermissionOption = PermissionRequestOption(
+    androidPermission: AndroidPermission(
+      type: RequestType.image,
+      mediaLocation: false,
+    ),
+  );
+
+  Future<void> _loadAlbumPhotos({bool openSettingsIfDenied = false}) async {
+    setState(() {
+      _albumLoading = true;
+      _albumError = null;
+    });
+    try {
+      final permission = await PhotoManager.requestPermissionExtend(
+        requestOption: _albumPermissionOption,
+      );
+      if (!permission.hasAccess) {
+        if (openSettingsIfDenied) {
+          await PhotoManager.openSetting();
+        }
+        if (!mounted) return;
+        setState(() {
+          _albumLoading = false;
+          _albumPhotos = const [];
+          _albumError = 'Photo permission denied';
+        });
+        return;
+      }
+
+      final paths = await PhotoManager.getAssetPathList(
+        type: RequestType.image,
+        onlyAll: true,
+        filterOption: FilterOptionGroup(
+          imageOption: const FilterOption(
+            sizeConstraint: SizeConstraint(ignoreSize: true),
+          ),
+          orders: [
+            const OrderOption(type: OrderOptionType.createDate, asc: false),
+          ],
+        ),
+      );
+      if (paths.isEmpty) {
+        if (!mounted) return;
+        setState(() {
+          _albumLoading = false;
+          _albumPhotos = const [];
+          _albumError = 'No photos in album';
+        });
+        return;
+      }
+
+      final assets = await paths.first.getAssetListPaged(
+        page: 0,
+        size: _albumPageSize,
+      );
+      if (!mounted) return;
+      setState(() {
+        _albumPhotos = assets;
+        _albumLoading = false;
+        _albumError = assets.isEmpty ? 'No photos in album' : null;
+      });
+    } catch (error) {
+      debugPrint('Load album failed: $error');
+      if (!mounted) return;
+      setState(() {
+        _albumLoading = false;
+        _albumPhotos = const [];
+        _albumError = 'Failed to load album';
+      });
+    }
+  }
+
+  Future<void> _closeVoicePanel({bool deleteFile = true}) async {
+    await _stopRecorderIfNeeded(deleteFile: deleteFile);
     _voiceTimer?.cancel();
     _voiceTimer = null;
     _voiceStartedAt = null;
+    await _previewPlayer.stop();
+    if (!mounted) return;
     setState(() {
       if (_panel == _DmPanel.voice) _panel = _DmPanel.none;
       _voicePhase = _ChatVoicePhase.idle;
       _voiceSeconds = 0;
       _voiceProgress = 0;
+      if (deleteFile) _voicePath = null;
     });
   }
 
-  void _startRecording() {
-    _voiceTimer?.cancel();
-    final started = DateTime.now();
-    setState(() {
-      _voicePhase = _ChatVoicePhase.recording;
-      _voiceSeconds = 0;
-      _voiceProgress = 0;
-      _voiceStartedAt = started;
-    });
-    _voiceTimer = Timer.periodic(const Duration(milliseconds: 50), (_) {
-      if (!mounted || _voiceStartedAt == null) return;
-      final elapsed =
-          DateTime.now().difference(_voiceStartedAt!).inMilliseconds / 1000;
-      if (elapsed >= _maxVoiceSeconds) {
-        setState(() {
-          _voiceSeconds = _maxVoiceSeconds;
-          _voiceProgress = 1;
-        });
-        _finishRecording();
-        return;
+  Future<void> _stopRecorderIfNeeded({required bool deleteFile}) async {
+    try {
+      if (await _recorder.isRecording()) {
+        final path = await _recorder.stop();
+        if (path != null && path.isNotEmpty) {
+          _voicePath = path;
+        }
       }
-      setState(() {
-        _voiceSeconds = elapsed.floor();
-        _voiceProgress = elapsed / _maxVoiceSeconds;
-      });
-    });
-  }
-
-  void _finishRecording() {
-    _voiceTimer?.cancel();
-    _voiceTimer = null;
-    _voiceStartedAt = null;
-    if (!mounted) return;
-    setState(() {
-      _voicePhase = _voiceSeconds > 0
-          ? _ChatVoicePhase.preview
-          : _ChatVoicePhase.idle;
-      if (_voicePhase == _ChatVoicePhase.idle) _voiceProgress = 0;
-    });
-  }
-
-  void _onVoiceMainTap() {
-    switch (_voicePhase) {
-      case _ChatVoicePhase.idle:
-        _startRecording();
-      case _ChatVoicePhase.recording:
-        _finishRecording();
-      case _ChatVoicePhase.preview:
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Playing…'),
-            behavior: SnackBarBehavior.floating,
-            duration: Duration(seconds: 1),
-          ),
-        );
+    } catch (_) {}
+    if (deleteFile) {
+      _deleteVoiceFile(_voicePath);
+      _voicePath = null;
     }
   }
 
-  void _resetVoice() {
+  void _deleteVoiceFile(String? path) {
+    final p = path?.trim() ?? '';
+    if (p.isEmpty) return;
+    try {
+      final f = File(p);
+      if (f.existsSync()) f.deleteSync();
+    } catch (_) {}
+  }
+
+  Future<void> _startRecording() async {
+    try {
+      final ok = await _recorder.hasPermission();
+      if (!ok) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Microphone permission is required for voice messages'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+      await _stopRecorderIfNeeded(deleteFile: true);
+      await _previewPlayer.stop();
+      final dir = await getTemporaryDirectory();
+      final path =
+          '${dir.path}/chimo_voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      await _recorder.start(
+        const RecordConfig(
+          encoder: AudioEncoder.aacLc,
+          bitRate: 128000,
+          sampleRate: 44100,
+          numChannels: 1,
+        ),
+        path: path,
+      );
+      _voicePath = path;
+      _voiceTimer?.cancel();
+      final started = DateTime.now();
+      if (!mounted) return;
+      setState(() {
+        _voicePhase = _ChatVoicePhase.recording;
+        _voiceSeconds = 0;
+        _voiceProgress = 0;
+        _voiceStartedAt = started;
+      });
+      _voiceTimer = Timer.periodic(const Duration(milliseconds: 50), (_) {
+        if (!mounted || _voiceStartedAt == null) return;
+        final elapsed =
+            DateTime.now().difference(_voiceStartedAt!).inMilliseconds / 1000;
+        if (elapsed >= _maxVoiceSeconds) {
+          setState(() {
+            _voiceSeconds = _maxVoiceSeconds;
+            _voiceProgress = 1;
+          });
+          unawaited(_finishRecording());
+          return;
+        }
+        setState(() {
+          _voiceSeconds = elapsed.floor();
+          _voiceProgress = elapsed / _maxVoiceSeconds;
+        });
+      });
+    } catch (error) {
+      debugPrint('Start voice record failed: $error');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not start recording: $error'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Future<void> _finishRecording() async {
+    _voiceTimer?.cancel();
+    _voiceTimer = null;
+    final started = _voiceStartedAt;
+    _voiceStartedAt = null;
+    try {
+      if (await _recorder.isRecording()) {
+        final path = await _recorder.stop();
+        if (path != null && path.isNotEmpty) {
+          _voicePath = path;
+        }
+      }
+    } catch (error) {
+      debugPrint('Stop voice record failed: $error');
+    }
+    if (!mounted) return;
+    final secs = started == null
+        ? _voiceSeconds
+        : DateTime.now().difference(started).inMilliseconds / 1000;
+    final duration = secs.floor().clamp(0, _maxVoiceSeconds);
+    setState(() {
+      _voiceSeconds = duration;
+      _voiceProgress = duration / _maxVoiceSeconds;
+      _voicePhase = duration > 0 && (_voicePath?.isNotEmpty ?? false)
+          ? _ChatVoicePhase.preview
+          : _ChatVoicePhase.idle;
+      if (_voicePhase == _ChatVoicePhase.idle) {
+        _deleteVoiceFile(_voicePath);
+        _voicePath = null;
+        _voiceProgress = 0;
+      }
+    });
+  }
+
+  Future<void> _onVoiceMainTap() async {
+    switch (_voicePhase) {
+      case _ChatVoicePhase.idle:
+        await _startRecording();
+      case _ChatVoicePhase.recording:
+        await _finishRecording();
+      case _ChatVoicePhase.preview:
+        final path = _voicePath;
+        if (path == null || path.isEmpty) return;
+        try {
+          await _previewPlayer.stop();
+          await _previewPlayer.play(DeviceFileSource(path));
+        } catch (error) {
+          debugPrint('Preview voice failed: $error');
+        }
+    }
+  }
+
+  Future<void> _resetVoice() async {
+    await _stopRecorderIfNeeded(deleteFile: true);
     _voiceTimer?.cancel();
     _voiceTimer = null;
     _voiceStartedAt = null;
+    await _previewPlayer.stop();
+    if (!mounted) return;
     setState(() {
       _voicePhase = _ChatVoicePhase.idle;
       _voiceSeconds = 0;
       _voiceProgress = 0;
+      _voicePath = null;
     });
   }
 
-  void _confirmVoice() {
+  Future<void> _confirmVoice() async {
+    if (_voicePhase == _ChatVoicePhase.recording) {
+      await _finishRecording();
+    }
     final seconds = _voiceSeconds;
-    _closeVoicePanel();
-    widget.onSendVoice(seconds);
+    final path = _voicePath?.trim() ?? '';
+    if (seconds < 1 || path.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please record at least 1 second'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    // Keep file for send/play; panel closes without deleting.
+    await _closeVoicePanel(deleteFile: false);
+    widget.onSendVoice(path, seconds);
   }
 
   void _togglePhotoAt(int index) {
+    if (index < 0 || index >= _albumPhotos.length) return;
     setState(() {
       final i = _selectedPhotos.indexOf(index);
       if (i >= 0) {
@@ -292,14 +484,111 @@ class _DmInputBarState extends State<_DmInputBar> {
     });
   }
 
-  void _sendSelectedPhotos() {
+  Future<void> _previewSelectedPhotos() async {
     if (_selectedPhotos.isEmpty) return;
-    final assets = [for (final i in _selectedPhotos) _mockPhotos[i]];
+    final entities = <AssetEntity>[
+      for (final i in _selectedPhotos)
+        if (i >= 0 && i < _albumPhotos.length) _albumPhotos[i],
+    ];
+    if (entities.isEmpty || !mounted) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => AlbumSelectionPreviewPage(entities: entities),
+      ),
+    );
+  }
+
+  Future<void> _sendSelectedPhotos() async {
+    if (_selectedPhotos.isEmpty) return;
+    final entities = [
+      for (final i in _selectedPhotos)
+        if (i >= 0 && i < _albumPhotos.length) _albumPhotos[i],
+    ];
     setState(() {
       _panel = _DmPanel.none;
       _selectedPhotos.clear();
     });
-    widget.onSendImages(assets);
+
+    final paths = <String>[];
+    for (final entity in entities) {
+      try {
+        final file = _originalPhoto
+            ? await entity.originFile
+            : await entity.file;
+        final path = file?.path.trim() ?? '';
+        if (path.isNotEmpty) paths.add(path);
+      } catch (error) {
+        debugPrint('Resolve album file failed: $error');
+      }
+    }
+    if (!mounted) return;
+    if (paths.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not read selected photos'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    widget.onSendImages(paths);
+  }
+
+  Future<void> _pickFromAlbum() async {
+    // System multi-picker as fallback / full album.
+    try {
+      final files = await ImagePicker().pickMultiImage(
+        imageQuality: _originalPhoto ? 100 : 85,
+      );
+      if (files.isEmpty) return;
+      setState(() {
+        _panel = _DmPanel.none;
+        _selectedPhotos.clear();
+      });
+      widget.onSendImages([for (final f in files) f.path]);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Pick image failed: $error'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Future<void> _pickFromCamera() async {
+    try {
+      // Close photo panel first so camera activity is not covered.
+      if (_panel != _DmPanel.none) {
+        setState(() => _panel = _DmPanel.none);
+      }
+      final file = await ImagePicker().pickImage(
+        source: ImageSource.camera,
+        preferredCameraDevice: CameraDevice.rear,
+        imageQuality: _originalPhoto ? 100 : 85,
+        maxWidth: 1920,
+      );
+      if (!mounted) return;
+      if (file == null) {
+        // User cancelled or no camera activity available.
+        return;
+      }
+      widget.onSendImages([file.path]);
+    } catch (error) {
+      debugPrint('Camera pick failed: $error');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Camera unavailable: $error\n'
+            'On emulator: enable virtual camera, or use Album.',
+          ),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
   }
 
   Widget _toolIconFromAsset(String asset, {double size = 30}) {
@@ -325,7 +614,7 @@ class _DmInputBarState extends State<_DmInputBar> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withValues(alpha: 0.55),
-      builder: (_) => const _GiftSheet(),
+      builder: (_) => _GiftSheet(receiverUid: widget.receiverUid),
     );
     if (!mounted || result == null) return;
     widget.onSendGift(result);
@@ -483,21 +772,23 @@ class _DmInputBarState extends State<_DmInputBar> {
                   ),
                 ),
                 _DmPanel.photo => _ChatPhotoPanel(
-                  photos: _mockPhotos,
+                  photos: _albumPhotos,
                   selected: _selectedPhotos,
                   originalPhoto: _originalPhoto,
+                  loading: _albumLoading,
+                  error: _albumError,
                   bottomInset: widget.bottomInset,
                   onTogglePhoto: _togglePhotoAt,
-                  onCamera: () => _showPlaceholder('Camera coming soon'),
-                  onPreview: () {
-                    if (_selectedPhotos.isEmpty) return;
-                    _showPlaceholder('Preview coming soon');
-                  },
-                  onAlbum: () => _showPlaceholder('Album coming soon'),
+                  onCamera: () => unawaited(_pickFromCamera()),
+                  onPreview: () => unawaited(_previewSelectedPhotos()),
+                  onAlbum: () => unawaited(_pickFromAlbum()),
                   onToggleOriginal: () {
                     setState(() => _originalPhoto = !_originalPhoto);
                   },
-                  onSend: _sendSelectedPhotos,
+                  onSend: () => unawaited(_sendSelectedPhotos()),
+                  onRetry: () => unawaited(
+                    _loadAlbumPhotos(openSettingsIfDenied: true),
+                  ),
                 ),
                 _DmPanel.emoji => _ChatEmojiPanel(
                   bottomInset: widget.bottomInset,
@@ -658,6 +949,8 @@ class _ChatPhotoPanel extends StatelessWidget {
     required this.photos,
     required this.selected,
     required this.originalPhoto,
+    required this.loading,
+    required this.error,
     required this.bottomInset,
     required this.onTogglePhoto,
     required this.onCamera,
@@ -665,11 +958,14 @@ class _ChatPhotoPanel extends StatelessWidget {
     required this.onAlbum,
     required this.onToggleOriginal,
     required this.onSend,
+    required this.onRetry,
   });
 
-  final List<String> photos;
+  final List<AssetEntity> photos;
   final List<int> selected;
   final bool originalPhoto;
+  final bool loading;
+  final String? error;
   final double bottomInset;
   final ValueChanged<int> onTogglePhoto;
   final VoidCallback onCamera;
@@ -677,39 +973,78 @@ class _ChatPhotoPanel extends StatelessWidget {
   final VoidCallback onAlbum;
   final VoidCallback onToggleOriginal;
   final VoidCallback onSend;
+  final VoidCallback onRetry;
 
   static const Color _green = Color(0xFF00F875);
 
   @override
   Widget build(BuildContext context) {
     final hasSelection = selected.isNotEmpty;
+    // Camera cell + album photos.
     final itemCount = photos.length + 1;
 
     return Column(
       children: [
         Expanded(
-          child: GridView.builder(
-            padding: EdgeInsets.zero,
-            physics: const BouncingScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 4,
-              mainAxisSpacing: 2,
-              crossAxisSpacing: 2,
-            ),
-            itemCount: itemCount,
-            itemBuilder: (context, index) {
-              if (index == 0) {
-                return _CameraCell(onTap: onCamera);
-              }
-              final photoIndex = index - 1;
-              final order = selected.indexOf(photoIndex);
-              return _PhotoCell(
-                asset: photos[photoIndex],
-                order: order < 0 ? null : order + 1,
-                onTap: () => onTogglePhoto(photoIndex),
-              );
-            },
-          ),
+          child: loading
+              ? const Center(
+                  child: SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                )
+              : error != null && photos.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              error!,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Color(0xFF888888),
+                                fontSize: 13,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            TextButton(
+                              onPressed: onRetry,
+                              child: const Text('Retry'),
+                            ),
+                            TextButton(
+                              onPressed: onAlbum,
+                              child: const Text('Open system album'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : GridView.builder(
+                      padding: EdgeInsets.zero,
+                      physics: const BouncingScrollPhysics(),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 4,
+                        mainAxisSpacing: 2,
+                        crossAxisSpacing: 2,
+                      ),
+                      itemCount: itemCount,
+                      itemBuilder: (context, index) {
+                        if (index == 0) {
+                          return _CameraCell(onTap: onCamera);
+                        }
+                        final photoIndex = index - 1;
+                        final order = selected.indexOf(photoIndex);
+                        return _AlbumPhotoCell(
+                          entity: photos[photoIndex],
+                          order: order < 0 ? null : order + 1,
+                          onTap: () => onTogglePhoto(photoIndex),
+                        );
+                      },
+                    ),
         ),
         Padding(
           padding: EdgeInsets.fromLTRB(16, 10, 16, 8 + bottomInset),
@@ -825,21 +1160,33 @@ class _CameraCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: CustomPaint(
-        painter: const _DashedRectPainter(color: Color(0xFFD0D0D0), radius: 4),
-        child: ColoredBox(
-          color: const Color(0xFFF5F5F5),
-          child: Center(
-            child: Image.asset(
-              AppAssets.cameraIcon,
-              width: 28,
-              height: 28,
-              fit: BoxFit.contain,
-              color: const Color(0xFFB0B0B0),
-              colorBlendMode: BlendMode.srcIn,
-            ),
+    return Material(
+      color: const Color(0xFFF5F5F5),
+      child: InkWell(
+        onTap: onTap,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border.all(color: const Color(0xFFD8D8D8)),
+          ),
+          child: const Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.photo_camera_outlined,
+                size: 28,
+                color: Color(0xFF666666),
+              ),
+              SizedBox(height: 4),
+              Text(
+                'Camera',
+                style: TextStyle(
+                  color: Color(0xFF888888),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  height: 1,
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -847,14 +1194,14 @@ class _CameraCell extends StatelessWidget {
   }
 }
 
-class _PhotoCell extends StatelessWidget {
-  const _PhotoCell({
-    required this.asset,
+class _AlbumPhotoCell extends StatelessWidget {
+  const _AlbumPhotoCell({
+    required this.entity,
     required this.order,
     required this.onTap,
   });
 
-  final String asset;
+  final AssetEntity entity;
   final int? order;
   final VoidCallback onTap;
 
@@ -867,12 +1214,33 @@ class _PhotoCell extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          Image.asset(
-            asset,
-            fit: BoxFit.cover,
-            errorBuilder: (_, _, _) =>
-                const ColoredBox(color: Color(0xFFE8E8E8)),
+          FutureBuilder<Uint8List?>(
+            future: entity.thumbnailDataWithSize(
+              const ThumbnailSize.square(200),
+              quality: 80,
+            ),
+            builder: (context, snapshot) {
+              final bytes = snapshot.data;
+              if (bytes == null || bytes.isEmpty) {
+                return const ColoredBox(
+                  color: Color(0xFFE8E8E8),
+                  child: Center(
+                    child: SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 1.5),
+                    ),
+                  ),
+                );
+              }
+              return Image.memory(
+                bytes,
+                fit: BoxFit.cover,
+                gaplessPlayback: true,
+              );
+            },
           ),
+          if (selected) const ColoredBox(color: Color(0x3300F875)),
           Positioned(
             top: 6,
             right: 6,
@@ -906,47 +1274,6 @@ class _PhotoCell extends StatelessWidget {
         ],
       ),
     );
-  }
-}
-
-class _DashedRectPainter extends CustomPainter {
-  const _DashedRectPainter({required this.color, this.radius = 4});
-
-  final Color color;
-  final double radius;
-  static const double _strokeWidth = 1.2;
-  static const double _dash = 4;
-  static const double _gap = 3;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = _strokeWidth;
-    final rect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(
-        _strokeWidth / 2,
-        _strokeWidth / 2,
-        size.width - _strokeWidth,
-        size.height - _strokeWidth,
-      ),
-      Radius.circular(radius),
-    );
-    final path = Path()..addRRect(rect);
-    for (final metric in path.computeMetrics()) {
-      var distance = 0.0;
-      while (distance < metric.length) {
-        final next = math.min(distance + _dash, metric.length);
-        canvas.drawPath(metric.extractPath(distance, next), paint);
-        distance = next + _gap;
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _DashedRectPainter oldDelegate) {
-    return oldDelegate.color != color || oldDelegate.radius != radius;
   }
 }
 

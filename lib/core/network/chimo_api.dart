@@ -34,6 +34,30 @@ class ChimoApi {
 
   Future<ApiResponse> refreshToken() => _client.get('/auth/refresh-token');
 
+  Future<ApiResponse> sendEmailCode({required String email}) {
+    return _client.post('/auth/send-email-code', bizParam: {'email': email});
+  }
+
+  Future<ApiResponse> emailAuth({
+    required String email,
+    required String code,
+  }) {
+    return _client.post(
+      '/auth/email-auth',
+      bizParam: {'email': email, 'code': code},
+    );
+  }
+
+  Future<ApiResponse> bindEmail({
+    required String email,
+    required String code,
+  }) {
+    return _client.post(
+      '/user/bind-email',
+      bizParam: {'email': email, 'code': code},
+    );
+  }
+
   // ---- user ----
   Future<ApiResponse> userOpen({bool open = false}) {
     return _client.post('/user/open', bizParam: {'open': open});
@@ -111,6 +135,86 @@ class ChimoApi {
     return _client.post('/user-relation/unfollow/$uid');
   }
 
+  Future<ApiResponse> setBlackList({
+    required String userId,
+    required bool isCancel,
+  }) {
+    return _client.post(
+      '/user-relation/set-black-list',
+      bizParam: {
+        'userId': userId,
+        'isCancel': isCancel,
+      },
+    );
+  }
+
+  Future<ApiResponse> getBlackList() =>
+      _client.get('/user-relation/get-black-list');
+
+  /// Who viewed my profile (Visits page).
+  Future<ApiResponse> viewedBy() => _client.get('/user-relation/viewedBy');
+
+  /// Remove one visit record from Visits list.
+  Future<ApiResponse> deleteVisitRecord(String visitorId) {
+    return _client.post(
+      '/user-relation/delete-visit-record',
+      bizParam: {'visitorId': visitorId},
+    );
+  }
+
+  Future<ApiResponse> cashCurrent() => _client.get('/cash/current');
+
+  /// Coin recharge packages for wallet.
+  Future<ApiResponse> cashChargeProducts() =>
+      _client.get('/cash/charge/product');
+
+  /// Shop goods catalog (optional wallet/goods source).
+  Future<ApiResponse> cashGoods() => _client.get('/cash/goods');
+
+  /// Gift catalog for room/private (tabs + items).
+  Future<ApiResponse> cashItems({int version = 1, int rid = 0}) {
+    return _client.get(
+      '/cash/item',
+      query: {
+        'version': '$version',
+        'rid': '$rid',
+      },
+    );
+  }
+
+  /// Send gift to one or more users.
+  Future<ApiResponse> cashGift({
+    required List<String> receiverIds,
+    required String itemId,
+    required int count,
+    String? channelId,
+  }) {
+    return _client.post(
+      '/cash/gift',
+      bizParam: {
+        'receiverId': receiverIds,
+        'itemId': itemId,
+        'count': count,
+        if (channelId != null && channelId.isNotEmpty) 'channel': channelId,
+      },
+    );
+  }
+
+  /// Batch users for conversation list avatars / nicknames.
+  Future<ApiResponse> msgUsers(String emUserNames) {
+    return _client.get(
+      '/user/msglist-users',
+      query: {'emUserNames': emUserNames},
+    );
+  }
+
+  Future<ApiResponse> msgUser(String emUserName) {
+    return _client.get(
+      '/user/msg-user',
+      query: {'emUserName': emUserName},
+    );
+  }
+
   // ---- group / chat ----
   Future<ApiResponse> groupTypeList() => _client.get('/chat/group/getTypeList');
 
@@ -158,6 +262,10 @@ class ChimoApi {
 
   // ---- app / home ----
   Future<ApiResponse> appSettings() => _client.get('/app/settings');
+
+  Future<ApiResponse> updateAppSettings(Map<String, dynamic> fields) {
+    return _client.post('/app/settings', bizParam: fields);
+  }
 
   Future<ApiResponse> splashList() => _client.get('/app/splash_list');
 

@@ -1,14 +1,45 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../core/constants/app_assets.dart';
+import '../../core/network/network_bootstrap.dart';
 import '../../core/theme/app_colors.dart';
 import 'joy_coins_help_page.dart';
 import 'levels_help_page.dart';
 
-/// Help entry: Chimo title with help topics below.
-class HelpPage extends StatelessWidget {
+/// Help entry: loads conf on open; FAQ bodies remain local design copy.
+class HelpPage extends StatefulWidget {
   const HelpPage({super.key});
+
+  @override
+  State<HelpPage> createState() => _HelpPageState();
+}
+
+class _HelpPageState extends State<HelpPage> {
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_prefetch());
+    });
+  }
+
+  Future<void> _prefetch() async {
+    try {
+      await Future.wait([
+        NetworkBootstrap.api.userConf(),
+        NetworkBootstrap.api.appSettings(),
+      ]);
+    } catch (_) {
+      // Static FAQ still usable offline.
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -45,6 +76,12 @@ class HelpPage extends StatelessWidget {
                 ],
               ),
             ),
+            if (_loading)
+              const LinearProgressIndicator(
+                minHeight: 2,
+                color: AppColors.primaryBright,
+                backgroundColor: Colors.transparent,
+              ),
             _HelpTile(
               title: 'Joy Coins Recharge',
               onTap: () {

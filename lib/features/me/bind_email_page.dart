@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../../app/app_router.dart';
 import '../../core/auth/auth_session.dart';
 import '../../core/constants/app_assets.dart';
+import '../../core/network/network_bootstrap.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/center_toast.dart';
 
@@ -35,6 +36,7 @@ class _BindEmailPageState extends State<BindEmailPage> {
   );
 
   late final TextEditingController _emailController;
+  bool _sending = false;
 
   String get _email => _emailController.text.trim();
 
@@ -54,23 +56,40 @@ class _BindEmailPageState extends State<BindEmailPage> {
   }
 
   Future<void> _onGetCode() async {
-    if (!_isValidEmail) return;
-    final bound = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
-        builder: (_) => _BindEmailCodePage(
-          email: _email,
-          forLogin: widget.forLogin,
+    if (!_isValidEmail || _sending) return;
+    setState(() => _sending = true);
+    try {
+      final res = await NetworkBootstrap.api.sendEmailCode(email: _email);
+      if (!mounted) return;
+      if (!res.success) {
+        showCenterToast(
+          context,
+          message: res.message.isEmpty ? 'Failed to send code' : res.message,
+        );
+        return;
+      }
+      final bound = await Navigator.of(context).push<bool>(
+        MaterialPageRoute<bool>(
+          builder: (_) => _BindEmailCodePage(
+            email: _email,
+            forLogin: widget.forLogin,
+          ),
         ),
-      ),
-    );
-    if (!mounted || bound != true) return;
-    if (widget.forLogin) return;
-    Navigator.of(context).pop();
+      );
+      if (!mounted || bound != true) return;
+      if (widget.forLogin) return;
+      Navigator.of(context).pop();
+    } catch (error) {
+      if (!mounted) return;
+      showCenterToast(context, message: 'Failed to send code: $error');
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final canSubmit = _isValidEmail;
+    final canSubmit = _isValidEmail && !_sending;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
@@ -231,10 +250,13 @@ class _BindEmailCodePageState extends State<_BindEmailCodePage> {
   final FocusNode _focusNode = FocusNode();
   Timer? _resendTimer;
   int _resendLeft = _resendSeconds;
+  bool _verifying = false;
+  bool _resending = false;
 
-  bool get _canVerify => _controller.text.trim().length == _codeLength;
+  bool get _canVerify =>
+      _controller.text.trim().length == _codeLength && !_verifying;
 
-  bool get _canResend => _resendLeft <= 0;
+  bool get _canResend => _resendLeft <= 0 && !_resending;
 
   @override
   void initState() {
@@ -271,24 +293,88 @@ class _BindEmailCodePageState extends State<_BindEmailCodePage> {
     });
   }
 
-  void _onResend() {
+  Future<void> _onResend() async {
     if (!_canResend) return;
-    showCenterToast(context, message: 'Verification code resent');
-    _startResendCountdown();
+    setState(() => _resending = true);
+    try {
+      final res =
+          await NetworkBootstrap.api.sendEmailCode(email: widget.email);
+      if (!mounted) return;
+      if (!res.success) {
+        showCenterToast(
+          context,
+          message: res.message.isEmpty ? 'Resend failed' : res.message,
+        );
+        return;
+      }
+      showCenterToast(context, message: 'Verification code resent');
+      _startResendCountdown();
+    } catch (error) {
+      if (!mounted) return;
+      showCenterToast(context, message: 'Resend failed: $error');
+    } finally {
+      if (mounted) setState(() => _resending = false);
+    }
   }
 
   Future<void> _onVerify() async {
     if (!_canVerify) return;
+    final code = _controller.text.trim();
+    setState(() => _verifying = true);
+    try {
+      if (widget.forLogin) {
+        final res = await NetworkBootstrap.api.emailAuth(
+          email: widget.email,
+          code: code,
+        );
+        if (!mounted) return;
+        if (!res.success) {
+          showCenterToast(
+            context,
+            message: res.message.isEmpty ? 'Verification failed' : res.message,
+          );
+          return;
+        }
+        final data = res.data;
+        final map =
+            data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+        final token = '${map['token'] ?? ''}';
+        if (token.isEmpty) {
+          showCenterToast(context, message: 'Login succeeded but token missing');
+          return;
+        }
+        await AuthSession.markLoggedIn(
+          method: 'email',
+          token: token,
+          nickname: '${map['nickName'] ?? map['nickname'] ?? ''}',
+          avatarUrl: '${map['avatar'] ?? map['avatarUrl'] ?? ''}',
+        );
+        await NetworkBootstrap.applySessionToken(token);
+        if (!mounted) return;
+        context.go(AppRoutes.shell);
+        return;
+      }
 
-    if (widget.forLogin) {
-      await AuthSession.markLoggedIn(method: 'email');
+      final res = await NetworkBootstrap.api.bindEmail(
+        email: widget.email,
+        code: code,
+      );
       if (!mounted) return;
-      context.go(AppRoutes.shell);
-      return;
+      if (!res.success) {
+        showCenterToast(
+          context,
+          message: res.message.isEmpty ? 'Bind failed' : res.message,
+        );
+        return;
+      }
+      showCenterToast(context, message: 'Email bound successfully');
+      Navigator.of(context).pop(true);
+    } catch (error) {
+      if (!mounted) return;
+      showCenterToast(context, message: 'Verification failed: $error');
+    } finally {
+      if (mounted) setState(() => _verifying = false);
     }
-
-    showCenterToast(context, message: 'Email bound successfully');
-    Navigator.of(context).pop(true);
   }
 
   @override

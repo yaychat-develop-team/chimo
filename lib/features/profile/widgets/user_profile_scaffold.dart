@@ -43,7 +43,7 @@ String _zodiacEmoji(String zodiac) {
   return '✨';
 }
 
-/// Shared shell for own / other profiles: background, info, Moments, Flavor, Gift Wall; caller supplies bottom bar.
+/// Shared shell for own / other profiles: background, info, Moments, Flavor; caller supplies bottom bar.
 class UserProfileScaffold extends StatelessWidget {
   const UserProfileScaffold({
     super.key,
@@ -61,8 +61,6 @@ class UserProfileScaffold extends StatelessWidget {
     this.momentAssets = const [],
     this.momentUrls = const [],
     this.flavors,
-    this.giftUnlocked = 12,
-    this.giftTotal = 58,
     this.inPartyName,
     this.showMore = false,
     this.onBack,
@@ -87,8 +85,6 @@ class UserProfileScaffold extends StatelessWidget {
 
   /// `null` → show default mock tags; empty → hide tags section.
   final List<ProfileFlavorTag>? flavors;
-  final int giftUnlocked;
-  final int giftTotal;
 
   /// When non-null, shows the “In Party: …” pill next to the avatar.
   final String? inPartyName;
@@ -111,11 +107,10 @@ class UserProfileScaffold extends StatelessWidget {
     final remoteMoments = momentUrls.where((u) => u.trim().isNotEmpty).toList();
     final localMoments = momentAssets.where((u) => u.trim().isNotEmpty).toList();
     final hasRemoteMoments = remoteMoments.isNotEmpty;
+    // Match Edit Profile album cap (9); previously hard-capped at 4.
     final moments = hasRemoteMoments
-        ? remoteMoments.take(4).toList()
-        : (localMoments.isEmpty
-            ? List<String>.filled(4, avatarAsset)
-            : localMoments.take(4).toList());
+        ? remoteMoments.take(9).toList()
+        : localMoments.take(9).toList();
     final flavorTags = flavors ?? ProfileFlavorTag.defaults;
 
     // Design: avatar top at y=289; status 44 + button area ~48 → spacer below top bar.
@@ -365,53 +360,55 @@ class UserProfileScaffold extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 28),
-                        const Text(
-                          'Moments',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            height: 21 / 14,
+                        if (moments.isNotEmpty) ...[
+                          const Text(
+                            'Moments',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              height: 21 / 14,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        SizedBox(
-                          height: 89,
-                          child: ListView.separated(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: moments.length,
-                            separatorBuilder: (_, _) =>
-                                const SizedBox(width: 6),
-                            itemBuilder: (context, index) {
-                              final src = moments[index];
-                              return ClipRRect(
-                                borderRadius: BorderRadius.circular(10),
-                                child: hasRemoteMoments ||
-                                        src.startsWith('http')
-                                    ? Image.network(
-                                        src,
-                                        width: 90,
-                                        height: 89,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (_, error, stack) =>
-                                            Image.asset(
-                                          avatarAsset,
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            height: 89,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: moments.length,
+                              separatorBuilder: (_, _) =>
+                                  const SizedBox(width: 6),
+                              itemBuilder: (context, index) {
+                                final src = moments[index];
+                                return ClipRRect(
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: hasRemoteMoments ||
+                                          src.startsWith('http')
+                                      ? Image.network(
+                                          src,
+                                          width: 90,
+                                          height: 89,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, error, stack) =>
+                                              Image.asset(
+                                            avatarAsset,
+                                            width: 90,
+                                            height: 89,
+                                            fit: BoxFit.cover,
+                                          ),
+                                        )
+                                      : Image.asset(
+                                          src,
                                           width: 90,
                                           height: 89,
                                           fit: BoxFit.cover,
                                         ),
-                                      )
-                                    : Image.asset(
-                                        src,
-                                        width: 90,
-                                        height: 89,
-                                        fit: BoxFit.cover,
-                                      ),
-                              );
-                            },
+                                );
+                              },
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 28),
+                          const SizedBox(height: 28),
+                        ],
                         if (flavorTags.isNotEmpty) ...[
                           const Text(
                             'My Flavor',
@@ -434,12 +431,7 @@ class UserProfileScaffold extends StatelessWidget {
                                 ),
                             ],
                           ),
-                          const SizedBox(height: 28),
                         ],
-                        _FullGiftWallCard(
-                          unlocked: giftUnlocked,
-                          total: giftTotal,
-                        ),
                       ],
                     ),
                   ),
@@ -976,95 +968,6 @@ class _FlavorChip extends StatelessWidget {
             height: 1.2,
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _FullGiftWallCard extends StatelessWidget {
-  const _FullGiftWallCard({
-    required this.unlocked,
-    required this.total,
-  });
-
-  final int unlocked;
-  final int total;
-
-  static const _giftAssets = [
-    AppAssets.giftIcon,
-    AppAssets.levelMask1,
-    AppAssets.levelMask3,
-    AppAssets.levelMask4,
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 54,
-      padding: const EdgeInsets.fromLTRB(12, 4, 8, 4),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        gradient: const LinearGradient(
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-          colors: [Color(0xFF2F6BFF), Color(0xFF9B22FF)],
-        ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Gift Wall',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    height: 20 / 13,
-                  ),
-                ),
-                Text(
-                  'Unlocked: $unlocked/$total',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.7),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w400,
-                    height: 17 / 11,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          for (final asset in _giftAssets) ...[
-            Container(
-              width: 46,
-              height: 46,
-              margin: const EdgeInsets.only(left: 2),
-              alignment: Alignment.center,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.asset(
-                  asset,
-                  width: 36,
-                  height: 36,
-                  fit: BoxFit.cover,
-                ),
-              ),
-            ),
-          ],
-          SvgPicture.asset(
-            AppAssets.mineArrow,
-            width: 5,
-            height: 8,
-            colorFilter: ColorFilter.mode(
-              Colors.white.withValues(alpha: 0.85),
-              BlendMode.srcIn,
-            ),
-          ),
-        ],
       ),
     );
   }

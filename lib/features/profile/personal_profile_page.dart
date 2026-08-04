@@ -26,8 +26,6 @@ class PersonalProfilePage extends StatefulWidget {
 
 class _PersonalProfilePageState extends State<PersonalProfilePage> {
   late MeProfile _profile;
-  int _giftUnlocked = 0;
-  int _giftTotal = 0;
   bool _loading = true;
 
   @override
@@ -72,10 +70,6 @@ class _PersonalProfilePageState extends State<PersonalProfilePage> {
 
   List<String> get _momentUrls {
     if (_profile.momentUrls.isNotEmpty) return _profile.momentUrls;
-    final avatar = _profile.avatarUrl;
-    if (avatar != null && avatar.isNotEmpty) {
-      return List<String>.filled(4, avatar);
-    }
     return const [];
   }
 
@@ -86,22 +80,6 @@ class _PersonalProfilePageState extends State<PersonalProfilePage> {
       final parsed = UserDto.parseProfile(infoRes);
       if (parsed != null) {
         setState(() => _profile = parsed);
-      }
-
-      final uid = parsed?.userId ?? _profile.userId;
-      if (uid.isNotEmpty) {
-        final giftRes = await NetworkBootstrap.api.giftWallList(uid);
-        if (!mounted) return;
-        final data = giftRes.data;
-        if (giftRes.success && data is Map) {
-          final levelInfo = data['levelInfo'];
-          if (levelInfo is Map) {
-            setState(() {
-              _giftUnlocked = int.tryParse('${levelInfo['receiveGift']}') ?? 0;
-              _giftTotal = int.tryParse('${levelInfo['totalGift']}') ?? 0;
-            });
-          }
-        }
       }
     } catch (_) {
       // Keep seed profile from Me page if refresh fails.
@@ -149,8 +127,6 @@ class _PersonalProfilePageState extends State<PersonalProfilePage> {
             voiceSeconds: _profile.voiceSeconds,
             momentUrls: _momentUrls,
             flavors: _flavors,
-            giftUnlocked: _giftUnlocked,
-            giftTotal: _giftTotal,
             inPartyName: null,
             showMore: false,
             onBack: _popWithResult,

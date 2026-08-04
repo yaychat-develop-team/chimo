@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/auth/auth_session.dart';
 import '../../core/network/network_bootstrap.dart';
 import '../../core/widgets/app_tip_dialog.dart';
 import '../../core/widgets/center_toast.dart';
@@ -10,6 +11,8 @@ import '../chats/data/chats_list_controller.dart';
 import '../chats/models/chat_conversation.dart';
 import '../chats/widgets/gift_bottom_sheet.dart';
 import '../me/data/user_dto.dart';
+import '../me/models/me_models.dart';
+import '../profile/edit_profile_page.dart';
 import '../profile/widgets/user_profile_scaffold.dart';
 import '../report/report_page.dart';
 import 'models/chat_user_profile.dart';
@@ -33,6 +36,7 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
   late bool _following;
   bool _blocked = false;
   bool _loading = true;
+  bool _isSelf = false;
 
   @override
   void initState() {
@@ -40,8 +44,13 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
     _profile = widget.profile;
     _following = widget.profile.isFollowing;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      unawaited(_loadProfile());
+      unawaited(_bootstrap());
     });
+  }
+
+  String get _targetUid {
+    final id = _profile.userId.isNotEmpty ? _profile.userId : _profile.id;
+    return id.trim();
   }
 
   String get _bioText {
@@ -60,43 +69,64 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
 
   List<String> get _momentUrls {
     if (_profile.momentUrls.isNotEmpty) return _profile.momentUrls;
-    final avatar = _profile.avatarUrl;
-    if (avatar != null && avatar.isNotEmpty) return [avatar];
     return const [];
   }
 
+  Future<void> _bootstrap() async {
+    final seedUid = _targetUid;
+    final self = seedUid.isNotEmpty && await AuthSession.isCurrentUser(seedUid);
+    if (!mounted) return;
+    setState(() => _isSelf = self);
+    await _loadProfile();
+  }
+
   Future<void> _loadProfile() async {
-    final uid = _profile.userId.isNotEmpty ? _profile.userId : _profile.id;
+    final uid = _targetUid;
     if (uid.isEmpty) {
       setState(() => _loading = false);
       return;
     }
     try {
-      final infoRes = await NetworkBootstrap.api.userInfoByUid(uid);
+      final infoRes = _isSelf
+          ? await NetworkBootstrap.api.userInfo()
+          : await NetworkBootstrap.api.userInfoByUid(uid);
       if (!mounted) return;
-      final parsed = UserDto.parseChatProfile(infoRes);
-      if (parsed != null) {
-        setState(() {
-          _profile = parsed.copyWith(
-            giftUnlocked: _profile.giftUnlocked,
-            giftTotal: _profile.giftTotal,
+      if (_isSelf) {
+        final me = UserDto.parseProfile(infoRes);
+        if (me != null) {
+          await AuthSession.markLoggedIn(
+            userId: me.userId,
+            nickname: me.displayName,
+            avatarUrl: me.avatarUrl,
           );
-          _following = parsed.isFollowing;
-        });
-      }
-
-      final giftRes = await NetworkBootstrap.api.giftWallList(uid);
-      if (!mounted) return;
-      final data = giftRes.data;
-      if (giftRes.success && data is Map) {
-        final levelInfo = data['levelInfo'];
-        if (levelInfo is Map) {
           setState(() {
-            _profile = _profile.copyWith(
-              giftUnlocked:
-                  int.tryParse('${levelInfo['receiveGift']}') ?? 0,
-              giftTotal: int.tryParse('${levelInfo['totalGift']}') ?? 0,
+            _profile = ChatUserProfile(
+              id: me.userId,
+              nickname: me.displayName,
+              userId: me.userId,
+              avatarAsset: me.avatarAsset,
+              avatarUrl: me.avatarUrl,
+              isMale: me.isMale,
+              age: _ageFromBirthday(me.birthday),
+              zodiac: _profile.zodiac,
+              level: me.vipLevel,
+              bio: me.signature,
+              voiceSeconds: me.voiceSeconds,
+              momentUrls: me.momentUrls,
+              tags: me.tags,
+              isFollowing: false,
             );
+          });
+        }
+      } else {
+        final parsed = UserDto.parseChatProfile(infoRes);
+        if (parsed != null) {
+          final self = await AuthSession.isCurrentUser(parsed.userId) ||
+              await AuthSession.isCurrentUser(parsed.id);
+          setState(() {
+            _profile = parsed;
+            _following = parsed.isFollowing;
+            _isSelf = self;
           });
         }
       }
@@ -105,6 +135,18 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  static int _ageFromBirthday(String birthday) {
+    final birth = DateTime.tryParse(birthday);
+    if (birth == null) return 0;
+    final now = DateTime.now();
+    var age = now.year - birth.year;
+    if (now.month < birth.month ||
+        (now.month == birth.month && now.day < birth.day)) {
+      age -= 1;
+    }
+    return age.clamp(0, 120);
   }
 
   void _openReport() {
@@ -125,6 +167,8 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
       zodiac: _profile.zodiac,
       isFollowing: _following,
       momentAssets: _profile.momentAssets,
+      avatarUrl: _profile.avatarUrl,
+      emUserName: _profile.emUsername,
     );
     widget.chatsController?.upsertPrivateChat(conversation);
     Navigator.of(context).push(
@@ -137,8 +181,67 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
     );
   }
 
+  Future<void> _openEditProfile() async {
+    try {
+      final res = await NetworkBootstrap.api.userInfo();
+      final me = UserDto.parseProfile(res);
+      if (!mounted) return;
+      final seed = me ??
+          MeProfile(
+            displayName: _profile.nickname,
+            userId: _profile.userId,
+            avatarAsset: _profile.avatarAsset,
+            avatarUrl: _profile.avatarUrl,
+            friends: 0,
+            fans: 0,
+            follows: 0,
+            visitors: 0,
+            signature: _profile.bio,
+            gender: _profile.isMale ? 'Male' : 'Female',
+            tags: _profile.tags,
+            vipLevel: _profile.level,
+            momentUrls: _profile.momentUrls,
+            voiceSeconds: _profile.voiceSeconds,
+          );
+      final updated = await Navigator.of(context).push<MeProfile>(
+        MaterialPageRoute(builder: (_) => EditProfilePage(profile: seed)),
+      );
+      if (!mounted) return;
+      if (updated != null) {
+        setState(() {
+          _profile = ChatUserProfile(
+            id: updated.userId,
+            nickname: updated.displayName,
+            userId: updated.userId,
+            avatarAsset: updated.avatarAsset,
+            avatarUrl: updated.avatarUrl,
+            isMale: updated.isMale,
+            age: _ageFromBirthday(updated.birthday),
+            zodiac: _profile.zodiac,
+            level: updated.vipLevel,
+            bio: updated.signature,
+            voiceSeconds: updated.voiceSeconds,
+            momentUrls: updated.momentUrls,
+            tags: updated.tags,
+            isFollowing: false,
+          );
+        });
+      } else {
+        unawaited(_loadProfile());
+      }
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Open edit profile failed: $error'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
   Future<void> _toggleFollow() async {
-    final uid = _profile.userId.isNotEmpty ? _profile.userId : _profile.id;
+    final uid = _targetUid;
     try {
       final res = _following
           ? await NetworkBootstrap.api.unfollowUser(uid)
@@ -168,6 +271,7 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
   }
 
   Future<void> _openMoreMenu() async {
+    if (_isSelf) return;
     final action = await showModalBottomSheet<_ProfileMoreAction>(
       context: context,
       backgroundColor: Colors.transparent,
@@ -209,6 +313,13 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
   }
 
   Widget _buildBottomBar() {
+    if (_isSelf) {
+      return ProfilePrimaryAction(
+        label: 'Edit Profile',
+        onTap: () => unawaited(_openEditProfile()),
+      );
+    }
+
     if (_following) {
       return Row(
         children: [
@@ -256,11 +367,9 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
           voiceSeconds: _profile.voiceSeconds,
           momentUrls: _momentUrls,
           flavors: _flavors,
-          giftUnlocked: _profile.giftUnlocked,
-          giftTotal: _profile.giftTotal,
-          inPartyName: _profile.inPartyName,
-          showMore: true,
-          onMore: _openMoreMenu,
+          inPartyName: _isSelf ? null : _profile.inPartyName,
+          showMore: !_isSelf,
+          onMore: _isSelf ? null : _openMoreMenu,
           bottomBar: _buildBottomBar(),
         ),
         if (_loading)

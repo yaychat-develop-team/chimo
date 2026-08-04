@@ -18,6 +18,7 @@ class MeProfile {
     this.voiceSeconds,
     this.nicknameChangedOnce = false,
     this.vipLevel = 1,
+    this.experience = 0,
     this.momentUrls = const [],
   });
 
@@ -54,6 +55,7 @@ class MeProfile {
   final int? voiceSeconds;
   final bool nicknameChangedOnce;
   final int vipLevel;
+  final int experience;
   final List<String> momentUrls;
 
   bool get isMale => gender == 'Male';
@@ -79,6 +81,7 @@ class MeProfile {
     bool clearVoice = false,
     bool? nicknameChangedOnce,
     int? vipLevel,
+    int? experience,
     List<String>? momentUrls,
   }) {
     return MeProfile(
@@ -99,6 +102,7 @@ class MeProfile {
       voiceSeconds: clearVoice ? null : (voiceSeconds ?? this.voiceSeconds),
       nicknameChangedOnce: nicknameChangedOnce ?? this.nicknameChangedOnce,
       vipLevel: vipLevel ?? this.vipLevel,
+      experience: experience ?? this.experience,
       momentUrls: momentUrls ?? this.momentUrls,
     );
   }

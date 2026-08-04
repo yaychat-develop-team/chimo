@@ -22,6 +22,7 @@ class ChatUserProfile {
     this.tags = const [],
     this.isFollowing = false,
     this.inPartyName,
+    this.emUsername = '',
   });
 
   final String id;
@@ -44,6 +45,9 @@ class ChatUserProfile {
   final List<String> tags;
   final bool isFollowing;
   final String? inPartyName;
+
+  /// EaseMob chat id (preferred peer conversation target).
+  final String emUsername;
 
   static const List<String> demoMomentAssets = [
     AppAssets.launchBg,
@@ -102,6 +106,7 @@ class ChatUserProfile {
     bool? isFollowing,
     String? inPartyName,
     bool clearInParty = false,
+    String? emUsername,
   }) {
     return ChatUserProfile(
       id: id ?? this.id,
@@ -122,6 +127,7 @@ class ChatUserProfile {
       tags: tags ?? this.tags,
       isFollowing: isFollowing ?? this.isFollowing,
       inPartyName: clearInParty ? null : (inPartyName ?? this.inPartyName),
+      emUsername: emUsername ?? this.emUsername,
     );
   }
 }

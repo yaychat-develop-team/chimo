@@ -50,161 +50,171 @@ class _AlmostInPageState extends State<AlmostInPage> {
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.paddingOf(context).bottom;
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
         backgroundColor: const Color(0xFF0A0A14),
+        resizeToAvoidBottomInset: true,
         body: SafeArea(
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(30, 16, 30, 16 + bottom),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Material(
-                    color: const Color(0xFF2A2A2A),
-                    borderRadius: BorderRadius.circular(12),
-                    child: InkWell(
-                      onTap: () => Navigator.of(context).pop(),
-                      borderRadius: BorderRadius.circular(12),
-                      child: SizedBox(
-                        width: 36,
-                        height: 36,
-                        child: Center(
-                          child: SvgPicture.asset(
-                            AppAssets.backArrow,
-                            width: 7,
-                            height: 12,
-                            colorFilter: const ColorFilter.mode(
-                              Colors.white,
-                              BlendMode.srcIn,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: EdgeInsets.fromLTRB(30, 16, 30, 16 + bottom),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Material(
+                          color: const Color(0xFF2A2A2A),
+                          borderRadius: BorderRadius.circular(12),
+                          child: InkWell(
+                            onTap: () => Navigator.of(context).pop(),
+                            borderRadius: BorderRadius.circular(12),
+                            child: SizedBox(
+                              width: 36,
+                              height: 36,
+                              child: Center(
+                                child: SvgPicture.asset(
+                                  AppAssets.backArrow,
+                                  width: 7,
+                                  height: 12,
+                                  colorFilter: const ColorFilter.mode(
+                                    Colors.white,
+                                    BlendMode.srcIn,
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 28),
-                const Text(
-                  "You're almost in!",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 26,
-                    fontWeight: FontWeight.w700,
-                    height: 1.5,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'A great profile picture and nickname help you stand out.',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w400,
-                    height: 1.5,
-                  ),
-                ),
-                const SizedBox(height: 40),
-                Center(
-                  child: SizedBox(
-                    width: 112,
-                    height: 112,
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        ClipOval(
-                          child: Image.asset(
-                            AppAssets.defaultAvatar,
-                            width: 112,
-                            height: 112,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) => Image.asset(
-                              AppAssets.friendsEmpty,
-                              width: 112,
-                              height: 112,
-                              fit: BoxFit.cover,
-                            ),
-                          ),
+                      SizedBox(height: keyboardOpen ? 16 : 28),
+                      const Text(
+                        "You're almost in!",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 26,
+                          fontWeight: FontWeight.w700,
+                          height: 1.5,
                         ),
-                        Positioned(
-                          right: 0,
-                          bottom: 0,
-                          child: Image.asset(
-                            AppAssets.cameraIcon,
-                            width: 32,
-                            height: 32,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 36),
-                Container(
-                  height: 54,
-                  padding: const EdgeInsets.symmetric(horizontal: 18),
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2A2A2A),
-                    borderRadius: BorderRadius.circular(27),
-                  ),
-                  child: TextField(
-                    controller: _nickController,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    cursorColor: AppColors.accentLime,
-                    inputFormatters: [
-                      LengthLimitingTextInputFormatter(20),
-                    ],
-                    decoration: const InputDecoration(
-                      border: InputBorder.none,
-                      isCollapsed: true,
-                      hintText: 'Enter a nickname',
-                      hintStyle: TextStyle(
-                        color: Color(0xFF8A8A8A),
-                        fontSize: 14,
                       ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 110),
-                Center(
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: _onLetsGo,
-                      borderRadius: BorderRadius.circular(27),
-                      child: Ink(
-                        width: 134,
+                      const SizedBox(height: 4),
+                      const Text(
+                        'A great profile picture and nickname help you stand out.',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w400,
+                          height: 1.5,
+                        ),
+                      ),
+                      SizedBox(height: keyboardOpen ? 20 : 40),
+                      Center(
+                        child: SizedBox(
+                          width: 112,
+                          height: 112,
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              ClipOval(
+                                child: Image.asset(
+                                  AppAssets.defaultAvatar,
+                                  width: 112,
+                                  height: 112,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, _, _) => Image.asset(
+                                    AppAssets.friendsEmpty,
+                                    width: 112,
+                                    height: 112,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                right: 0,
+                                bottom: 0,
+                                child: Image.asset(
+                                  AppAssets.cameraIcon,
+                                  width: 32,
+                                  height: 32,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: keyboardOpen ? 20 : 36),
+                      Container(
                         height: 54,
+                        padding: const EdgeInsets.symmetric(horizontal: 18),
+                        alignment: Alignment.center,
                         decoration: BoxDecoration(
+                          color: const Color(0xFF2A2A2A),
                           borderRadius: BorderRadius.circular(27),
-                          gradient: AppColors.promoBannerGradient,
                         ),
-                        child: const Center(
-                          child: Text(
-                            "Let's Go!",
-                            style: TextStyle(
-                              color: AppColors.promoText,
+                        child: TextField(
+                          controller: _nickController,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          cursorColor: AppColors.accentLime,
+                          inputFormatters: [
+                            LengthLimitingTextInputFormatter(20),
+                          ],
+                          decoration: const InputDecoration(
+                            border: InputBorder.none,
+                            isCollapsed: true,
+                            hintText: 'Enter a nickname',
+                            hintStyle: TextStyle(
+                              color: Color(0xFF8A8A8A),
                               fontSize: 14,
-                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ),
                       ),
-                    ),
+                      SizedBox(height: keyboardOpen ? 28 : 48),
+                      Center(
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: _onLetsGo,
+                            borderRadius: BorderRadius.circular(27),
+                            child: Ink(
+                              width: 134,
+                              height: 54,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(27),
+                                gradient: AppColors.promoBannerGradient,
+                              ),
+                              child: const Center(
+                                child: Text(
+                                  "Let's Go!",
+                                  style: TextStyle(
+                                    color: AppColors.promoText,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const Spacer(),
-              ],
-            ),
+              );
+            },
           ),
         ),
       ),

@@ -7,6 +7,8 @@ import '../../core/constants/app_assets.dart';
 import '../../core/network/network_bootstrap.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_tip_dialog.dart';
+import 'bind_email_page.dart';
+import 'privacy_settings_page.dart';
 
 /// Settings: account security, privacy, clear cache, log out.
 class SettingsPage extends StatelessWidget {
@@ -87,10 +89,9 @@ class SettingsPage extends StatelessWidget {
                     _SettingsTile(
                       title: 'Account Security',
                       onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Account Security coming soon'),
-                            behavior: SnackBarBehavior.floating,
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const BindEmailPage(),
                           ),
                         );
                       },
@@ -105,10 +106,9 @@ class SettingsPage extends StatelessWidget {
                     _SettingsTile(
                       title: 'Privacy Setting',
                       onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Privacy Setting coming soon'),
-                            behavior: SnackBarBehavior.floating,
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const PrivacySettingsPage(),
                           ),
                         );
                       },
