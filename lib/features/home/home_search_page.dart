@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/constants/app_assets.dart';
 import '../../core/network/network_bootstrap.dart';
@@ -78,6 +79,8 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
   bool _searching = false;
   String? _selfUserId;
 
+  /// Matches forya `searchHistoryKey`.
+  static const _historyPrefsKey = 'searchHistoryKey';
   static final RegExp _idPattern = RegExp(r'^\d{5,}$');
 
   @override
@@ -87,7 +90,39 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _focusNode.requestFocus();
       unawaited(_loadSelfId());
+      unawaited(_loadHistory());
     });
+  }
+
+  Future<void> _loadHistory() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getStringList(_historyPrefsKey) ?? const [];
+      if (!mounted || saved.isEmpty) return;
+      setState(() {
+        _history
+          ..clear()
+          ..addAll(saved);
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _persistHistory() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(_historyPrefsKey, List<String>.from(_history));
+    } catch (_) {}
+  }
+
+  void _addHistory(String query) {
+    setState(() {
+      _history.remove(query);
+      _history.insert(0, query);
+      if (_history.length > 20) {
+        _history.removeRange(20, _history.length);
+      }
+    });
+    unawaited(_persistHistory());
   }
 
   Future<void> _loadSelfId() async {
@@ -130,6 +165,7 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
       _history.clear();
       _editingHistory = false;
     });
+    unawaited(_persistHistory());
   }
 
   void _removeHistoryItem(String item) {
@@ -137,6 +173,7 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
       _history.remove(item);
       if (_history.isEmpty) _editingHistory = false;
     });
+    unawaited(_persistHistory());
   }
 
   void _clearInput() {
@@ -189,11 +226,6 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
 
     FocusScope.of(context).unfocus();
     setState(() {
-      _history.remove(query);
-      _history.insert(0, query);
-      if (_history.length > 20) {
-        _history.removeRange(20, _history.length);
-      }
       _searching = true;
       _hasSearched = true;
       _result = null;
@@ -229,6 +261,11 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
           _selfUserId != null &&
           hit.userId == _selfUserId) {
         hit = hit.copyWith(relation: _SearchRelation.self);
+      }
+
+      // forya: only record history when search returns a hit.
+      if (hit != null) {
+        _addHistory(query);
       }
 
       setState(() {
@@ -300,7 +337,8 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
   @override
   Widget build(BuildContext context) {
     final hasText = _controller.text.isNotEmpty;
-    final showResults = _hasSearched && (_result != null || _searching);
+    // After submit, show result / empty / loading; clear input returns to History.
+    final showResults = _hasSearched;
 
     return Scaffold(
       backgroundColor: AppColors.background,

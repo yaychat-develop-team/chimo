@@ -32,6 +32,8 @@ class ChatConversation {
     this.isMale = true,
     this.signature = '',
     this.zodiac = 'Capricorn',
+    this.heightInches = 0,
+    this.weightLb = 0,
     this.isFollowing = false,
     this.momentAssets = const [],
     this.momentUrls = const [],
@@ -41,6 +43,8 @@ class ChatConversation {
     this.postCount = 0,
     this.level = 1,
     this.emUserName = '',
+    this.lastMsgAtMs = 0,
+    this.isSystem = false,
   });
 
   final String id;
@@ -72,6 +76,12 @@ class ChatConversation {
   /// Peer zodiac label.
   final String zodiac;
 
+  /// Peer height in inches (0 = hidden).
+  final int heightInches;
+
+  /// Peer weight in LB (0 = hidden).
+  final int weightLb;
+
   /// Whether following (DM app bar Follow).
   final bool isFollowing;
 
@@ -90,6 +100,12 @@ class ChatConversation {
 
   /// Peer EaseMob username for 1v1 (empty for groups).
   final String emUserName;
+
+  /// Latest message server time (ms) for sort / relative labels.
+  final int lastMsgAtMs;
+
+  /// Official / system conversation (New Friends, etc.).
+  final bool isSystem;
 
   String get signatureDisplay {
     if (signature.trim().isNotEmpty) return signature.trim();
@@ -124,6 +140,8 @@ class ChatConversation {
     bool? isMale,
     String? signature,
     String? zodiac,
+    int? heightInches,
+    int? weightLb,
     bool? isFollowing,
     List<String>? momentAssets,
     List<String>? momentUrls,
@@ -133,6 +151,8 @@ class ChatConversation {
     int? postCount,
     int? level,
     String? emUserName,
+    int? lastMsgAtMs,
+    bool? isSystem,
   }) {
     return ChatConversation(
       id: id ?? this.id,
@@ -149,6 +169,8 @@ class ChatConversation {
       isMale: isMale ?? this.isMale,
       signature: signature ?? this.signature,
       zodiac: zodiac ?? this.zodiac,
+      heightInches: heightInches ?? this.heightInches,
+      weightLb: weightLb ?? this.weightLb,
       isFollowing: isFollowing ?? this.isFollowing,
       momentAssets: momentAssets ?? this.momentAssets,
       momentUrls: momentUrls ?? this.momentUrls,
@@ -158,6 +180,8 @@ class ChatConversation {
       postCount: postCount ?? this.postCount,
       level: level ?? this.level,
       emUserName: emUserName ?? this.emUserName,
+      lastMsgAtMs: lastMsgAtMs ?? this.lastMsgAtMs,
+      isSystem: isSystem ?? this.isSystem,
     );
   }
 }

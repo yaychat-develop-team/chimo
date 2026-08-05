@@ -38,6 +38,7 @@ class MePage extends StatefulWidget {
 class _MePageState extends State<MePage> {
   MeProfile _profile = MeMockData.profile;
   bool _loading = true;
+  bool _hasBoundEmail = false;
 
   @override
   void initState() {
@@ -70,6 +71,16 @@ class _MePageState extends State<MePage> {
         MeStatItem(label: 'Visitors', value: _formatCount(_profile.visitors)),
       ];
 
+  /// Hide Bind Email once an email is already bound (email login or bind flow).
+  List<QuickAccessItem> get _quickAccess {
+    if (_hasBoundEmail) {
+      return MeMockData.quickAccess
+          .where((item) => item.id != 'bind_email')
+          .toList(growable: false);
+    }
+    return MeMockData.quickAccess;
+  }
+
   Future<void> _loadProfile() async {
     try {
       final res = await NetworkBootstrap.api.userInfo();
@@ -84,14 +95,25 @@ class _MePageState extends State<MePage> {
         }
         return;
       }
+      final sessionEmail = (await AuthSession.email())?.trim() ?? '';
+      final loginMethod = await AuthSession.loginMethod();
+      final email =
+          parsed.email.trim().isNotEmpty ? parsed.email.trim() : sessionEmail;
+      final hasBoundEmail = email.isNotEmpty || loginMethod == 'email';
+      final profile =
+          email.isEmpty || email == parsed.email
+              ? parsed
+              : parsed.copyWith(email: email);
       setState(() {
-        _profile = parsed;
+        _profile = profile;
+        _hasBoundEmail = hasBoundEmail;
         _loading = false;
       });
       await AuthSession.markLoggedIn(
-        nickname: parsed.displayName,
-        avatarUrl: parsed.avatarUrl,
-        userId: parsed.userId,
+        nickname: profile.displayName,
+        avatarUrl: profile.avatarUrl,
+        userId: profile.userId,
+        email: email.isEmpty ? null : email,
       );
       // Keep IM online after app-token refresh paths.
       unawaited(NetworkBootstrap.connectImAfterLogin());
@@ -209,7 +231,7 @@ class _MePageState extends State<MePage> {
                   ),
                   const SizedBox(height: 24),
                   MeQuickAccessSection(
-                    items: MeMockData.quickAccess,
+                    items: _quickAccess,
                     onItemTap: (item) async {
                       if (item.id == 'debug') {
                         Navigator.of(context).push(
@@ -218,11 +240,15 @@ class _MePageState extends State<MePage> {
                           ),
                         );
                       } else if (item.id == 'bind_email') {
-                        Navigator.of(context).push(
-                          MaterialPageRoute<void>(
+                        final bound = await Navigator.of(context).push<bool>(
+                          MaterialPageRoute<bool>(
                             builder: (_) => const BindEmailPage(),
                           ),
                         );
+                        if (!mounted) return;
+                        if (bound == true) {
+                          await _loadProfile();
+                        }
                       } else if (item.id == 'about') {
                         Navigator.of(context).push(
                           MaterialPageRoute<void>(

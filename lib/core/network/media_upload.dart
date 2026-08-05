@@ -1,4 +1,5 @@
-﻿import 'dart:io';
+﻿import 'dart:async';
+import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
@@ -6,9 +7,10 @@ import 'network_bootstrap.dart';
 
 /// Upload local media via `GET /aws/upload-url` then PUT to the signed URL.
 ///
-/// Mirrors D:\forya `S3UploadApi` (sceneCode 101 = images by default).
+/// Mirrors D:\forya `S3UploadApi` (sceneCode 101 = images, 102 = voice).
 abstract final class MediaUpload {
   static const _cdnDomain = 'https://cdn.echimo.com';
+  static const _maxAttempts = 3;
 
   /// Returns a CDN-facing URL on success; otherwise `null`.
   static Future<String?> uploadFile(
@@ -38,24 +40,67 @@ abstract final class MediaUpload {
     final signedUrl = _parseSignedUrl(signedRes.data);
     if (signedUrl == null || signedUrl.isEmpty) return null;
 
-    final bytes = await file.readAsBytes();
-    final put = await http.put(
-      Uri.parse(signedUrl),
-      headers: {
-        'Content-Type': _guessMime(name),
-        'Content-Length': '${bytes.length}',
-      },
-      body: bytes,
+    // Forya: mime lookup, fallback application/octet-stream.
+    // Voice scene always uses octet-stream — audio/* often causes S3 resets
+    // on emulator when the signed URL only covers `host`.
+    final contentType = sceneCode == 102 || sceneCode == 103
+        ? 'application/octet-stream'
+        : _guessMime(name);
+
+    final ok = await _putWithRetry(
+      signedUrl: signedUrl,
+      file: file,
+      length: length,
+      contentType: contentType,
     );
-    // ignore: avoid_print
-    print('MediaUpload PUT ${put.statusCode} bytes=${bytes.length}');
-    if (put.statusCode < 200 || put.statusCode >= 300) {
-      // ignore: avoid_print
-      print('MediaUpload PUT body=${put.body.length > 200 ? put.body.substring(0, 200) : put.body}');
-      return null;
-    }
+    if (!ok) return null;
 
     return _toCdnUrl(signedUrl);
+  }
+
+  static Future<bool> _putWithRetry({
+    required String signedUrl,
+    required File file,
+    required int length,
+    required String contentType,
+  }) async {
+    Object? lastError;
+    for (var attempt = 1; attempt <= _maxAttempts; attempt++) {
+      try {
+        final request = http.StreamedRequest('PUT', Uri.parse(signedUrl));
+        request.headers['Content-Type'] = contentType;
+        request.contentLength = length;
+
+        // Stream file like forya Dio openRead(); avoids loading whole file twice.
+        unawaited(
+          file.openRead().pipe(request.sink).catchError((Object error, _) {
+            // ignore: avoid_print
+            print('MediaUpload stream error: $error');
+          }),
+        );
+
+        final streamed = await request.send().timeout(
+          const Duration(seconds: 60),
+        );
+        final status = streamed.statusCode;
+        // Drain body so the connection can close cleanly.
+        await streamed.stream.drain<void>();
+        // ignore: avoid_print
+        print('MediaUpload PUT attempt=$attempt status=$status bytes=$length');
+        if (status >= 200 && status < 300) return true;
+        lastError = 'HTTP $status';
+      } catch (error) {
+        lastError = error;
+        // ignore: avoid_print
+        print('MediaUpload PUT attempt=$attempt failed: $error');
+        if (attempt < _maxAttempts) {
+          await Future<void>.delayed(Duration(milliseconds: 400 * attempt));
+        }
+      }
+    }
+    // ignore: avoid_print
+    print('MediaUpload giving up: $lastError');
+    return false;
   }
 
   static String? _parseSignedUrl(Object? data) {
@@ -84,12 +129,20 @@ abstract final class MediaUpload {
 
   static String _guessMime(String filename) {
     final lower = filename.toLowerCase();
+    if (lower.endsWith('.m4a') || lower.endsWith('.aac')) {
+      return 'application/octet-stream';
+    }
+    if (lower.endsWith('.mp3')) return 'audio/mpeg';
+    if (lower.endsWith('.wav')) return 'audio/wav';
     if (lower.endsWith('.png')) return 'image/png';
     if (lower.endsWith('.webp')) return 'image/webp';
     if (lower.endsWith('.gif')) return 'image/gif';
     if (lower.endsWith('.heic') || lower.endsWith('.heif')) {
       return 'image/heic';
     }
-    return 'image/jpeg';
+    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) {
+      return 'image/jpeg';
+    }
+    return 'application/octet-stream';
   }
 }

@@ -6,7 +6,7 @@ import '../../shared/models/group_member.dart';
 /// Auth persistence / credentials (local for now).
 abstract class AuthRepository {
   Future<bool> isLoggedIn();
-  Future<void> markLoggedIn({String method = 'phone', String? phone});
+  Future<void> markLoggedIn({String? method, String? phone});
   Future<void> clear();
   Future<String?> phone();
 }

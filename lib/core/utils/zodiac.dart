@@ -1,7 +1,7 @@
 /// Western zodiac name from a `yyyy-MM-dd` birthday.
 String zodiacFromBirthday(String birthday) {
   final date = DateTime.tryParse(birthday);
-  if (date == null) return 'Capricornus';
+  if (date == null) return 'Capricorn';
   final m = date.month;
   final d = date.day;
   if ((m == 3 && d >= 21) || (m == 4 && d <= 19)) return 'Aries';
@@ -13,7 +13,26 @@ String zodiacFromBirthday(String birthday) {
   if ((m == 9 && d >= 23) || (m == 10 && d <= 22)) return 'Libra';
   if ((m == 10 && d >= 23) || (m == 11 && d <= 21)) return 'Scorpio';
   if ((m == 11 && d >= 22) || (m == 12 && d <= 21)) return 'Sagittarius';
-  if ((m == 12 && d >= 22) || (m == 1 && d <= 19)) return 'Capricornus';
+  if ((m == 12 && d >= 22) || (m == 1 && d <= 19)) return 'Capricorn';
   if ((m == 1 && d >= 20) || (m == 2 && d <= 18)) return 'Aquarius';
   return 'Pisces';
+}
+
+/// Emoji prefix matching forya chat card constellation labels.
+String zodiacEmoji(String zodiac) {
+  return switch (zodiac.toLowerCase()) {
+    'aries' => '♈️',
+    'taurus' => '♉️',
+    'gemini' => '♊️',
+    'cancer' => '♋️',
+    'leo' => '♌️',
+    'virgo' => '♍️',
+    'libra' => '♎️',
+    'scorpio' => '♏️',
+    'sagittarius' => '♐️',
+    'capricorn' || 'capricornus' => '♑️',
+    'aquarius' => '♒️',
+    'pisces' => '♓️',
+    _ => '♑️',
+  };
 }

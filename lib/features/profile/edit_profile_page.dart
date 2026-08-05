@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -46,6 +47,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
   int? _height;
   int? _weight;
   int? _voiceSeconds;
+  String? _voiceUrl;
+  /// Local pending recording path (uploaded on Save).
+  String? _pendingVoicePath;
   List<String> _tags = const [];
   bool _nicknameChangedOnce = false;
   final List<String> _photoPaths = [];
@@ -74,6 +78,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
     _height = p.height;
     _weight = p.weight;
     _voiceSeconds = p.voiceSeconds;
+    _voiceUrl = p.voiceUrl;
+    _pendingVoicePath = null;
     _tags = List<String>.from(p.tags);
     _nicknameChangedOnce = p.nicknameChangedOnce;
     _photoPaths
@@ -121,6 +127,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       signature: _signature,
       tags: _tags,
       voiceSeconds: _voiceSeconds,
+      voiceUrl: _voiceUrl,
       clearVoice: _voiceSeconds == null,
       nicknameChangedOnce: _nicknameChangedOnce,
       momentUrls: List<String>.from(_photoPaths),
@@ -155,6 +162,31 @@ class _EditProfilePageState extends State<EditProfilePage> {
       }
       if (_voiceSeconds == null) {
         fields['deleteVoice'] = true;
+      } else {
+        var voice = (_voiceUrl ?? '').trim();
+        final pending = (_pendingVoicePath ?? '').trim();
+        if (pending.isNotEmpty &&
+            !pending.startsWith('http://') &&
+            !pending.startsWith('https://')) {
+          final uploaded = await MediaUpload.uploadFile(pending, sceneCode: 102);
+          if (uploaded == null || uploaded.isEmpty) {
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Voice upload failed'),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+            return;
+          }
+          voice = uploaded;
+          _voiceUrl = uploaded;
+          _pendingVoicePath = null;
+        }
+        if (voice.isNotEmpty) {
+          fields['voice'] = voice;
+          fields['voiceDuration'] = _voiceSeconds;
+        }
       }
 
       final res = await NetworkBootstrap.api.updateUserInfo(fields);
@@ -389,15 +421,23 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   Future<void> _openVoiceNote() async {
-    final result = await Navigator.of(context).push<int>(
+    final result = await Navigator.of(context).push<VoiceNoteResult>(
       MaterialPageRoute(builder: (_) => const VoiceNotePage()),
     );
-    if (!mounted || result == null || result <= 0) return;
-    setState(() => _voiceSeconds = result);
+    if (!mounted || result == null || result.seconds <= 0) return;
+    setState(() {
+      _voiceSeconds = result.seconds;
+      _pendingVoicePath = result.path;
+      _voiceUrl = result.path;
+    });
   }
 
   void _deleteVoiceNote() {
-    setState(() => _voiceSeconds = null);
+    setState(() {
+      _voiceSeconds = null;
+      _voiceUrl = null;
+      _pendingVoicePath = null;
+    });
   }
 
   Future<void> _openTags() async {
@@ -587,13 +627,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
                       onAdd: () => _pickPhoto(forAlbum: true),
                       onRemove: (index) => unawaited(_removeAlbumPhoto(index)),
                       onOpen: (index) {
-                        Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => AlbumPhotoViewerPage(
-                              paths: List<String>.from(_photoPaths),
-                              initialIndex: index,
-                            ),
-                          ),
+                        AlbumPhotoViewerPage.open(
+                          context,
+                          paths: List<String>.from(_photoPaths),
+                          initialIndex: index,
                         );
                       },
                     ),
@@ -607,6 +644,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     const SizedBox(height: 16),
                     _VoiceNoteCard(
                       seconds: _voiceSeconds,
+                      source: _voiceUrl,
                       onTap: _openVoiceNote,
                       onDelete: _deleteVoiceNote,
                     ),
@@ -1044,9 +1082,12 @@ class _VoiceNoteCard extends StatefulWidget {
     required this.seconds,
     required this.onTap,
     required this.onDelete,
+    this.source,
   });
 
   final int? seconds;
+  /// Remote URL or local file path for playback.
+  final String? source;
   final VoidCallback onTap;
   final VoidCallback onDelete;
 
@@ -1058,24 +1099,42 @@ class _VoiceNoteCardState extends State<_VoiceNoteCard> {
   bool _playing = false;
   int _remaining = 0;
   Timer? _playTimer;
+  final AudioPlayer _player = AudioPlayer();
+  StreamSubscription<void>? _completeSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _completeSub = _player.onPlayerComplete.listen((_) {
+      _stopPlay(resetOnly: true);
+    });
+  }
 
   @override
   void didUpdateWidget(covariant _VoiceNoteCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.seconds != widget.seconds) {
-      _stopPlay();
+    if (oldWidget.seconds != widget.seconds ||
+        oldWidget.source != widget.source) {
+      unawaited(_stopPlay());
     }
   }
 
   @override
   void dispose() {
     _playTimer?.cancel();
+    _completeSub?.cancel();
+    unawaited(_player.dispose());
     super.dispose();
   }
 
-  void _stopPlay() {
+  Future<void> _stopPlay({bool resetOnly = false}) async {
     _playTimer?.cancel();
     _playTimer = null;
+    if (!resetOnly) {
+      try {
+        await _player.stop();
+      } catch (_) {}
+    }
     if (!mounted) {
       _playing = false;
       _remaining = 0;
@@ -1087,38 +1146,57 @@ class _VoiceNoteCardState extends State<_VoiceNoteCard> {
     });
   }
 
-  void _togglePlay() {
+  Future<void> _togglePlay() async {
     final seconds = widget.seconds;
-    if (seconds == null || seconds <= 0) return;
+    final source = (widget.source ?? '').trim();
+    if (seconds == null || seconds <= 0 || source.isEmpty) return;
     if (_playing) {
-      _stopPlay();
+      await _stopPlay();
       return;
     }
-    setState(() {
-      _playing = true;
-      _remaining = seconds;
-    });
-    _playTimer?.cancel();
-    _playTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-      if (_remaining <= 1) {
-        timer.cancel();
-        _playTimer = null;
-        setState(() {
-          _playing = false;
-          _remaining = 0;
-        });
-        return;
-      }
-      setState(() => _remaining -= 1);
-    });
+    try {
+      await _player.stop();
+      final isRemote =
+          source.startsWith('http://') || source.startsWith('https://');
+      await _player.play(
+        isRemote ? UrlSource(source) : DeviceFileSource(source),
+      );
+      if (!mounted) return;
+      setState(() {
+        _playing = true;
+        _remaining = seconds;
+      });
+      _playTimer?.cancel();
+      _playTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (!mounted) {
+          timer.cancel();
+          return;
+        }
+        if (_remaining <= 1) {
+          timer.cancel();
+          _playTimer = null;
+          setState(() {
+            _playing = false;
+            _remaining = 0;
+          });
+          return;
+        }
+        setState(() => _remaining -= 1);
+      });
+    } catch (error) {
+      debugPrint('Edit voice play failed: $error');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Playback failed: $error'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
-  void _onDelete() {
-    _stopPlay();
+  Future<void> _onDelete() async {
+    await _stopPlay();
     widget.onDelete();
   }
 
@@ -1170,66 +1248,64 @@ class _VoiceNoteCardState extends State<_VoiceNoteCard> {
           else
             Row(
               children: [
-                Container(
-                  height: 28,
-                  constraints: const BoxConstraints(minWidth: 108),
-                  padding: const EdgeInsets.fromLTRB(2, 2, 8, 2),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2E2E16),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      GestureDetector(
-                        onTap: _togglePlay,
-                        child: Container(
-                          width: 24,
-                          height: 24,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFFDF652),
-                            shape: BoxShape.circle,
+                GestureDetector(
+                  onTap: () => unawaited(_togglePlay()),
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    width: 140,
+                    height: 32,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: const Color(0x1FFDF652),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      children: [
+                        SvgPicture.asset(
+                          _playing
+                              ? AppAssets.voicePauseIcon
+                              : AppAssets.voicePlayIcon,
+                          width: 18,
+                          height: 18,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: SizedBox(
+                            height: 14,
+                            child: _playing
+                                ? Image.asset(
+                                    AppAssets.voiceWaveAnim,
+                                    fit: BoxFit.contain,
+                                    alignment: Alignment.centerLeft,
+                                  )
+                                : SvgPicture.asset(
+                                    AppAssets.voiceWaveLine,
+                                    height: 10,
+                                    fit: BoxFit.contain,
+                                    colorFilter: const ColorFilter.mode(
+                                      Colors.white70,
+                                      BlendMode.srcIn,
+                                    ),
+                                  ),
                           ),
-                          alignment: Alignment.center,
-                          child: Icon(
-                            _playing
-                                ? Icons.pause_rounded
-                                : Icons.play_arrow_rounded,
-                            color: Colors.black,
-                            size: 16,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '$displaySeconds"',
+                          style: const TextStyle(
+                            color: Colors.white54,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 6),
-                      if (_playing)
-                        Image.asset(
-                          AppAssets.audioWaveAnim,
-                          width: 44,
-                          height: 8,
-                          fit: BoxFit.contain,
-                        )
-                      else
-                        Image.asset(
-                          AppAssets.audioWaveLine,
-                          width: 44,
-                          height: 8,
-                          fit: BoxFit.contain,
-                        ),
-                      const SizedBox(width: 6),
-                      Text(
-                        '$displaySeconds"',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
                 const Spacer(),
                 GestureDetector(
-                  onTap: _onDelete,
+                  onTap: () => unawaited(_onDelete()),
                   child: Image.asset(
                     AppAssets.voiceDeleteIcon,
                     width: 28,

@@ -95,30 +95,31 @@ class _DmAppBar extends StatelessWidget {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 2),
-                        Row(
-                          children: [
-                            Container(
-                              width: 6,
-                              height: 6,
-                              decoration: BoxDecoration(
-                                color: conversation.isOnline
-                                    ? AppColors.onlineDot
-                                    : const Color(0xFF6E6E6E),
-                                shape: BoxShape.circle,
+                        // Match forya: only show presence when online.
+                        if (conversation.isOnline) ...[
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              Container(
+                                width: 6,
+                                height: 6,
+                                decoration: const BoxDecoration(
+                                  color: AppColors.onlineDot,
+                                  shape: BoxShape.circle,
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              conversation.isOnline ? 'Online' : 'Offline',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.5),
-                                fontSize: 10,
-                                fontWeight: FontWeight.w400,
+                              const SizedBox(width: 4),
+                              Text(
+                                'Online',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.5),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w400,
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -129,36 +130,32 @@ class _DmAppBar extends StatelessWidget {
                     widthFactor: followVisible.clamp(0.0, 1.0),
                     child: Opacity(
                       opacity: followVisible.clamp(0.0, 1.0),
-                      child: Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: GestureDetector(
-                          onTap: onFollowTap,
-                          child: Container(
-                            width: 64,
-                            height: 28,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              gradient: following
-                                  ? null
-                                  : AppColors.promoBannerGradient,
-                              color: following
-                                  ? Colors.white.withValues(alpha: 0.12)
-                                  : null,
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Text(
-                              following ? 'Following' : 'Follow',
-                              style: TextStyle(
-                                color: following
-                                    ? Colors.white
-                                    : AppColors.promoText,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
+                      // forya: Follow only while not following; hide after follow.
+                      child: following
+                          ? const SizedBox.shrink()
+                          : Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: GestureDetector(
+                                onTap: onFollowTap,
+                                child: Container(
+                                  width: 64,
+                                  height: 28,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    gradient: AppColors.promoBannerGradient,
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: const Text(
+                                    'Follow',
+                                    style: TextStyle(
+                                      color: AppColors.promoText,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
-                        ),
-                      ),
                     ),
                   ),
                 ),
@@ -203,7 +200,20 @@ class _DmAppBar extends StatelessWidget {
                         spacing: 6,
                         runSpacing: 6,
                         children: [
-                          _ProfileTag(label: '♑ ${conversation.zodiac}'),
+                          _ProfileTag(
+                            label:
+                                '${zodiacEmoji(conversation.zodiac)} ${conversation.zodiac}',
+                          ),
+                          if (conversation.heightInches > 0)
+                            _ProfileTag(
+                              label: '${conversation.heightInches} Inch',
+                              iconAsset: AppAssets.tagHeight,
+                            ),
+                          if (conversation.weightLb > 0)
+                            _ProfileTag(
+                              label: '${conversation.weightLb} LB',
+                              iconAsset: AppAssets.tagWeight,
+                            ),
                         ],
                       ),
                       if (loading) ...[
@@ -227,13 +237,20 @@ class _DmAppBar extends StatelessWidget {
                             separatorBuilder: (_, _) =>
                                 const SizedBox(width: 6),
                             itemBuilder: (context, i) {
-                              return ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: NetworkOrAssetAvatar(
-                                  asset: AppAssets.avatarPlace,
-                                  url: conversation.momentUrls[i],
-                                  width: 72,
-                                  height: 72,
+                              return GestureDetector(
+                                onTap: () => AlbumPhotoViewerPage.open(
+                                  context,
+                                  paths: conversation.momentUrls,
+                                  initialIndex: i,
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: NetworkOrAssetAvatar(
+                                    asset: AppAssets.avatarPlace,
+                                    url: conversation.momentUrls[i],
+                                    width: 72,
+                                    height: 72,
+                                  ),
                                 ),
                               );
                             },
@@ -249,13 +266,20 @@ class _DmAppBar extends StatelessWidget {
                             separatorBuilder: (_, _) =>
                                 const SizedBox(width: 6),
                             itemBuilder: (context, i) {
-                              return ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: Image.asset(
-                                  conversation.momentAssets[i],
-                                  width: 72,
-                                  height: 72,
-                                  fit: BoxFit.cover,
+                              return GestureDetector(
+                                onTap: () => AlbumPhotoViewerPage.open(
+                                  context,
+                                  paths: conversation.momentAssets,
+                                  initialIndex: i,
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.asset(
+                                    conversation.momentAssets[i],
+                                    width: 72,
+                                    height: 72,
+                                    fit: BoxFit.cover,
+                                  ),
                                 ),
                               );
                             },
@@ -275,31 +299,47 @@ class _DmAppBar extends StatelessWidget {
 }
 
 class _ProfileTag extends StatelessWidget {
-  const _ProfileTag({required this.label});
+  const _ProfileTag({required this.label, this.iconAsset});
 
   final String label;
+  final String? iconAsset;
 
   @override
   Widget build(BuildContext context) {
+    // Do not set Container.alignment — it expands to max width inside Wrap.
     return Container(
       height: 22,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      alignment: Alignment.center,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(4),
       ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 12,
-          fontWeight: FontWeight.w400,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (iconAsset != null) ...[
+            SvgPicture.asset(
+              iconAsset!,
+              width: 14,
+              height: 14,
+            ),
+            const SizedBox(width: 3),
+          ],
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+        ],
       ),
     );
   }
 }
+
+
 
 class _DmMoreSheet extends StatelessWidget {
   const _DmMoreSheet({required this.following, required this.blocked});

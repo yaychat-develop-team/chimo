@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -9,6 +10,7 @@ import '../../../core/constants/app_assets.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/center_toast.dart';
 import '../../../core/widgets/network_or_asset_avatar.dart';
+import '../album_photo_viewer_page.dart';
 
 /// Flavor tag (emoji + label).
 class ProfileFlavorTag {
@@ -53,11 +55,12 @@ class UserProfileScaffold extends StatelessWidget {
     required this.isMale,
     required this.age,
     required this.zodiac,
-    required this.level,
     required this.bio,
     required this.bottomBar,
     this.avatarUrl,
     this.voiceSeconds,
+    this.voiceUrl,
+    this.vipIconUrl,
     this.momentAssets = const [],
     this.momentUrls = const [],
     this.flavors,
@@ -75,11 +78,16 @@ class UserProfileScaffold extends StatelessWidget {
   final bool isMale;
   final int age;
   final String zodiac;
-  final int level;
   final String bio;
 
   /// Matches Edit Profile Voice Note; hides player when no recording.
   final int? voiceSeconds;
+
+  /// Remote URL or local path for real playback.
+  final String? voiceUrl;
+
+  /// Level badge from server (`icons.smallIcon`); empty → hide (forya UserLevWidget).
+  final String? vipIconUrl;
   final List<String> momentAssets;
   final List<String> momentUrls;
 
@@ -188,248 +196,272 @@ class UserProfileScaffold extends StatelessWidget {
                 ),
                 Expanded(
                   child: SingleChildScrollView(
+                    // Original om_personal: start-only padding so voice can sit flush right.
                     padding: EdgeInsets.fromLTRB(
                       16,
                       math.max(8, avatarTop),
-                      16,
+                      0,
                       24,
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SizedBox(
-                          height: 72,
-                          width: double.infinity,
-                          child: Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              Container(
-                                width: 72,
-                                height: 72,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Colors.white,
-                                    width: 2,
+                        Padding(
+                          padding: const EdgeInsets.only(right: 16),
+                          child: SizedBox(
+                            height: 72,
+                            width: double.infinity,
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Container(
+                                  width: 72,
+                                  height: 72,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Colors.white,
+                                      width: 2,
+                                    ),
+                                  ),
+                                  child: ClipOval(
+                                    child: NetworkOrAssetAvatar(
+                                      asset: avatarAsset,
+                                      url: avatarUrl,
+                                    ),
                                   ),
                                 ),
-                                child: ClipOval(
-                                  child: NetworkOrAssetAvatar(
-                                    asset: avatarAsset,
-                                    url: avatarUrl,
+                                if (inPartyName != null &&
+                                    inPartyName!.trim().isNotEmpty)
+                                  Positioned(
+                                    left: 52,
+                                    right: 0,
+                                    bottom: 5,
+                                    child: _InPartyBanner(
+                                      title: inPartyName!,
+                                      onTap: onInPartyTap,
+                                    ),
                                   ),
-                                ),
-                              ),
-                              if (inPartyName != null &&
-                                  inPartyName!.trim().isNotEmpty)
-                                Positioned(
-                                  left: 52,
-                                  right: 0,
-                                  bottom: 5,
-                                  child: _InPartyBanner(
-                                    title: inPartyName!,
-                                    onTap: onInPartyTap,
-                                  ),
-                                ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                         const SizedBox(height: 16),
                         Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    nickname,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w600,
-                                      height: 27 / 18,
+                              child: Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      nickname,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w600,
+                                        height: 27 / 18,
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  GestureDetector(
-                                    onTap: () => _copyId(context),
-                                    behavior: HitTestBehavior.opaque,
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
+                                    const SizedBox(height: 2),
+                                    GestureDetector(
+                                      onTap: () => _copyId(context),
+                                      behavior: HitTestBehavior.opaque,
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            'ID:$userId',
+                                            style: const TextStyle(
+                                              color: Color(0xFFA3A3A3),
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w400,
+                                              height: 18 / 12,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          SvgPicture.asset(
+                                            AppAssets.mineCopy,
+                                            width: 10,
+                                            height: 10,
+                                            colorFilter: const ColorFilter.mode(
+                                              Color(0xFFA3A3A3),
+                                              BlendMode.srcIn,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Wrap(
+                                      spacing: 4,
+                                      runSpacing: 4,
+                                      crossAxisAlignment:
+                                          WrapCrossAlignment.center,
                                       children: [
-                                        Text(
-                                          'ID:$userId',
-                                          style: const TextStyle(
-                                            color: Color(0xFFA3A3A3),
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w400,
-                                            height: 18 / 12,
+                                        _ProfileChip(
+                                          height: 20,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                          ),
+                                          background: Colors.white12,
+                                          child: Text(
+                                            '${_zodiacEmoji(zodiac)} $zodiac',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w500,
+                                              height: 1,
+                                            ),
                                           ),
                                         ),
-                                        const SizedBox(width: 6),
-                                        SvgPicture.asset(
-                                          AppAssets.mineCopy,
-                                          width: 10,
-                                          height: 10,
-                                          colorFilter: const ColorFilter.mode(
-                                            Color(0xFFA3A3A3),
-                                            BlendMode.srcIn,
+                                        _ProfileChip(
+                                          height: 16,
+                                          padding: const EdgeInsets.fromLTRB(
+                                            0,
+                                            0,
+                                            4,
+                                            0,
+                                          ),
+                                          background: isMale
+                                              ? const Color(0xFF0091FF)
+                                              : const Color(0xFFFF4D94),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Image.asset(
+                                                isMale
+                                                    ? AppAssets.genderMan
+                                                    : AppAssets.genderWoman,
+                                                width: 16,
+                                                height: 16,
+                                              ),
+                                              const SizedBox(width: 2),
+                                              Text(
+                                                '$age',
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w600,
+                                                  height: 1,
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
+                                        if ((vipIconUrl ?? '')
+                                            .trim()
+                                            .isNotEmpty)
+                                          _VipLevelIcon(url: vipIconUrl!.trim()),
                                       ],
                                     ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Wrap(
-                                    spacing: 6,
-                                    runSpacing: 6,
-                                    children: [
-                                      _ProfileChip(
-                                        height: 16,
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                        ),
-                                        child: Text(
-                                          '${_zodiacEmoji(zodiac)} $zodiac',
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w500,
-                                            height: 1,
-                                          ),
-                                        ),
-                                      ),
-                                      _ProfileChip(
-                                        height: 16,
-                                        padding: const EdgeInsets.fromLTRB(
-                                          3,
-                                          0,
-                                          6,
-                                          0,
-                                        ),
-                                        background: isMale
-                                            ? const Color(0xFF4F8BFF)
-                                            : const Color(0xFFFF5BA8),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Image.asset(
-                                              isMale
-                                                  ? AppAssets.genderMan
-                                                  : AppAssets.genderWoman,
-                                              width: 16,
-                                              height: 16,
-                                            ),
-                                            const SizedBox(width: 2),
-                                            Text(
-                                              '$age',
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w600,
-                                                height: 1,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      _LevelChip(level: level),
-                                    ],
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
-                            if (voiceSeconds != null && voiceSeconds! > 0) ...[
-                              const SizedBox(width: 8),
-                              Padding(
-                                padding: const EdgeInsets.only(top: 4),
-                                child: _VoiceCard(seconds: voiceSeconds!),
+                            if (voiceSeconds != null && voiceSeconds! > 0)
+                              _VoiceCard(
+                                seconds: voiceSeconds!,
+                                source: voiceUrl,
                               ),
-                            ],
                           ],
                         ),
-                        const SizedBox(height: 16),
-                        Text(
-                          bio,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 13,
-                            height: 20 / 13,
-                            fontWeight: FontWeight.w400,
-                          ),
-                        ),
-                        const SizedBox(height: 28),
-                        if (moments.isNotEmpty) ...[
-                          const Text(
-                            'Moments',
-                            style: TextStyle(
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(0, 16, 16, 8),
+                          child: Text(
+                            bio,
+                            style: const TextStyle(
                               color: Colors.white,
                               fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              height: 21 / 14,
+                              height: 20 / 14,
+                              fontWeight: FontWeight.w400,
                             ),
                           ),
-                          const SizedBox(height: 8),
+                        ),
+                        if (moments.isNotEmpty) ...[
+                          const Padding(
+                            padding: EdgeInsets.only(top: 12, bottom: 8),
+                            child: Text(
+                              'Moments',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                height: 21 / 14,
+                              ),
+                            ),
+                          ),
                           SizedBox(
                             height: 89,
                             child: ListView.separated(
                               scrollDirection: Axis.horizontal,
+                              padding: const EdgeInsets.only(right: 16),
                               itemCount: moments.length,
                               separatorBuilder: (_, _) =>
                                   const SizedBox(width: 6),
                               itemBuilder: (context, index) {
                                 final src = moments[index];
-                                return ClipRRect(
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: hasRemoteMoments ||
-                                          src.startsWith('http')
-                                      ? Image.network(
-                                          src,
-                                          width: 90,
-                                          height: 89,
-                                          fit: BoxFit.cover,
-                                          errorBuilder: (_, error, stack) =>
-                                              Image.asset(
-                                            avatarAsset,
+                                return GestureDetector(
+                                  onTap: () => AlbumPhotoViewerPage.open(
+                                    context,
+                                    paths: moments,
+                                    initialIndex: index,
+                                  ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: hasRemoteMoments ||
+                                            src.startsWith('http')
+                                        ? Image.network(
+                                            src,
+                                            width: 90,
+                                            height: 89,
+                                            fit: BoxFit.cover,
+                                            errorBuilder:
+                                                (_, error, stack) =>
+                                                    Image.asset(
+                                              avatarAsset,
+                                              width: 90,
+                                              height: 89,
+                                              fit: BoxFit.cover,
+                                            ),
+                                          )
+                                        : Image.asset(
+                                            src,
                                             width: 90,
                                             height: 89,
                                             fit: BoxFit.cover,
                                           ),
-                                        )
-                                      : Image.asset(
-                                          src,
-                                          width: 90,
-                                          height: 89,
-                                          fit: BoxFit.cover,
-                                        ),
+                                  ),
                                 );
                               },
                             ),
                           ),
-                          const SizedBox(height: 28),
                         ],
                         if (flavorTags.isNotEmpty) ...[
-                          const Text(
-                            'My Flavor',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              height: 21 / 14,
+                          const Padding(
+                            padding: EdgeInsets.only(top: 20, bottom: 8),
+                            child: Text(
+                              'My Flavor',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                height: 21 / 14,
+                              ),
                             ),
                           ),
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              for (final tag in flavorTags)
-                                _FlavorChip(
-                                  label: tag.label,
-                                  emoji: tag.emoji,
-                                ),
-                            ],
+                          Padding(
+                            padding: const EdgeInsets.only(right: 16),
+                            child: Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                for (final tag in flavorTags)
+                                  _FlavorChip(label: tag.label),
+                              ],
+                            ),
                           ),
                         ],
                       ],
@@ -677,93 +709,77 @@ class _ProfileChip extends StatelessWidget {
   }
 }
 
-class _LevelChip extends StatelessWidget {
-  const _LevelChip({required this.level});
+/// Forya [UserLevWidget]: remote `icons.smallIcon`, height 22.
+class _VipLevelIcon extends StatelessWidget {
+  const _VipLevelIcon({required this.url});
 
-  final int level;
+  final String url;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 22,
-      padding: const EdgeInsets.only(right: 8),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(11),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF9B6BFF), Color(0xFF6B4EFF)],
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Image.asset(
-            AppAssets.levelBadgeHero,
-            width: 22,
-            height: 22,
-            fit: BoxFit.cover,
-          ),
-          const SizedBox(width: 2),
-          Text(
-            '$level',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              height: 1,
-            ),
-          ),
-        ],
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(end: 4),
+      child: Image.network(
+        url,
+        height: 22,
+        fit: BoxFit.fitHeight,
+        errorBuilder: (_, error, stack) => const SizedBox.shrink(),
       ),
     );
   }
 }
 
-/// Profile voice bar: static [AppAssets.voiceWaveLine]; switches to animated wave while playing.
+/// Profile voice bar: static [AppAssets.voiceWaveLine]; animated webp while playing.
 class _VoiceCard extends StatefulWidget {
-  const _VoiceCard({required this.seconds});
+  const _VoiceCard({required this.seconds, this.source});
 
   final int seconds;
+  final String? source;
 
   @override
   State<_VoiceCard> createState() => _VoiceCardState();
 }
 
-class _VoiceCardState extends State<_VoiceCard>
-    with SingleTickerProviderStateMixin {
+class _VoiceCardState extends State<_VoiceCard> {
   bool _playing = false;
   int _remaining = 0;
   Timer? _playTimer;
-  late final AnimationController _waveController;
+  final AudioPlayer _player = AudioPlayer();
+  StreamSubscription<void>? _completeSub;
 
   @override
   void initState() {
     super.initState();
-    _waveController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 700),
-    );
+    _completeSub = _player.onPlayerComplete.listen((_) {
+      unawaited(_stopPlay(resetOnly: true));
+    });
   }
 
   @override
   void didUpdateWidget(covariant _VoiceCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.seconds != widget.seconds) {
-      _stopPlay();
+    if (oldWidget.seconds != widget.seconds ||
+        oldWidget.source != widget.source) {
+      unawaited(_stopPlay());
     }
   }
 
   @override
   void dispose() {
     _playTimer?.cancel();
-    _waveController.dispose();
+    _completeSub?.cancel();
+    unawaited(_player.dispose());
     super.dispose();
   }
 
-  void _stopPlay() {
+  Future<void> _stopPlay({bool resetOnly = false}) async {
     _playTimer?.cancel();
     _playTimer = null;
-    _waveController.stop();
-    _waveController.reset();
+    if (!resetOnly) {
+      try {
+        await _player.stop();
+      } catch (_) {}
+    }
     if (!mounted) {
       _playing = false;
       _remaining = 0;
@@ -775,89 +791,127 @@ class _VoiceCardState extends State<_VoiceCard>
     });
   }
 
-  void _togglePlay() {
+  Future<void> _togglePlay() async {
     if (widget.seconds <= 0) return;
     if (_playing) {
-      _stopPlay();
+      await _stopPlay();
       return;
     }
-    setState(() {
-      _playing = true;
-      _remaining = widget.seconds;
-    });
-    _waveController.repeat();
-    _playTimer?.cancel();
-    _playTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-      if (_remaining <= 1) {
-        timer.cancel();
-        _playTimer = null;
-        _waveController.stop();
-        _waveController.reset();
-        setState(() {
-          _playing = false;
-          _remaining = 0;
-        });
-        return;
-      }
-      setState(() => _remaining -= 1);
-    });
+    final source = (widget.source ?? '').trim();
+    if (source.isEmpty) {
+      // No file yet — keep visual countdown only.
+      setState(() {
+        _playing = true;
+        _remaining = widget.seconds;
+      });
+      _playTimer?.cancel();
+      _playTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (!mounted) {
+          timer.cancel();
+          return;
+        }
+        if (_remaining <= 1) {
+          timer.cancel();
+          _playTimer = null;
+          setState(() {
+            _playing = false;
+            _remaining = 0;
+          });
+          return;
+        }
+        setState(() => _remaining -= 1);
+      });
+      return;
+    }
+    try {
+      await _player.stop();
+      final isRemote =
+          source.startsWith('http://') || source.startsWith('https://');
+      await _player.play(
+        isRemote ? UrlSource(source) : DeviceFileSource(source),
+      );
+      if (!mounted) return;
+      setState(() {
+        _playing = true;
+        _remaining = widget.seconds;
+      });
+      _playTimer?.cancel();
+      _playTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (!mounted) {
+          timer.cancel();
+          return;
+        }
+        if (_remaining <= 1) {
+          timer.cancel();
+          _playTimer = null;
+          setState(() {
+            _playing = false;
+            _remaining = 0;
+          });
+          return;
+        }
+        setState(() => _remaining -= 1);
+      });
+    } catch (error) {
+      debugPrint('Profile voice play failed: $error');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final displaySeconds = _playing ? _remaining : widget.seconds;
 
+    // Match forya AudioPlayerWidget (borderEnd: false) — flush to screen edge.
     return GestureDetector(
-      onTap: _togglePlay,
+      onTap: () => unawaited(_togglePlay()),
       behavior: HitTestBehavior.opaque,
       child: Container(
-        width: 108,
-        height: 28,
-        padding: const EdgeInsets.fromLTRB(2, 2, 8, 2),
-        decoration: BoxDecoration(
-          color: const Color(0xFF2E2E16),
-          borderRadius: BorderRadius.circular(14),
+        width: 140,
+        height: 32,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        alignment: Alignment.center,
+        decoration: const BoxDecoration(
+          color: Color(0x1FFDF652),
+          borderRadius: BorderRadiusDirectional.only(
+            topStart: Radius.circular(16),
+            bottomStart: Radius.circular(16),
+          ),
         ),
         child: Row(
           children: [
-            Container(
-              width: 24,
-              height: 24,
-              decoration: const BoxDecoration(
-                color: Color(0xFFFDF652),
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: Icon(
-                _playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                color: Colors.black,
-                size: 16,
-              ),
+            SvgPicture.asset(
+              _playing ? AppAssets.voicePauseIcon : AppAssets.voicePlayIcon,
+              width: 18,
+              height: 18,
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: 6),
             Expanded(
               child: SizedBox(
-                height: 8,
+                height: 14,
                 child: _playing
-                    ? _AnimatedVoiceWave(animation: _waveController)
+                    ? Image.asset(
+                        AppAssets.voiceWaveAnim,
+                        fit: BoxFit.contain,
+                        alignment: Alignment.centerLeft,
+                      )
                     : SvgPicture.asset(
                         AppAssets.voiceWaveLine,
-                        height: 8,
+                        height: 10,
                         fit: BoxFit.contain,
+                        colorFilter: const ColorFilter.mode(
+                          Colors.white70,
+                          BlendMode.srcIn,
+                        ),
                       ),
               ),
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: 6),
             Text(
               '$displaySeconds"',
               style: const TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
+                color: Colors.white54,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],
@@ -867,104 +921,27 @@ class _VoiceCardState extends State<_VoiceCard>
   }
 }
 
-/// Animated wave while playing: mostly flat line with a short pulse moving left/right.
-class _AnimatedVoiceWave extends StatelessWidget {
-  const _AnimatedVoiceWave({required this.animation});
-
-  final Animation<double> animation;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: animation,
-      builder: (context, _) {
-        return CustomPaint(
-          size: const Size(44, 8),
-          painter: _VoiceWavePainter(phase: animation.value * 2 * 3.1415926),
-        );
-      },
-    );
-  }
-}
-
-class _VoiceWavePainter extends CustomPainter {
-  const _VoiceWavePainter({required this.phase});
-
-  final double phase;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final midY = size.height / 2;
-    final startX = 2.0;
-    final endX = size.width - 2.0;
-    final fade = Paint()
-      ..shader = LinearGradient(
-        colors: [
-          Colors.white.withValues(alpha: 0),
-          Colors.white,
-          Colors.white,
-          Colors.white.withValues(alpha: 0),
-        ],
-        stops: const [0, 0.2, 0.8, 1],
-      ).createShader(Offset.zero & size)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.4
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-    final travel = (math.sin(phase * 0.9) + 1) / 2;
-    final pulseCenter = startX + 8 + (endX - startX - 16) * travel;
-    const gapWidth = 2.4;
-    const pulseHalfWidth = 4.8;
-    final amplitude = 2.4 + math.sin(phase * 1.3) * 0.6;
-
-    final leftSegEnd = pulseCenter - pulseHalfWidth - gapWidth;
-    final rightSegStart = pulseCenter + pulseHalfWidth + gapWidth;
-
-    if (leftSegEnd > startX) {
-      canvas.drawLine(Offset(startX, midY), Offset(leftSegEnd, midY), fade);
-    }
-    if (rightSegStart < endX) {
-      canvas.drawLine(Offset(rightSegStart, midY), Offset(endX, midY), fade);
-    }
-
-    final pulse = Path()
-      ..moveTo(pulseCenter - pulseHalfWidth, midY)
-      ..lineTo(pulseCenter - 1.6, midY)
-      ..lineTo(pulseCenter, midY - amplitude)
-      ..lineTo(pulseCenter + 2.0, midY + amplitude * 0.72)
-      ..lineTo(pulseCenter + pulseHalfWidth, midY);
-
-    canvas.drawPath(pulse, fade);
-  }
-
-  @override
-  bool shouldRepaint(covariant _VoiceWavePainter oldDelegate) {
-    return oldDelegate.phase != phase;
-  }
-}
-
 class _FlavorChip extends StatelessWidget {
-  const _FlavorChip({required this.label, required this.emoji});
+  const _FlavorChip({required this.label});
 
   final String label;
-  final String emoji;
 
   @override
   Widget build(BuildContext context) {
-    final text = emoji.isEmpty ? label : '$emoji $label';
+    // Original My Flavor tags are text-only (no emoji prefix).
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF2A2A2A),
+        color: const Color(0x1FFFFFFF),
         borderRadius: BorderRadius.circular(15),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         child: Text(
-          text,
+          label,
           style: const TextStyle(
-            color: Color(0xFFE6E6E6),
+            color: Color(0xFFA3A3A3),
             fontSize: 12,
-            fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.w400,
             height: 1.2,
           ),
         ),

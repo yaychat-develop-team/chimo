@@ -6,7 +6,7 @@ class MockAuthRepository implements AuthRepository {
   Future<bool> isLoggedIn() => AuthSession.isLoggedIn();
 
   @override
-  Future<void> markLoggedIn({String method = 'phone', String? phone}) =>
+  Future<void> markLoggedIn({String? method, String? phone}) =>
       AuthSession.markLoggedIn(method: method, phone: phone);
 
   @override

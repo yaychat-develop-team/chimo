@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../chats/data/chats_list_controller.dart';
+import 'chat_user_profile_page.dart';
 import 'group_details_page.dart';
+import 'models/chat_user_profile.dart';
 import 'models/group_item.dart';
+import 'widgets/group_members_sheet.dart';
 import 'widgets/popular_group_card.dart';
 
 /// Joined groups list (Home My Groups → More).
@@ -20,6 +23,26 @@ class JoinedGroupsPage extends StatelessWidget {
   final List<PopularGroupItem> groups;
   final ChatsListController? chatsController;
   final void Function(PopularGroupItem group, bool joined)? onMembershipChanged;
+
+  void _openMembersSheet(BuildContext context, PopularGroupItem group) {
+    GroupMembersSheet.show(
+      context,
+      groupId: group.id,
+      onMemberTap: (member) {
+        Navigator.of(context).pop();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => ChatUserProfilePage(
+                profile: ChatUserProfile.fromMember(member),
+                chatsController: chatsController,
+              ),
+            ),
+          );
+        });
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -66,6 +89,7 @@ class JoinedGroupsPage extends StatelessWidget {
                   return PopularGroupCard(
                     group: group,
                     showJoinAction: false,
+                    onMembersTap: () => _openMembersSheet(context, group),
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute<void>(

@@ -2,12 +2,16 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:im_flutter_sdk/im_flutter_sdk.dart';
 
 import '../../../core/constants/app_assets.dart';
 import '../../../core/im/im_service.dart';
+import '../../../core/im/im_system_accounts.dart';
 import '../../../core/network/group_dto.dart';
 import '../../../core/network/network_bootstrap.dart';
 import '../../../core/repositories/repositories.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/chat_time_label.dart';
 import '../../../shared/models/chat_conversation.dart';
 import '../../../shared/models/group_item.dart';
 
@@ -44,7 +48,7 @@ class ChatsListController extends ChangeNotifier {
   int get totalUnread =>
       _conversations.fold(0, (sum, c) => sum + c.unreadCount);
 
-  /// Pinned first, then natural order.
+  /// Pinned first, then by latest message time (desc).
   List<ChatConversation> get visibleConversations {
     final byId = {for (final c in _conversations) c.id: c};
     final pinned = <ChatConversation>[];
@@ -56,7 +60,8 @@ class ChatsListController extends ChangeNotifier {
     final unpinned = _conversations
         .where((c) => !pinnedSet.contains(c.id))
         .map((c) => c.copyWith(isPinned: false))
-        .toList();
+        .toList()
+      ..sort((a, b) => b.lastMsgAtMs.compareTo(a.lastMsgAtMs));
     return [...pinned, ...unpinned];
   }
 
@@ -108,7 +113,7 @@ class ChatsListController extends ChangeNotifier {
       _joinedGroupIds
         ..clear()
         ..addAll(nextJoined);
-      await _mergeImDmConversations();
+      await _mergeImConversations();
       _loading = false;
       if (!groupsRes.success && next.isEmpty) {
         _loadError = groupsRes.message.isEmpty
@@ -126,64 +131,114 @@ class ChatsListController extends ChangeNotifier {
     }
   }
 
-  Future<void> _mergeImDmConversations() async {
+  Future<void> _mergeImConversations() async {
     try {
       if (!ImService.isConnected) {
         await ImService.connectFromServer();
       }
-      final dms = await ImService.loadDmConversations();
-      for (final conv in dms) {
+      final all = await ImService.loadListConversations();
+      for (final conv in all) {
         final emId = conv.id;
         if (emId.isEmpty) continue;
-        final listId = 'dm_$emId';
+
         final preview = await ImService.previewFor(conv);
         final unread = await conv.unreadCount();
-        // Prefer existing row by emUserName or id.
-        final index = _conversations.indexWhere(
-          (c) =>
-              c.emUserName == emId ||
-              c.id == listId ||
-              c.id == 'dm_$emId',
-        );
-        if (index >= 0) {
+        final atMs = await ImService.latestTimeMs(conv);
+        final timeLabel = ChatTimeLabel.forList(atMs);
+
+        if (conv.type == EMConversationType.GroupChat) {
+          final index = _conversations.indexWhere(
+            (c) =>
+                c.badge == ChatBadgeType.group &&
+                (c.id == emId || c.emUserName == emId),
+          );
+          if (index < 0) continue;
           final prev = _conversations[index];
           _conversations[index] = prev.copyWith(
             lastMessage:
                 preview.isNotEmpty ? preview : prev.lastMessage,
-            timeLabel: preview.isNotEmpty ? 'Just' : prev.timeLabel,
+            timeLabel: timeLabel.isNotEmpty ? timeLabel : prev.timeLabel,
             unreadCount: unread,
+            lastMsgAtMs: atMs > 0 ? atMs : prev.lastMsgAtMs,
             emUserName: emId,
           );
           continue;
         }
-        // Resolve profile via msg-user for nickname/avatar.
+
+        // —— Chat (DM / system) ——
+        final isSystem = ImSystemAccounts.isSystemAccount(emId);
+        final listId = isSystem ? 'sys_$emId' : 'dm_$emId';
+
+        final index = _conversations.indexWhere(
+          (c) =>
+              c.emUserName == emId ||
+              c.id == listId ||
+              c.id == 'dm_$emId' ||
+              c.id == 'sys_$emId' ||
+              c.id == emId,
+        );
+        if (index >= 0) {
+          final prev = _conversations[index];
+          _conversations[index] = prev.copyWith(
+            title: isSystem
+                ? ImSystemAccounts.displayName(emId)
+                : prev.title,
+            avatarAsset: isSystem
+                ? ImSystemAccounts.avatarAsset(emId)
+                : prev.avatarAsset,
+            avatarUrl: isSystem ? null : prev.avatarUrl,
+            lastMessage:
+                preview.isNotEmpty ? preview : prev.lastMessage,
+            timeLabel: timeLabel.isNotEmpty ? timeLabel : prev.timeLabel,
+            unreadCount: unread,
+            emUserName: emId,
+            lastMsgAtMs: atMs > 0 ? atMs : prev.lastMsgAtMs,
+            isSystem: isSystem || prev.isSystem,
+            titleColor: isSystem ? AppColors.primaryBright : prev.titleColor,
+          );
+          continue;
+        }
+
         String title = emId;
+        String avatarAsset = AppAssets.avatarPlace;
         String? avatarUrl;
-        try {
-          final res = await NetworkBootstrap.api.msgUser(emId);
-          if (res.success && res.data is Map) {
-            final data = Map<String, dynamic>.from(res.data as Map);
-            final user = data['user'] is Map
-                ? Map<String, dynamic>.from(data['user'] as Map)
-                : data;
-            final nick =
-                '${user['nickname'] ?? user['nickName'] ?? ''}'.trim();
-            if (nick.isNotEmpty) title = nick;
-            final av = '${user['avatar'] ?? ''}'.trim();
-            if (av.isNotEmpty) avatarUrl = av;
-          }
-        } catch (_) {}
+        Color? titleColor;
+
+        if (isSystem) {
+          title = ImSystemAccounts.displayName(emId);
+          avatarAsset = ImSystemAccounts.avatarAsset(emId);
+          titleColor = AppColors.primaryBright;
+        } else {
+          try {
+            final res = await NetworkBootstrap.api.msgUser(emId);
+            if (res.success && res.data is Map) {
+              final data = Map<String, dynamic>.from(res.data as Map);
+              final user = data['user'] is Map
+                  ? Map<String, dynamic>.from(data['user'] as Map)
+                  : data;
+              final nick =
+                  '${user['nickname'] ?? user['nickName'] ?? ''}'.trim();
+              if (nick.isNotEmpty) title = nick;
+              final av = '${user['avatar'] ?? ''}'.trim();
+              if (av.isNotEmpty) avatarUrl = av;
+            }
+          } catch (_) {}
+        }
+
         _conversations.insert(
           0,
           ChatConversation(
             id: listId,
             title: title,
-            avatarAsset: AppAssets.avatarPlace,
+            avatarAsset: avatarAsset,
             avatarUrl: avatarUrl,
             lastMessage: preview,
-            timeLabel: preview.isEmpty ? '' : 'Just',
+            timeLabel: timeLabel,
             unreadCount: unread,
             emUserName: emId,
+            lastMsgAtMs: atMs,
+            isSystem: isSystem,
+            titleColor: titleColor,
           ),
         );
       }
@@ -260,9 +315,28 @@ class ChatsListController extends ChangeNotifier {
     final index = _conversations.indexWhere((c) => c.id == id);
     if (index < 0) return;
     final prev = _conversations[index];
-    if (prev.unreadCount == 0) return;
-    _conversations[index] = prev.copyWith(unreadCount: 0);
-    notifyListeners();
+    if (prev.unreadCount != 0) {
+      _conversations[index] = prev.copyWith(unreadCount: 0);
+      notifyListeners();
+    }
+    // Persist to EaseMob so restart does not restore the badge.
+    final emId = prev.emUserName.isNotEmpty
+        ? prev.emUserName
+        : prev.id.startsWith('dm_')
+            ? prev.id.substring(3)
+            : prev.id.startsWith('sys_')
+                ? prev.id.substring(4)
+                : prev.badge == ChatBadgeType.group
+                    ? prev.id
+                    : '';
+    if (emId.isNotEmpty) {
+      unawaited(
+        ImService.markConversationRead(
+          emId,
+          isGroup: prev.badge == ChatBadgeType.group,
+        ),
+      );
+    }
   }
 
   void joinGroup(PopularGroupItem group) {
@@ -335,6 +409,8 @@ class ChatsListController extends ChangeNotifier {
     int? postCount,
     int? level,
   }) {
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    final timeLabel = ChatTimeLabel.forList(nowMs);
     final index = _conversations.indexWhere((c) => c.id == id);
     if (index >= 0) {
       final prev = _conversations.removeAt(index);
@@ -345,7 +421,7 @@ class ChatsListController extends ChangeNotifier {
           avatarAsset: avatarAsset,
           avatarUrl: avatarUrl,
           lastMessage: lastMessage,
-          timeLabel: 'Just',
+          timeLabel: timeLabel,
           badge: badge,
           unreadCount: prev.unreadCount + unreadDelta,
           isMale: isMale,
@@ -358,6 +434,7 @@ class ChatsListController extends ChangeNotifier {
           memberCount: memberCount,
           postCount: postCount,
           level: level,
+          lastMsgAtMs: nowMs,
         ),
       );
     } else {
@@ -369,7 +446,7 @@ class ChatsListController extends ChangeNotifier {
           avatarAsset: avatarAsset,
           avatarUrl: avatarUrl,
           lastMessage: lastMessage,
-          timeLabel: 'Just',
+          timeLabel: timeLabel,
           badge: badge,
           unreadCount: unreadDelta,
           isMale: isMale ?? true,
@@ -382,6 +459,7 @@ class ChatsListController extends ChangeNotifier {
           memberCount: memberCount ?? 0,
           postCount: postCount ?? 0,
           level: level ?? 1,
+          lastMsgAtMs: nowMs,
         ),
       );
     }

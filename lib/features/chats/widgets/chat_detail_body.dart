@@ -9,6 +9,9 @@ class _DmChatBody extends StatelessWidget {
     required this.onHandleDragEnd,
     this.peerAvatarUrl,
     this.selfAvatarUrl,
+    this.historyLoading = false,
+    this.historyHasMore = false,
+    this.onBlankTap,
   });
 
   final List<_ChatLine> messages;
@@ -18,6 +21,9 @@ class _DmChatBody extends StatelessWidget {
   final ScrollController messagesScroll;
   final GestureDragUpdateCallback onHandleDragUpdate;
   final GestureDragEndCallback onHandleDragEnd;
+  final bool historyLoading;
+  final bool historyHasMore;
+  final VoidCallback? onBlankTap;
 
   @override
   Widget build(BuildContext context) {
@@ -58,6 +64,9 @@ class _DmChatBody extends StatelessWidget {
               peerAvatarUrl: peerAvatarUrl,
               selfAvatarUrl: selfAvatarUrl,
               scrollController: messagesScroll,
+              historyLoading: historyLoading,
+              historyHasMore: historyHasMore,
+              onBlankTap: onBlankTap,
             ),
           ),
         ],
@@ -73,6 +82,9 @@ class _DmMessagesFeed extends StatelessWidget {
     required this.scrollController,
     this.peerAvatarUrl,
     this.selfAvatarUrl,
+    this.historyLoading = false,
+    this.historyHasMore = false,
+    this.onBlankTap,
   });
 
   final List<_ChatLine> messages;
@@ -80,15 +92,26 @@ class _DmMessagesFeed extends StatelessWidget {
   final String? peerAvatarUrl;
   final String? selfAvatarUrl;
   final ScrollController scrollController;
+  final bool historyLoading;
+  final bool historyHasMore;
+  final VoidCallback? onBlankTap;
 
   bool _showAvatar(int index) {
-    if (index == 0) return true;
-    return messages[index].side != messages[index - 1].side;
+    if (messages[index].kind == _ChatLineKind.tip) return false;
+    // Walk back past tip lines so avatar grouping stays correct.
+    var prev = index - 1;
+    while (prev >= 0 && messages[prev].kind == _ChatLineKind.tip) {
+      prev--;
+    }
+    if (prev < 0) return true;
+    return messages[index].side != messages[prev].side;
   }
 
   bool _isMedia(int index) {
     final k = messages[index].kind;
-    return k == _ChatLineKind.image || k == _ChatLineKind.voice;
+    return k == _ChatLineKind.image ||
+        k == _ChatLineKind.voice ||
+        k == _ChatLineKind.emote;
   }
 
   double _topGap(int index) {
@@ -113,7 +136,27 @@ class _DmMessagesFeed extends StatelessWidget {
   }
 
   String _formatTime(int ms) {
-    final dt = DateTime.fromMillisecondsSinceEpoch(ms);
+    final now = DateTime.now();
+    final time = DateTime.fromMillisecondsSinceEpoch(ms);
+    final clock = _formatClock(time);
+
+    // Match forya TimeAgo.timeForMsg(showTime: true):
+    // same calendar day → clock; next calendar day within 24h → yesterday;
+    // older → month/day (and year when needed).
+    if (now.year != time.year) {
+      return '${_monthAbbr(time.month)} ${time.day}, ${time.year} $clock';
+    }
+    final elapsed = now.difference(time);
+    if (elapsed.inDays >= 1) {
+      return '${_monthAbbr(time.month)} ${time.day} $clock';
+    }
+    if (now.day != time.day || now.month != time.month) {
+      return 'yesterday $clock';
+    }
+    return clock;
+  }
+
+  String _formatClock(DateTime dt) {
     final h24 = dt.hour;
     final m = dt.minute.toString().padLeft(2, '0');
     final period = h24 >= 12 ? 'PM' : 'AM';
@@ -121,29 +164,66 @@ class _DmMessagesFeed extends StatelessWidget {
     return '$h12:$m $period';
   }
 
+  static const _months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+
+  String _monthAbbr(int month) =>
+      _months[(month - 1).clamp(0, 11)];
+
   @override
   Widget build(BuildContext context) {
     if (messages.isEmpty) {
-      return const Center(
-        child: Text(
-          'No messages yet',
-          style: TextStyle(
-            color: Color(0xFFC9C9C9),
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onBlankTap,
+        child: const Center(
+          child: Text(
+            'No messages yet',
+            style: TextStyle(
+              color: Color(0xFFC9C9C9),
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
       );
     }
 
-    return ListView.builder(
-      controller: scrollController,
-      padding: const EdgeInsets.fromLTRB(14, 8, 14, 24),
-      itemCount: messages.length,
-      itemBuilder: (context, index) {
-        final line = messages[index];
-        final showAvatar = _showAvatar(index);
-        final showTime = _showTimeLabel(index);
+    final showTopLoader = historyLoading || historyHasMore;
+    final itemCount = messages.length + (showTopLoader ? 1 : 0);
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onBlankTap,
+      child: ListView.builder(
+        controller: scrollController,
+        // Non-reverse: short threads start under the handle (no huge top blank).
+        // Entering still pins to the latest via jumpTo(maxScrollExtent).
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        padding: const EdgeInsets.fromLTRB(14, 8, 14, 24),
+        itemCount: itemCount,
+        itemBuilder: (context, index) {
+        if (showTopLoader && index == 0) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Center(
+              child: SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Color(0xFFB0B0B0),
+                ),
+              ),
+            ),
+          );
+        }
+        final msgIndex = showTopLoader ? index - 1 : index;
+        final line = messages[msgIndex];
+        final showAvatar = _showAvatar(msgIndex);
+        final showTime = _showTimeLabel(msgIndex);
         final bubble = switch (line.kind) {
           _ChatLineKind.voice => _VoiceBubble(
             side: line.side,
@@ -162,6 +242,21 @@ class _DmMessagesFeed extends StatelessWidget {
             peerAvatarUrl: peerAvatarUrl,
             selfAvatarUrl: selfAvatarUrl,
             showAvatar: showAvatar,
+            onTap: () {
+              final paths = [
+                for (final m in messages)
+                  if (m.kind == _ChatLineKind.image &&
+                      m.displayMedia.trim().isNotEmpty)
+                    m.displayMedia.trim(),
+              ];
+              final src = line.displayMedia.trim();
+              final initial = paths.indexOf(src);
+              AlbumPhotoViewerPage.open(
+                context,
+                paths: paths,
+                initialIndex: initial < 0 ? 0 : initial,
+              );
+            },
           ),
           _ChatLineKind.gift => _GiftMessageCard(
             side: line.side,
@@ -175,6 +270,29 @@ class _DmMessagesFeed extends StatelessWidget {
             selfAvatarUrl: selfAvatarUrl,
             showAvatar: showAvatar,
           ),
+          _ChatLineKind.emote => _EmoteBubble(
+            side: line.side,
+            source: line.displayMedia,
+            peerAvatar: peerAvatar,
+            peerAvatarUrl: peerAvatarUrl,
+            selfAvatarUrl: selfAvatarUrl,
+            showAvatar: showAvatar,
+          ),
+          _ChatLineKind.tip => Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+                child: Text(
+                  line.text,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: const Color(0xFFAEAEAE),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w400,
+                    height: 1.3,
+                  ),
+                ),
+              ),
+            ),
           _ChatLineKind.text => line.side == _ChatSide.self
               ? _SelfBubble(
                   text: line.text,
@@ -190,7 +308,7 @@ class _DmMessagesFeed extends StatelessWidget {
         };
 
         return Padding(
-          padding: EdgeInsets.only(top: showTime ? 12 : _topGap(index)),
+          padding: EdgeInsets.only(top: showTime ? 12 : _topGap(msgIndex)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -210,6 +328,7 @@ class _DmMessagesFeed extends StatelessWidget {
           ),
         );
       },
+      ),
     );
   }
 }
@@ -667,6 +786,7 @@ class _ImageBubble extends StatelessWidget {
     required this.showAvatar,
     this.peerAvatarUrl,
     this.selfAvatarUrl,
+    this.onTap,
   });
 
   final _ChatSide side;
@@ -676,6 +796,7 @@ class _ImageBubble extends StatelessWidget {
   final String? peerAvatarUrl;
   final String? selfAvatarUrl;
   final bool showAvatar;
+  final VoidCallback? onTap;
 
   bool get _isSelf => side == _ChatSide.self;
 
@@ -828,7 +949,117 @@ class _ImageBubble extends StatelessWidget {
       peerAvatar: peerAvatar,
       peerAvatarUrl: peerAvatarUrl,
       selfAvatarUrl: selfAvatarUrl,
-      child: bubble,
+      child: locked || onTap == null
+          ? bubble
+          : GestureDetector(
+              onTap: onTap,
+              behavior: HitTestBehavior.opaque,
+              child: bubble,
+            ),
+    );
+  }
+}
+
+/// Sticker message: network URL with contain fit (not cropped like photo).
+class _EmoteBubble extends StatelessWidget {
+  const _EmoteBubble({
+    required this.side,
+    required this.source,
+    required this.peerAvatar,
+    required this.showAvatar,
+    this.peerAvatarUrl,
+    this.selfAvatarUrl,
+  });
+
+  final _ChatSide side;
+  final String source;
+  final String peerAvatar;
+  final String? peerAvatarUrl;
+  final String? selfAvatarUrl;
+  final bool showAvatar;
+
+  bool get _isSelf => side == _ChatSide.self;
+
+  Widget _sticker() {
+    final src = source.trim();
+    // Match forya `_EmoteItem`: fixed width 65, fitWidth (no cover crop).
+    const size = _BubbleLayout.emoteSize;
+    if (src.isEmpty) {
+      return const SizedBox(
+        width: size,
+        height: size,
+        child: ColoredBox(
+          color: Color(0xFFF0F0F0),
+          child: Icon(Icons.broken_image_outlined, color: Color(0xFF999999)),
+        ),
+      );
+    }
+
+    final Widget image;
+    if (src.startsWith('http://') || src.startsWith('https://')) {
+      image = Image.network(
+        src,
+        width: size,
+        fit: BoxFit.fitWidth,
+        gaplessPlayback: true,
+        filterQuality: FilterQuality.medium,
+        loadingBuilder: (context, child, progress) {
+          if (progress == null) return child;
+          return const SizedBox(
+            width: size,
+            height: size,
+            child: ColoredBox(
+              color: Color(0xFFF5F5F5),
+              child: Center(
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            ),
+          );
+        },
+        errorBuilder: (_, _, _) => const SizedBox(
+          width: size,
+          height: size,
+          child: ColoredBox(
+            color: Color(0xFFF0F0F0),
+            child: Icon(Icons.broken_image_outlined, color: Color(0xFF999999)),
+          ),
+        ),
+      );
+    } else {
+      final file = File(src);
+      if (file.existsSync()) {
+        image = Image.file(file, width: size, fit: BoxFit.fitWidth);
+      } else {
+        image = const SizedBox(
+          width: size,
+          height: size,
+          child: ColoredBox(
+            color: Color(0xFFF0F0F0),
+            child: Icon(Icons.broken_image_outlined, color: Color(0xFF999999)),
+          ),
+        );
+      }
+    }
+
+    return SizedBox(
+      width: size,
+      child: image,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _ChatRow(
+      isSelf: _isSelf,
+      showAvatar: showAvatar,
+      peerAvatar: peerAvatar,
+      peerAvatarUrl: peerAvatarUrl,
+      selfAvatarUrl: selfAvatarUrl,
+      child: _sticker(),
     );
   }
 }
@@ -858,10 +1089,71 @@ class _GiftMessageCard extends StatelessWidget {
   final String? selfAvatarUrl;
   final bool showAvatar;
 
-  /// Design: pink→peach gift strip with corner chest badge.
-  static const _cardHeight = 82.0;
-  static const _cardMax = 268.0;
-  static const _qtyYellow = Color(0xFFE8FF00);
+  /// Match forya GiftItemV2: padding 16, icon 56, gap 16, font 14.
+  static const _qtyYellow = Color(0xFFFDF652);
+  static const _labelStyle = TextStyle(
+    color: Color(0xFF1A1A1A),
+    fontSize: 14,
+    fontWeight: FontWeight.w600,
+    height: 1.25,
+  );
+
+  Widget _giftIcon() {
+    if (giftIconUrl.isNotEmpty) {
+      return Image.network(
+        giftIconUrl,
+        width: 56,
+        height: 56,
+        fit: BoxFit.contain,
+        errorBuilder: (_, _, _) => Text(
+          emoji.isEmpty ? '🎁' : emoji,
+          style: const TextStyle(fontSize: 36, height: 1),
+        ),
+      );
+    }
+    return Text(
+      emoji.isEmpty ? '🎁' : emoji,
+      style: const TextStyle(fontSize: 36, height: 1),
+    );
+  }
+
+  Widget _content({required bool isSelf}) {
+    final name = giftName.isNotEmpty
+        ? giftName
+        : (giftId > 0 ? '$giftId' : 'Gift');
+    return LimitedBox(
+      maxWidth: 200,
+      child: Text.rich(
+        TextSpan(
+          children: [
+            TextSpan(
+              text: isSelf ? 'You sent\n' : 'Gift to you\n',
+              style: _labelStyle,
+            ),
+            TextSpan(text: '$name ', style: _labelStyle),
+            TextSpan(
+              text: 'x $qty',
+              style: const TextStyle(
+                color: _qtyYellow,
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                fontStyle: FontStyle.italic,
+                height: 1.25,
+                shadows: [
+                  Shadow(
+                    color: Color(0x80333333),
+                    blurRadius: 1,
+                    offset: Offset(0, 0.5),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        maxLines: 2,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -873,171 +1165,46 @@ class _GiftMessageCard extends StatelessWidget {
           )
         : const SizedBox(width: _BubbleLayout.avatar);
 
-    final card = ConstrainedBox(
-      constraints: const BoxConstraints(
-        maxWidth: _cardMax,
-        minWidth: 220,
-      ),
-      child: SizedBox(
-        height: _cardHeight,
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  gradient: const LinearGradient(
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                    colors: [
-                      Color(0xFFFFD0E4),
-                      Color(0xFFFFE4C4),
-                      Color(0xFFFFF3C8),
-                    ],
-                    stops: [0.0, 0.55, 1.0],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFFF8AB8).withValues(alpha: 0.18),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 8, 20, 8),
-                  child: Row(
-                    children: [
-                      SizedBox(
-                        width: 66,
-                        height: 66,
-                        child: Center(
-                          child: giftIconUrl.isNotEmpty
-                              ? Image.network(
-                                  giftIconUrl,
-                                  width: 52,
-                                  height: 52,
-                                  fit: BoxFit.contain,
-                                  errorBuilder: (_, _, _) => Text(
-                                    emoji.isEmpty ? '🎁' : emoji,
-                                    style: const TextStyle(
-                                      fontSize: 44,
-                                      height: 1,
-                                    ),
-                                  ),
-                                )
-                              : Text(
-                                  emoji.isEmpty ? '🎁' : emoji,
-                                  style: const TextStyle(fontSize: 44, height: 1),
-                                ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              isSelf ? 'You sent' : 'Gift to you',
-                              style: const TextStyle(
-                                color: Color(0xFF1A1A1A),
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                                height: 1.15,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Flexible(
-                                  child: Text(
-                                    giftName.isNotEmpty
-                                        ? giftName
-                                        : (giftId > 0 ? '$giftId' : 'Gift'),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: Color(0xFF1A1A1A),
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.w800,
-                                      height: 1.1,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                // Neon yellow qty with light outline for cream bg.
-                                Stack(
-                                  children: [
-                                    Text(
-                                      'x $qty',
-                                      style: TextStyle(
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.w900,
-                                        fontStyle: FontStyle.italic,
-                                        height: 1,
-                                        foreground: Paint()
-                                          ..style = PaintingStyle.stroke
-                                          ..strokeWidth = 2.2
-                                          ..color = const Color(0xFF3A2A00),
-                                      ),
-                                    ),
-                                    Text(
-                                      'x $qty',
-                                      style: const TextStyle(
-                                        color: _qtyYellow,
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.w900,
-                                        fontStyle: FontStyle.italic,
-                                        height: 1,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+    final card = Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: isSelf
+                  ? const [Color(0x33FE8F19), Color(0x33FC1192)]
+                  : const [Color(0x33FC1192), Color(0x33FE8F19)],
             ),
-            Positioned(
-              right: -4,
-              bottom: -8,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFFFFB020).withValues(alpha: 0.55),
-                          blurRadius: 10,
-                          spreadRadius: 1,
-                        ),
-                      ],
-                    ),
-                  ),
-                  Image.asset(
-                    AppAssets.giftIcon,
-                    width: 30,
-                    height: 30,
-                    fit: BoxFit.contain,
-                  ),
-                ],
-              ),
+            borderRadius: BorderRadiusDirectional.only(
+              topStart: Radius.circular(isSelf ? 16 : 0),
+              topEnd: Radius.circular(isSelf ? 0 : 16),
+              bottomStart: const Radius.circular(16),
+              bottomEnd: const Radius.circular(16),
             ),
-          ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (isSelf) ...[
+                _content(isSelf: true),
+                const SizedBox(width: 16),
+                _giftIcon(),
+              ] else ...[
+                _giftIcon(),
+                const SizedBox(width: 16),
+                _content(isSelf: false),
+              ],
+            ],
+          ),
         ),
-      ),
+        // Match forya box-item badge on gift bubble corner.
+        const PositionedDirectional(
+          end: -8,
+          bottom: -8,
+          child: _GiftBoxBadge(),
+        ),
+      ],
     );
 
     if (isSelf) {
@@ -1059,6 +1226,20 @@ class _GiftMessageCard extends StatelessWidget {
         const SizedBox(width: _BubbleLayout.avatarGap),
         card,
       ],
+    );
+  }
+}
+
+class _GiftBoxBadge extends StatelessWidget {
+  const _GiftBoxBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Image.asset(
+      AppAssets.giftIcon,
+      width: 28,
+      height: 28,
+      fit: BoxFit.contain,
     );
   }
 }

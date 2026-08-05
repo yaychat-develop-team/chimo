@@ -54,12 +54,19 @@ class ApiClient {
     final normalized = path.startsWith('/') ? path : '/$path';
     final base = Uri.parse('${ApiConfig.baseUrl}$normalized');
     if (query == null || query.isEmpty) return base;
-    return base.replace(
-      queryParameters: {
-        ...base.queryParameters,
-        ...query,
-      },
-    );
+    // Uri.replace(queryParameters:) drops "=" for empty values ("keyword"
+    // instead of "keyword="), which breaks echimo list APIs that expect an
+    // explicit empty keyword the same way forya builds: keyword=$searchStr.
+    final merged = <String, String>{
+      ...base.queryParameters,
+      ...query,
+    };
+    final pairs = <String>[
+      for (final e in merged.entries)
+        '${Uri.encodeQueryComponent(e.key)}='
+            '${Uri.encodeQueryComponent(e.value)}',
+    ];
+    return base.replace(query: pairs.join('&'));
   }
 
   Map<String, String> _headers() {

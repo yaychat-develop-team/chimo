@@ -82,7 +82,7 @@ class ChimoApi {
   /// People I follow (`Follow` tab). Empty keyword = full list.
   Future<ApiResponse> searchFollowing({
     int pageNum = 1,
-    int pageSize = 50,
+    int pageSize = 20,
     String keyword = '',
   }) {
     return _client.get(
@@ -98,7 +98,7 @@ class ChimoApi {
   /// Fans who follow me (`Followers` tab).
   Future<ApiResponse> searchFans({
     int pageNum = 1,
-    int pageSize = 50,
+    int pageSize = 20,
     String keyword = '',
   }) {
     return _client.get(
@@ -114,7 +114,7 @@ class ChimoApi {
   /// Mutual friends (`Friends` tab).
   Future<ApiResponse> searchFriends({
     int pageNum = 1,
-    int pageSize = 50,
+    int pageSize = 20,
     String keyword = '',
   }) {
     return _client.get(
@@ -298,5 +298,17 @@ class ChimoApi {
 
   Future<ApiResponse> bannerList({int type = 1}) {
     return _client.get('/banner/list', query: {'type': '$type'});
+  }
+
+  // ---- emote / stickers (forya EmoteApi) ----
+  Future<ApiResponse> emoticonsList({String scene = 'CHAT'}) {
+    return _client.get('/emote/emoticons-list', query: {'scene': scene});
+  }
+
+  Future<ApiResponse> emoteItemList(String emoticonId) {
+    return _client.get(
+      '/emote/item-list',
+      query: {'emoticon_id': emoticonId},
+    );
   }
 }

@@ -5,13 +5,17 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../core/auth/auth_session.dart';
 import '../../core/constants/app_assets.dart';
+import '../../core/im/im_service.dart';
 import '../../core/network/network_bootstrap.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_tip_dialog.dart';
+import '../../core/widgets/center_toast.dart';
 import '../../core/widgets/network_or_asset_avatar.dart';
 import '../chats/data/chats_list_controller.dart';
 import '../chats/models/chat_conversation.dart';
+import '../profile/album_photo_viewer_page.dart';
 import '../report/report_page.dart';
 import 'chat_user_profile_page.dart';
 import 'models/chat_user_profile.dart';
@@ -48,57 +52,193 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
   final TextEditingController _inputController = TextEditingController();
   final ScrollController _messagesScroll = ScrollController();
   final List<_OutgoingMessage> _sentMessages = [];
-  List<String> _photoAssets = const [];
+  final Set<String> _seenMsgIds = {};
+  StreamSubscription<ImChatMessage>? _imSub;
+  List<_GroupPhotoSection> _photoSections = const [];
+  final GlobalKey<GroupChatInputBarState> _inputBarKey =
+      GlobalKey<GroupChatInputBarState>();
 
   PopularGroupItem get _group => widget.group;
+
+  String get _emGroupId => _group.id.trim();
+
+  List<String> get _flatPhotos => [
+        for (final s in _photoSections) ...s.urls,
+      ];
 
   @override
   void initState() {
     super.initState();
     unawaited(_loadPhotos());
+    _imSub = ImService.messages.listen(_onImMessage);
+    if (_isJoined) {
+      unawaited(_loadImHistory());
+    }
+  }
+
+  Future<void> _loadImHistory() async {
+    final gid = _emGroupId;
+    if (gid.isEmpty) return;
+    try {
+      if (!ImService.isConnected) {
+        await ImService.connectFromServer();
+      }
+      final page = await ImService.loadHistory(
+        gid,
+        count: 40,
+        isGroup: true,
+      );
+      if (!mounted) return;
+      final added = <_OutgoingMessage>[];
+      for (final m in page.messages) {
+        if (m.id.isNotEmpty && _seenMsgIds.contains(m.id)) continue;
+        final line = _lineFromIm(m);
+        if (line == null) continue;
+        if (m.id.isNotEmpty) _seenMsgIds.add(m.id);
+        added.add(line);
+      }
+      if (added.isEmpty) return;
+      setState(() {
+        // Drop provisional join tips (no EaseMob id) once history arrives.
+        _sentMessages.removeWhere(
+          (m) => m.kind == _OutgoingKind.join && m.msgId.isEmpty,
+        );
+        _sentMessages.insertAll(0, added);
+        _sentMessages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
+      });
+      _scrollToBottom(force: true);
+      unawaited(ImService.markConversationRead(gid, isGroup: true));
+    } catch (error) {
+      debugPrint('GroupDetails loadImHistory: $error');
+    }
+  }
+
+  void _onImMessage(ImChatMessage m) {
+    final gid = _emGroupId;
+    if (gid.isEmpty) return;
+    if (m.conversationId != gid && m.to != gid) return;
+    if (m.id.isNotEmpty && _seenMsgIds.contains(m.id)) return;
+    final line = _lineFromIm(m);
+    if (line == null) return;
+    if (m.id.isNotEmpty) _seenMsgIds.add(m.id);
+    if (!mounted) return;
+    setState(() => _sentMessages.add(line));
+    if (m.msgType == 'join') {
+      _notifyNewMessage(m.text);
+    } else if (!m.isSelf) {
+      _notifyNewMessage(m.text.isEmpty ? '[Message]' : m.text);
+    }
+    _scrollToBottom();
+  }
+
+  _OutgoingMessage? _lineFromIm(ImChatMessage m) {
+    final at = m.serverTimeMs > 0
+        ? DateTime.fromMillisecondsSinceEpoch(m.serverTimeMs)
+        : DateTime.now();
+    switch (m.msgType) {
+      case 'join':
+        return _OutgoingMessage.join(
+          m.joinName.isEmpty ? 'Someone' : m.joinName,
+          uid: m.joinUid,
+          at: at,
+          msgId: m.id,
+        );
+      case 'txt':
+        return _OutgoingMessage.text(
+          m.text,
+          at: at,
+          msgId: m.id,
+          isSelf: m.isSelf,
+        );
+      case 'image':
+        final src = m.playableOrDisplayUrl;
+        if (src.isEmpty) return null;
+        return _OutgoingMessage.image(
+          src,
+          at: at,
+          msgId: m.id,
+          isSelf: m.isSelf,
+        );
+      case 'voice':
+        return _OutgoingMessage.voice(
+          m.durationSecs > 0 ? m.durationSecs : 1,
+          at: at,
+          msgId: m.id,
+          isSelf: m.isSelf,
+        );
+      case 'emote':
+        final src = m.emoteUrl.isNotEmpty ? m.emoteUrl : m.playableOrDisplayUrl;
+        if (src.isEmpty) return null;
+        return _OutgoingMessage.image(
+          src,
+          at: at,
+          msgId: m.id,
+          isSelf: m.isSelf,
+        );
+      default:
+        return null;
+    }
   }
 
   Future<void> _loadPhotos() async {
     try {
       final res = await NetworkBootstrap.api.groupPhotos(_group.id);
       if (!mounted || !res.success) return;
-      final urls = _parsePhotoUrls(res.data);
-      if (urls.isEmpty) return;
-      setState(() => _photoAssets = urls);
+      final sections = _parsePhotoSections(res.data);
+      if (sections.isEmpty) return;
+      setState(() => _photoSections = sections);
     } catch (_) {}
   }
 
-  static List<String> _parsePhotoUrls(Object? data) {
+  /// Forya `GroupPhotoListRsp.groupPhotoList`: each item has periodName + photoList.
+  static List<_GroupPhotoSection> _parsePhotoSections(Object? data) {
     if (data is! Map) return const [];
     final list = data['groupPhotoList'] ?? data['photoList'] ?? data['list'];
     if (list is! List) return const [];
-    final urls = <String>[];
+    final out = <_GroupPhotoSection>[];
     for (final item in list) {
       if (item is String) {
         final s = item.trim();
-        if (s.isNotEmpty) urls.add(s);
+        if (s.isNotEmpty) {
+          out.add(_GroupPhotoSection(periodName: '', urls: [s]));
+        }
         continue;
       }
       if (item is! Map) continue;
       final map = Map<String, dynamic>.from(item);
-      final nested = map['photoList'];
+      final period = '${map['periodName'] ?? map['period'] ?? map['name'] ?? ''}'
+          .trim();
+      final nested = map['photoList'] ?? map['photos'] ?? map['list'];
+      final urls = <String>[];
       if (nested is List) {
         for (final p in nested) {
-          final s = '$p'.trim();
-          if (s.isNotEmpty) urls.add(s);
+          if (p is String) {
+            final s = p.trim();
+            if (s.isNotEmpty) urls.add(s);
+            continue;
+          }
+          if (p is Map) {
+            final u =
+                '${p['url'] ?? p['photo'] ?? p['img'] ?? p['image'] ?? ''}'
+                    .trim();
+            if (u.isNotEmpty) urls.add(u);
+          }
         }
-        continue;
+      } else {
+        final url =
+            '${map['url'] ?? map['photo'] ?? map['img'] ?? map['image'] ?? ''}'
+                .trim();
+        if (url.isNotEmpty) urls.add(url);
       }
-      final url =
-          '${map['url'] ?? map['photo'] ?? map['img'] ?? map['image'] ?? ''}'
-              .trim();
-      if (url.isNotEmpty) urls.add(url);
+      if (urls.isEmpty) continue;
+      out.add(_GroupPhotoSection(periodName: period, urls: urls));
     }
-    return urls;
+    return out;
   }
 
   @override
   void dispose() {
+    unawaited(_imSub?.cancel() ?? Future<void>.value());
     _inputController.dispose();
     _messagesScroll.dispose();
     super.dispose();
@@ -123,7 +263,18 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
             behavior: SnackBarBehavior.floating,
           ),
         );
+        return;
       }
+      // Server pushes JoinGroupMessage; also show a local tip immediately.
+      final nick = (await AuthSession.nickname())?.trim();
+      final name = (nick == null || nick.isEmpty) ? 'You' : nick;
+      if (!mounted) return;
+      setState(() {
+        _sentMessages.add(_OutgoingMessage.join(name));
+      });
+      _notifyNewMessage('$name joined the community');
+      _scrollToBottom();
+      unawaited(_loadImHistory());
     } catch (error) {
       if (!mounted) return;
       setState(() => _isJoined = false);
@@ -173,14 +324,42 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
     }
   }
 
-  void _scrollToBottom() {
+  void _scrollToBottom({bool force = false}) {
+    void jump({required bool animate}) {
+      if (!mounted || !_messagesScroll.hasClients) return;
+      final max = _messagesScroll.position.maxScrollExtent;
+      if (max <= 0) return;
+      if (animate) {
+        _messagesScroll.animateTo(
+          max,
+          duration: const Duration(milliseconds: 240),
+          curve: Curves.easeOut,
+        );
+      } else {
+        _messagesScroll.jumpTo(max);
+      }
+    }
+
+    // Entering / history load: jump repeatedly until layout settles on last msg.
+    if (force) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        jump(animate: false);
+        var left = 8;
+        void retry() {
+          Future<void>.delayed(const Duration(milliseconds: 50), () {
+            if (!mounted) return;
+            jump(animate: false);
+            left -= 1;
+            if (left > 0) retry();
+          });
+        }
+        retry();
+      });
+      return;
+    }
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_messagesScroll.hasClients) return;
-      _messagesScroll.animateTo(
-        _messagesScroll.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 240),
-        curve: Curves.easeOut,
-      );
+      jump(animate: true);
     });
   }
 
@@ -194,16 +373,42 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
     );
   }
 
-  void _sendMessage([String? raw]) {
+  Future<void> _sendMessage([String? raw]) async {
     final text = (raw ?? _inputController.text).trim();
-    if (text.isEmpty || !_isJoined) return;
+    if (!_isJoined) return;
+    if (text.isEmpty) {
+      if (!mounted) return;
+      showCenterToast(context, message: 'The message cannot be empty!');
+      return;
+    }
+    _inputController.clear();
     setState(() {
       _sentMessages.add(_OutgoingMessage.text(text));
       _tabIndex = 0;
     });
-    _inputController.clear();
     _notifyNewMessage(text);
     _scrollToBottom();
+
+    final gid = _emGroupId;
+    if (gid.isEmpty) return;
+    try {
+      final sent = await ImService.sendText(
+        peerEmUsername: gid,
+        content: text,
+        isGroup: true,
+      );
+      if (sent != null && sent.id.isNotEmpty) {
+        _seenMsgIds.add(sent.id);
+      }
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Send failed: $error'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   void _sendVoice(int seconds) {
@@ -216,17 +421,56 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
     _scrollToBottom();
   }
 
-  void _sendImages(List<String> paths) {
+  Future<void> _sendImages(List<String> paths) async {
     if (!_isJoined || paths.isEmpty) return;
+    final files =
+        paths.map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    if (files.isEmpty) return;
+
     final now = DateTime.now();
     setState(() {
-      for (final path in paths) {
+      for (final path in files) {
         _sentMessages.add(_OutgoingMessage.image(path, at: now));
       }
       _tabIndex = 0;
     });
-    _notifyNewMessage(paths.length == 1 ? '[Image]' : '[Image] x${paths.length}');
+    _notifyNewMessage(
+      files.length == 1 ? '[Image]' : '[Image] x${files.length}',
+    );
     _scrollToBottom();
+
+    final gid = _emGroupId;
+    if (gid.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cannot send image: group IM id missing'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    for (final path in files) {
+      try {
+        final sent = await ImService.sendImage(
+          peerEmUsername: gid,
+          filePath: path,
+          isGroup: true,
+        );
+        if (sent != null && sent.id.isNotEmpty) {
+          _seenMsgIds.add(sent.id);
+        }
+      } catch (error) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Image send failed: $error'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _openMoreMenu() async {
@@ -270,11 +514,12 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
   }
 
   void _openPhotoViewer(int initialIndex) {
-    if (!_isJoined || _photoAssets.isEmpty) return;
+    final photos = _flatPhotos;
+    if (!_isJoined || photos.isEmpty) return;
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => _GroupPhotoViewerPage(
-          photos: _photoAssets,
+          photos: photos,
           initialIndex: initialIndex,
         ),
       ),
@@ -288,6 +533,8 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      // Match DM: input bar owns keyboard / panel insets (avoid double shrink).
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
           Positioned(
@@ -295,7 +542,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
             left: 0,
             right: 0,
             height: 260 + topPadding,
-              child: ImageFiltered(
+            child: ImageFiltered(
               imageFilter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
               child: NetworkOrAssetAvatar(
                 asset: _group.avatarAsset,
@@ -333,43 +580,74 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
                 onToggleDesc: () =>
                     setState(() => _descExpanded = !_descExpanded),
               ),
-              AnimatedSize(
-                duration: const Duration(milliseconds: 280),
-                curve: Curves.easeOutCubic,
-                alignment: Alignment.topCenter,
-                child: _descExpanded
-                    ? _ProfileHeader(
-                        group: _group,
-                        isJoined: _isJoined,
-                        onCollapse: () => setState(() => _descExpanded = false),
-                        onMembersTap: _openMembersSheet,
-                      )
-                    : const SizedBox.shrink(),
-              ),
-              if (!_isJoined) const _MemberLimitBanner(),
+              // forya: `if (!_foldInfo) _groupInfoWidget` — fold whole header, not expand text.
+              if (_descExpanded)
+                _ProfileHeader(
+                  group: _group,
+                  isJoined: _isJoined,
+                  onCollapse: () => setState(() => _descExpanded = false),
+                  onMembersTap: _openMembersSheet,
+                ),
+              // forya: tip + chat share one rounded shell; non-member shell is
+              // translucent lime `0x1FC0F600` peeking above the white panel.
               Expanded(
-                child: ColoredBox(
-                  color: _isJoined
-                      ? AppColors.background
-                      : _MemberLimitBanner.color,
-                  child: _ChatBody(
-                    tabIndex: _tabIndex,
-                    isJoined: _isJoined,
-                    sentMessages: _sentMessages,
-                    photos: _photoAssets,
-                    messagesScroll: _messagesScroll,
-                    onTabChanged: (i) => setState(() => _tabIndex = i),
-                    onPhotoTap: _openPhotoViewer,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: _isJoined
+                        ? Colors.white
+                        : const Color(0x1FC0F600),
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(22),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      if (!_isJoined)
+                        const SizedBox(
+                          height: 43,
+                          child: Center(
+                            child: Text(
+                              'Not a member? Viewing is limited to 10 messages',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Color(0xFFC7EF4C),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ),
+                      Expanded(
+                        child: _ChatBody(
+                          tabIndex: _tabIndex,
+                          isJoined: _isJoined,
+                          sentMessages: _sentMessages,
+                          photos: _photoSections,
+                          messagesScroll: _messagesScroll,
+                          onTabChanged: (i) => setState(() => _tabIndex = i),
+                          onPhotoTap: _openPhotoViewer,
+                          onBlankTap: () =>
+                              _inputBarKey.currentState?.dismissComposer(),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
               if (_isJoined)
                 GroupChatInputBar(
+                  key: _inputBarKey,
                   bottomInset: bottomPadding,
                   controller: _inputController,
                   onSendText: _sendMessage,
                   onSendVoice: _sendVoice,
                   onSendImages: _sendImages,
+                  onPanelChanged: (open) {
+                    // Free vertical space when voice/photo/emoji panel opens.
+                    if (open && _descExpanded) {
+                      setState(() => _descExpanded = false);
+                    }
+                  },
                 )
               else
                 _JoinCommunityBar(
@@ -490,7 +768,8 @@ class _DescToggleChip extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              expanded ? 'See Less' : 'See More',
+              // forya always labels this chip "See More" (up = fold, down = expand).
+              'See More',
               style: TextStyle(
                 color: fg,
                 fontSize: 12,
@@ -711,11 +990,14 @@ class _ProfileHeader extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
+          // forya chat_group_page: desc always maxLines: 3; chip folds the header.
           Text(
             group.description,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               color: AppColors.textSecondary,
-              fontSize: 14,
+              fontSize: 12,
               height: 1.4,
             ),
           ),
@@ -733,34 +1015,6 @@ class _ProfileHeader extends StatelessWidget {
   }
 }
 
-class _MemberLimitBanner extends StatelessWidget {
-  const _MemberLimitBanner();
-
-  /// Matches the color peeking behind the white rounded panel.
-  static const Color color = Color(0xFF1A3A28);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-      decoration: const BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-      ),
-      child: const Text(
-        'Not a member? Viewing is limited to 10 messages',
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          color: Color(0xFFB8FF6A),
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-}
-
 class _ChatBody extends StatelessWidget {
   const _ChatBody({
     required this.tabIndex,
@@ -770,15 +1024,17 @@ class _ChatBody extends StatelessWidget {
     required this.messagesScroll,
     required this.onTabChanged,
     required this.onPhotoTap,
+    this.onBlankTap,
   });
 
   final int tabIndex;
   final bool isJoined;
   final List<_OutgoingMessage> sentMessages;
-  final List<String> photos;
+  final List<_GroupPhotoSection> photos;
   final ScrollController messagesScroll;
   final ValueChanged<int> onTabChanged;
   final ValueChanged<int> onPhotoTap;
+  final VoidCallback? onBlankTap;
 
   @override
   Widget build(BuildContext context) {
@@ -817,10 +1073,11 @@ class _ChatBody extends StatelessWidget {
                     isJoined: isJoined,
                     sentMessages: sentMessages,
                     scrollController: messagesScroll,
+                    onBlankTap: onBlankTap,
                   )
                 : _PhotosGrid(
                     isJoined: isJoined,
-                    photos: photos,
+                    sections: photos,
                     onPhotoTap: onPhotoTap,
                   ),
           ),
@@ -877,55 +1134,88 @@ class _MessagesFeed extends StatelessWidget {
     required this.isJoined,
     required this.sentMessages,
     required this.scrollController,
+    this.onBlankTap,
   });
 
   final bool isJoined;
   final List<_OutgoingMessage> sentMessages;
   final ScrollController scrollController;
+  final VoidCallback? onBlankTap;
 
   @override
   Widget build(BuildContext context) {
     // Group history is IM (EaseMob), not REST. Until SDK is wired, only show
     // messages composed in this session so the feed is never fake layout data.
     if (sentMessages.isEmpty) {
-      return ListView(
-        controller: scrollController,
-        padding: const EdgeInsets.fromLTRB(16, 48, 16, 20),
-        children: [
-          Text(
-            isJoined
-                ? 'No messages yet'
-                : 'Join the group to chat.\nHistory loads after IM is connected.',
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Color(0xFFAEAEAE),
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              height: 1.4,
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onBlankTap,
+        child: ListView(
+          controller: scrollController,
+          padding: const EdgeInsets.fromLTRB(16, 48, 16, 20),
+          children: [
+            Text(
+              isJoined
+                  ? 'No messages yet'
+                  : 'Join the group to chat.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Color(0xFFAEAEAE),
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                height: 1.4,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       );
     }
 
-    return ListView(
-      controller: scrollController,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-      children: [
-        for (var i = 0; i < sentMessages.length; i++) ...[
-          if (_shouldShowOutgoingTimestamp(sentMessages, i)) ...[
-            SizedBox(height: i == 0 ? 0 : 14),
-            _TimestampLabel(_formatChatTimestamp(sentMessages[i].sentAt)),
-            const SizedBox(height: 10),
-          ] else
-            SizedBox(height: i == 0 ? 0 : 10),
-          _SelfOutgoingBubble(
-            message: sentMessages[i],
-            showAvatar: i == 0 ||
-                sentMessages[i].kind != sentMessages[i - 1].kind,
-          ),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onBlankTap,
+      child: ListView(
+        controller: scrollController,
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+        children: [
+          for (var i = 0; i < sentMessages.length; i++) ...[
+            if (_shouldShowOutgoingTimestamp(sentMessages, i)) ...[
+              SizedBox(height: i == 0 ? 0 : 14),
+              _TimestampLabel(_formatChatTimestamp(sentMessages[i].sentAt)),
+              const SizedBox(height: 10),
+            ] else
+              SizedBox(height: i == 0 ? 0 : 10),
+            if (sentMessages[i].kind == _OutgoingKind.join)
+              _JoinCommunityTip(name: sentMessages[i].joinName ?? 'Someone')
+            else
+              _GroupChatBubble(
+                message: sentMessages[i],
+                showAvatar: i == 0 ||
+                    sentMessages[i - 1].kind == _OutgoingKind.join ||
+                    sentMessages[i].isSelf != sentMessages[i - 1].isSelf ||
+                    sentMessages[i].kind != sentMessages[i - 1].kind,
+                onImageTap: sentMessages[i].kind == _OutgoingKind.image
+                    ? () {
+                        final paths = [
+                          for (final m in sentMessages)
+                            if (m.kind == _OutgoingKind.image &&
+                                (m.imagePath ?? '').trim().isNotEmpty)
+                              m.imagePath!.trim(),
+                        ];
+                        final src = sentMessages[i].imagePath?.trim() ?? '';
+                        final initial = paths.indexOf(src);
+                        AlbumPhotoViewerPage.open(
+                          context,
+                          paths: paths,
+                          initialIndex: initial < 0 ? 0 : initial,
+                        );
+                      }
+                    : null,
+              ),
+          ],
         ],
-      ],
+      ),
     );
   }
 }
@@ -954,7 +1244,12 @@ class _TimestampLabel extends StatelessWidget {
 }
 
 
-class _OutgoingKind { static const text = 0; static const voice = 1; static const image = 2; }
+class _OutgoingKind {
+  static const text = 0;
+  static const voice = 1;
+  static const image = 2;
+  static const join = 3;
+}
 
 /// Show a time divider when first message or gap ≥ 5 minutes.
 bool _shouldShowOutgoingTimestamp(List<_OutgoingMessage> list, int index) {
@@ -993,27 +1288,67 @@ class _OutgoingMessage {
     this.text,
     this.voiceSeconds,
     this.imagePath,
+    this.joinName,
+    this.joinUid,
+    this.msgId = '',
+    this.isSelf = true,
   });
 
-  factory _OutgoingMessage.text(String text, {DateTime? at}) =>
+  factory _OutgoingMessage.text(
+    String text, {
+    DateTime? at,
+    String msgId = '',
+    bool isSelf = true,
+  }) =>
       _OutgoingMessage._(
         kind: _OutgoingKind.text,
         text: text,
         sentAt: at ?? DateTime.now(),
+        msgId: msgId,
+        isSelf: isSelf,
       );
 
-  factory _OutgoingMessage.voice(int seconds, {DateTime? at}) =>
+  factory _OutgoingMessage.voice(
+    int seconds, {
+    DateTime? at,
+    String msgId = '',
+    bool isSelf = true,
+  }) =>
       _OutgoingMessage._(
         kind: _OutgoingKind.voice,
         voiceSeconds: seconds,
         sentAt: at ?? DateTime.now(),
+        msgId: msgId,
+        isSelf: isSelf,
       );
 
-  factory _OutgoingMessage.image(String path, {DateTime? at}) =>
+  factory _OutgoingMessage.image(
+    String path, {
+    DateTime? at,
+    String msgId = '',
+    bool isSelf = true,
+  }) =>
       _OutgoingMessage._(
         kind: _OutgoingKind.image,
         imagePath: path,
         sentAt: at ?? DateTime.now(),
+        msgId: msgId,
+        isSelf: isSelf,
+      );
+
+  factory _OutgoingMessage.join(
+    String name, {
+    String uid = '',
+    DateTime? at,
+    String msgId = '',
+  }) =>
+      _OutgoingMessage._(
+        kind: _OutgoingKind.join,
+        joinName: name,
+        joinUid: uid,
+        sentAt: at ?? DateTime.now(),
+        msgId: msgId,
+        isSelf: false,
       );
 
   final int kind;
@@ -1021,16 +1356,67 @@ class _OutgoingMessage {
   final String? text;
   final int? voiceSeconds;
   final String? imagePath;
+  final String? joinName;
+  final String? joinUid;
+  final String msgId;
+  final bool isSelf;
 }
 
-class _SelfOutgoingBubble extends StatelessWidget {
-  const _SelfOutgoingBubble({
+/// Forya CustomGroupJoinItem: teal name + grey "joined the community".
+class _JoinCommunityTip extends StatelessWidget {
+  const _JoinCommunityTip({required this.name});
+
+  final String name;
+
+  static const _nameColor = Color(0xFF00D68F);
+  static const _restColor = Color(0xFFBCBCBC);
+
+  @override
+  Widget build(BuildContext context) {
+    final display = name.trim().isEmpty ? 'Someone' : name.trim();
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Text.rich(
+          TextSpan(
+            children: [
+              TextSpan(
+                text: display,
+                style: const TextStyle(
+                  color: _nameColor,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  height: 1.3,
+                ),
+              ),
+              const TextSpan(
+                text: '  joined the community',
+                style: TextStyle(
+                  color: _restColor,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w400,
+                  height: 1.3,
+                ),
+              ),
+            ],
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ),
+    );
+  }
+}
+
+class _GroupChatBubble extends StatelessWidget {
+  const _GroupChatBubble({
     required this.message,
     this.showAvatar = true,
+    this.onImageTap,
   });
 
   final _OutgoingMessage message;
   final bool showAvatar;
+  final VoidCallback? onImageTap;
 
   static const double _avatar = 40;
   static const double _avatarGap = 10;
@@ -1038,51 +1424,9 @@ class _SelfOutgoingBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: _bubbleMax),
-          child: switch (message.kind) {
-            _OutgoingKind.voice => _SelfVoiceBubble(
-                seconds: message.voiceSeconds ?? 0,
-              ),
-            _OutgoingKind.image => ClipRRect(
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(18),
-                  topRight: Radius.circular(4),
-                  bottomLeft: Radius.circular(18),
-                  bottomRight: Radius.circular(18),
-                ),
-                child: _OutgoingImage(path: message.imagePath!),
-              ),
-            _ => Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFB8FF6A),
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(18),
-                    topRight: Radius.circular(4),
-                    bottomLeft: Radius.circular(18),
-                    bottomRight: Radius.circular(18),
-                  ),
-                ),
-                child: Text(
-                  message.text ?? '',
-                  style: const TextStyle(
-                    color: Color(0xFF111111),
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                    height: 20 / 15,
-                  ),
-                ),
-              ),
-          },
-        ),
-        const SizedBox(width: _avatarGap),
-        if (showAvatar)
-          ClipRRect(
+    final isSelf = message.isSelf;
+    final avatar = showAvatar
+        ? ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: Image.asset(
               AppAssets.avatarPlace,
@@ -1091,8 +1435,72 @@ class _SelfOutgoingBubble extends StatelessWidget {
               fit: BoxFit.cover,
             ),
           )
-        else
-          const SizedBox(width: _avatar),
+        : const SizedBox(width: _avatar);
+
+    final imageBubble = ClipRRect(
+      borderRadius: BorderRadius.only(
+        topLeft: Radius.circular(isSelf ? 18 : 4),
+        topRight: Radius.circular(isSelf ? 4 : 18),
+        bottomLeft: const Radius.circular(18),
+        bottomRight: const Radius.circular(18),
+      ),
+      child: _OutgoingImage(path: message.imagePath!),
+    );
+
+    final bubble = ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: _bubbleMax),
+      child: switch (message.kind) {
+        _OutgoingKind.voice => _SelfVoiceBubble(
+            seconds: message.voiceSeconds ?? 0,
+          ),
+        _OutgoingKind.image => onImageTap == null
+            ? imageBubble
+            : GestureDetector(
+                onTap: onImageTap,
+                behavior: HitTestBehavior.opaque,
+                child: imageBubble,
+              ),
+        _ => Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            decoration: BoxDecoration(
+              color: isSelf ? const Color(0xFFB8FF6A) : const Color(0xFFF0F0F0),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(isSelf ? 18 : 4),
+                topRight: Radius.circular(isSelf ? 4 : 18),
+                bottomLeft: const Radius.circular(18),
+                bottomRight: const Radius.circular(18),
+              ),
+            ),
+            child: Text(
+              message.text ?? '',
+              style: const TextStyle(
+                color: Color(0xFF111111),
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+                height: 20 / 15,
+              ),
+            ),
+          ),
+      },
+    );
+
+    if (isSelf) {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          bubble,
+          const SizedBox(width: _avatarGap),
+          avatar,
+        ],
+      );
+    }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        avatar,
+        const SizedBox(width: _avatarGap),
+        bubble,
       ],
     );
   }
@@ -1103,32 +1511,59 @@ class _OutgoingImage extends StatelessWidget {
 
   final String path;
 
+  /// Match DM / forya media bubble: ~3:4 portrait, not square.
+  static const double _w = 132;
+  static const double _h = 176;
+
   bool get _isAsset => path.startsWith('assets/');
+
+  Widget _child({required Widget Function(BoxFit fit) buildImage}) {
+    return SizedBox(
+      width: _w,
+      height: _h,
+      child: buildImage(BoxFit.cover),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final error = Container(
-      width: 180,
-      height: 180,
+      width: _w,
+      height: _h,
       color: const Color(0xFFE8E8E8),
       alignment: Alignment.center,
       child: const Icon(Icons.broken_image_outlined),
     );
     if (_isAsset) {
-      return Image.asset(
-        path,
-        width: 180,
-        height: 180,
-        fit: BoxFit.cover,
-        errorBuilder: (_, _, _) => error,
+      return _child(
+        buildImage: (fit) => Image.asset(
+          path,
+          width: _w,
+          height: _h,
+          fit: fit,
+          errorBuilder: (_, _, _) => error,
+        ),
       );
     }
-    return Image.file(
-      File(path),
-      width: 180,
-      height: 180,
-      fit: BoxFit.cover,
-      errorBuilder: (_, _, _) => error,
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return _child(
+        buildImage: (fit) => Image.network(
+          path,
+          width: _w,
+          height: _h,
+          fit: fit,
+          errorBuilder: (_, _, _) => error,
+        ),
+      );
+    }
+    return _child(
+      buildImage: (fit) => Image.file(
+        File(path),
+        width: _w,
+        height: _h,
+        fit: fit,
+        errorBuilder: (_, _, _) => error,
+      ),
     );
   }
 }
@@ -1230,68 +1665,133 @@ class _SelfVoiceBubbleState extends State<_SelfVoiceBubble> {
 }
 
 
+class _GroupPhotoSection {
+  const _GroupPhotoSection({
+    required this.periodName,
+    required this.urls,
+  });
+
+  final String periodName;
+  final List<String> urls;
+}
+
 class _PhotosGrid extends StatelessWidget {
   const _PhotosGrid({
     required this.isJoined,
-    required this.photos,
+    required this.sections,
     required this.onPhotoTap,
   });
 
   final bool isJoined;
-  final List<String> photos;
+  final List<_GroupPhotoSection> sections;
   final ValueChanged<int> onPhotoTap;
 
   @override
   Widget build(BuildContext context) {
-    if (isJoined) {
-      return GridView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3,
-          mainAxisSpacing: 8,
-          crossAxisSpacing: 8,
-          childAspectRatio: 1,
+    if (!isJoined) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset(
+                AppAssets.groupUnjoinedLock,
+                width: 140,
+                height: 140,
+                fit: BoxFit.contain,
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Want to see everything?\nJoin the group!',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Color(0xFF9A9A9A),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w400,
+                  height: 1.45,
+                ),
+              ),
+            ],
+          ),
         ),
-        itemCount: photos.length,
-        itemBuilder: (context, index) {
-          return GestureDetector(
-            onTap: () => onPhotoTap(index),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: _GroupPhotoImage(src: photos[index]),
-            ),
-          );
-        },
       );
     }
 
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Image.asset(
-              AppAssets.groupUnjoinedLock,
-              width: 140,
-              height: 140,
-              fit: BoxFit.contain,
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'Want to see everything?\nJoin the group!',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Color(0xFF9A9A9A),
-                fontSize: 15,
-                fontWeight: FontWeight.w400,
-                height: 1.45,
+    if (sections.isEmpty) {
+      return const Center(
+        child: Text(
+          'No photos yet',
+          style: TextStyle(
+            color: Color(0xFFAEAEAE),
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      );
+    }
+
+    // Match forya ChatGroupPhotosPage: periodName headers + 4-col grids.
+    var globalIndex = 0;
+    final slivers = <Widget>[];
+    for (final section in sections) {
+      final label = section.periodName.trim();
+      if (label.isNotEmpty) {
+        slivers.add(
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 24, bottom: 12),
+              child: Center(
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    color: Color(0xFFBCBCBC),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w400,
+                    height: 1.2,
+                  ),
+                ),
               ),
             ),
-          ],
+          ),
+        );
+      } else {
+        slivers.add(const SliverToBoxAdapter(child: SizedBox(height: 12)));
+      }
+
+      final startIndex = globalIndex;
+      final count = section.urls.length;
+      globalIndex += count;
+      slivers.add(
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 5),
+          sliver: SliverGrid(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 4,
+              crossAxisSpacing: 4,
+              mainAxisSpacing: 4,
+              childAspectRatio: 1,
+            ),
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                final flatIndex = startIndex + index;
+                return GestureDetector(
+                  onTap: () => onPhotoTap(flatIndex),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: _GroupPhotoImage(src: section.urls[index]),
+                  ),
+                );
+              },
+              childCount: count,
+            ),
+          ),
         ),
-      ),
-    );
+      );
+    }
+    slivers.add(const SliverToBoxAdapter(child: SizedBox(height: 20)));
+
+    return CustomScrollView(slivers: slivers);
   }
 }
 

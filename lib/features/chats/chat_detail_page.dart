@@ -17,6 +17,7 @@ import '../../core/im/im_service.dart';
 import '../../core/network/api_client.dart';
 import '../../core/network/network_bootstrap.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/zodiac.dart';
 import '../../core/widgets/app_asset_image.dart';
 import '../../core/widgets/app_tip_dialog.dart';
 import '../../core/widgets/center_toast.dart';
@@ -29,8 +30,10 @@ import '../report/report_page.dart';
 import '../wallet/wallet_page.dart';
 import 'data/cash_gift_dto.dart';
 import 'data/chats_list_controller.dart';
+import 'data/emote_dto.dart';
 import 'models/chat_conversation.dart';
 import 'widgets/album_selection_preview_page.dart';
+import '../profile/album_photo_viewer_page.dart';
 
 part 'widgets/chat_detail_models.dart';
 part 'widgets/chat_detail_app_bar.dart';
@@ -58,6 +61,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     with SingleTickerProviderStateMixin {
   final TextEditingController _inputController = TextEditingController();
   final ScrollController _messagesScroll = ScrollController();
+  final GlobalKey<_DmInputBarState> _inputBarKey = GlobalKey<_DmInputBarState>();
 
   /// 0 = intro expanded, 1 = intro collapsed (app bar row only).
   late final AnimationController _introCollapse;
@@ -69,6 +73,11 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   final List<_ChatLine> _messages = [];
   final Set<String> _seenMsgIds = {};
   StreamSubscription<ImChatMessage>? _imSub;
+  bool _historyHasMore = true;
+  bool _historyLoading = false;
+  String _historyCursor = '';
+  /// After first open, only then allow pull-up history (avoids racing scroll-to-bottom).
+  bool _allowHistoryLoadMore = false;
 
   late ChatConversation _conversation = widget.conversation;
   ChatUserProfile? _peerProfile;
@@ -77,11 +86,24 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   bool _blocked = false;
   bool _loadingPeer = true;
   String _peerEmUser = '';
+  /// Backend numeric user id (for follow / block / gifts). Distinct from EM id.
+  String _peerAppUid = '';
 
   String get _peerUid {
     final id = _conversation.id;
     if (id.startsWith('dm_')) return id.substring(3);
     return id;
+  }
+
+  /// Prefer resolved app uid; fall back to conversation id only if numeric.
+  String get _relationUid {
+    final fromProfile = (_peerProfile?.userId ?? '').trim();
+    if (fromProfile.isNotEmpty) return fromProfile;
+    final cached = _peerAppUid.trim();
+    if (cached.isNotEmpty) return cached;
+    final id = _peerUid.trim();
+    if (RegExp(r'^\d+$').hasMatch(id)) return id;
+    return '';
   }
 
   String get _imConversationId {
@@ -100,20 +122,53 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       duration: const Duration(milliseconds: 220),
     );
     _imSub = ImService.messages.listen(_onImMessage);
+    _messagesScroll.addListener(_onMessagesScroll);
+    // Clear list badge + EaseMob unread when opening the thread.
+    widget.chatsController?.markRead(widget.conversation.id);
+    final em = _imConversationId;
+    if (em.isNotEmpty) {
+      unawaited(ImService.markConversationRead(em));
+    }
     unawaited(_loadFromApi());
   }
 
   Future<void> _loadFromApi() async {
-    final uid = _peerUid.trim();
-    if (uid.isEmpty && _peerEmUser.isEmpty) {
+    final rawId = _peerUid.trim();
+    final emHint = _peerEmUser.isNotEmpty
+        ? _peerEmUser
+        : (rawId.startsWith('yqdf-') || rawId.contains('yqdf')
+            ? rawId
+            : '');
+    if (rawId.isEmpty && emHint.isEmpty) {
       if (mounted) setState(() => _loadingPeer = false);
       return;
     }
 
     try {
       final api = NetworkBootstrap.api;
-      final peerFuture = uid.isNotEmpty
-          ? api.userInfoByUid(uid)
+      // Resolve numeric app uid when conversation key is an EM username.
+      var appUid = RegExp(r'^\d+$').hasMatch(rawId) ? rawId : '';
+      if (appUid.isEmpty && emHint.isNotEmpty) {
+        try {
+          final msgRes = await api.msgUser(emHint);
+          final data = msgRes.data;
+          if (data is Map) {
+            final user = data['user'];
+            final map = user is Map ? user : data;
+            appUid = '${map['id'] ?? map['userId'] ?? ''}'.trim();
+          }
+        } catch (_) {}
+      }
+      if (appUid.isEmpty && RegExp(r'^\d+$').hasMatch(rawId)) {
+        appUid = rawId;
+      }
+      // user/info accepts either numeric id or emUsername on this backend.
+      final infoKey = appUid.isNotEmpty
+          ? appUid
+          : (rawId.isNotEmpty ? rawId : emHint);
+
+      final peerFuture = infoKey.isNotEmpty
+          ? api.userInfoByUid(infoKey)
           : Future<ApiResponse>.value(
               const ApiResponse(
                 success: false,
@@ -135,23 +190,31 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       final blackRes = results[2];
 
       final peer =
-          uid.isNotEmpty ? UserDto.parseChatProfile(peerRes) : null;
+          infoKey.isNotEmpty ? UserDto.parseChatProfile(peerRes) : null;
       final self = UserDto.parseProfile(selfRes);
-      final blocked =
-          uid.isEmpty ? false : _isOnBlackList(blackRes.data, uid);
+      if (peer != null && peer.userId.isNotEmpty) {
+        appUid = peer.userId;
+      }
+      final blocked = appUid.isEmpty
+          ? false
+          : _isOnBlackList(blackRes.data, appUid);
 
       if (peer != null) {
         final em = peer.emUsername.isNotEmpty
             ? peer.emUsername
-            : _conversation.emUserName;
+            : (_conversation.emUserName.isNotEmpty
+                ? _conversation.emUserName
+                : emHint);
         final updated = _conversation.copyWith(
           title: peer.nickname.isEmpty ? _conversation.title : peer.nickname,
           avatarUrl: peer.avatarUrl ?? _conversation.avatarUrl,
           isMale: peer.isMale,
           signature: peer.bio,
           zodiac: peer.zodiac,
+          heightInches: peer.heightInches,
+          weightLb: peer.weightLb,
           isFollowing: peer.isFollowing,
-          isOnline: peer.inPartyName != null,
+          isOnline: peer.isOnline,
           momentUrls: peer.momentUrls,
           momentAssets:
               peer.momentUrls.isEmpty ? _conversation.momentAssets : const [],
@@ -164,12 +227,14 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           _blocked = blocked;
           _selfAvatarUrl = self?.avatarUrl;
           _peerEmUser = em;
+          _peerAppUid = appUid;
           _loadingPeer = false;
         });
         widget.chatsController?.upsertPrivateChat(updated);
         if (em.isNotEmpty) unawaited(_loadImHistory(em));
       } else {
         setState(() {
+          _peerAppUid = appUid;
           _blocked = blocked;
           _selfAvatarUrl = self?.avatarUrl;
           _loadingPeer = false;
@@ -190,16 +255,79 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     }
   }
 
-  Future<void> _loadImHistory(String peerEm) async {
-    final history = await ImService.loadHistory(peerEm);
-    if (!mounted || history.isEmpty) return;
-    setState(() {
-      for (final m in history) {
+  Future<void> _loadImHistory(String peerEm, {bool loadMore = false}) async {
+    if (_historyLoading) return;
+    if (loadMore && !_historyHasMore) return;
+
+    final cursor = loadMore ? _historyCursor : '';
+    setState(() => _historyLoading = true);
+    try {
+      final page = await ImService.loadHistory(
+        peerEm,
+        startMsgId: cursor,
+        count: 20,
+      );
+      if (!mounted) return;
+
+      final beforePixels =
+          loadMore && _messagesScroll.hasClients ? _messagesScroll.position.pixels : 0.0;
+      final beforeMax = loadMore && _messagesScroll.hasClients
+          ? _messagesScroll.position.maxScrollExtent
+          : 0.0;
+
+      final added = <_ChatLine>[];
+      for (final m in page.messages) {
+        if (m.msgType == 'follow') continue;
         if (m.id.isNotEmpty && !_seenMsgIds.add(m.id)) continue;
-        _messages.add(_lineFromIm(m));
+        added.add(_lineFromIm(m));
       }
-    });
-    _scrollToBottom();
+
+      setState(() {
+        if (loadMore) {
+          _messages.insertAll(0, added);
+        } else {
+          _messages.addAll(added);
+        }
+        if (loadMore && added.isEmpty) {
+          _historyHasMore = false;
+        } else {
+          _historyHasMore = page.hasMore;
+        }
+        _historyLoading = false;
+        if (_messages.isNotEmpty) {
+          final oldest = _messages.first.msgId;
+          if (oldest.isNotEmpty) _historyCursor = oldest;
+        }
+      });
+
+      if (!loadMore) {
+        _scrollToBottom(force: true);
+        return;
+      }
+      if (added.isEmpty) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_messagesScroll.hasClients) return;
+        final afterMax = _messagesScroll.position.maxScrollExtent;
+        final delta = afterMax - beforeMax;
+        _messagesScroll.jumpTo(beforePixels + delta);
+      });
+    } catch (error) {
+      debugPrint('loadImHistory failed: $error');
+      if (!mounted) return;
+      setState(() => _historyLoading = false);
+    }
+  }
+
+  void _onMessagesScroll() {
+    if (!_allowHistoryLoadMore) return;
+    if (!_messagesScroll.hasClients) return;
+    if (_historyLoading || !_historyHasMore) return;
+    final peerEm = _imConversationId;
+    if (peerEm.isEmpty) return;
+    // Near the top → load older messages.
+    if (_messagesScroll.position.pixels <= 64) {
+      unawaited(_loadImHistory(peerEm, loadMore: true));
+    }
   }
 
   void _onImMessage(ImChatMessage m) {
@@ -209,12 +337,27 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         m.from == convId ||
         m.to == convId;
     if (!match) return;
+    // Follow tips are not shown in the DM stream.
+    if (m.msgType == 'follow') return;
     if (m.id.isNotEmpty && !_seenMsgIds.add(m.id)) return;
     if (!mounted) return;
     setState(() {
       _messages.add(_lineFromIm(m));
     });
-    if (!m.isSelf) {
+    if (m.isSelf) {
+      widget.chatsController?.onNewMessage(
+        id: _conversation.id,
+        title: _conversation.title,
+        avatarAsset: _conversation.avatarAsset,
+        avatarUrl: _conversation.avatarUrl,
+        lastMessage: m.text,
+        isMale: _conversation.isMale,
+        signature: _conversation.signature,
+        zodiac: _conversation.zodiac,
+        isFollowing: _following,
+        unreadDelta: 0,
+      );
+    } else {
       widget.chatsController?.onNewMessage(
         id: _conversation.id,
         title: _conversation.title,
@@ -243,6 +386,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           imageAssets: media.isEmpty ? const [] : [media],
           text: m.text,
           serverTimeMs: m.serverTimeMs,
+          msgId: m.id,
         );
       case 'voice':
         return _ChatLine(
@@ -252,12 +396,37 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           mediaSource: media,
           text: m.text,
           serverTimeMs: m.serverTimeMs,
+          msgId: m.id,
+        );
+      case 'gift':
+        return _ChatLine(
+          side: side,
+          kind: _ChatLineKind.gift,
+          giftId: m.giftId,
+          giftQty: m.giftQty,
+          giftName: m.giftName,
+          giftIconUrl: m.giftIconUrl,
+          text: m.text,
+          serverTimeMs: m.serverTimeMs,
+          msgId: m.id,
+        );
+      case 'emote':
+        return _ChatLine(
+          side: side,
+          kind: _ChatLineKind.emote,
+          emoteUrl: m.emoteUrl.isNotEmpty ? m.emoteUrl : media,
+          emoteName: m.emoteName,
+          mediaSource: m.emoteUrl.isNotEmpty ? m.emoteUrl : media,
+          text: m.text,
+          serverTimeMs: m.serverTimeMs,
+          msgId: m.id,
         );
       default:
         return _ChatLine(
           side: side,
           text: m.text,
           serverTimeMs: m.serverTimeMs,
+          msgId: m.id,
         );
     }
   }
@@ -282,6 +451,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     unawaited(_imSub?.cancel() ?? Future<void>.value());
     _introCollapse.dispose();
     _inputController.dispose();
+    _messagesScroll.removeListener(_onMessagesScroll);
     _messagesScroll.dispose();
     super.dispose();
   }
@@ -308,7 +478,11 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
   Future<void> _sendMessage([String? raw]) async {
     final text = (raw ?? _inputController.text).trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty) {
+      if (!mounted) return;
+      showCenterToast(context, message: 'The message cannot be empty!');
+      return;
+    }
     _inputController.clear();
 
     final peerEm = _imConversationId;
@@ -345,6 +519,62 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       _messages.add(_ChatLine(side: _ChatSide.self, text: text));
     });
     _afterSend(text);
+  }
+
+  Future<void> _sendEmote(EmotePack pack, EmoteSticker sticker) async {
+    final url = sticker.url.trim().isNotEmpty
+        ? sticker.url.trim()
+        : sticker.showUrl.trim();
+    if (url.isEmpty) return;
+    final name = sticker.name.trim();
+    final preview = name.isEmpty ? '[Sticker]' : '[$name]';
+
+    setState(() {
+      _messages.add(
+        _ChatLine(
+          side: _ChatSide.self,
+          kind: _ChatLineKind.emote,
+          emoteUrl: url,
+          emoteName: name,
+          mediaSource: url,
+          text: preview,
+        ),
+      );
+    });
+    _afterSend(preview);
+
+    final peerEm = _imConversationId;
+    if (peerEm.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cannot send sticker: peer IM account missing'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    try {
+      final sent = await ImService.sendEmote(
+        peerEmUsername: peerEm,
+        packId: pack.id,
+        stickerId: sticker.id,
+        name: name,
+        url: url,
+      );
+      if (sent != null && sent.id.isNotEmpty) {
+        _seenMsgIds.add(sent.id);
+      }
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Sticker send failed: $error'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   Future<void> _sendVoice(String path, int seconds) async {
@@ -494,20 +724,59 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     _scrollToBottom();
   }
 
-  void _scrollToBottom() {
+  void _scrollToBottom({bool force = false, bool animated = false}) {
+    void jump({required bool animate}) {
+      if (!mounted || !_messagesScroll.hasClients) return;
+      final max = _messagesScroll.position.maxScrollExtent;
+      // Content shorter than viewport: stay at 0 so messages sit under the handle.
+      if (max <= 0) return;
+      if (animate) {
+        _messagesScroll.animateTo(
+          max,
+          duration: const Duration(milliseconds: 240),
+          curve: Curves.easeOut,
+        );
+      } else {
+        _messagesScroll.jumpTo(max);
+      }
+    }
+
+    if (force) {
+      _allowHistoryLoadMore = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        jump(animate: false);
+        var left = 8;
+        void retry() {
+          Future<void>.delayed(const Duration(milliseconds: 50), () {
+            if (!mounted) return;
+            jump(animate: false);
+            left -= 1;
+            if (left > 0) {
+              retry();
+            } else {
+              _allowHistoryLoadMore = true;
+            }
+          });
+        }
+        retry();
+      });
+      return;
+    }
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_messagesScroll.hasClients) return;
-      _messagesScroll.animateTo(
-        _messagesScroll.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 240),
-        curve: Curves.easeOut,
-      );
+      jump(animate: animated);
     });
   }
 
   Future<void> _toggleFollow() async {
-    final uid = _peerUid;
-    if (uid.isEmpty) return;
+    final uid = _relationUid;
+    if (uid.isEmpty) {
+      showCenterToast(
+        context,
+        message: 'Follow failed: user id not ready',
+      );
+      return;
+    }
     final prev = _following;
     setState(() => _following = !prev);
     try {
@@ -527,6 +796,9 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         _conversation = _conversation.copyWith(isFollowing: _following);
       });
       widget.chatsController?.upsertPrivateChat(_conversation);
+      if (_following) {
+        showCenterToast(context, message: 'Followed');
+      }
     } catch (error) {
       if (!mounted) return;
       setState(() => _following = prev);
@@ -565,8 +837,14 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   }
 
   Future<void> _toggleBlock() async {
-    final uid = _peerUid;
-    if (uid.isEmpty) return;
+    final uid = _relationUid;
+    if (uid.isEmpty) {
+      showCenterToast(
+        context,
+        message: 'Block failed: user id not ready',
+      );
+      return;
+    }
 
     if (_blocked) {
       try {
@@ -619,11 +897,12 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
   void _openPeerProfile() {
     final base = _peerProfile;
+    final uid = _relationUid.isNotEmpty ? _relationUid : _peerUid;
     final profile = (base ??
             ChatUserProfile(
-              id: _peerUid,
+              id: uid,
               nickname: _conversation.title,
-              userId: _peerUid,
+              userId: uid,
               avatarAsset: _conversation.avatarAsset,
               avatarUrl: _conversation.avatarUrl,
               isMale: _conversation.isMale,
@@ -634,8 +913,18 @@ class _ChatDetailPageState extends State<ChatDetailPage>
               isFollowing: _following,
               momentUrls: _conversation.momentUrls,
               momentAssets: _conversation.momentAssets,
+              emUsername: _peerEmUser.isNotEmpty
+                  ? _peerEmUser
+                  : _conversation.emUserName,
             ))
-        .copyWith(isFollowing: _following);
+        .copyWith(
+          isFollowing: _following,
+          emUsername: _peerEmUser.isNotEmpty
+              ? _peerEmUser
+              : (_conversation.emUserName.isNotEmpty
+                  ? _conversation.emUserName
+                  : null),
+        );
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => ChatUserProfilePage(
@@ -678,18 +967,23 @@ class _ChatDetailPageState extends State<ChatDetailPage>
               peerAvatarUrl: _conversation.avatarUrl,
               selfAvatarUrl: _selfAvatarUrl,
               messagesScroll: _messagesScroll,
+              historyLoading: _historyLoading,
+              historyHasMore: _historyHasMore && _allowHistoryLoadMore,
               onHandleDragUpdate: _onIntroDragUpdate,
               onHandleDragEnd: _onIntroDragEnd,
+              onBlankTap: () => _inputBarKey.currentState?.dismissComposer(),
             ),
           ),
           _DmInputBar(
+            key: _inputBarKey,
             bottomInset: bottomPadding,
             controller: _inputController,
             onSend: _sendMessage,
             onSendVoice: _sendVoice,
             onSendImages: _sendImages,
             onSendGift: _sendGift,
-            receiverUid: _peerUid,
+            onSendEmote: _sendEmote,
+            receiverUid: _relationUid.isNotEmpty ? _relationUid : _peerUid,
           ),
         ],
       ),

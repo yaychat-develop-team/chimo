@@ -9,6 +9,7 @@ class MeProfile {
     required this.follows,
     required this.visitors,
     this.avatarUrl,
+    this.email = '',
     this.gender = 'Male',
     this.birthday = '1995-01-01',
     this.height,
@@ -16,6 +17,8 @@ class MeProfile {
     this.signature = '',
     this.tags = const [],
     this.voiceSeconds,
+    this.voiceUrl,
+    this.vipIconUrl,
     this.nicknameChangedOnce = false,
     this.vipLevel = 1,
     this.experience = 0,
@@ -27,6 +30,9 @@ class MeProfile {
 
   /// User ID (for copy).
   final String userId;
+
+  /// Bound login email; empty when not bound.
+  final String email;
 
   /// Local avatar asset path (fallback).
   final String avatarAsset;
@@ -53,6 +59,11 @@ class MeProfile {
   final String signature;
   final List<String> tags;
   final int? voiceSeconds;
+  /// Remote CDN URL (or pending local path before save).
+  final String? voiceUrl;
+
+  /// Server Level badge (`icons.smallIcon`); empty → hide like forya UserLevWidget.
+  final String? vipIconUrl;
   final bool nicknameChangedOnce;
   final int vipLevel;
   final int experience;
@@ -65,6 +76,7 @@ class MeProfile {
     String? userId,
     String? avatarAsset,
     String? avatarUrl,
+    String? email,
     int? friends,
     int? fans,
     int? follows,
@@ -78,6 +90,8 @@ class MeProfile {
     String? signature,
     List<String>? tags,
     int? voiceSeconds,
+    String? voiceUrl,
+    String? vipIconUrl,
     bool clearVoice = false,
     bool? nicknameChangedOnce,
     int? vipLevel,
@@ -89,6 +103,7 @@ class MeProfile {
       userId: userId ?? this.userId,
       avatarAsset: avatarAsset ?? this.avatarAsset,
       avatarUrl: avatarUrl ?? this.avatarUrl,
+      email: email ?? this.email,
       friends: friends ?? this.friends,
       fans: fans ?? this.fans,
       follows: follows ?? this.follows,
@@ -100,6 +115,8 @@ class MeProfile {
       signature: signature ?? this.signature,
       tags: tags ?? this.tags,
       voiceSeconds: clearVoice ? null : (voiceSeconds ?? this.voiceSeconds),
+      voiceUrl: clearVoice ? null : (voiceUrl ?? this.voiceUrl),
+      vipIconUrl: vipIconUrl ?? this.vipIconUrl,
       nicknameChangedOnce: nicknameChangedOnce ?? this.nicknameChangedOnce,
       vipLevel: vipLevel ?? this.vipLevel,
       experience: experience ?? this.experience,

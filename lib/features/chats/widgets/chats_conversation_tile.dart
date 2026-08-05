@@ -111,7 +111,9 @@ class _ChatsConversationTileState extends State<ChatsConversationTile> {
 
   bool get _useBrandTitle {
     final c = widget.conversation;
-    return c.badge == ChatBadgeType.verified || c.titleColor != null;
+    // Solid titleColor wins; verified badge without color uses brand gradient.
+    if (c.titleColor != null) return false;
+    return c.badge == ChatBadgeType.verified;
   }
 
   @override

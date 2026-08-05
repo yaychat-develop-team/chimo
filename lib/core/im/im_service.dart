@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -6,6 +7,7 @@ import 'package:im_flutter_sdk/im_flutter_sdk.dart';
 
 import '../auth/auth_session.dart';
 import '../network/network_bootstrap.dart';
+import 'im_system_accounts.dart';
 
 /// Lightweight DM message event for UI (peer or self).
 class ImChatMessage {
@@ -22,6 +24,15 @@ class ImChatMessage {
     this.mediaRemoteUrl = '',
     this.thumbnailUrl = '',
     this.durationSecs = 0,
+    this.customEvent = '',
+    this.giftId = 0,
+    this.giftQty = 1,
+    this.giftName = '',
+    this.giftIconUrl = '',
+    this.emoteUrl = '',
+    this.emoteName = '',
+    this.joinName = '',
+    this.joinUid = '',
   });
 
   final String id;
@@ -32,7 +43,7 @@ class ImChatMessage {
   final bool isSelf;
   final int serverTimeMs;
 
-  /// `txt` | `image` | `voice` | `custom`
+  /// `txt` | `image` | `voice` | `gift` | `follow` | `emote` | `join` | `custom`
   final String msgType;
 
   /// Local file path when available (sent / already downloaded).
@@ -47,6 +58,22 @@ class ImChatMessage {
   /// Voice duration in seconds.
   final int durationSecs;
 
+  /// EaseMob custom body event (SendGift, Smiley, …).
+  final String customEvent;
+
+  final int giftId;
+  final int giftQty;
+  final String giftName;
+  final String giftIconUrl;
+
+  /// Sticker image URL (emote message).
+  final String emoteUrl;
+  final String emoteName;
+
+  /// Join-group tip (JoinGroupMessage).
+  final String joinName;
+  final String joinUid;
+
   /// Prefer existing local file, else remote URL, else thumbnail.
   String get playableOrDisplayUrl {
     final local = mediaLocalPath.trim();
@@ -59,6 +86,17 @@ class ImChatMessage {
     if (remote.isNotEmpty) return remote;
     return thumbnailUrl.trim();
   }
+}
+
+/// One page of DM history for lazy loading.
+class ImHistoryPage {
+  const ImHistoryPage({
+    required this.messages,
+    required this.hasMore,
+  });
+
+  final List<ImChatMessage> messages;
+  final bool hasMore;
 }
 
 /// EaseMob IM facade for Chimo (init / login / DM send-receive).
@@ -253,10 +291,14 @@ abstract final class ImService {
     _connected = false;
   }
 
-  /// Send 1v1 text. [peerEmUsername] is conversation id on EaseMob.
+  /// Send text. [peerEmUsername] is peer EM id, or group id when [isGroup].
+  ///
+  /// [extra] is stored under message attributes `extra` (forya emote payload).
   static Future<ImChatMessage?> sendText({
     required String peerEmUsername,
     required String content,
+    Map<String, dynamic>? extra,
+    bool isGroup = false,
   }) async {
     final text = content.trim();
     if (text.isEmpty || peerEmUsername.isEmpty) return null;
@@ -266,8 +308,13 @@ abstract final class ImService {
         targetId: peerEmUsername,
         content: text,
       );
-      msg.chatType = ChatType.Chat;
+      msg.chatType = isGroup ? ChatType.GroupChat : ChatType.Chat;
       await _applySenderAttrs(msg);
+      if (extra != null && extra.isNotEmpty) {
+        final attrs = Map<String, dynamic>.from(msg.attributes ?? const {});
+        attrs['extra'] = extra;
+        msg.attributes = attrs;
+      }
       final sent = await EMClient.getInstance.chatManager.sendMessage(msg);
       return _emitAndReturn(sent, forceSelf: true);
     } on EMError catch (e) {
@@ -276,11 +323,60 @@ abstract final class ImService {
     }
   }
 
-  /// Send 1v1 voice file (local path + duration seconds).
+  /// Send sticker (forya sendEmote): text `[name]` + attributes.extra.emote.
+  static Future<ImChatMessage?> sendEmote({
+    required String peerEmUsername,
+    required String packId,
+    required String stickerId,
+    required String name,
+    required String url,
+    bool isGroup = false,
+  }) {
+    return sendText(
+      peerEmUsername: peerEmUsername,
+      content: '[${name.isEmpty ? 'Sticker' : name}]',
+      isGroup: isGroup,
+      extra: {
+        'type': 'emote',
+        'emote': {
+          'emoticons_id': packId,
+          'id': stickerId,
+          'desc': name,
+          'url': url,
+        },
+      },
+    );
+  }
+
+  /// Forya `im_follow_message` tip after follow / unfollow.
+  static Future<ImChatMessage?> sendFollowTip({
+    required String peerEmUsername,
+    required bool followed,
+  }) async {
+    if (peerEmUsername.isEmpty) return null;
+    if (!_sdkInited) await connectFromServer();
+    try {
+      final msg = EMMessage.createCustomSendMessage(
+        targetId: peerEmUsername,
+        event: 'im_follow_message',
+        params: {'follow': followed ? '1' : '0'},
+      );
+      msg.chatType = ChatType.Chat;
+      await _applySenderAttrs(msg);
+      final sent = await EMClient.getInstance.chatManager.sendMessage(msg);
+      return _emitAndReturn(sent, forceSelf: true);
+    } on EMError catch (e) {
+      debugPrint('ImService sendFollowTip failed ${e.code} ${e.description}');
+      rethrow;
+    }
+  }
+
+  /// Send voice file (local path + duration seconds).
   static Future<ImChatMessage?> sendVoice({
     required String peerEmUsername,
     required String filePath,
     required int durationSecs,
+    bool isGroup = false,
   }) async {
     final path = filePath.trim();
     if (path.isEmpty || peerEmUsername.isEmpty) return null;
@@ -304,7 +400,7 @@ abstract final class ImService {
         fileSize: file.lengthSync(),
         displayName: local.split(RegExp(r'[/\\]')).last,
       );
-      msg.chatType = ChatType.Chat;
+      msg.chatType = isGroup ? ChatType.GroupChat : ChatType.Chat;
       await _applySenderAttrs(msg);
       final sent = await EMClient.getInstance.chatManager.sendMessage(msg);
       return _emitAndReturn(sent, forceSelf: true);
@@ -314,11 +410,12 @@ abstract final class ImService {
     }
   }
 
-  /// Send 1v1 image (local file path).
+  /// Send image (local file path).
   static Future<ImChatMessage?> sendImage({
     required String peerEmUsername,
     required String filePath,
     bool sendOriginalImage = false,
+    bool isGroup = false,
   }) async {
     final path = filePath.trim();
     if (path.isEmpty || peerEmUsername.isEmpty) return null;
@@ -339,7 +436,7 @@ abstract final class ImService {
         fileSize: file.lengthSync(),
         displayName: local.split(RegExp(r'[/\\]')).last,
       );
-      msg.chatType = ChatType.Chat;
+      msg.chatType = isGroup ? ChatType.GroupChat : ChatType.Chat;
       await _applySenderAttrs(msg);
       final sent = await EMClient.getInstance.chatManager.sendMessage(msg);
       return _emitAndReturn(sent, forceSelf: true);
@@ -370,34 +467,54 @@ abstract final class ImService {
     return out;
   }
 
-  /// Local + attempt server history for a 1v1 conversation.
-  static Future<List<ImChatMessage>> loadHistory(
-    String peerEmUsername, {
-    int count = 40,
+  /// Local + server history page for a conversation.
+  ///
+  /// [startMsgId] empty = first page (newest). Non-empty = older page before that id.
+  /// Matches forya ChatController.loadMessages pagination.
+  static Future<ImHistoryPage> loadHistory(
+    String conversationId, {
+    String startMsgId = '',
+    int count = 20,
+    bool isGroup = false,
   }) async {
-    if (peerEmUsername.isEmpty) return const [];
+    if (conversationId.isEmpty) {
+      return const ImHistoryPage(messages: [], hasMore: false);
+    }
     if (!_sdkInited) await connectFromServer();
+    final convType =
+        isGroup ? EMConversationType.GroupChat : EMConversationType.Chat;
     try {
       final conv = await EMClient.getInstance.chatManager.getConversation(
-        peerEmUsername,
-        type: EMConversationType.Chat,
+        conversationId,
+        type: convType,
         createIfNeed: true,
       );
-      if (conv == null) return const [];
+      if (conv == null) {
+        return const ImHistoryPage(messages: [], hasMore: false);
+      }
 
       var list = await conv.loadMessages(
-        startMsgId: '',
+        startMsgId: startMsgId,
         loadCount: count,
+        direction: EMSearchDirection.Up,
       );
-      if (list.isEmpty) {
+
+      // Pull from server when opening older pages, or when local page is short.
+      if (startMsgId.isNotEmpty || list.length < count) {
         try {
-          final result =
-              await EMClient.getInstance.chatManager.fetchHistoryMessages(
-            conversationId: peerEmUsername,
-            type: EMConversationType.Chat,
+          final cursorResult =
+              await EMClient.getInstance.chatManager.fetchHistoryMessagesByOption(
+            conversationId,
+            convType,
+            options: FetchMessageOptions(
+              direction: EMSearchDirection.Up,
+              needSave: true,
+            ),
+            cursor: startMsgId.isEmpty ? null : startMsgId,
             pageSize: count,
           );
-          list = result.data;
+          // Server Up returns newest-first; flip to oldest-first.
+          list = cursorResult.data.reversed.toList();
         } catch (error) {
           debugPrint('ImService fetchHistory: $error');
         }
@@ -409,27 +526,71 @@ abstract final class ImService {
         if (mapped != null) out.add(mapped);
       }
       out.sort((a, b) => a.serverTimeMs.compareTo(b.serverTimeMs));
-      return out;
+      return ImHistoryPage(
+        messages: out,
+        hasMore: list.length >= count,
+      );
     } catch (error) {
       debugPrint('ImService.loadHistory failed: $error');
-      return const [];
+      return const ImHistoryPage(messages: [], hasMore: false);
     }
   }
 
-  /// Open EM conversations of Chat type for list previews.
-  static Future<List<EMConversation>> loadDmConversations() async {
+  /// Mark a 1v1 conversation as read in EaseMob (local + read ack).
+  ///
+  /// Without this, list badges clear in UI but come back after restart.
+  static Future<void> markConversationRead(
+    String peerEmUsername, {
+    bool isGroup = false,
+  }) async {
+    final id = peerEmUsername.trim();
+    if (id.isEmpty) return;
+    if (!_sdkInited) await connectFromServer();
+    try {
+      final conv = await EMClient.getInstance.chatManager.getConversation(
+        id,
+        type: isGroup ? EMConversationType.GroupChat : EMConversationType.Chat,
+        createIfNeed: false,
+      );
+      if (conv == null) return;
+      await conv.markAllMessagesAsRead();
+      if (!isGroup) {
+        try {
+          await EMClient.getInstance.chatManager.sendConversationReadAck(id);
+        } catch (error) {
+          debugPrint('ImService sendConversationReadAck: $error');
+        }
+      }
+    } catch (error) {
+      debugPrint('ImService.markConversationRead failed: $error');
+    }
+  }
+
+  /// Open EM conversations for list merge (1v1 Chat + GroupChat).
+  static Future<List<EMConversation>> loadListConversations() async {
     if (!_sdkInited) await connectFromServer();
     try {
       final all =
           await EMClient.getInstance.chatManager.loadAllConversations();
       return [
         for (final c in all)
-          if (c.type == EMConversationType.Chat) c,
+          if (c.type == EMConversationType.Chat ||
+              c.type == EMConversationType.GroupChat)
+            c,
       ];
     } catch (error) {
-      debugPrint('ImService.loadDmConversations: $error');
+      debugPrint('ImService.loadListConversations: $error');
       return const [];
     }
+  }
+
+  /// Open EM conversations of Chat type for list previews.
+  static Future<List<EMConversation>> loadDmConversations() async {
+    final all = await loadListConversations();
+    return [
+      for (final c in all)
+        if (c.type == EMConversationType.Chat) c,
+    ];
   }
 
   static Future<String> previewFor(EMConversation conv) async {
@@ -442,19 +603,79 @@ abstract final class ImService {
     }
   }
 
+  static Future<int> latestTimeMs(EMConversation conv) async {
+    try {
+      final latest = await conv.latestMessage();
+      return latest?.serverTime ?? 0;
+    } catch (_) {
+      return 0;
+    }
+  }
+
   static String previewText(EMMessage message) {
     final body = message.body;
-    if (body is EMTextMessageBody) return body.content;
+    if (body is EMTextMessageBody) {
+      final emote = _emoteFromAttributes(message.attributes);
+      if (emote != null) {
+        return emote.name.isEmpty ? '[Sticker]' : '[${emote.name}]';
+      }
+      return body.content;
+    }
     if (body is EMImageMessageBody) return '[Image]';
     if (body is EMVoiceMessageBody) {
       final d = body.duration;
       return d > 0 ? '[Voice] $d"' : '[Voice]';
     }
     if (body is EMCustomMessageBody) {
-      final event = body.event;
-      return event.isEmpty ? '[Message]' : '[$event]';
+      return _customPreview(body, message: message);
     }
     return '[Message]';
+  }
+
+  static String _customPreview(
+    EMCustomMessageBody body, {
+    required EMMessage message,
+  }) {
+    final event = body.event;
+    if (event.isEmpty) return '[Message]';
+    switch (event) {
+      case 'SendGift':
+        return '[Gift]';
+      case 'im_ride_invite_message':
+        return '[Ride Invitation]';
+      case 'im_room_invite_message':
+      case 'RoomInvite':
+        return '[Room Invitation]';
+      case 'share_user_msg':
+        return '[Friend Referral]';
+      case 'im_prick_message':
+        return '[Poke]';
+      case 'im_follow_message':
+        return 'Followed you';
+      case 'JoinGroupMessage':
+        final join = _parseJoinGroupParams(body.params);
+        if (join.name.isNotEmpty) {
+          return '${join.name} joined the community';
+        }
+        return 'joined the community';
+      case 'SystemNotify':
+        final params = body.params;
+        if (params != null) {
+          for (final key in ['text', 'content', 'title', 'body']) {
+            final v = '${params[key] ?? ''}'.trim();
+            if (v.isNotEmpty && !v.startsWith('{') && !v.startsWith('[')) {
+              return v;
+            }
+          }
+        }
+        final convId = message.conversationId ?? message.from;
+        if (ImSystemAccounts.isNewFriends(convId)) {
+          return 'New friend activity';
+        }
+        return '[Message]';
+      default:
+        return '[$event]';
+    }
   }
 
   static void _emitEmMessage(EMMessage message) {
@@ -488,6 +709,21 @@ abstract final class ImService {
 
     if (body is EMTextMessageBody) {
       text = body.content;
+      final emote = _emoteFromAttributes(message.attributes);
+      if (emote != null) {
+        type = 'emote';
+        remote = emote.url;
+        text = emote.name.isEmpty ? text : '[${emote.name}]';
+        return _finishEm(
+          message,
+          forceSelf: forceSelf,
+          text: text,
+          type: type,
+          remote: remote,
+          emoteUrl: emote.url,
+          emoteName: emote.name,
+        );
+      }
     } else if (body is EMImageMessageBody) {
       type = 'image';
       local = _pickLocal(body.localPath);
@@ -503,12 +739,40 @@ abstract final class ImService {
       durationSecs = body.duration;
       text = durationSecs > 0 ? '[Voice] $durationSecs"' : '[Voice]';
     } else if (body is EMCustomMessageBody) {
-      text = body.event.isEmpty ? '[Message]' : '[${body.event}]';
-      type = 'custom';
+      return _mapCustomBody(body, message: message, forceSelf: forceSelf);
     } else {
       return null;
     }
 
+    return _finishEm(
+      message,
+      forceSelf: forceSelf,
+      text: text,
+      type: type,
+      local: local,
+      remote: remote,
+      thumb: thumb,
+      durationSecs: durationSecs,
+    );
+  }
+
+  static ImChatMessage _finishEm(
+    EMMessage message, {
+    required bool forceSelf,
+    required String text,
+    required String type,
+    String local = '',
+    String remote = '',
+    String thumb = '',
+    int durationSecs = 0,
+    String emoteUrl = '',
+    String emoteName = '',
+    String customEvent = '',
+    int giftId = 0,
+    int giftQty = 1,
+    String giftName = '',
+    String giftIconUrl = '',
+  }) {
     final selfUser = _currentEmUser ?? '';
     final isSelf = forceSelf ||
         message.direction == MessageDirection.SEND ||
@@ -532,7 +796,232 @@ abstract final class ImService {
       mediaRemoteUrl: remote,
       thumbnailUrl: thumb,
       durationSecs: durationSecs,
+      customEvent: customEvent,
+      giftId: giftId,
+      giftQty: giftQty,
+      giftName: giftName,
+      giftIconUrl: giftIconUrl,
+      emoteUrl: emoteUrl,
+      emoteName: emoteName,
     );
+  }
+
+  static ({String url, String name})? _emoteFromAttributes(
+    Map<String, dynamic>? attributes,
+  ) {
+    if (attributes == null) return null;
+    var extra = attributes['extra'];
+    if (extra is String) {
+      final raw = extra.trim();
+      if (raw.isEmpty) return null;
+      try {
+        extra = jsonDecode(raw);
+      } catch (_) {
+        return null;
+      }
+    }
+    if (extra is! Map) return null;
+    final type = '${extra['type'] ?? ''}';
+    if (type != 'emote' && type != 'outside_emote') return null;
+    final emote = extra['emote'];
+    if (emote is! Map) return null;
+    final url =
+        '${emote['url'] ?? emote['resource'] ?? emote['showUrl'] ?? ''}'
+            .trim();
+    if (url.isEmpty) return null;
+    final name = '${emote['desc'] ?? emote['name'] ?? ''}'.trim();
+    return (url: url, name: name);
+  }
+
+  static ImChatMessage? _mapCustomBody(
+    EMCustomMessageBody body, {
+    required EMMessage message,
+    bool forceSelf = false,
+  }) {
+    final selfUser = _currentEmUser ?? '';
+    final isSelf = forceSelf ||
+        message.direction == MessageDirection.SEND ||
+        (selfUser.isNotEmpty && message.from == selfUser);
+    final convIdRaw = message.conversationId?.trim() ?? '';
+    final conversationId = convIdRaw.isNotEmpty
+        ? convIdRaw
+        : (isSelf ? (message.to ?? '') : (message.from ?? ''));
+
+    final event = body.event;
+    final params = body.params ?? const <String, String>{};
+
+    if (event == 'SendGift') {
+      final gift = _parseGiftParams(params);
+      final name = gift.name;
+      final qty = gift.qty;
+      final text = name.isEmpty
+          ? '[Gift] x$qty'
+          : '[Gift] $name x$qty';
+      return ImChatMessage(
+        id: message.msgId,
+        conversationId: conversationId,
+        from: message.from ?? '',
+        to: message.to ?? '',
+        text: text,
+        isSelf: isSelf,
+        serverTimeMs: message.serverTime,
+        msgType: 'gift',
+        customEvent: event,
+        giftId: gift.id,
+        giftQty: qty,
+        giftName: name,
+        giftIconUrl: gift.iconUrl,
+      );
+    }
+
+    if (event == 'im_follow_message') {
+      final followed = (int.tryParse('${params['follow'] ?? '1'}') ?? 1) > 0;
+      final text = isSelf
+          ? (followed
+              ? 'You have followed the user'
+              : 'You have unfollowed the user')
+          : (followed
+              ? 'The user has followed you'
+              : 'The user has unfollowed you');
+      return ImChatMessage(
+        id: message.msgId,
+        conversationId: conversationId,
+        from: message.from ?? '',
+        to: message.to ?? '',
+        text: text,
+        isSelf: isSelf,
+        serverTimeMs: message.serverTime,
+        msgType: 'follow',
+        customEvent: event,
+      );
+    }
+
+    if (event == 'JoinGroupMessage') {
+      final join = _parseJoinGroupParams(params);
+      final name = join.name.isEmpty ? 'Someone' : join.name;
+      return ImChatMessage(
+        id: message.msgId,
+        conversationId: conversationId,
+        from: message.from ?? '',
+        to: message.to ?? '',
+        text: '$name joined the community',
+        isSelf: isSelf,
+        serverTimeMs: message.serverTime,
+        msgType: 'join',
+        customEvent: event,
+        joinName: name,
+        joinUid: join.uid,
+      );
+    }
+
+    // Stickers / Smiley and similar: prefer raw emoji / text in params.
+    if (event == 'Smiley' || event == 'Emoji' || event == 'sticker') {
+      final emoji = _firstParam(params, const [
+        'emoji',
+        'text',
+        'content',
+        'smiley',
+        'name',
+      ]);
+      return ImChatMessage(
+        id: message.msgId,
+        conversationId: conversationId,
+        from: message.from ?? '',
+        to: message.to ?? '',
+        text: emoji.isNotEmpty ? emoji : '😊',
+        isSelf: isSelf,
+        serverTimeMs: message.serverTime,
+        msgType: 'txt',
+        customEvent: event,
+      );
+    }
+
+    final preview = _customPreview(body, message: message);
+    return ImChatMessage(
+      id: message.msgId,
+      conversationId: conversationId,
+      from: message.from ?? '',
+      to: message.to ?? '',
+      text: preview,
+      isSelf: isSelf,
+      serverTimeMs: message.serverTime,
+      msgType: 'custom',
+      customEvent: event,
+    );
+  }
+
+  static ({int id, int qty, String name, String iconUrl}) _parseGiftParams(
+    Map<String, String> params,
+  ) {
+    var id = 0;
+    var qty = 1;
+    var name = '';
+    var iconUrl = '';
+    final raw = params['content'] ?? params['gift'] ?? '';
+    if (raw.isEmpty) {
+      id = int.tryParse(params['id'] ?? params['giftId'] ?? '') ?? 0;
+      qty = int.tryParse(params['itemCount'] ?? params['qty'] ?? '1') ?? 1;
+      name = params['name'] ?? params['giftName'] ?? '';
+      iconUrl = params['icon'] ?? params['giftIcon'] ?? '';
+      return (id: id, qty: qty, name: name, iconUrl: iconUrl);
+    }
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) {
+        final map = Map<String, dynamic>.from(decoded);
+        final item = map['item'];
+        if (item is Map) {
+          final im = Map<String, dynamic>.from(item);
+          id = int.tryParse('${im['id'] ?? ''}') ?? 0;
+          name = '${im['name'] ?? im['title'] ?? ''}'.trim();
+          iconUrl = '${im['icon'] ?? im['iconUrl'] ?? im['url'] ?? ''}'.trim();
+        }
+        qty = int.tryParse('${map['itemCount'] ?? map['count'] ?? '1'}') ?? 1;
+        if (name.isEmpty) {
+          name = '${map['name'] ?? map['giftName'] ?? ''}'.trim();
+        }
+        if (iconUrl.isEmpty) {
+          iconUrl = '${map['icon'] ?? map['giftIcon'] ?? ''}'.trim();
+        }
+      }
+    } catch (error) {
+      debugPrint('ImService parse gift: $error');
+    }
+    if (qty < 1) qty = 1;
+    return (id: id, qty: qty, name: name, iconUrl: iconUrl);
+  }
+
+  /// Join tip params: flat `name`/`uid`, or JSON `content` (server / forya).
+  static ({String name, String uid}) _parseJoinGroupParams(
+    Map<String, String>? params,
+  ) {
+    if (params == null || params.isEmpty) {
+      return (name: '', uid: '');
+    }
+    var name = '${params['name'] ?? ''}'.trim();
+    var uid = '${params['uid'] ?? params['userId'] ?? ''}'.trim();
+    final raw = '${params['content'] ?? ''}'.trim();
+    if (raw.startsWith('{')) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map) {
+          final map = Map<String, dynamic>.from(decoded);
+          final n = '${map['name'] ?? map['nickname'] ?? ''}'.trim();
+          final u = '${map['uid'] ?? map['userId'] ?? map['id'] ?? ''}'.trim();
+          if (n.isNotEmpty) name = n;
+          if (u.isNotEmpty) uid = u;
+        }
+      } catch (_) {}
+    }
+    return (name: name, uid: uid);
+  }
+
+  static String _firstParam(Map<String, String> params, List<String> keys) {
+    for (final k in keys) {
+      final v = '${params[k] ?? ''}'.trim();
+      if (v.isNotEmpty && !v.startsWith('{') && !v.startsWith('[')) return v;
+    }
+    return '';
   }
 
   /// For tests / hot restart.

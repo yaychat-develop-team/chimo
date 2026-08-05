@@ -6,9 +6,8 @@ import 'package:go_router/go_router.dart';
 import '../../app/app_router.dart';
 import '../../core/auth/auth_session.dart';
 import '../../core/constants/app_assets.dart';
-import '../../core/theme/app_colors.dart';
 
-/// App launch screen: launch_bg + bottom slogan, then login or main.
+/// App launch screen: launch_bg (top) + bottom slogan, then login or main.
 class SplashPage extends StatefulWidget {
   const SplashPage({
     super.key,
@@ -46,60 +45,26 @@ class _SplashPageState extends State<SplashPage> {
 
   @override
   Widget build(BuildContext context) {
+    final bottom = MediaQuery.paddingOf(context).bottom;
+    final screenW = MediaQuery.sizeOf(context).width;
+
     return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Stack(
-        fit: StackFit.expand,
+      backgroundColor: const Color(0xFF0F0F0F),
+      body: Column(
         children: [
-          // Background includes "Chimo" wordmark at bottom; align upward to leave room for slogan.
+          // Logo + wordmark live in the asset; fit width so they stay upper-screen.
           Image.asset(
             AppAssets.launchBg,
-            fit: BoxFit.cover,
-            alignment: const Alignment(0, -0.45),
+            width: screenW,
+            fit: BoxFit.fitWidth,
           ),
-          // Bottom gradient mask so wordmark and slogan don't clash.
-          const Align(
-            alignment: Alignment.bottomCenter,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Color(0x00000000),
-                    Color(0xCC000000),
-                    Color(0xFF000000),
-                  ],
-                  stops: [0.0, 0.45, 1.0],
-                ),
-              ),
-              child: SizedBox(height: 140, width: double.infinity),
-            ),
+          const Spacer(),
+          Image.asset(
+            AppAssets.splashSlogan,
+            height: 15,
+            fit: BoxFit.contain,
           ),
-          SafeArea(
-            child: Align(
-              alignment: Alignment.bottomCenter,
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 28),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Image.asset(
-                      AppAssets.splashTitle,
-                      height: 34,
-                      fit: BoxFit.contain,
-                    ),
-                    const SizedBox(height: 12),
-                    Image.asset(
-                      AppAssets.splashSlogan,
-                      height: 15,
-                      fit: BoxFit.contain,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
+          SizedBox(height: 54 + bottom),
         ],
       ),
     );

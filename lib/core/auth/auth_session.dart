@@ -146,10 +146,23 @@ abstract final class AuthSession {
     return null;
   }
 
-  /// [method]: `phone` / `email`.
+  static Future<String?> email() async {
+    final data = await _read();
+    final value = data['email'];
+    return value is String && value.isNotEmpty ? value : null;
+  }
+
+  static Future<String?> loginMethod() async {
+    final data = await _read();
+    final value = data['method'];
+    return value is String && value.isNotEmpty ? value : null;
+  }
+
+  /// [method]: `phone` / `email`. Omit to keep the previously stored method.
   static Future<void> markLoggedIn({
-    String method = 'phone',
+    String? method,
     String? phone,
+    String? email,
     String? token,
     String? userId,
     String? nickname,
@@ -159,8 +172,9 @@ abstract final class AuthSession {
   }) async {
     final data = await _read();
     data['loggedIn'] = true;
-    data['method'] = method;
+    if (method != null && method.isNotEmpty) data['method'] = method;
     if (phone != null && phone.isNotEmpty) data['phone'] = phone;
+    if (email != null && email.isNotEmpty) data['email'] = email;
     if (token != null && token.isNotEmpty) {
       data['token'] = token;
       userId ??= userIdFromJwt(token);

@@ -18,6 +18,28 @@ class AlbumPhotoViewerPage extends StatefulWidget {
   final List<String> paths;
   final int initialIndex;
 
+  /// Push full-screen viewer; no-op when [paths] has no usable entries.
+  static Future<void> open(
+    BuildContext context, {
+    required List<String> paths,
+    int initialIndex = 0,
+  }) {
+    final clean = [
+      for (final p in paths)
+        if (p.trim().isNotEmpty) p.trim(),
+    ];
+    if (clean.isEmpty) return Future<void>.value();
+    final index = initialIndex.clamp(0, clean.length - 1);
+    return Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => AlbumPhotoViewerPage(
+          paths: clean,
+          initialIndex: index,
+        ),
+      ),
+    );
+  }
+
   @override
   State<AlbumPhotoViewerPage> createState() => _AlbumPhotoViewerPageState();
 }

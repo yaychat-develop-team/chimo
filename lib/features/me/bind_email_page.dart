@@ -345,6 +345,7 @@ class _BindEmailCodePageState extends State<_BindEmailCodePage> {
         }
         await AuthSession.markLoggedIn(
           method: 'email',
+          email: widget.email,
           token: token,
           nickname: '${map['nickName'] ?? map['nickname'] ?? ''}',
           avatarUrl: '${map['avatar'] ?? map['avatarUrl'] ?? ''}',
@@ -367,6 +368,8 @@ class _BindEmailCodePageState extends State<_BindEmailCodePage> {
         );
         return;
       }
+      await AuthSession.markLoggedIn(email: widget.email);
+      if (!mounted) return;
       showCenterToast(context, message: 'Email bound successfully');
       Navigator.of(context).pop(true);
     } catch (error) {

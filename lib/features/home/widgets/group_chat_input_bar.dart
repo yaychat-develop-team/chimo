@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:photo_manager/photo_manager.dart';
 
 import '../../../core/constants/app_assets.dart';
-import '../../profile/album_photo_viewer_page.dart';
+import '../../../core/widgets/center_toast.dart';
+import '../../chats/widgets/album_selection_preview_page.dart';
 
 enum GroupChatPanel { none, voice, photo, emoji }
 
@@ -20,6 +23,7 @@ class GroupChatInputBar extends StatefulWidget {
     required this.onSendText,
     required this.onSendVoice,
     required this.onSendImages,
+    this.onPanelChanged,
   });
 
   final double bottomInset;
@@ -27,29 +31,19 @@ class GroupChatInputBar extends StatefulWidget {
   final ValueChanged<String> onSendText;
   final ValueChanged<int> onSendVoice;
   final ValueChanged<List<String>> onSendImages;
+  /// Called when voice / photo / emoji panel opens or closes.
+  final ValueChanged<bool>? onPanelChanged;
 
   @override
-  State<GroupChatInputBar> createState() => _GroupChatInputBarState();
+  State<GroupChatInputBar> createState() => GroupChatInputBarState();
 }
 
-class _GroupChatInputBarState extends State<GroupChatInputBar> {
+class GroupChatInputBarState extends State<GroupChatInputBar> {
   static const int _maxVoiceSeconds = 60;
-  static const double _panelHeight = 290;
+  static const int _albumPageSize = 80;
 
-  static const List<String> _mockPhotos = [
-    AppAssets.genderFemaleImg,
-    AppAssets.genderMaleImg,
-    AppAssets.personalBg,
-    AppAssets.avatarPlace,
-    AppAssets.homeRoomBg,
-    AppAssets.launchBg,
-    AppAssets.splashLogo,
-    AppAssets.mineBg,
-    AppAssets.genderFemaleSelected,
-    AppAssets.genderMaleSelected,
-    AppAssets.emptyAvatar,
-    AppAssets.defaultAvatar,
-  ];
+  /// Match DM photo / voice panel height.
+  static const double _panelHeight = 300;
 
   static const ColorFilter _iconFilter = ColorFilter.matrix(<double>[
     0, 0, 0, 0, 90,
@@ -65,6 +59,10 @@ class _GroupChatInputBarState extends State<GroupChatInputBar> {
   double _voiceProgress = 0;
   DateTime? _voiceStartedAt;
   Timer? _voiceTimer;
+
+  List<AssetEntity> _albumPhotos = const [];
+  bool _albumLoading = false;
+  String? _albumError;
   final List<int> _selectedPhotos = [];
   bool _originalPhoto = true;
 
@@ -97,6 +95,10 @@ class _GroupChatInputBarState extends State<GroupChatInputBar> {
     FocusManager.instance.primaryFocus?.unfocus();
   }
 
+  void _notifyPanel(bool open) {
+    widget.onPanelChanged?.call(open);
+  }
+
   void _closePanel() {
     if (_panel == GroupChatPanel.none) return;
     _voiceTimer?.cancel();
@@ -109,6 +111,13 @@ class _GroupChatInputBarState extends State<GroupChatInputBar> {
       _voiceProgress = 0;
       _selectedPhotos.clear();
     });
+    _notifyPanel(false);
+  }
+
+  /// Tap message blank area: dismiss keyboard + voice/photo/emoji panels.
+  void dismissComposer() {
+    _dismissKeyboard();
+    _closePanel();
   }
 
   void _toggleVoice() {
@@ -125,6 +134,7 @@ class _GroupChatInputBarState extends State<GroupChatInputBar> {
       _voiceProgress = 0;
       _selectedPhotos.clear();
     });
+    _notifyPanel(true);
   }
 
   void _togglePhoto() {
@@ -133,6 +143,7 @@ class _GroupChatInputBarState extends State<GroupChatInputBar> {
         _panel = GroupChatPanel.none;
         _selectedPhotos.clear();
       });
+      _notifyPanel(false);
       return;
     }
     _dismissKeyboard();
@@ -145,12 +156,201 @@ class _GroupChatInputBarState extends State<GroupChatInputBar> {
       _voiceStartedAt = null;
       _selectedPhotos.clear();
       _originalPhoto = true;
+      _albumError = null;
     });
+    _notifyPanel(true);
+    unawaited(_loadAlbumPhotos());
+  }
+
+  /// Image-only: same as DM — avoid VIDEO permission on Android 13+.
+  static const _albumPermissionOption = PermissionRequestOption(
+    androidPermission: AndroidPermission(
+      type: RequestType.image,
+      mediaLocation: false,
+    ),
+  );
+
+  Future<void> _loadAlbumPhotos({bool openSettingsIfDenied = false}) async {
+    setState(() {
+      _albumLoading = true;
+      _albumError = null;
+    });
+    try {
+      final permission = await PhotoManager.requestPermissionExtend(
+        requestOption: _albumPermissionOption,
+      );
+      if (!permission.hasAccess) {
+        if (openSettingsIfDenied) {
+          await PhotoManager.openSetting();
+        }
+        if (!mounted) return;
+        setState(() {
+          _albumLoading = false;
+          _albumPhotos = const [];
+          _albumError = 'Photo permission denied';
+        });
+        return;
+      }
+
+      final paths = await PhotoManager.getAssetPathList(
+        type: RequestType.image,
+        onlyAll: true,
+        filterOption: FilterOptionGroup(
+          imageOption: const FilterOption(
+            sizeConstraint: SizeConstraint(ignoreSize: true),
+          ),
+          orders: [
+            const OrderOption(type: OrderOptionType.createDate, asc: false),
+          ],
+        ),
+      );
+      if (paths.isEmpty) {
+        if (!mounted) return;
+        setState(() {
+          _albumLoading = false;
+          _albumPhotos = const [];
+          _albumError = 'No photos in album';
+        });
+        return;
+      }
+
+      final assets = await paths.first.getAssetListPaged(
+        page: 0,
+        size: _albumPageSize,
+      );
+      if (!mounted) return;
+      setState(() {
+        _albumPhotos = assets;
+        _albumLoading = false;
+        _albumError = assets.isEmpty ? 'No photos in album' : null;
+      });
+    } catch (error) {
+      debugPrint('Group load album failed: $error');
+      if (!mounted) return;
+      setState(() {
+        _albumLoading = false;
+        _albumPhotos = const [];
+        _albumError = 'Failed to load album';
+      });
+    }
+  }
+
+  void _togglePhotoAt(int index) {
+    if (index < 0 || index >= _albumPhotos.length) return;
+    setState(() {
+      final i = _selectedPhotos.indexOf(index);
+      if (i >= 0) {
+        _selectedPhotos.removeAt(i);
+      } else {
+        _selectedPhotos.add(index);
+      }
+    });
+  }
+
+  Future<void> _previewSelected() async {
+    if (_selectedPhotos.isEmpty) return;
+    final entities = <AssetEntity>[
+      for (final i in _selectedPhotos)
+        if (i >= 0 && i < _albumPhotos.length) _albumPhotos[i],
+    ];
+    if (entities.isEmpty || !mounted) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => AlbumSelectionPreviewPage(entities: entities),
+      ),
+    );
+  }
+
+  Future<void> _sendSelectedPhotos() async {
+    if (_selectedPhotos.isEmpty) return;
+    final entities = [
+      for (final i in _selectedPhotos)
+        if (i >= 0 && i < _albumPhotos.length) _albumPhotos[i],
+    ];
+    setState(() {
+      _panel = GroupChatPanel.none;
+      _selectedPhotos.clear();
+    });
+
+    final paths = <String>[];
+    for (final entity in entities) {
+      try {
+        final file =
+            _originalPhoto ? await entity.originFile : await entity.file;
+        final path = file?.path.trim() ?? '';
+        if (path.isNotEmpty) paths.add(path);
+      } catch (error) {
+        debugPrint('Group resolve album file failed: $error');
+      }
+    }
+    if (!mounted) return;
+    if (paths.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not read selected photos'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    widget.onSendImages(paths);
+  }
+
+  Future<void> _openCamera() async {
+    try {
+      if (_panel != GroupChatPanel.none) {
+        setState(() => _panel = GroupChatPanel.none);
+      }
+      final file = await ImagePicker().pickImage(
+        source: ImageSource.camera,
+        preferredCameraDevice: CameraDevice.rear,
+        imageQuality: _originalPhoto ? 100 : 85,
+        maxWidth: 1920,
+      );
+      if (!mounted || file == null) return;
+      widget.onSendImages([file.path]);
+    } catch (error) {
+      debugPrint('Group camera pick failed: $error');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Camera unavailable: $error\n'
+            'On emulator: enable virtual camera, or use Album.',
+          ),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
+  Future<void> _openAlbum() async {
+    try {
+      final files = await ImagePicker().pickMultiImage(
+        imageQuality: _originalPhoto ? 100 : 85,
+      );
+      if (files.isEmpty) return;
+      setState(() {
+        _panel = GroupChatPanel.none;
+        _selectedPhotos.clear();
+      });
+      widget.onSendImages([for (final f in files) f.path]);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Pick image failed: $error'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   void _toggleEmoji() {
     if (_panel == GroupChatPanel.emoji) {
       setState(() => _panel = GroupChatPanel.none);
+      _notifyPanel(false);
       _focus.requestFocus();
       return;
     }
@@ -163,65 +363,7 @@ class _GroupChatInputBarState extends State<GroupChatInputBar> {
       _voiceProgress = 0;
       _selectedPhotos.clear();
     });
-  }
-
-  void _togglePhotoAt(int index) {
-    setState(() {
-      final i = _selectedPhotos.indexOf(index);
-      if (i >= 0) {
-        _selectedPhotos.removeAt(i);
-      } else {
-        _selectedPhotos.add(index);
-      }
-    });
-  }
-
-  void _sendSelectedPhotos() {
-    if (_selectedPhotos.isEmpty) return;
-    final assets = [for (final i in _selectedPhotos) _mockPhotos[i]];
-    setState(() {
-      _panel = GroupChatPanel.none;
-      _selectedPhotos.clear();
-    });
-    widget.onSendImages(assets);
-  }
-
-  void _previewSelected() {
-    if (_selectedPhotos.isEmpty) return;
-    final paths = [for (final i in _selectedPhotos) _mockPhotos[i]];
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => AlbumPhotoViewerPage(paths: paths),
-      ),
-    );
-  }
-
-  Future<void> _openCamera() async {
-    final file = await ImagePicker().pickImage(
-      source: ImageSource.camera,
-      imageQuality: 85,
-      maxWidth: 1920,
-    );
-    if (!mounted || file == null) return;
-    setState(() {
-      _panel = GroupChatPanel.none;
-      _selectedPhotos.clear();
-    });
-    widget.onSendImages([file.path]);
-  }
-
-  Future<void> _openAlbum() async {
-    final file = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 85,
-      maxWidth: 1920,
-    );
-    if (!mounted || file == null) return;
-    setState(() {
-      _panel = GroupChatPanel.none;
-      _selectedPhotos.clear();
-    });
-    widget.onSendImages([file.path]);
+    _notifyPanel(true);
   }
 
   void _insertEmoji(String emoji) {
@@ -328,7 +470,10 @@ class _GroupChatInputBarState extends State<GroupChatInputBar> {
 
   void _submit() {
     final text = widget.controller.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty) {
+      showCenterToast(context, message: 'The message cannot be empty!');
+      return;
+    }
     widget.onSendText(text);
   }
 
@@ -446,18 +591,23 @@ class _GroupChatInputBarState extends State<GroupChatInputBar> {
                     ),
                   ),
                 GroupChatPanel.photo => _PhotoPanel(
-                    photos: _mockPhotos,
+                    photos: _albumPhotos,
                     selected: _selectedPhotos,
                     originalPhoto: _originalPhoto,
+                    loading: _albumLoading,
+                    error: _albumError,
                     bottomInset: widget.bottomInset,
                     onTogglePhoto: _togglePhotoAt,
-                    onCamera: _openCamera,
-                    onPreview: _previewSelected,
-                    onAlbum: _openAlbum,
+                    onCamera: () => unawaited(_openCamera()),
+                    onPreview: () => unawaited(_previewSelected()),
+                    onAlbum: () => unawaited(_openAlbum()),
                     onToggleOriginal: () {
                       setState(() => _originalPhoto = !_originalPhoto);
                     },
-                    onSend: _sendSelectedPhotos,
+                    onSend: () => unawaited(_sendSelectedPhotos()),
+                    onRetry: () => unawaited(
+                      _loadAlbumPhotos(openSettingsIfDenied: true),
+                    ),
                   ),
                 GroupChatPanel.emoji => _EmojiPanel(
                     bottomInset: widget.bottomInset,
@@ -683,6 +833,8 @@ class _PhotoPanel extends StatelessWidget {
     required this.photos,
     required this.selected,
     required this.originalPhoto,
+    required this.loading,
+    required this.error,
     required this.bottomInset,
     required this.onTogglePhoto,
     required this.onCamera,
@@ -690,11 +842,14 @@ class _PhotoPanel extends StatelessWidget {
     required this.onAlbum,
     required this.onToggleOriginal,
     required this.onSend,
+    required this.onRetry,
   });
 
-  final List<String> photos;
+  final List<AssetEntity> photos;
   final List<int> selected;
   final bool originalPhoto;
+  final bool loading;
+  final String? error;
   final double bottomInset;
   final ValueChanged<int> onTogglePhoto;
   final VoidCallback onCamera;
@@ -702,6 +857,7 @@ class _PhotoPanel extends StatelessWidget {
   final VoidCallback onAlbum;
   final VoidCallback onToggleOriginal;
   final VoidCallback onSend;
+  final VoidCallback onRetry;
 
   static const Color _green = Color(0xFF00F875);
 
@@ -713,28 +869,65 @@ class _PhotoPanel extends StatelessWidget {
     return Column(
       children: [
         Expanded(
-          child: GridView.builder(
-            padding: EdgeInsets.zero,
-            physics: const BouncingScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 4,
-              mainAxisSpacing: 2,
-              crossAxisSpacing: 2,
-            ),
-            itemCount: itemCount,
-            itemBuilder: (context, index) {
-              if (index == 0) {
-                return _CameraCell(onTap: onCamera);
-              }
-              final photoIndex = index - 1;
-              final order = selected.indexOf(photoIndex);
-              return _PhotoCell(
-                asset: photos[photoIndex],
-                order: order < 0 ? null : order + 1,
-                onTap: () => onTogglePhoto(photoIndex),
-              );
-            },
-          ),
+          child: loading
+              ? const Center(
+                  child: SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                )
+              : error != null && photos.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              error!,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Color(0xFF888888),
+                                fontSize: 13,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            TextButton(
+                              onPressed: onRetry,
+                              child: const Text('Retry'),
+                            ),
+                            TextButton(
+                              onPressed: onAlbum,
+                              child: const Text('Open system album'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : GridView.builder(
+                      padding: EdgeInsets.zero,
+                      physics: const BouncingScrollPhysics(),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 4,
+                        mainAxisSpacing: 2,
+                        crossAxisSpacing: 2,
+                      ),
+                      itemCount: itemCount,
+                      itemBuilder: (context, index) {
+                        if (index == 0) {
+                          return _CameraCell(onTap: onCamera);
+                        }
+                        final photoIndex = index - 1;
+                        final order = selected.indexOf(photoIndex);
+                        return _AlbumPhotoCell(
+                          entity: photos[photoIndex],
+                          order: order < 0 ? null : order + 1,
+                          onTap: () => onTogglePhoto(photoIndex),
+                        );
+                      },
+                    ),
         ),
         Padding(
           padding: EdgeInsets.fromLTRB(16, 10, 16, 8 + bottomInset),
@@ -850,21 +1043,33 @@ class _CameraCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: CustomPaint(
-        painter: const _DashedRectPainter(color: Color(0xFFD0D0D0), radius: 4),
-        child: ColoredBox(
-          color: const Color(0xFFF5F5F5),
-          child: Center(
-            child: Image.asset(
-              AppAssets.cameraIcon,
-              width: 28,
-              height: 28,
-              fit: BoxFit.contain,
-              color: const Color(0xFFB0B0B0),
-              colorBlendMode: BlendMode.srcIn,
-            ),
+    return Material(
+      color: const Color(0xFFF5F5F5),
+      child: InkWell(
+        onTap: onTap,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border.all(color: const Color(0xFFD8D8D8)),
+          ),
+          child: const Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.photo_camera_outlined,
+                size: 28,
+                color: Color(0xFF666666),
+              ),
+              SizedBox(height: 4),
+              Text(
+                'Camera',
+                style: TextStyle(
+                  color: Color(0xFF888888),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  height: 1,
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -872,14 +1077,14 @@ class _CameraCell extends StatelessWidget {
   }
 }
 
-class _PhotoCell extends StatelessWidget {
-  const _PhotoCell({
-    required this.asset,
+class _AlbumPhotoCell extends StatelessWidget {
+  const _AlbumPhotoCell({
+    required this.entity,
     required this.order,
     required this.onTap,
   });
 
-  final String asset;
+  final AssetEntity entity;
   final int? order;
   final VoidCallback onTap;
 
@@ -892,12 +1097,33 @@ class _PhotoCell extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          Image.asset(
-            asset,
-            fit: BoxFit.cover,
-            errorBuilder: (_, _, _) =>
-                const ColoredBox(color: Color(0xFFE8E8E8)),
+          FutureBuilder<Uint8List?>(
+            future: entity.thumbnailDataWithSize(
+              const ThumbnailSize.square(200),
+              quality: 80,
+            ),
+            builder: (context, snapshot) {
+              final bytes = snapshot.data;
+              if (bytes == null || bytes.isEmpty) {
+                return const ColoredBox(
+                  color: Color(0xFFE8E8E8),
+                  child: Center(
+                    child: SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 1.5),
+                    ),
+                  ),
+                );
+              }
+              return Image.memory(
+                bytes,
+                fit: BoxFit.cover,
+                gaplessPlayback: true,
+              );
+            },
           ),
+          if (selected) const ColoredBox(color: Color(0x3300F875)),
           Positioned(
             top: 6,
             right: 6,
@@ -931,47 +1157,6 @@ class _PhotoCell extends StatelessWidget {
         ],
       ),
     );
-  }
-}
-
-class _DashedRectPainter extends CustomPainter {
-  const _DashedRectPainter({required this.color, this.radius = 4});
-
-  final Color color;
-  final double radius;
-  static const double _strokeWidth = 1.2;
-  static const double _dash = 4;
-  static const double _gap = 3;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = _strokeWidth;
-    final rect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(
-        _strokeWidth / 2,
-        _strokeWidth / 2,
-        size.width - _strokeWidth,
-        size.height - _strokeWidth,
-      ),
-      Radius.circular(radius),
-    );
-    final path = Path()..addRRect(rect);
-    for (final metric in path.computeMetrics()) {
-      var distance = 0.0;
-      while (distance < metric.length) {
-        final next = math.min(distance + _dash, metric.length);
-        canvas.drawPath(metric.extractPath(distance, next), paint);
-        distance = next + _gap;
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _DashedRectPainter oldDelegate) {
-    return oldDelegate.color != color || oldDelegate.radius != radius;
   }
 }
 

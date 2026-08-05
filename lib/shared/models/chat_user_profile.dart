@@ -14,7 +14,11 @@ class ChatUserProfile {
     required this.level,
     required this.bio,
     this.avatarUrl,
+    this.heightInches = 0,
+    this.weightLb = 0,
     this.voiceSeconds,
+    this.voiceUrl,
+    this.vipIconUrl,
     this.giftUnlocked = 0,
     this.giftTotal = 0,
     this.momentAssets = const [],
@@ -22,6 +26,7 @@ class ChatUserProfile {
     this.tags = const [],
     this.isFollowing = false,
     this.inPartyName,
+    this.isOnline = false,
     this.emUsername = '',
   });
 
@@ -36,8 +41,20 @@ class ChatUserProfile {
   final int level;
   final String bio;
 
+  /// Height in inches; 0 means not set / hide tag.
+  final int heightInches;
+
+  /// Weight in LB; 0 means not set / hide tag.
+  final int weightLb;
+
   /// Voice note duration in seconds; null if none.
   final int? voiceSeconds;
+
+  /// Remote voice URL for playback.
+  final String? voiceUrl;
+
+  /// Server Level badge URL (`icons.smallIcon`); empty → hide.
+  final String? vipIconUrl;
   final int giftUnlocked;
   final int giftTotal;
   final List<String> momentAssets;
@@ -45,6 +62,9 @@ class ChatUserProfile {
   final List<String> tags;
   final bool isFollowing;
   final String? inPartyName;
+
+  /// Presence from `/user/info` (`onlineStatus == 1` and not hidden).
+  final bool isOnline;
 
   /// EaseMob chat id (preferred peer conversation target).
   final String emUsername;
@@ -62,7 +82,7 @@ class ChatUserProfile {
     avatarAsset: AppAssets.avatarPlace,
     isMale: false,
     age: 22,
-    zodiac: 'Capricornus',
+    zodiac: 'Capricorn',
     level: 16,
     bio:
         'I love listening to songs and playing gaes. Hope to find a good friend.',
@@ -79,7 +99,7 @@ class ChatUserProfile {
       avatarUrl: member.avatarUrl,
       isMale: member.isMale,
       age: member.isMale ? 24 : 22,
-      zodiac: member.isMale ? 'Leo' : 'Capricornus',
+      zodiac: member.isMale ? 'Leo' : 'Capricorn',
       level: 1,
       bio: '',
     );
@@ -96,7 +116,11 @@ class ChatUserProfile {
     String? zodiac,
     int? level,
     String? bio,
+    int? heightInches,
+    int? weightLb,
     int? voiceSeconds,
+    String? voiceUrl,
+    String? vipIconUrl,
     bool clearVoice = false,
     int? giftUnlocked,
     int? giftTotal,
@@ -106,6 +130,7 @@ class ChatUserProfile {
     bool? isFollowing,
     String? inPartyName,
     bool clearInParty = false,
+    bool? isOnline,
     String? emUsername,
   }) {
     return ChatUserProfile(
@@ -119,7 +144,11 @@ class ChatUserProfile {
       zodiac: zodiac ?? this.zodiac,
       level: level ?? this.level,
       bio: bio ?? this.bio,
+      heightInches: heightInches ?? this.heightInches,
+      weightLb: weightLb ?? this.weightLb,
       voiceSeconds: clearVoice ? null : (voiceSeconds ?? this.voiceSeconds),
+      voiceUrl: clearVoice ? null : (voiceUrl ?? this.voiceUrl),
+      vipIconUrl: vipIconUrl ?? this.vipIconUrl,
       giftUnlocked: giftUnlocked ?? this.giftUnlocked,
       giftTotal: giftTotal ?? this.giftTotal,
       momentAssets: momentAssets ?? this.momentAssets,
@@ -127,6 +156,7 @@ class ChatUserProfile {
       tags: tags ?? this.tags,
       isFollowing: isFollowing ?? this.isFollowing,
       inPartyName: clearInParty ? null : (inPartyName ?? this.inPartyName),
+      isOnline: isOnline ?? this.isOnline,
       emUsername: emUsername ?? this.emUsername,
     );
   }

@@ -2,12 +2,14 @@ part of '../chat_detail_page.dart';
 
 class _DmInputBar extends StatefulWidget {
   const _DmInputBar({
+    super.key,
     required this.bottomInset,
     required this.controller,
     required this.onSend,
     required this.onSendVoice,
     required this.onSendImages,
     required this.onSendGift,
+    required this.onSendEmote,
     this.receiverUid = '',
   });
 
@@ -18,6 +20,7 @@ class _DmInputBar extends StatefulWidget {
   final void Function(String path, int seconds) onSendVoice;
   final ValueChanged<List<String>> onSendImages;
   final ValueChanged<_GiftSendResult> onSendGift;
+  final void Function(EmotePack pack, EmoteSticker sticker) onSendEmote;
   final String receiverUid;
 
   @override
@@ -33,7 +36,7 @@ class _DmInputBarState extends State<_DmInputBar> {
   static const int _albumPageSize = 80;
 
   /// Voice / photo panels share the same bottom area height (excl. safe inset).
-  static const double _panelHeight = 290;
+  static const double _panelHeight = 300;
 
   final FocusNode _inputFocus = FocusNode();
   final AudioRecorder _recorder = AudioRecorder();
@@ -107,6 +110,12 @@ class _DmInputBarState extends State<_DmInputBar> {
     });
   }
 
+  /// Tap message blank area: dismiss keyboard + function panels.
+  void dismissComposer() {
+    _dismissKeyboard();
+    _closeFunctionPanel();
+  }
+
   String get _voiceTimeLabel {
     final m = (_voiceSeconds ~/ 60).toString().padLeft(2, '0');
     final s = (_voiceSeconds % 60).toString().padLeft(2, '0');
@@ -157,7 +166,10 @@ class _DmInputBarState extends State<_DmInputBar> {
   }
 
   void _sendFromEmojiPanel() {
-    if (!_hasText) return;
+    if (!_hasText) {
+      showCenterToast(context, message: 'The message cannot be empty!');
+      return;
+    }
     widget.onSend(null);
   }
 
@@ -620,12 +632,6 @@ class _DmInputBarState extends State<_DmInputBar> {
     widget.onSendGift(result);
   }
 
-  void _showPlaceholder(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final showPanel = _panel != _DmPanel.none;
@@ -743,10 +749,6 @@ class _DmInputBarState extends State<_DmInputBar> {
                         onTap: _showGiftSheet,
                         child: _giftToolIcon(),
                       ),
-                      GestureDetector(
-                        onTap: () => _showPlaceholder('Wish coming soon'),
-                        child: _toolIconFromAsset(AppAssets.chatWish, size: 30),
-                      ),
                     ],
                   ),
                 ),
@@ -796,6 +798,7 @@ class _DmInputBarState extends State<_DmInputBar> {
                   onEmojiTap: _insertEmoji,
                   onBackspace: _emojiBackspace,
                   onSend: _sendFromEmojiPanel,
+                  onSendEmote: widget.onSendEmote,
                 ),
                 _DmPanel.none => const SizedBox.shrink(),
               },
@@ -806,13 +809,14 @@ class _DmInputBarState extends State<_DmInputBar> {
   }
 }
 
-class _ChatEmojiPanel extends StatelessWidget {
+class _ChatEmojiPanel extends StatefulWidget {
   const _ChatEmojiPanel({
     required this.bottomInset,
     required this.canSend,
     required this.onEmojiTap,
     required this.onBackspace,
     required this.onSend,
+    required this.onSendEmote,
   });
 
   final double bottomInset;
@@ -820,122 +824,369 @@ class _ChatEmojiPanel extends StatelessWidget {
   final ValueChanged<String> onEmojiTap;
   final VoidCallback onBackspace;
   final VoidCallback onSend;
-
-  static const Color _green = Color(0xFF00F875);
-
-  static const List<String> _emojis = [
-    '😀', '😁', '😂', '🤣', '😃', '😄', '😅', '😆',
-    '😉', '😊', '😋', '😎', '😍', '😘', '🥰', '😗',
-    '😙', '😚', '🙂', '🤗', '🤩', '🤔', '🤨', '😐',
-    '😑', '😶', '🙄', '😏', '😣', '😥', '😮', '🤐',
-    '😯', '😪', '😫', '🥱', '😴', '😌', '😛', '😜',
-    '😝', '🤤', '😒', '😓', '😔', '😕', '🙃', '🤑',
-    '😲', '☹️', '🙁', '😖', '😞', '😟', '😤', '😢',
-    '😭', '😦', '😧', '😨', '😩', '🤯', '😬', '😰',
-    '😱', '🥵', '🥶', '😳', '🤪', '😵', '😡', '😠',
-    '🤬', '😷', '🤒', '🤕', '🤢', '🤮', '🤧', '😇',
-    '🥳', '🥺', '🤠', '🤡', '🤥', '🤫', '🤭', '🧐',
-    '🤓', '😈', '👿', '👹', '👺', '💀', '👻', '👽',
-    '🤖', '💩', '😺', '😸', '😹', '😻', '😼', '😽',
-    '🙀', '😿', '😾', '👍', '👎', '👏', '🙏', '💪',
-    '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '💔',
-    '💕', '💞', '💓', '💗', '💖', '💘', '💝', '✨',
-  ];
+  final void Function(EmotePack pack, EmoteSticker sticker) onSendEmote;
 
   @override
-  Widget build(BuildContext context) {
-    return ColoredBox(
-      color: const Color(0xFFF7F7F7),
-      child: Padding(
-        padding: EdgeInsets.only(bottom: bottomInset),
-        child: Column(
-          children: [
-            SizedBox(
-              height: 44,
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 16),
+  State<_ChatEmojiPanel> createState() => _ChatEmojiPanelState();
+}
+
+class _ChatEmojiPanelState extends State<_ChatEmojiPanel> {
+  /// Match forya EmojiSubPanel set (common chat emoji).
+  static const List<String> _emojis = [
+    '😀', '😁', '😂', '🤣', '😃', '😄',
+    '😅', '😆', '😉', '😊', '😋', '😎',
+    '😍', '😘', '🥰', '😗', '😙', '😚',
+    '🙂', '🤗', '🤩', '🤔', '🤨', '😐',
+    '😑', '😶', '🙄', '😏', '😣', '😥',
+    '😮', '🤐', '😯', '😪', '😫', '🥱',
+    '😴', '😌', '😛', '😜', '😝', '🤤',
+    '😒', '😓', '😔', '😕', '🙃', '🤑',
+    '😲', '🙁', '😖', '😞', '😟', '😤',
+    '😢', '😭', '😦', '😧', '😨', '😩',
+    '🤯', '😬', '😰', '😱', '🥵', '🥶',
+    '😳', '🤪', '😵', '😡', '😠', '🤬',
+    '😷', '🤒', '🤕', '🤢', '🤮', '🤧',
+    '😇', '🥳', '🥺', '🤠', '🤡', '🤥',
+    '👍', '👎', '👏', '🙏', '💪', '❤️',
+    '🧡', '💛', '💚', '💙', '💜', '💔',
+    '💕', '💞', '💓', '💗', '💖', '✨',
+  ];
+
+  /// Tab 0 = system emoji; 1..n = sticker packs.
+  int _tab = 0;
+  List<EmotePack> _packs = const [];
+  final Map<String, List<EmoteSticker>> _stickersByPack = {};
+  final Set<String> _loadingPacks = {};
+  bool _packsLoading = true;
+  String? _packsError;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadPacks());
+  }
+
+  Future<void> _loadPacks() async {
+    setState(() {
+      _packsLoading = true;
+      _packsError = null;
+    });
+    try {
+      final res = await NetworkBootstrap.api.emoticonsList(scene: 'CHAT');
+      if (!mounted) return;
+      final packs = EmoteDto.parsePacks(res.data);
+      setState(() {
+        _packs = packs;
+        _packsLoading = false;
+        if (packs.isEmpty && !res.success) {
+          _packsError =
+              res.message.isEmpty ? 'Failed to load stickers' : res.message;
+        }
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _packsLoading = false;
+        _packsError = '$error';
+      });
+    }
+  }
+
+  Future<void> _ensureStickers(EmotePack pack) async {
+    if (_stickersByPack.containsKey(pack.id) ||
+        _loadingPacks.contains(pack.id)) {
+      return;
+    }
+    _loadingPacks.add(pack.id);
+    setState(() {});
+    try {
+      final res = await NetworkBootstrap.api.emoteItemList(pack.id);
+      if (!mounted) return;
+      final items = EmoteDto.parseStickers(res.data);
+      setState(() {
+        _stickersByPack[pack.id] = items;
+        _loadingPacks.remove(pack.id);
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _stickersByPack[pack.id] = const [];
+        _loadingPacks.remove(pack.id);
+      });
+    }
+  }
+
+  void _selectTab(int index) {
+    if (index == _tab) return;
+    setState(() => _tab = index);
+    if (index > 0 && index <= _packs.length) {
+      unawaited(_ensureStickers(_packs[index - 1]));
+    }
+  }
+
+  Widget _tabChip({
+    required bool selected,
+    required Widget child,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        width: 32,
+        height: 32,
+        margin: const EdgeInsets.symmetric(horizontal: 5),
+        decoration: BoxDecoration(
+          color: selected ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        alignment: Alignment.center,
+        child: child,
+      ),
+    );
+  }
+
+  Widget _packCover(EmotePack pack) {
+    final cover = pack.cover.trim();
+    if (cover.startsWith('http://') || cover.startsWith('https://')) {
+      return Image.network(
+        cover,
+        width: 22,
+        height: 22,
+        fit: BoxFit.contain,
+        errorBuilder: (_, _, _) => const Icon(
+          Icons.emoji_emotions_outlined,
+          size: 18,
+          color: Color(0xFF999999),
+        ),
+      );
+    }
+    return const Icon(
+      Icons.emoji_emotions_outlined,
+      size: 18,
+      color: Color(0xFF999999),
+    );
+  }
+
+  Widget _emojiGrid() {
+    return Stack(
+      children: [
+        GridView.builder(
+          padding: const EdgeInsets.fromLTRB(8, 0, 8, 56),
+          physics: const BouncingScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 6,
+            mainAxisSpacing: 4,
+            crossAxisSpacing: 4,
+          ),
+          itemCount: _emojis.length,
+          itemBuilder: (context, index) {
+            final emoji = _emojis[index];
+            return GestureDetector(
+              onTap: () => widget.onEmojiTap(emoji),
+              behavior: HitTestBehavior.opaque,
+              child: Center(
+                child: Text(emoji, style: const TextStyle(fontSize: 24)),
+              ),
+            );
+          },
+        ),
+        PositionedDirectional(
+          end: 16,
+          bottom: 10,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              GestureDetector(
+                onTap: widget.onBackspace,
+                child: Container(
+                  width: 60,
+                  height: 34,
+                  decoration: const ShapeDecoration(
+                    shape: StadiumBorder(),
+                    color: Colors.white,
+                  ),
+                  alignment: Alignment.center,
+                  child: Image.asset(
+                    AppAssets.voiceDeleteIcon,
+                    width: 18,
+                    fit: BoxFit.fitWidth,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              GestureDetector(
+                onTap: widget.canSend ? widget.onSend : null,
+                child: Opacity(
+                  opacity: widget.canSend ? 1 : 0.5,
                   child: Container(
-                    width: 36,
+                    width: 60,
                     height: 36,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(10),
+                    decoration: const ShapeDecoration(
+                      shape: StadiumBorder(),
+                      color: AppColors.accentLime,
                     ),
                     alignment: Alignment.center,
-                    child: const Text('😊', style: TextStyle(fontSize: 20)),
-                  ),
-                ),
-              ),
-            ),
-            Expanded(
-              child: GridView.builder(
-                padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
-                physics: const BouncingScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 8,
-                  mainAxisSpacing: 4,
-                  crossAxisSpacing: 4,
-                ),
-                itemCount: _emojis.length,
-                itemBuilder: (context, index) {
-                  final emoji = _emojis[index];
-                  return GestureDetector(
-                    onTap: () => onEmojiTap(emoji),
-                    behavior: HitTestBehavior.opaque,
-                    child: Center(
-                      child: Text(emoji, style: const TextStyle(fontSize: 26)),
-                    ),
-                  );
-                },
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-              child: Row(
-                children: [
-                  const Spacer(),
-                  GestureDetector(
-                    onTap: onBackspace,
-                    child: Container(
-                      width: 44,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFE5E5E5)),
-                      ),
-                      child: const Icon(
-                        Icons.backspace_outlined,
-                        size: 20,
-                        color: Color(0xFF666666),
+                    child: const Text(
+                      'Send',
+                      style: TextStyle(
+                        color: Color(0xFF111111),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  GestureDetector(
-                    onTap: canSend ? onSend : null,
-                    child: Container(
-                      height: 36,
-                      padding: const EdgeInsets.symmetric(horizontal: 18),
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: canSend ? _green : const Color(0xFFE0E0E0),
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: Text(
-                        'Send',
-                        style: TextStyle(
-                          color: canSend ? Colors.black : const Color(0xFF999999),
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _stickerGrid(EmotePack pack) {
+    final loading = _loadingPacks.contains(pack.id) &&
+        !_stickersByPack.containsKey(pack.id);
+    final stickers = _stickersByPack[pack.id];
+    if (loading || stickers == null) {
+      return const Center(
+        child: SizedBox(
+          width: 22,
+          height: 22,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: Color(0xFFB0B0B0),
+          ),
+        ),
+      );
+    }
+    if (stickers.isEmpty) {
+      return const Center(
+        child: Text(
+          'No stickers',
+          style: TextStyle(color: Color(0xFFAEAEAE), fontSize: 13),
+        ),
+      );
+    }
+    return GridView.builder(
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
+      physics: const BouncingScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 4,
+        mainAxisSpacing: 4,
+        crossAxisSpacing: 4,
+      ),
+      itemCount: stickers.length,
+      itemBuilder: (context, index) {
+        final sticker = stickers[index];
+        final thumb = sticker.gridUrl;
+        return GestureDetector(
+          onTap: () => widget.onSendEmote(pack, sticker),
+          behavior: HitTestBehavior.opaque,
+          child: Center(
+            child: SizedBox(
+              width: 50,
+              height: 50,
+              child: thumb.isEmpty
+                  ? const ColoredBox(color: Color(0xFFEAEAEA))
+                  : Image.network(
+                      thumb,
+                      fit: BoxFit.contain,
+                      loadingBuilder: (context, child, progress) {
+                        if (progress == null) return child;
+                        return const ColoredBox(
+                          color: Color(0xFFF0F0F0),
+                          child: Center(
+                            child: SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          ),
+                        );
+                      },
+                      errorBuilder: (_, _, _) => const ColoredBox(
+                        color: Color(0xFFEAEAEA),
+                        child: Icon(
+                          Icons.broken_image_outlined,
+                          color: Color(0xFF999999),
+                          size: 20,
                         ),
                       ),
                     ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Match forya EmotePanel: emoji tab + pack tabs; stickers 4-col.
+    final showEmoji = _tab == 0;
+    final packIndex = _tab - 1;
+    final activePack =
+        packIndex >= 0 && packIndex < _packs.length ? _packs[packIndex] : null;
+
+    return ColoredBox(
+      color: const Color(0xFFF5F5F5),
+      child: Padding(
+        padding: EdgeInsets.only(bottom: widget.bottomInset),
+        child: Column(
+          children: [
+            SizedBox(
+              height: 46,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.only(left: 10, right: 10),
+                children: [
+                  _tabChip(
+                    selected: showEmoji,
+                    onTap: () => _selectTab(0),
+                    child: Image.asset(
+                      AppAssets.inputEmoji,
+                      width: 22,
+                      height: 22,
+                      fit: BoxFit.contain,
+                    ),
                   ),
+                  if (_packsLoading)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8),
+                      child: Center(
+                        child: SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
+                    )
+                  else
+                    for (var i = 0; i < _packs.length; i++)
+                      _tabChip(
+                        selected: _tab == i + 1,
+                        onTap: () => _selectTab(i + 1),
+                        child: _packCover(_packs[i]),
+                      ),
                 ],
               ),
+            ),
+            Expanded(
+              child: showEmoji
+                  ? _emojiGrid()
+                  : activePack == null
+                      ? Center(
+                          child: Text(
+                            _packsError ?? 'No sticker packs',
+                            style: const TextStyle(
+                              color: Color(0xFFAEAEAE),
+                              fontSize: 13,
+                            ),
+                          ),
+                        )
+                      : _stickerGrid(activePack),
             ),
           ],
         ),

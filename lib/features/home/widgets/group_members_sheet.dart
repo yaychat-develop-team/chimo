@@ -31,6 +31,8 @@ class GroupMembersSheet extends StatefulWidget {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      isDismissible: true,
+      enableDrag: true,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withValues(alpha: 0.55),
       builder: (context) => GroupMembersSheet(
@@ -129,76 +131,87 @@ class _GroupMembersSheetState extends State<GroupMembersSheet> {
     final bottom = MediaQuery.paddingOf(context).bottom;
     final height = MediaQuery.sizeOf(context).height * 0.72;
 
-    return Align(
-      alignment: Alignment.bottomCenter,
-      child: SizedBox(
-        height: height,
-        child: DecoratedBox(
-          decoration: const BoxDecoration(
-            color: Color(0xFF1C1C1E),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 18),
-              const Text(
-                'Group Members',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
+    // isScrollControlled sheets fill the screen; Align alone still hits the
+    // transparent top and blocks barrier dismiss — tap empty area to close.
+    return SizedBox.expand(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => Navigator.of(context).maybePop(),
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          child: GestureDetector(
+            onTap: () {},
+            child: SizedBox(
+              height: height,
+              child: DecoratedBox(
+                decoration: const BoxDecoration(
+                  color: Color(0xFF1C1C1E),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
                 ),
-              ),
-              const SizedBox(height: 14),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Container(
-                  height: 44,
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2C2C2E),
-                    borderRadius: BorderRadius.circular(22),
-                  ),
-                  child: Row(
-                    children: [
-                      const AppAssetImage(
-                        AppAssets.msgSearch,
-                        width: 18,
-                        height: 18,
-                        color: AppColors.textTertiary,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(height: 18),
+                    const Text(
+                      'Group Members',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: TextField(
-                          controller: _searchController,
-                          onChanged: _onQueryChanged,
-                          style: const TextStyle(
-                            color: AppColors.textPrimary,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          cursorColor: AppColors.primaryBright,
-                          decoration: const InputDecoration(
-                            isDense: true,
-                            border: InputBorder.none,
-                            hintText: 'Enter a nickname to search',
-                            hintStyle: TextStyle(
+                    ),
+                    const SizedBox(height: 14),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Container(
+                        height: 44,
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2C2C2E),
+                          borderRadius: BorderRadius.circular(22),
+                        ),
+                        child: Row(
+                          children: [
+                            const AppAssetImage(
+                              AppAssets.msgSearch,
+                              width: 18,
+                              height: 18,
                               color: AppColors.textTertiary,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w400,
                             ),
-                          ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: TextField(
+                                controller: _searchController,
+                                onChanged: _onQueryChanged,
+                                style: const TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                cursorColor: AppColors.primaryBright,
+                                decoration: const InputDecoration(
+                                  isDense: true,
+                                  border: InputBorder.none,
+                                  hintText: 'Enter a nickname to search',
+                                  hintStyle: TextStyle(
+                                    color: AppColors.textTertiary,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: 8),
+                    Expanded(child: _buildBody(bottom)),
+                  ],
                 ),
               ),
-              const SizedBox(height: 8),
-              Expanded(child: _buildBody(bottom)),
-            ],
+            ),
           ),
         ),
       ),

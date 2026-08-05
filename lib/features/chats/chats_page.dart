@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_assets.dart';
+import '../../core/im/im_system_accounts.dart';
 import '../../core/network/network_bootstrap.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_tip_dialog.dart';
@@ -109,6 +110,24 @@ class _ChatsPageState extends State<ChatsPage> {
       return;
     }
 
+    // New Friends system account → contacts (followers), not a blank DM.
+    final em = item.emUserName.isNotEmpty
+        ? item.emUserName
+        : (item.id.startsWith('sys_')
+            ? item.id.substring(4)
+            : item.id.startsWith('dm_')
+                ? item.id.substring(3)
+                : '');
+    if (item.isSystem && ImSystemAccounts.isNewFriends(em)) {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) =>
+              const FriendsPage(initialTab: FriendsTab.followers),
+        ),
+      );
+      return;
+    }
+
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) =>
@@ -120,7 +139,10 @@ class _ChatsPageState extends State<ChatsPage> {
   bool _isPeerConversation(ChatConversation item) {
     if (item.badge == ChatBadgeType.group) return false;
     if (item.badge == ChatBadgeType.verified) return false;
-    if (item.id.startsWith('system_') || item.id.startsWith('official_')) {
+    if (item.isSystem) return false;
+    if (item.id.startsWith('system_') ||
+        item.id.startsWith('official_') ||
+        item.id.startsWith('sys_')) {
       return false;
     }
     return true;
@@ -133,6 +155,9 @@ class _ChatsPageState extends State<ChatsPage> {
     }
 
     final uid = item.id.startsWith('dm_') ? item.id.substring(3) : item.id;
+    final em = item.emUserName.isNotEmpty
+        ? item.emUserName
+        : (uid.startsWith('yqdf-') || uid.contains('yqdf') ? uid : '');
     final profile = ChatUserProfile(
       id: uid,
       nickname: item.title,
@@ -145,6 +170,7 @@ class _ChatsPageState extends State<ChatsPage> {
       level: 1,
       bio: item.signature,
       isFollowing: item.isFollowing,
+      emUsername: em,
     );
 
     Navigator.of(context).push(

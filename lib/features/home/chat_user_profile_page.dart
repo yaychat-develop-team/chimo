@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/auth/auth_session.dart';
 import '../../core/network/network_bootstrap.dart';
+import '../../core/utils/zodiac.dart';
 import '../../core/widgets/app_tip_dialog.dart';
 import '../../core/widgets/center_toast.dart';
 import '../chats/chat_detail_page.dart';
@@ -53,6 +54,14 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
     return id.trim();
   }
 
+  String get _emHint {
+    final em = _profile.emUsername.trim();
+    if (em.isNotEmpty) return em;
+    final id = _targetUid;
+    if (id.startsWith('yqdf-') || id.contains('yqdf')) return id;
+    return '';
+  }
+
   String get _bioText {
     if (_profile.bio.trim().isNotEmpty) return _profile.bio;
     return _profile.isMale
@@ -74,24 +83,43 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
 
   Future<void> _bootstrap() async {
     final seedUid = _targetUid;
-    final self = seedUid.isNotEmpty && await AuthSession.isCurrentUser(seedUid);
+    final self = seedUid.isNotEmpty &&
+        (await AuthSession.isCurrentUser(seedUid) ||
+            await AuthSession.isCurrentUser(_emHint));
     if (!mounted) return;
     setState(() => _isSelf = self);
     await _loadProfile();
   }
 
+  /// Prefer numeric app uid; resolve EaseMob username via `/user/msg-user`.
+  Future<String> _resolveAppUid() async {
+    final raw = _targetUid;
+    if (RegExp(r'^\d+$').hasMatch(raw)) return raw;
+    final em = _emHint.isNotEmpty ? _emHint : raw;
+    if (em.isEmpty) return raw;
+    try {
+      final msgRes = await NetworkBootstrap.api.msgUser(em);
+      final data = msgRes.data;
+      if (data is Map) {
+        final user = data['user'];
+        final map = user is Map ? Map<String, dynamic>.from(user) : data;
+        final id = '${map['id'] ?? map['userId'] ?? ''}'.trim();
+        if (RegExp(r'^\d+$').hasMatch(id)) return id;
+      }
+    } catch (_) {}
+    return raw;
+  }
+
   Future<void> _loadProfile() async {
-    final uid = _targetUid;
-    if (uid.isEmpty) {
+    final seed = _targetUid;
+    if (seed.isEmpty && _emHint.isEmpty) {
       setState(() => _loading = false);
       return;
     }
     try {
-      final infoRes = _isSelf
-          ? await NetworkBootstrap.api.userInfo()
-          : await NetworkBootstrap.api.userInfoByUid(uid);
-      if (!mounted) return;
       if (_isSelf) {
+        final infoRes = await NetworkBootstrap.api.userInfo();
+        if (!mounted) return;
         final me = UserDto.parseProfile(infoRes);
         if (me != null) {
           await AuthSession.markLoggedIn(
@@ -108,23 +136,36 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
               avatarUrl: me.avatarUrl,
               isMale: me.isMale,
               age: _ageFromBirthday(me.birthday),
-              zodiac: _profile.zodiac,
+              zodiac: zodiacFromBirthday(me.birthday),
               level: me.vipLevel,
               bio: me.signature,
               voiceSeconds: me.voiceSeconds,
+              voiceUrl: me.voiceUrl,
+              vipIconUrl: me.vipIconUrl,
               momentUrls: me.momentUrls,
               tags: me.tags,
               isFollowing: false,
+              emUsername: _profile.emUsername,
             );
           });
         }
       } else {
+        final appUid = await _resolveAppUid();
+        if (!mounted) return;
+        final infoRes = await NetworkBootstrap.api.userInfoByUid(appUid);
+        if (!mounted) return;
         final parsed = UserDto.parseChatProfile(infoRes);
         if (parsed != null) {
           final self = await AuthSession.isCurrentUser(parsed.userId) ||
               await AuthSession.isCurrentUser(parsed.id);
+          final em = parsed.emUsername.isNotEmpty
+              ? parsed.emUsername
+              : (_emHint.isNotEmpty ? _emHint : _profile.emUsername);
           setState(() {
-            _profile = parsed;
+            _profile = parsed.copyWith(
+              emUsername: em,
+              // Keep seed moments/tags only if API omitted them (rare).
+            );
             _following = parsed.isFollowing;
             _isSelf = self;
           });
@@ -221,6 +262,8 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
             level: updated.vipLevel,
             bio: updated.signature,
             voiceSeconds: updated.voiceSeconds,
+            voiceUrl: updated.voiceUrl,
+            vipIconUrl: updated.vipIconUrl,
             momentUrls: updated.momentUrls,
             tags: updated.tags,
             isFollowing: false,
@@ -362,9 +405,10 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
           isMale: _profile.isMale,
           age: _profile.age,
           zodiac: _profile.zodiac,
-          level: _profile.level,
           bio: _bioText,
           voiceSeconds: _profile.voiceSeconds,
+          voiceUrl: _profile.voiceUrl,
+          vipIconUrl: _profile.vipIconUrl,
           momentUrls: _momentUrls,
           flavors: _flavors,
           inPartyName: _isSelf ? null : _profile.inPartyName,

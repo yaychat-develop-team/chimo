@@ -2,7 +2,7 @@ part of '../chat_detail_page.dart';
 
 enum _ChatSide { peer, self }
 
-enum _ChatLineKind { text, voice, image, gift }
+enum _ChatLineKind { text, voice, image, gift, emote, tip }
 
 class _ChatLine {
   const _ChatLine({
@@ -10,7 +10,7 @@ class _ChatLine {
     this.kind = _ChatLineKind.text,
     this.text = '',
     this.voiceSeconds = 0,
-    /// Asset path, absolute file path, or http(s) URL (image / voice).
+    /// Asset path, absolute file path, or http(s) URL (image / voice / emote).
     this.mediaSource = '',
     this.imageAssets = const [],
     this.giftId = 0,
@@ -18,7 +18,10 @@ class _ChatLine {
     this.giftEmoji = '',
     this.giftName = '',
     this.giftIconUrl = '',
+    this.emoteUrl = '',
+    this.emoteName = '',
     this.serverTimeMs = 0,
+    this.msgId = '',
   });
 
   final _ChatSide side;
@@ -32,10 +35,16 @@ class _ChatLine {
   final String giftEmoji;
   final String giftName;
   final String giftIconUrl;
+  final String emoteUrl;
+  final String emoteName;
   final int serverTimeMs;
+
+  /// EaseMob message id (cursor for history pagination).
+  final String msgId;
 
   String get displayMedia {
     if (mediaSource.trim().isNotEmpty) return mediaSource.trim();
+    if (emoteUrl.trim().isNotEmpty) return emoteUrl.trim();
     if (imageAssets.isNotEmpty) return imageAssets.first;
     return '';
   }
@@ -51,6 +60,10 @@ class _ChatLine {
           ? '[Gift] $giftId x$giftQty'
           : '[Gift] $giftName x$giftQty';
     }
+    if (kind == _ChatLineKind.emote) {
+      return emoteName.isEmpty ? '[Sticker]' : '[$emoteName]';
+    }
+    if (kind == _ChatLineKind.tip) return text;
     return text;
   }
 }
@@ -71,6 +84,8 @@ abstract final class _BubbleLayout {
   static const double imageW = 132;
   static const double imageH = 176;
   static const double imageRadius = 12;
+  /// Sticker bubble (forya _EmoteItem: width 65, fitWidth).
+  static const double emoteSize = 65;
   static const Color peerColor = Color(0xFFF0F0F0);
   static const Color selfColor = Color(0xFFB8FF6A);
   static const Color peerText = Color(0xFF232518);

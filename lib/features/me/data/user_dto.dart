@@ -42,11 +42,14 @@ abstract final class UserDto {
     final signature =
         '${json['personalSignature'] ?? json['signature'] ?? json['desc'] ?? ''}';
 
+    final email = '${json['email'] ?? ''}'.trim();
+
     return MeProfile(
       displayName: '${json['nickname'] ?? json['nickName'] ?? ''}',
       userId: '${json['id'] ?? ''}',
       avatarAsset: AppAssets.avatarPlace,
       avatarUrl: avatar.isEmpty ? null : avatar,
+      email: email,
       friends: _asInt(json['friendNum']),
       fans: _asInt(json['fanNum']),
       follows: _asInt(json['followNum']),
@@ -61,6 +64,11 @@ abstract final class UserDto {
       experience: _asInt(json['experience'] ?? json['exp'] ?? 0),
       momentUrls: _parsePicUrls(json['picList']),
       voiceSeconds: _asIntOrNull(json['voiceDuration']),
+      voiceUrl: () {
+        final v = '${json['voice'] ?? ''}'.trim();
+        return v.isEmpty ? null : v;
+      }(),
+      vipIconUrl: _parseVipSmallIcon(json),
     );
   }
 
@@ -89,6 +97,11 @@ abstract final class UserDto {
       if (name.isNotEmpty) inParty = name;
     }
 
+    final onlineStatus = _asInt(json['onlineStatus']);
+    final isHidden = json['isHidden'] == true ||
+        json['isHidden'] == 1 ||
+        '${json['isHidden'] ?? ''}' == 'true';
+
     return ChatUserProfile(
       id: id,
       nickname: '${json['nickname'] ?? json['nickName'] ?? ''}',
@@ -100,12 +113,32 @@ abstract final class UserDto {
       zodiac: zodiacFromBirthday(birthday.isEmpty ? '1995-01-01' : birthday),
       level: _asInt(json['vipLevel'], fallback: 1),
       bio: signature,
+      heightInches: _asInt(json['height']),
+      weightLb: _asInt(json['weight']),
+      voiceSeconds: _asIntOrNull(json['voiceDuration']),
+      voiceUrl: () {
+        final v = '${json['voice'] ?? ''}'.trim();
+        return v.isEmpty ? null : v;
+      }(),
+      vipIconUrl: _parseVipSmallIcon(json),
       momentUrls: _parsePicUrls(json['picList']),
       tags: _parseTags(json['makeFriendsLabel']),
       isFollowing: isFollowing,
       inPartyName: inParty,
+      isOnline: onlineStatus == 1 && !isHidden,
       emUsername: '${json['emUsername'] ?? json['emUserName'] ?? ''}'.trim(),
     );
+  }
+
+  /// Forya UserLevWidget: show only when `icons.smallIcon` is non-empty.
+  static String? _parseVipSmallIcon(Map<String, dynamic> json) {
+    final icons = json['icons'] ?? json['vipIcons'];
+    if (icons is Map) {
+      final small = '${icons['smallIcon'] ?? icons['small_icon'] ?? ''}'.trim();
+      if (small.isNotEmpty) return small;
+    }
+    final flat = '${json['vipLevelIcon'] ?? json['smallIcon'] ?? ''}'.trim();
+    return flat.isEmpty ? null : flat;
   }
 
   static List<String> _parseTags(Object? raw) {

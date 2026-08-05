@@ -37,6 +37,10 @@ abstract final class AppAssets {
 
   /// Profile voice bar: static waveform.
   static const String voiceWaveLine = '$_forya/ic_voice_line.svg';
+  /// Profile voice bar: animated waveform while playing (original webp).
+  static const String voiceWaveAnim = '$_forya/anim_line_voice.webp';
+  static const String voicePlayIcon = '$_forya/ic_play.svg';
+  static const String voicePauseIcon = '$_forya/ic_pause.svg';
   static const String voiceDeleteIcon = '$_forya/delete_icon.webp';
 
   /// Splash: character logo / white Chimo title / bottom slogan.
@@ -178,6 +182,10 @@ abstract final class AppAssets {
   /// Gender badge icons.
   static const String genderMan = '$_forya/man.webp';
   static const String genderWoman = '$_forya/woman.webp';
+
+  /// Chat profile card tags (height / weight).
+  static const String tagHeight = '$_forya/ic_height.svg';
+  static const String tagWeight = '$_forya/ic_weight.svg';
 
   /// Profile setup: gender cards (unselected / selected).
   static const String genderMaleImg = '$_forya/man_img.webp';
