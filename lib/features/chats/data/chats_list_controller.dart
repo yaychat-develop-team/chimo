@@ -1,15 +1,12 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:im_flutter_sdk/im_flutter_sdk.dart';
 
 import '../../../core/constants/app_assets.dart';
 import '../../../core/im/im_service.dart';
 import '../../../core/im/im_system_accounts.dart';
-import '../../../core/network/group_dto.dart';
-import '../../../core/network/network_bootstrap.dart';
-import '../../../core/repositories/repositories.dart';
+import '../../../core/network/app_apis.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/chat_time_label.dart';
 import '../../../shared/models/chat_conversation.dart';
@@ -20,15 +17,22 @@ import '../../../shared/models/group_item.dart';
 /// Session rows for groups come from `GET /chat/group/myGroups`.
 /// Last-message previews need IM (EaseMob); until then we show member count /
 /// group desc as subtitle, and keep any local previews from this device.
+///
+/// Listens to [ImService.messages] so previews / unread update without pull
+/// refresh (forya ConversationController pattern).
 class ChatsListController extends ChangeNotifier {
-  ChatsListController({ChatRepository? chatRepository})
-      : _chatRepository = chatRepository;
-
-  final ChatRepository? _chatRepository;
+  ChatsListController() {
+    _imSub = ImService.messages.listen(_onImMessage);
+  }
 
   final List<ChatConversation> _conversations = [];
   final List<String> _pinnedIds = [];
   final Set<String> _joinedGroupIds = {};
+  /// Swipe-deleted rows; survive API/IM refresh until a new message restores them.
+  final Set<String> _hiddenIds = {};
+  /// Open chat/group detail key (list id or EM id) — no unread bump while viewing.
+  String? _activeConversationKey;
+  StreamSubscription<ImChatMessage>? _imSub;
   bool _loading = false;
   String? _loadError;
 
@@ -71,8 +75,8 @@ class ChatsListController extends ChangeNotifier {
     _loadError = null;
     notifyListeners();
     try {
-      final groupsRes = await NetworkBootstrap.api.myGroups();
-      final groups = GroupDto.parseList(groupsRes);
+      final groupsRes = await AppApis.group.myGroups();
+      final groups = groupsRes.data ?? const [];
 
       final prevById = {for (final c in _conversations) c.id: c};
       final next = <ChatConversation>[];
@@ -80,6 +84,7 @@ class ChatsListController extends ChangeNotifier {
 
       for (final g in groups) {
         nextJoined.add(g.id);
+        if (_isHidden(g.id)) continue;
         final prev = prevById[g.id];
         next.add(_conversationFromGroup(g, prev));
       }
@@ -87,6 +92,7 @@ class ChatsListController extends ChangeNotifier {
       // Keep non-group rows started in-app (real DMs / system), not bulk friends.
       for (final c in _conversations) {
         if (c.badge == ChatBadgeType.group) continue;
+        if (_isHidden(c.id, c.emUserName)) continue;
         if (next.any((n) => n.id == c.id)) continue;
         next.add(c);
       }
@@ -95,6 +101,7 @@ class ChatsListController extends ChangeNotifier {
       // re-pull detail so the list still reflects server group cards.
       for (final id in _joinedGroupIds) {
         if (nextJoined.contains(id)) continue;
+        if (_isHidden(id)) continue;
         final prev = prevById[id];
         if (prev == null || prev.badge != ChatBadgeType.group) continue;
         final detail = await _fetchGroupDetail(id);
@@ -115,7 +122,7 @@ class ChatsListController extends ChangeNotifier {
         ..addAll(nextJoined);
       await _mergeImConversations();
       _loading = false;
-      if (!groupsRes.success && next.isEmpty) {
+      if (!groupsRes.ok && next.isEmpty) {
         _loadError = groupsRes.message.isEmpty
             ? 'Failed to load chats'
             : groupsRes.message;
@@ -124,9 +131,6 @@ class ChatsListController extends ChangeNotifier {
     } catch (error) {
       _loading = false;
       _loadError = '$error';
-      if (_conversations.isEmpty && _chatRepository != null) {
-        _conversations.addAll(_chatRepository.seedConversations());
-      }
       notifyListeners();
     }
   }
@@ -147,6 +151,7 @@ class ChatsListController extends ChangeNotifier {
         final timeLabel = ChatTimeLabel.forList(atMs);
 
         if (conv.type == EMConversationType.GroupChat) {
+          if (_isHidden(emId)) continue;
           final index = _conversations.indexWhere(
             (c) =>
                 c.badge == ChatBadgeType.group &&
@@ -168,6 +173,7 @@ class ChatsListController extends ChangeNotifier {
         // —— Chat (DM / system) ——
         final isSystem = ImSystemAccounts.isSystemAccount(emId);
         final listId = isSystem ? 'sys_$emId' : 'dm_$emId';
+        if (_isHidden(listId, emId)) continue;
 
         final index = _conversations.indexWhere(
           (c) =>
@@ -210,17 +216,11 @@ class ChatsListController extends ChangeNotifier {
           titleColor = AppColors.primaryBright;
         } else {
           try {
-            final res = await NetworkBootstrap.api.msgUser(emId);
-            if (res.success && res.data is Map) {
-              final data = Map<String, dynamic>.from(res.data as Map);
-              final user = data['user'] is Map
-                  ? Map<String, dynamic>.from(data['user'] as Map)
-                  : data;
-              final nick =
-                  '${user['nickname'] ?? user['nickName'] ?? ''}'.trim();
-              if (nick.isNotEmpty) title = nick;
-              final av = '${user['avatar'] ?? ''}'.trim();
-              if (av.isNotEmpty) avatarUrl = av;
+            final res = await AppApis.relation.msgUser(emId);
+            final brief = res.data;
+            if (res.ok && brief != null) {
+              if (brief.nickname.isNotEmpty) title = brief.nickname;
+              if (brief.avatarUrl.isNotEmpty) avatarUrl = brief.avatarUrl;
             }
           } catch (_) {}
         }
@@ -249,21 +249,9 @@ class ChatsListController extends ChangeNotifier {
 
   Future<PopularGroupItem?> _fetchGroupDetail(String gid) async {
     try {
-      final res = await NetworkBootstrap.api.groupDetail(gid);
-      if (!res.success) return null;
-      final data = res.data;
-      if (data is Map) {
-        // Some envelopes nest under group.
-        final nested = data['group'];
-        if (nested is Map) {
-          return GroupDto.fromMap(Map<String, dynamic>.from(nested));
-        }
-        final list = GroupDto.parseData(data);
-        if (list.isNotEmpty) return list.first;
-        if (data.containsKey('name') || data.containsKey('emGroupId')) {
-          return GroupDto.fromMap(Map<String, dynamic>.from(data));
-        }
-      }
+      final res = await AppApis.group.detail(gid);
+      if (!res.ok) return null;
+      return res.data;
     } catch (_) {}
     return null;
   }
@@ -305,10 +293,71 @@ class ChatsListController extends ChangeNotifier {
   }
 
   /// Remove conversation only; group join state unchanged.
+  ///
+  /// Persists hide across refresh (myGroups / IM merge). New messages restore
+  /// the row via [onNewMessage] / [upsertPrivateChat]. Also deletes EaseMob
+  /// local+remote session like forya `removeItem`.
   void delete(String id) {
-    _conversations.removeWhere((c) => c.id == id);
+    final index = _conversations.indexWhere((c) => c.id == id);
+    ChatConversation? removed;
+    if (index >= 0) {
+      removed = _conversations.removeAt(index);
+    }
     _pinnedIds.remove(id);
+    _hide(id, emUserName: removed?.emUserName);
+    if (removed != null) {
+      unawaited(_deleteImConversation(removed));
+    }
     notifyListeners();
+  }
+
+  bool _isHidden(String id, [String? emUserName]) {
+    if (_hiddenIds.contains(id)) return true;
+    if (emUserName != null &&
+        emUserName.isNotEmpty &&
+        _hiddenIds.contains(emUserName)) {
+      return true;
+    }
+    return false;
+  }
+
+  void _hide(String id, {String? emUserName}) {
+    if (id.isNotEmpty) _hiddenIds.add(id);
+    final em = (emUserName ?? '').trim();
+    if (em.isEmpty) return;
+    _hiddenIds.add(em);
+    _hiddenIds.add('dm_$em');
+    _hiddenIds.add('sys_$em');
+  }
+
+  void _unhide(String id, {String? emUserName}) {
+    _hiddenIds.remove(id);
+    final em = (emUserName ?? '').trim();
+    if (em.isEmpty) {
+      if (id.startsWith('dm_')) _hiddenIds.remove(id.substring(3));
+      if (id.startsWith('sys_')) _hiddenIds.remove(id.substring(4));
+      return;
+    }
+    _hiddenIds.remove(em);
+    _hiddenIds.remove('dm_$em');
+    _hiddenIds.remove('sys_$em');
+  }
+
+  Future<void> _deleteImConversation(ChatConversation c) async {
+    final emId = c.emUserName.isNotEmpty
+        ? c.emUserName
+        : c.id.startsWith('dm_')
+            ? c.id.substring(3)
+            : c.id.startsWith('sys_')
+                ? c.id.substring(4)
+                : c.badge == ChatBadgeType.group
+                    ? c.id
+                    : '';
+    if (emId.isEmpty) return;
+    await ImService.deleteConversation(
+      emId,
+      isGroup: c.badge == ChatBadgeType.group,
+    );
   }
 
   void markRead(String id) {
@@ -341,6 +390,7 @@ class ChatsListController extends ChangeNotifier {
 
   void joinGroup(PopularGroupItem group) {
     _joinedGroupIds.add(group.id);
+    _unhide(group.id);
     _upsertConversation(group);
     notifyListeners();
     // Sync list fields from server detail when available.
@@ -351,6 +401,7 @@ class ChatsListController extends ChangeNotifier {
     final detail = await _fetchGroupDetail(id);
     if (detail == null) return;
     _joinedGroupIds.add(detail.id);
+    if (_isHidden(detail.id)) return;
     _upsertConversation(detail.copyWith(isJoined: true));
     notifyListeners();
   }
@@ -361,6 +412,11 @@ class ChatsListController extends ChangeNotifier {
   }
 
   void upsertJoinedGroup(PopularGroupItem group) {
+    _joinedGroupIds.add(group.id);
+    if (_isHidden(group.id)) {
+      notifyListeners();
+      return;
+    }
     _upsertConversation(group);
     notifyListeners();
   }
@@ -371,6 +427,7 @@ class ChatsListController extends ChangeNotifier {
           ? ChatBadgeType.none
           : conversation.badge,
     );
+    _unhide(dm.id, emUserName: dm.emUserName);
     final index = _conversations.indexWhere((c) => c.id == dm.id);
     if (index >= 0) {
       final prev = _conversations[index];
@@ -408,7 +465,11 @@ class ChatsListController extends ChangeNotifier {
     int? memberCount,
     int? postCount,
     int? level,
+    String? emUserName,
+    bool? isSystem,
+    Color? titleColor,
   }) {
+    _unhide(id, emUserName: emUserName);
     final nowMs = DateTime.now().millisecondsSinceEpoch;
     final timeLabel = ChatTimeLabel.forList(nowMs);
     final index = _conversations.indexWhere((c) => c.id == id);
@@ -435,6 +496,11 @@ class ChatsListController extends ChangeNotifier {
           postCount: postCount,
           level: level,
           lastMsgAtMs: nowMs,
+          emUserName: (emUserName != null && emUserName.isNotEmpty)
+              ? emUserName
+              : prev.emUserName,
+          isSystem: isSystem ?? prev.isSystem,
+          titleColor: titleColor ?? prev.titleColor,
         ),
       );
     } else {
@@ -460,9 +526,157 @@ class ChatsListController extends ChangeNotifier {
           postCount: postCount ?? 0,
           level: level ?? 1,
           lastMsgAtMs: nowMs,
+          emUserName: emUserName ?? '',
+          isSystem: isSystem ?? false,
+          titleColor: titleColor,
         ),
       );
     }
+    notifyListeners();
+  }
+
+  /// Mark which conversation is open so realtime pushes don't bump unread.
+  void setActiveConversation(String? idOrEm) {
+    final key = idOrEm?.trim();
+    _activeConversationKey = (key == null || key.isEmpty) ? null : key;
+  }
+
+  void _onImMessage(ImChatMessage m) {
+    if (m.msgType == 'follow') return;
+    final emId = m.conversationId.trim();
+    if (emId.isEmpty) return;
+
+    final preview = m.text.trim().isEmpty ? '[Message]' : m.text;
+    final viewing = _isViewingConversation(emId);
+    final unreadDelta = (m.isSelf || viewing) ? 0 : 1;
+
+    final existing = _findByEmOrListId(emId);
+    if (existing != null) {
+      onNewMessage(
+        id: existing.id,
+        title: existing.title,
+        avatarAsset: existing.avatarAsset,
+        avatarUrl: existing.avatarUrl,
+        lastMessage: preview,
+        badge: existing.badge,
+        unreadDelta: unreadDelta,
+        isMale: existing.isMale,
+        signature: existing.signature,
+        zodiac: existing.zodiac,
+        isFollowing: existing.isFollowing,
+        momentAssets: existing.momentAssets,
+        groupDescription: existing.groupDescription,
+        category: existing.category,
+        memberCount: existing.memberCount,
+        postCount: existing.postCount,
+        level: existing.level,
+        emUserName: existing.emUserName.isNotEmpty ? existing.emUserName : emId,
+        isSystem: existing.isSystem,
+        titleColor: existing.titleColor,
+      );
+      if (viewing && !m.isSelf) {
+        markRead(existing.id);
+      }
+      return;
+    }
+
+    final isGroup = m.isGroup || _joinedGroupIds.contains(emId);
+    if (isGroup) {
+      // Don't surface groups we never joined (local IM ghosts).
+      if (!_joinedGroupIds.contains(emId) && !_isHidden(emId)) return;
+      onNewMessage(
+        id: emId,
+        title: 'Group',
+        avatarAsset: AppAssets.avatarPlace,
+        lastMessage: preview,
+        badge: ChatBadgeType.group,
+        unreadDelta: unreadDelta,
+        emUserName: emId,
+      );
+      unawaited(_enrichHiddenOrNewGroup(emId));
+      return;
+    }
+
+    final isSystem = ImSystemAccounts.isSystemAccount(emId);
+    final listId = isSystem ? 'sys_$emId' : 'dm_$emId';
+    if (isSystem) {
+      onNewMessage(
+        id: listId,
+        title: ImSystemAccounts.displayName(emId),
+        avatarAsset: ImSystemAccounts.avatarAsset(emId),
+        lastMessage: preview,
+        unreadDelta: unreadDelta,
+        emUserName: emId,
+        isSystem: true,
+        titleColor: AppColors.primaryBright,
+      );
+      return;
+    }
+
+    onNewMessage(
+      id: listId,
+      title: emId,
+      avatarAsset: AppAssets.avatarPlace,
+      lastMessage: preview,
+      unreadDelta: unreadDelta,
+      emUserName: emId,
+    );
+    unawaited(_enrichDmProfile(listId, emId));
+  }
+
+  bool _isViewingConversation(String emId) {
+    final active = _activeConversationKey;
+    if (active == null || active.isEmpty) return false;
+    if (active == emId) return true;
+    if (active == 'dm_$emId' || active == 'sys_$emId') return true;
+    final existing = _findByEmOrListId(emId);
+    return existing != null && existing.id == active;
+  }
+
+  ChatConversation? _findByEmOrListId(String emId) {
+    final index = _conversations.indexWhere(
+      (c) =>
+          c.emUserName == emId ||
+          c.id == emId ||
+          c.id == 'dm_$emId' ||
+          c.id == 'sys_$emId',
+    );
+    if (index < 0) return null;
+    return _conversations[index];
+  }
+
+  Future<void> _enrichDmProfile(String listId, String emId) async {
+    try {
+      final res = await AppApis.relation.msgUser(emId);
+      final brief = res.data;
+      if (!res.ok || brief == null) return;
+      final index = _conversations.indexWhere((c) => c.id == listId);
+      if (index < 0) return;
+      final prev = _conversations[index];
+      _conversations[index] = prev.copyWith(
+        title: brief.nickname.isNotEmpty ? brief.nickname : prev.title,
+        avatarUrl:
+            brief.avatarUrl.isNotEmpty ? brief.avatarUrl : prev.avatarUrl,
+        emUserName: emId,
+      );
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  Future<void> _enrichHiddenOrNewGroup(String groupId) async {
+    final detail = await _fetchGroupDetail(groupId);
+    if (detail == null) return;
+    _joinedGroupIds.add(detail.id);
+    final index = _conversations.indexWhere((c) => c.id == groupId);
+    if (index < 0) return;
+    final prev = _conversations[index];
+    _conversations[index] = _conversationFromGroup(detail, prev).copyWith(
+      lastMessage: prev.lastMessage,
+      timeLabel: prev.timeLabel,
+      unreadCount: prev.unreadCount,
+      lastMsgAtMs: prev.lastMsgAtMs,
+      emUserName: groupId,
+    );
     notifyListeners();
   }
 
@@ -475,5 +689,12 @@ class ChatsListController extends ChangeNotifier {
     } else {
       _conversations.insert(0, next);
     }
+  }
+
+  @override
+  void dispose() {
+    unawaited(_imSub?.cancel() ?? Future<void>.value());
+    _imSub = null;
+    super.dispose();
   }
 }

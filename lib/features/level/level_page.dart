@@ -1,45 +1,79 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../core/constants/app_assets.dart';
-import '../../core/network/network_bootstrap.dart';
-import '../me/data/user_dto.dart';
+import '../../core/network/app_apis.dart';
+import '../../core/widgets/app_nav_bar.dart';
+import '../../core/widgets/app_top_loading_bar.dart';
 import '../me/levels_help_page.dart';
+import '../me/models/me_models.dart';
 
-/// My level: current level from `/user/info` + privilege list.
+/// My Level — mirrors forya `MineLevelPage` / `MineLevelModel`.
 class LevelPage extends StatefulWidget {
   const LevelPage({
     super.key,
-    this.initialLevel = 1,
+    this.initialLevel = 0,
     this.initialExperience = 0,
+    this.initialMoreExpForNextLevel = 0,
+    this.initialTotalExperience = 0,
   });
 
   final int initialLevel;
   final int initialExperience;
+  final int initialMoreExpForNextLevel;
+  final int initialTotalExperience;
 
   @override
   State<LevelPage> createState() => _LevelPageState();
 }
 
 class _LevelPageState extends State<LevelPage> {
-  late int _level = widget.initialLevel;
-  late int _experience = widget.initialExperience;
-  late int _pointsToLevelUp = _estimatePointsToNext(_level, _experience);
+  static const _mainColors = [
+    Color(0xFF4E566B),
+    Color(0xFF1587F2),
+    Color(0xFF6A39F5),
+    Color(0xFFE97B15),
+    Color(0xFFE7425F),
+    Color(0xFFAE1817),
+  ];
+
+  late MeProfile _profile = MeProfile.empty.copyWith(
+    vipLevel: widget.initialLevel,
+    experience: widget.initialExperience,
+    moreExpForNextLevel: widget.initialMoreExpForNextLevel,
+    totalExperience: widget.initialTotalExperience,
+  );
   bool _loading = true;
 
-  double get _progress {
-    final total = _experience + _pointsToLevelUp;
-    if (total <= 0) return 0;
-    return (_experience / total).clamp(0.0, 1.0);
+  Color get _mainColor => _mainColors[_profile.levelIndex];
+
+  List<Color> get _progressColors => [
+        _mainColor.withValues(alpha: 0.5),
+        _mainColor,
+      ];
+
+  String get _experienceText {
+    if (_profile.isMaxLevel) {
+      return 'Current experience point:${_profile.totalExperience}';
+    }
+    return 'Current experience point:${_profile.displayedExperience}';
   }
 
-  static int _estimatePointsToNext(int level, int experience) {
-    final step = 1000 * (level.clamp(1, 100));
-    final into = experience % step;
-    final remaining = step - into;
-    return remaining <= 0 ? step : remaining;
+  String get _levelUpText {
+    if (_profile.isMaxLevel) return '';
+    return '${_profile.moreExpForNextLevel} points to level up';
+  }
+
+  double get _percent {
+    if (_profile.isMaxLevel) return 1;
+    final total = _profile.experience;
+    if (total <= 0) return 0;
+    return math.min(
+      1.0,
+      1 - _profile.moreExpForNextLevel / total.toDouble(),
+    );
   }
 
   @override
@@ -53,19 +87,13 @@ class _LevelPageState extends State<LevelPage> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final res = await NetworkBootstrap.api.userInfo();
+      final res = await AppApis.user.profileOrNull();
       if (!mounted) return;
-      final profile = UserDto.parseProfile(res);
-      if (profile != null) {
-        setState(() {
-          _level = profile.vipLevel <= 0 ? 1 : profile.vipLevel;
-          _experience = profile.experience;
-          _pointsToLevelUp = _estimatePointsToNext(_level, _experience);
-          _loading = false;
-        });
-      } else {
-        setState(() => _loading = false);
-      }
+      final profile = res.data;
+      setState(() {
+        if (profile != null) _profile = profile;
+        _loading = false;
+      });
     } catch (_) {
       if (mounted) setState(() => _loading = false);
     }
@@ -83,9 +111,10 @@ class _LevelPageState extends State<LevelPage> {
   Widget build(BuildContext context) {
     final top = MediaQuery.paddingOf(context).top;
     final bottom = MediaQuery.paddingOf(context).bottom;
+    final levelIndex = _profile.levelIndex;
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: const Color(0xFF0C052A),
       body: Stack(
         children: [
           Positioned(
@@ -103,54 +132,57 @@ class _LevelPageState extends State<LevelPage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               SizedBox(height: top),
-              _LevelAppBar(
-                onHelp: () => _openIntroduction(context),
-              ),
-              if (_loading)
-                const LinearProgressIndicator(
-                  minHeight: 2,
-                  color: Color(0xFFFFD56A),
-                  backgroundColor: Colors.transparent,
+              AppNavBar(
+                title: 'My Level',
+                titleStyle: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
                 ),
+                trailing: IconButton(
+                  onPressed: () => _openIntroduction(context),
+                  icon: const Icon(
+                    Icons.help_outline,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+              ),
+              AppTopLoadingBar(visible: _loading),
               Expanded(
                 child: RefreshIndicator(
                   color: const Color(0xFFFFD56A),
                   onRefresh: _load,
                   child: ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
-                    padding: EdgeInsets.fromLTRB(16, 20, 16, 24 + bottom),
+                    padding: EdgeInsets.fromLTRB(12, 16, 12, 24 + bottom),
                     children: [
                       _CurrentLevelCard(
-                        level: _level,
-                        experience: _experience,
-                        pointsToLevelUp: _pointsToLevelUp,
-                        progress: _progress,
+                        level: _profile.vipLevel,
+                        levelIndex: levelIndex,
+                        mainColor: _mainColor,
+                        progressColors: _progressColors,
+                        experienceText: _experienceText,
+                        levelUpText: _levelUpText,
+                        percent: _percent,
                       ),
-                      const SizedBox(height: 28),
+                      const SizedBox(height: 24),
                       const _SectionTitle(),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 16),
                       const _PrivilegeCard(
                         iconAsset: AppAssets.levelPrivilegeBadge,
                         title: 'Level Badge',
-                        unlockLevel: 40,
+                        activationLabel: 'Activation Level: 1',
                         description:
-                            'Your personal homepage and room public screen display your level badges. The higher your level is, the more splendid the badge becomes.',
+                            'Your personal homepage display your level badges. The higher your level is, the more splendid the badge becomes.',
                       ),
                       const SizedBox(height: 12),
                       const _PrivilegeCard(
                         iconAsset: AppAssets.levelPrivilegeAssist,
                         title: 'Exclusive Assistance',
-                        unlockLevel: 40,
+                        activationLabel: 'Activation Level: 1',
                         description:
                             'Own exclusive assistance, 1-on-1 problem-solving, priority registration for activities.',
-                      ),
-                      const SizedBox(height: 12),
-                      const _PrivilegeCard(
-                        iconAsset: AppAssets.levelPrivilegeCar,
-                        title: 'Exclusively Custom-made car',
-                        unlockLevel: 40,
-                        description:
-                            'Own exclusive cars, and you can drive them into the room to show them off.',
                       ),
                     ],
                   ),
@@ -164,161 +196,142 @@ class _LevelPageState extends State<LevelPage> {
   }
 }
 
-class _LevelAppBar extends StatelessWidget {
-  const _LevelAppBar({required this.onHelp});
-
-  final VoidCallback onHelp;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 48,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: IconButton(
-              onPressed: () => Navigator.of(context).pop(),
-              icon: SvgPicture.asset(
-                AppAssets.chatBack,
-                width: 17,
-                height: 7,
-                colorFilter: const ColorFilter.mode(
-                  Colors.white,
-                  BlendMode.srcIn,
-                ),
-              ),
-            ),
-          ),
-          const Text(
-            'My level',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          Align(
-            alignment: Alignment.centerRight,
-            child: IconButton(
-              onPressed: onHelp,
-              icon: const Icon(
-                Icons.help_outline_rounded,
-                color: Colors.white,
-                size: 24,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _CurrentLevelCard extends StatelessWidget {
   const _CurrentLevelCard({
     required this.level,
-    required this.experience,
-    required this.pointsToLevelUp,
-    required this.progress,
+    required this.levelIndex,
+    required this.mainColor,
+    required this.progressColors,
+    required this.experienceText,
+    required this.levelUpText,
+    required this.percent,
   });
 
   final int level;
-  final int experience;
-  final int pointsToLevelUp;
-  final double progress;
+  final int levelIndex;
+  final Color mainColor;
+  final List<Color> progressColors;
+  final String experienceText;
+  final String levelUpText;
+  final double percent;
+
+  static const double _startMargin = 17;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 168,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Positioned.fill(
-            child: Image.asset(
-              AppAssets.levelCardBg,
-              fit: BoxFit.fill,
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 19),
+          child: Container(
+            width: double.infinity,
+            height: 160,
+            decoration: BoxDecoration(
+              image: DecorationImage(
+                image: AssetImage(AppAssets.levelCardBg(levelIndex)),
+                fit: BoxFit.fill,
+              ),
             ),
-          ),
-          Positioned(
-            right: 6,
-            top: -28,
-            child: Image.asset(
-              AppAssets.levelBadgeHero,
-              width: 118,
-              height: 118,
-              fit: BoxFit.contain,
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 16, 120, 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      const EdgeInsets.symmetric(horizontal: 17, vertical: 5),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFB7C8DA),
-                    borderRadius: BorderRadius.circular(10),
+                    color: mainColor.withValues(alpha: 0.2),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(12),
+                      bottomRight: Radius.circular(12),
+                    ),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Current level',
                     style: TextStyle(
-                      color: Color(0xFF5A6B7A),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
+                      color: mainColor,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  'LV.$level',
-                  style: const TextStyle(
-                    color: Color(0xFF1A1A1A),
-                    fontSize: 42,
-                    fontWeight: FontWeight.w900,
-                    fontStyle: FontStyle.italic,
-                    height: 1,
+                const SizedBox(height: 4),
+                Padding(
+                  padding: const EdgeInsets.only(left: _startMargin, top: 6),
+                  child: Text(
+                    'Lv.$level',
+                    style: TextStyle(
+                      fontSize: 36,
+                      fontWeight: FontWeight.w800,
+                      color: mainColor,
+                      fontStyle: FontStyle.italic,
+                      height: 1,
+                    ),
                   ),
                 ),
                 const Spacer(),
-                Text(
-                  'Current experience value $experience',
-                  style: const TextStyle(
-                    color: Color(0xFF4A5A68),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    minHeight: 6,
-                    backgroundColor: Colors.white.withValues(alpha: 0.75),
-                    valueColor: const AlwaysStoppedAnimation<Color>(
-                      Color(0xFF6FA8D8),
+                Padding(
+                  padding: const EdgeInsets.only(left: _startMargin),
+                  child: Text(
+                    experienceText,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w400,
+                      color: mainColor,
                     ),
                   ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  '$pointsToLevelUp to go, 1 level up',
-                  style: const TextStyle(
-                    color: Color(0xFF4A5A68),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
+                Container(
+                  margin: const EdgeInsets.only(
+                    left: _startMargin,
+                    top: 6,
+                    right: _startMargin,
+                  ),
+                  height: 4,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(2),
+                    color: Colors.white,
+                  ),
+                  child: FractionallySizedBox(
+                    widthFactor: percent.clamp(0.0, 1.0),
+                    heightFactor: 1,
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(2),
+                        gradient: LinearGradient(colors: progressColors),
+                      ),
+                    ),
                   ),
                 ),
+                if (levelUpText.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(left: _startMargin, top: 6),
+                    child: Text(
+                      levelUpText,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w400,
+                        color: mainColor,
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 20),
               ],
             ),
           ),
-        ],
-      ),
+        ),
+        Positioned(
+          right: 0,
+          top: 0,
+          child: Image.asset(
+            AppAssets.levelBadgeHero(levelIndex),
+            width: 142,
+            height: 124,
+            fit: BoxFit.contain,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -328,98 +341,25 @@ class _SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Image.asset(
-          AppAssets.levelPrivilegeAccent,
-          width: 26,
-          height: 26,
-          fit: BoxFit.contain,
-        ),
-        const SizedBox(width: 8),
-        const Text(
-          'Level Privilege',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _PrivilegeCard extends StatelessWidget {
-  const _PrivilegeCard({
-    required this.iconAsset,
-    required this.title,
-    required this.unlockLevel,
-    required this.description,
-  });
-
-  final String iconAsset;
-  final String title;
-  final int unlockLevel;
-  final String description;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF2A1F3D),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFF3D2F55)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return Center(
+      child: Stack(
+        alignment: Alignment.bottomLeft,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _PrivilegeIcon(asset: iconAsset),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 10),
-                  child: Text(
-                    title,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
-              Container(
-                margin: const EdgeInsets.only(top: 2),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF3A3150),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'Unlock level:$unlockLevel',
-                  style: const TextStyle(
-                    color: Color(0xFFB8AEC8),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
+          Image.asset(
+            AppAssets.levelPrivilegeAccent,
+            width: 39,
+            height: 15,
+            fit: BoxFit.contain,
           ),
-          const SizedBox(height: 10),
-          Text(
-            description,
-            style: const TextStyle(
-              color: Color(0xFFB8AEC8),
-              fontSize: 13,
-              height: 1.4,
-              fontWeight: FontWeight.w400,
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 6),
+            child: Text(
+              'Level Privilege',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],
@@ -428,37 +368,87 @@ class _PrivilegeCard extends StatelessWidget {
   }
 }
 
-class _PrivilegeIcon extends StatelessWidget {
-  const _PrivilegeIcon({required this.asset});
+class _PrivilegeCard extends StatelessWidget {
+  const _PrivilegeCard({
+    required this.iconAsset,
+    required this.title,
+    required this.activationLabel,
+    required this.description,
+  });
 
-  final String asset;
+  final String iconAsset;
+  final String title;
+  final String activationLabel;
+  final String description;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 64,
-      height: 64,
-      child: Stack(
-        alignment: Alignment.center,
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFF272048),
+        borderRadius: BorderRadius.all(Radius.circular(12)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: RadialGradient(
-                colors: [
-                  const Color(0xFF8B5CF6).withValues(alpha: 0.55),
-                  const Color(0xFF8B5CF6).withValues(alpha: 0.0),
-                ],
-              ),
-            ),
-          ),
           Image.asset(
-            asset,
-            width: 52,
-            height: 52,
+            iconAsset,
+            width: 92,
+            height: 92,
             fit: BoxFit.contain,
+          ),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Spacer(),
+                    Container(
+                      width: 100,
+                      height: 18,
+                      alignment: Alignment.center,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF504970),
+                        borderRadius: BorderRadius.only(
+                          topRight: Radius.circular(12),
+                          bottomLeft: Radius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        activationLabel,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  description,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.8),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w400,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 18),
+              ],
+            ),
           ),
         ],
       ),

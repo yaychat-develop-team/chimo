@@ -2,10 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
-import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/app_page_scaffold.dart';
 
 /// Interest tag selection page.
 class MyTagsPage extends StatefulWidget {
@@ -125,85 +124,54 @@ class _MyTagsPageState extends State<MyTagsPage> {
   Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
-      child: Scaffold(
-        backgroundColor: AppColors.background,
-        body: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              SizedBox(
-                height: 48,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: IconButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        icon: SvgPicture.asset(
-                          AppAssets.chatBack,
-                          width: 17,
-                          height: 7,
-                        ),
-                      ),
-                    ),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: _onConfirm,
-                        child: const Text(
-                          'Confirm',
-                          style: TextStyle(
-                            color: AppColors.primaryBright,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-                  children: [
-                    const Text(
-                      'Build your own tag set',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 26,
-                        fontWeight: FontWeight.w700,
-                        height: 1.25,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    const Text(
-                      'Pick tags to find like-minded friends!',
-                      style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                    const SizedBox(height: 28),
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
-                      children: [
-                        for (final tag in MyTagsPage.allTags)
-                          _TagChip(
-                            label: tag,
-                            selected: _selected.contains(tag),
-                            onTap: () => _toggle(tag),
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
+      child: AppPageScaffold(
+        title: '',
+        trailing: TextButton(
+          onPressed: _onConfirm,
+          child: const Text(
+            'Confirm',
+            style: TextStyle(
+              color: AppColors.primaryBright,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
           ),
+        ),
+        body: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          children: [
+            const Text(
+              'Build your own tag set',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 26,
+                fontWeight: FontWeight.w700,
+                height: 1.25,
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'Pick tags to find like-minded friends!',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 14,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+            const SizedBox(height: 28),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                for (final tag in MyTagsPage.allTags)
+                  _TagChip(
+                    label: tag,
+                    selected: _selected.contains(tag),
+                    onTap: () => _toggle(tag),
+                  ),
+              ],
+            ),
+          ],
         ),
       ),
     );

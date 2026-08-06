@@ -1,0 +1,65 @@
+import '../../../features/chats/data/cash_gift_dto.dart';
+import '../api_gateway.dart';
+import '../api_result.dart';
+import '../cash_charge_dto.dart';
+import '../network_bootstrap.dart';
+
+/// Wallet / gift cash endpoints.
+class CashApi {
+  const CashApi();
+
+  Future<ApiResult<int>> balance() {
+    return ApiGateway.request(
+      () => NetworkBootstrap.api.cashCurrent(),
+      map: CashGiftDto.parseBalance,
+    );
+  }
+
+  Future<ApiResult<List<CashChargeProduct>>> chargeProducts() {
+    return ApiGateway.request(
+      () => NetworkBootstrap.api.cashChargeProducts(),
+      map: CashChargeDto.parseChargeProducts,
+    );
+  }
+
+  Future<ApiResult<List<CashChargeProduct>>> goods() {
+    return ApiGateway.request(
+      () => NetworkBootstrap.api.cashGoods(),
+      map: CashChargeDto.parseGoods,
+    );
+  }
+
+  /// Charge products, falling back to goods catalog when empty.
+  Future<ApiResult<List<CashChargeProduct>>> rechargeOptions() async {
+    final products = await chargeProducts();
+    if (!products.ok) return products;
+    if (products.data != null && products.data!.isNotEmpty) return products;
+    return goods();
+  }
+
+  Future<ApiResult<List<CashGiftItem>>> giftItems({
+    int version = 1,
+    int rid = 0,
+  }) {
+    return ApiGateway.request(
+      () => NetworkBootstrap.api.cashItems(version: version, rid: rid),
+      map: CashGiftDto.parseItems,
+    );
+  }
+
+  Future<ApiResult<void>> sendGift({
+    required List<String> receiverIds,
+    required String itemId,
+    required int count,
+    String? channelId,
+  }) {
+    return ApiGateway.action(
+      () => NetworkBootstrap.api.cashGift(
+        receiverIds: receiverIds,
+        itemId: itemId,
+        count: count,
+        channelId: channelId,
+      ),
+    );
+  }
+}

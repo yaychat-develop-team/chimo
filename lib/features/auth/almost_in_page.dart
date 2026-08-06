@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../../app/app_router.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/app_gradient_button.dart';
 
 /// Registration finale: avatar + nickname (Figma 完善资料 — You're almost in!).
 class AlmostInPage extends StatefulWidget {
@@ -184,30 +185,10 @@ class _AlmostInPageState extends State<AlmostInPage> {
                       ),
                       SizedBox(height: keyboardOpen ? 28 : 48),
                       Center(
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            onTap: _onLetsGo,
-                            borderRadius: BorderRadius.circular(27),
-                            child: Ink(
-                              width: 134,
-                              height: 54,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(27),
-                                gradient: AppColors.promoBannerGradient,
-                              ),
-                              child: const Center(
-                                child: Text(
-                                  "Let's Go!",
-                                  style: TextStyle(
-                                    color: AppColors.promoText,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
+                        child: AppGradientButton(
+                          label: "Let's Go!",
+                          onTap: _onLetsGo,
+                          width: 134,
                         ),
                       ),
                     ],

@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/constants/app_assets.dart';
-import '../../core/network/network_bootstrap.dart';
+import '../../core/network/app_apis.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_asset_image.dart';
 import '../../core/widgets/center_toast.dart';
@@ -14,9 +14,6 @@ import '../../shared/models/friend_user.dart';
 import '../chats/chat_detail_page.dart';
 import '../chats/data/chats_list_controller.dart';
 import '../chats/models/chat_conversation.dart';
-import '../friends/data/friend_dto.dart';
-import '../me/data/user_dto.dart';
-import 'models/chat_user_profile.dart';
 
 enum _SearchRelation { self, notFollowing, following }
 
@@ -78,6 +75,8 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
   bool _hasSearched = false;
   bool _searching = false;
   String? _selfUserId;
+  Timer? _searchDebounce;
+  int _searchSeq = 0;
 
   /// Matches forya `searchHistoryKey`.
   static const _historyPrefsKey = 'searchHistoryKey';
@@ -127,8 +126,8 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
 
   Future<void> _loadSelfId() async {
     try {
-      final res = await NetworkBootstrap.api.userInfo();
-      final profile = UserDto.parseProfile(res);
+      final res = await AppApis.user.profileOrNull();
+      final profile = res.data;
       if (!mounted || profile == null) return;
       setState(() => _selfUserId = profile.userId);
     } catch (_) {}
@@ -136,6 +135,7 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _controller.removeListener(_onInputChanged);
     _controller.dispose();
     _focusNode.dispose();
@@ -144,6 +144,36 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
 
   void _onInputChanged() {
     setState(() {});
+    final query = _controller.text.trim();
+    _searchDebounce?.cancel();
+
+    if (_editingHistory) {
+      _exitEditHistory();
+    }
+
+    if (query.isEmpty) {
+      setState(() {
+        _result = null;
+        _hasSearched = false;
+        _searching = false;
+      });
+      return;
+    }
+
+    // Forya: throttle search on input (~500ms). Skip toast while typing
+    // incomplete IDs; only auto-search when the ID looks complete.
+    if (!_isValidId(query)) {
+      setState(() {
+        _result = null;
+        _hasSearched = false;
+        _searching = false;
+      });
+      return;
+    }
+
+    _searchDebounce = Timer(const Duration(milliseconds: 500), () {
+      unawaited(_runSearch(query, unfocus: false, showInvalidToast: false));
+    });
   }
 
   void _enterEditHistory() {
@@ -177,11 +207,13 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
   }
 
   void _clearInput() {
+    _searchDebounce?.cancel();
     _controller.clear();
     setState(() {
       _result = null;
       _hasSearched = false;
       _editingHistory = false;
+      _searching = false;
     });
     _focusNode.requestFocus();
   }
@@ -202,13 +234,21 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
       avatarUrl: u.avatarUrl,
       isMale: u.isMale,
       age: u.age,
-      momentAssets: ChatUserProfile.demoMomentAssets,
+      momentAssets: const [],
       relation: relation,
     );
   }
 
   Future<void> _submit(String raw) async {
-    final query = raw.trim();
+    _searchDebounce?.cancel();
+    await _runSearch(raw.trim(), unfocus: true, showInvalidToast: true);
+  }
+
+  Future<void> _runSearch(
+    String query, {
+    required bool unfocus,
+    required bool showInvalidToast,
+  }) async {
     if (query.isEmpty) return;
 
     if (_editingHistory) {
@@ -219,12 +259,19 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
       setState(() {
         _result = null;
         _hasSearched = false;
+        _searching = false;
       });
-      showCenterToast(context, message: 'Search by correct ID');
+      if (showInvalidToast) {
+        showCenterToast(context, message: 'Search by correct ID');
+      }
       return;
     }
 
-    FocusScope.of(context).unfocus();
+    if (unfocus) {
+      FocusScope.of(context).unfocus();
+    }
+
+    final seq = ++_searchSeq;
     setState(() {
       _searching = true;
       _hasSearched = true;
@@ -232,10 +279,10 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
     });
 
     try {
-      final res = await NetworkBootstrap.api.searchUsers(query);
-      if (!mounted) return;
+      final res = await AppApis.relation.searchUsers(query);
+      if (!mounted || seq != _searchSeq) return;
 
-      if (!res.success) {
+      if (!res.ok) {
         setState(() => _searching = false);
         showCenterToast(
           context,
@@ -244,10 +291,7 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
         return;
       }
 
-      final users = FriendDto.parseList(
-        res,
-        relation: FriendRelation.follower,
-      );
+      final users = res.data ?? const [];
       _SearchUser? hit;
       for (final u in users) {
         if (u.userId == query || u.id == query) {
@@ -273,7 +317,7 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
         _searching = false;
       });
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || seq != _searchSeq) return;
       setState(() => _searching = false);
       showCenterToast(context, message: 'Search failed: $error');
     }
@@ -281,9 +325,12 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
 
   void _onHistoryTap(String item) {
     if (_editingHistory) return;
+    _searchDebounce?.cancel();
     _controller.text = item;
     _controller.selection = TextSelection.collapsed(offset: item.length);
-    unawaited(_submit(item));
+    // Listener schedules a debounce; cancel it and search immediately.
+    _searchDebounce?.cancel();
+    unawaited(_runSearch(item, unfocus: true, showInvalidToast: true));
   }
 
   Future<void> _follow(_SearchUser user) async {
@@ -291,9 +338,9 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
       _result = user.copyWith(relation: _SearchRelation.following);
     });
     try {
-      final res = await NetworkBootstrap.api.followUser(user.userId);
+      final res = await AppApis.relation.follow(user.userId);
       if (!mounted) return;
-      if (!res.success) {
+      if (!res.ok) {
         setState(() {
           _result = user.copyWith(relation: _SearchRelation.notFollowing);
         });
@@ -371,6 +418,7 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
                             child: TextField(
                               controller: _controller,
                               focusNode: _focusNode,
+                              keyboardType: TextInputType.number,
                               style: const TextStyle(
                                 color: AppColors.textPrimary,
                                 fontSize: 15,
@@ -379,6 +427,7 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
                               cursorWidth: 1.5,
                               textInputAction: TextInputAction.search,
                               inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
                                 LengthLimitingTextInputFormatter(64),
                               ],
                               onSubmitted: (v) => unawaited(_submit(v)),
@@ -440,15 +489,7 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
                         ),
                       )
                     : _result == null
-                        ? const Center(
-                            child: Text(
-                              'No users found',
-                              style: TextStyle(
-                                color: AppColors.textTertiary,
-                                fontSize: 14,
-                              ),
-                            ),
-                          )
+                        ? const _SearchEmptyState()
                         : _UsersResult(
                             user: _result!,
                             onFollow: () => unawaited(_follow(_result!)),
@@ -551,6 +592,42 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
                   ),
                 ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SearchEmptyState extends StatelessWidget {
+  const _SearchEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    // Mirrors forya `JREmptyView(desc: 'Sorry. No relevant content.')`
+    // with `empty_no_search` illustration.
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Image.asset(
+              AppAssets.emptyNoSearch,
+              width: 220,
+              height: 160,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'Sorry. No relevant content.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ],
         ),
       ),

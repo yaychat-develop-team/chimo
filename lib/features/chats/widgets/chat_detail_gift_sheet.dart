@@ -35,25 +35,24 @@ class _GiftSheetState extends State<_GiftSheet> {
       _loadError = null;
     });
     try {
-      final api = NetworkBootstrap.api;
-      final results = await Future.wait([
-        api.cashItems(),
-        api.cashCurrent(),
-      ]);
+      final itemsFuture = AppApis.cash.giftItems();
+      final balanceFuture = AppApis.cash.balance();
+      final itemsRes = await itemsFuture;
+      final balanceRes = await balanceFuture;
       if (!mounted) return;
-      final items = CashGiftDto.parseItems(results[0])
+      final items = (itemsRes.data ?? const [])
           .where((g) => g.canBuy)
           .toList(growable: false);
-      final balance = CashGiftDto.parseBalance(results[1]);
+      final balance = balanceRes.data ?? 0;
       setState(() {
         _gifts = items;
         _balance = balance;
         _selected = items.isEmpty ? 0 : 0;
         _loading = false;
-        if (items.isEmpty && !results[0].success) {
-          _loadError = results[0].message.isEmpty
+        if (items.isEmpty && !itemsRes.ok) {
+          _loadError = itemsRes.message.isEmpty
               ? 'Failed to load gifts'
-              : results[0].message;
+              : itemsRes.message;
         }
       });
     } catch (error) {
@@ -120,13 +119,13 @@ class _GiftSheetState extends State<_GiftSheet> {
 
     setState(() => _sending = true);
     try {
-      final res = await NetworkBootstrap.api.cashGift(
+      final res = await AppApis.cash.sendGift(
         receiverIds: [uid],
         itemId: item.id,
         count: _qty,
       );
       if (!mounted) return;
-      if (!res.success) {
+      if (!res.ok) {
         setState(() => _sending = false);
         showCenterToast(
           context,
@@ -137,9 +136,9 @@ class _GiftSheetState extends State<_GiftSheet> {
 
       // Refresh balance after successful spend.
       try {
-        final bal = await NetworkBootstrap.api.cashCurrent();
+        final bal = await AppApis.cash.balance();
         if (mounted) {
-          setState(() => _balance = CashGiftDto.parseBalance(bal));
+          setState(() => _balance = bal.data ?? _balance);
         }
       } catch (_) {}
 

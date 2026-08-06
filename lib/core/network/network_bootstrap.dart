@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../auth/auth_session.dart';
 import '../im/im_service.dart';
 import 'api_client.dart';
+import 'auth_request_headers.dart';
 import 'api_config.dart';
 import 'api_config_store.dart';
 import 'chimo_api.dart';
@@ -24,6 +25,7 @@ abstract final class NetworkBootstrap {
 
   static Future<ApiResponse> initialize({bool startHeartbeat = true}) async {
     await ApiConfigStore.load();
+    await AuthRequestHeaders.initialize();
     authToken = await AuthSession.token();
     debugPrint(
       'NetworkBootstrap baseUrl=${ApiConfig.baseUrl} hasToken=${authToken != null}',

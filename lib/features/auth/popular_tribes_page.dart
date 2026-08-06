@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -6,7 +8,11 @@ import 'package:go_router/go_router.dart';
 import '../../app/app_router.dart';
 import '../../core/auth/auth_session.dart';
 import '../../core/constants/app_assets.dart';
+import '../../core/network/app_apis.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/app_gradient_button.dart';
+import '../../core/widgets/center_toast.dart';
+import '../../core/widgets/network_or_asset_avatar.dart';
 
 class _TribeOption {
   const _TribeOption({
@@ -14,75 +20,88 @@ class _TribeOption {
     required this.name,
     required this.subtitle,
     required this.avatarAsset,
+    this.avatarUrl,
   });
 
   final String id;
   final String name;
   final String subtitle;
   final String avatarAsset;
+  final String? avatarUrl;
 }
 
-/// Registration flow: pick popular tribes.
+/// Registration flow: pick tribes from `/chat/group/listByType` (forya) /
+/// fallback `/chat/group/list`, then join selected on Next Step.
 class PopularTribesPage extends StatefulWidget {
   const PopularTribesPage({super.key});
-
-  static const List<_TribeOption> tribes = [
-    _TribeOption(
-      id: 'cat',
-      name: 'Cat Club',
-      subtitle: 'Feline lovers',
-      avatarAsset: AppAssets.avatarPlace,
-    ),
-    _TribeOption(
-      id: 'code',
-      name: 'Code Crafters',
-      subtitle: 'Software Developers',
-      avatarAsset: AppAssets.avatarPlace,
-    ),
-    _TribeOption(
-      id: 'food',
-      name: 'Foodie Hub',
-      subtitle: 'Culinary Creators',
-      avatarAsset: AppAssets.avatarPlace,
-    ),
-    _TribeOption(
-      id: 'wellness',
-      name: 'Wellness',
-      subtitle: 'Holistic living',
-      avatarAsset: AppAssets.avatarPlace,
-    ),
-    _TribeOption(
-      id: 'clinical',
-      name: 'Clinical Corner',
-      subtitle: 'Physicians & Specialists',
-      avatarAsset: AppAssets.avatarPlace,
-    ),
-    _TribeOption(
-      id: 'finance',
-      name: 'Finance',
-      subtitle: 'Financial Pros',
-      avatarAsset: AppAssets.avatarPlace,
-    ),
-    _TribeOption(
-      id: 'green',
-      name: 'Green Life',
-      subtitle: 'Embracing eco-consciousness',
-      avatarAsset: AppAssets.avatarPlace,
-    ),
-    _TribeOption(
-      id: 'teachers',
-      name: "Teachers' Lounge",
-      subtitle: 'Educators & Teachers',
-      avatarAsset: AppAssets.avatarPlace,
-    ),
-  ];
 
   @override
   State<PopularTribesPage> createState() => _PopularTribesPageState();
 }
 
 class _PopularTribesPageState extends State<PopularTribesPage> {
-  final Set<String> _selected = {'code', 'clinical', 'finance'};
+  final Set<String> _selected = {};
+  List<_TribeOption> _tribes = const [];
+  bool _loading = true;
+  bool _submitting = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_loadTribes());
+    });
+  }
+
+  Future<void> _loadTribes() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      // Same as forya SelectTribesPage: listByType (empty typeList = all).
+      var res = await AppApis.group.listByType('');
+      if ((!res.ok || (res.data?.isEmpty ?? true))) {
+        res = await AppApis.group.list(pageNum: 1, pageSize: 50);
+      }
+      if (!mounted) return;
+      if (!res.ok) {
+        setState(() {
+          _tribes = const [];
+          _loading = false;
+          _error = res.message.isEmpty ? 'Failed to load tribes' : res.message;
+        });
+        return;
+      }
+      final groups = res.data ?? const [];
+      setState(() {
+        _tribes = [
+          for (final g in groups)
+            if (g.id.trim().isNotEmpty)
+              _TribeOption(
+                id: g.id,
+                name: g.name.trim().isEmpty ? 'Tribe' : g.name.trim(),
+                // Forya shows GroupInfo.type under the name.
+                subtitle: g.category.trim().isNotEmpty
+                    ? g.category.trim()
+                    : g.description.trim(),
+                avatarAsset: g.avatarAsset,
+                avatarUrl: g.avatarUrl,
+              ),
+        ];
+        _loading = false;
+        _error = null;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _tribes = const [];
+        _loading = false;
+        _error = '$error';
+      });
+    }
+  }
 
   void _toggle(String id) {
     setState(() {
@@ -94,10 +113,30 @@ class _PopularTribesPageState extends State<PopularTribesPage> {
     });
   }
 
-  Future<void> _goMain() async {
-    await AuthSession.markLoggedIn(method: 'phone');
-    if (!mounted) return;
-    context.go(AppRoutes.shell);
+  Future<void> _goMain({bool joinSelected = false}) async {
+    if (_submitting) return;
+    setState(() => _submitting = true);
+    try {
+      if (joinSelected && _selected.isNotEmpty) {
+        final res = await AppApis.group.join(_selected.toList(growable: false));
+        if (!mounted) return;
+        if (!res.ok) {
+          showCenterToast(
+            context,
+            message: res.message.isEmpty ? 'Join failed' : res.message,
+          );
+          return;
+        }
+      }
+      await AuthSession.markLoggedIn(method: 'phone');
+      if (!mounted) return;
+      context.go(AppRoutes.shell);
+    } catch (error) {
+      if (!mounted) return;
+      showCenterToast(context, message: 'Failed: $error');
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   @override
@@ -120,7 +159,9 @@ class _PopularTribesPageState extends State<PopularTribesPage> {
                       color: const Color(0xFF2A2A2A),
                       borderRadius: BorderRadius.circular(12),
                       child: InkWell(
-                        onTap: () => Navigator.of(context).maybePop(),
+                        onTap: _submitting
+                            ? null
+                            : () => Navigator.of(context).maybePop(),
                         borderRadius: BorderRadius.circular(12),
                         child: SizedBox(
                           width: 36,
@@ -141,7 +182,9 @@ class _PopularTribesPageState extends State<PopularTribesPage> {
                     ),
                     const Spacer(),
                     TextButton(
-                      onPressed: _goMain,
+                      onPressed: _submitting
+                          ? null
+                          : () => unawaited(_goMain()),
                       style: TextButton.styleFrom(
                         foregroundColor: AppColors.textSecondary,
                         textStyle: const TextStyle(
@@ -167,65 +210,97 @@ class _PopularTribesPageState extends State<PopularTribesPage> {
                 ),
               ),
               Expanded(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    const cardW = 150.0;
-                    const cardH = 105.0;
-                    const avatarHang = 18.0;
-                    const tileH = cardH + avatarHang;
-                    const gapX = 15.0;
-                    final sidePad =
-                        ((constraints.maxWidth - cardW * 2 - gapX) / 2)
-                            .clamp(12.0, 30.0);
+                child: _loading
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          color: Color(0xFFB6FF2E),
+                        ),
+                      )
+                    : _error != null && _tribes.isEmpty
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    _error!,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      color: Color(0xFF9A9A9A),
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  TextButton(
+                                    onPressed: () => unawaited(_loadTribes()),
+                                    child: const Text('Retry'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        : _tribes.isEmpty
+                            ? const Center(
+                                child: Text(
+                                  'No tribes available',
+                                  style: TextStyle(
+                                    color: Color(0xFF9A9A9A),
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              )
+                            : LayoutBuilder(
+                                builder: (context, constraints) {
+                                  const cardW = 150.0;
+                                  const cardH = 105.0;
+                                  const avatarHang = 18.0;
+                                  const tileH = cardH + avatarHang;
+                                  const gapX = 15.0;
+                                  final sidePad =
+                                      ((constraints.maxWidth -
+                                                  cardW * 2 -
+                                                  gapX) /
+                                              2)
+                                          .clamp(12.0, 30.0);
 
-                    return GridView.builder(
-                      padding: EdgeInsets.fromLTRB(sidePad, 8, sidePad, 12),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        mainAxisSpacing: 38,
-                        crossAxisSpacing: gapX,
-                        mainAxisExtent: tileH,
-                      ),
-                      itemCount: PopularTribesPage.tribes.length,
-                      itemBuilder: (context, index) {
-                        final tribe = PopularTribesPage.tribes[index];
-                        final selected = _selected.contains(tribe.id);
-                        return _TribeCard(
-                          tribe: tribe,
-                          selected: selected,
-                          onTap: () => _toggle(tribe.id),
-                        );
-                      },
-                    );
-                  },
-                ),
+                                  return GridView.builder(
+                                    padding: EdgeInsets.fromLTRB(
+                                      sidePad,
+                                      8,
+                                      sidePad,
+                                      12,
+                                    ),
+                                    gridDelegate:
+                                        const
+                                            SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: 2,
+                                      mainAxisSpacing: 38,
+                                      crossAxisSpacing: gapX,
+                                      mainAxisExtent: tileH,
+                                    ),
+                                    itemCount: _tribes.length,
+                                    itemBuilder: (context, index) {
+                                      final tribe = _tribes[index];
+                                      final selected =
+                                          _selected.contains(tribe.id);
+                                      return _TribeCard(
+                                        tribe: tribe,
+                                        selected: selected,
+                                        onTap: () => _toggle(tribe.id),
+                                      );
+                                    },
+                                  );
+                                },
+                              ),
               ),
               Padding(
                 padding: EdgeInsets.fromLTRB(30, 8, 30, bottom + 16),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: _goMain,
-                    borderRadius: BorderRadius.circular(27),
-                    child: Ink(
-                      height: 54,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(27),
-                        gradient: AppColors.promoBannerGradient,
-                      ),
-                      child: const Center(
-                        child: Text(
-                          'Next Step',
-                          style: TextStyle(
-                            color: AppColors.promoText,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
+                child: AppGradientButton(
+                  label: _submitting ? 'Please wait…' : 'Next Step',
+                  onTap: _submitting
+                      ? null
+                      : () => unawaited(_goMain(joinSelected: true)),
                 ),
               ),
             ],
@@ -272,7 +347,6 @@ class _TribeCard extends StatelessWidget {
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(18),
-                  // Solid fill under the bg art so the card is not see-through.
                   color: const Color(0xFF1A1A1A),
                   image: const DecorationImage(
                     image: AssetImage(AppAssets.homeMyGroupBg),
@@ -282,7 +356,6 @@ class _TribeCard extends StatelessWidget {
               ),
             ),
             Positioned(
-              // Inset from the 18px corner so the 20 check stays inside the card.
               top: avatarHang + 14,
               right: 14,
               child: Container(
@@ -316,22 +389,18 @@ class _TribeCard extends StatelessWidget {
                 height: avatarSize,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(14),
-                  // Opaque under avatar so PNG alpha does not show page through.
                   color: const Color(0xFF2A2A2A),
                 ),
                 clipBehavior: Clip.antiAlias,
-                child: Image.asset(
-                  tribe.avatarAsset,
-                  width: avatarSize,
-                  height: avatarSize,
-                  fit: BoxFit.cover,
+                child: NetworkOrAssetAvatar(
+                  asset: tribe.avatarAsset,
+                  url: tribe.avatarUrl,
                 ),
               ),
             ),
             Positioned(
               left: 16,
               right: 40,
-              // Below the 60 avatar; matches design title/subtitle blocks (~23 + gap + 18).
               top: avatarHang + 44,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

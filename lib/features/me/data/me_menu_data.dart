@@ -1,27 +1,8 @@
-import '../models/me_models.dart';
 import '../../../core/constants/app_assets.dart';
+import '../models/me_models.dart';
 
-/// Me page mock data (replace with API later).
-abstract final class MeMockData {
-  static const MeProfile profile = MeProfile(
-    displayName: 'Seraphina',
-    userId: '4757119063',
-    avatarAsset: AppAssets.avatarPlace,
-    friends: 5,
-    fans: 8,
-    follows: 7,
-    visitors: 88000,
-  );
-
-  /// Social stats display list (legacy mock; Me page now uses [UserRepository]).
-  static const List<MeStatItem> stats = [
-    MeStatItem(label: 'Friends', value: '5'),
-    MeStatItem(label: 'Fans', value: '8'),
-    MeStatItem(label: 'Follows', value: '7'),
-    MeStatItem(label: 'Visitors', value: '88K'),
-  ];
-
-  /// Quick Access menu items (6 per design).
+/// Me page Quick Access menu (static UI config, not user data).
+abstract final class MeMenuData {
   static const List<QuickAccessItem> quickAccess = [
     QuickAccessItem(
       id: 'debug',

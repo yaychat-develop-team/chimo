@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
-import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/app_page_scaffold.dart';
 
 /// Height / weight numeric input page.
 class BodyMetricPage extends StatefulWidget {
@@ -73,121 +72,89 @@ class _BodyMetricPageState extends State<BodyMetricPage> {
   Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
-      child: Scaffold(
-        backgroundColor: AppColors.background,
-        body: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              SizedBox(
-                height: 48,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: IconButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        icon: SvgPicture.asset(
-                          AppAssets.chatBack,
-                          width: 17,
-                          height: 7,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      widget.title,
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: _onConfirm,
-                        child: const Text(
-                          'Confirm',
-                          style: TextStyle(
-                            color: AppColors.primaryBright,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+      child: AppPageScaffold(
+        title: widget.title,
+        trailing: TextButton(
+          onPressed: _onConfirm,
+          child: const Text(
+            'Confirm',
+            style: TextStyle(
+              color: AppColors.primaryBright,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              child: Container(
+                height: 52,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2A2A2A),
+                  borderRadius: BorderRadius.circular(16),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                child: Container(
-                  height: 52,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2A2A2A),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _controller,
-                          focusNode: _focusNode,
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                            LengthLimitingTextInputFormatter(3),
-                          ],
-                          onChanged: (_) {
-                            if (_error != null) setState(() => _error = null);
-                          },
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          cursorColor: AppColors.primaryBright,
-                          decoration: InputDecoration(
-                            border: InputBorder.none,
-                            isCollapsed: true,
-                            hintText: widget.hint,
-                            hintStyle: const TextStyle(
-                              color: Color(0xFF8A8A8A),
-                              fontSize: 16,
-                            ),
-                          ),
-                        ),
-                      ),
-                      Text(
-                        widget.unit,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _controller,
+                        focusNode: _focusNode,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(3),
+                        ],
+                        onChanged: (_) {
+                          if (_error != null) setState(() => _error = null);
+                        },
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 16,
                           fontWeight: FontWeight.w500,
                         ),
+                        cursorColor: AppColors.primaryBright,
+                        decoration: InputDecoration(
+                          border: InputBorder.none,
+                          isCollapsed: true,
+                          hintText: widget.hint,
+                          hintStyle: const TextStyle(
+                            color: Color(0xFF8A8A8A),
+                            fontSize: 16,
+                          ),
+                        ),
                       ),
-                    ],
-                  ),
+                    ),
+                    Text(
+                      widget.unit,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                child: Text(
-                  _error ??
-                      'Please fill in the numbers between ${widget.min} and ${widget.max}',
-                  style: TextStyle(
-                    color: _error != null
-                        ? const Color(0xFFE44E50)
-                        : Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w400,
-                  ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              child: Text(
+                _error ??
+                    'Please fill in the numbers between ${widget.min} and ${widget.max}',
+                style: TextStyle(
+                  color: _error != null
+                      ? const Color(0xFFE44E50)
+                      : Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w400,
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

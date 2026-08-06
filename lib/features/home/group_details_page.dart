@@ -8,7 +8,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../core/auth/auth_session.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/im/im_service.dart';
-import '../../core/network/network_bootstrap.dart';
+import '../../core/network/app_apis.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_tip_dialog.dart';
 import '../../core/widgets/center_toast.dart';
@@ -54,7 +54,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
   final List<_OutgoingMessage> _sentMessages = [];
   final Set<String> _seenMsgIds = {};
   StreamSubscription<ImChatMessage>? _imSub;
-  List<_GroupPhotoSection> _photoSections = const [];
+  List<GroupPhotoSection> _photoSections = const [];
   final GlobalKey<GroupChatInputBarState> _inputBarKey =
       GlobalKey<GroupChatInputBarState>();
 
@@ -71,6 +71,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
     super.initState();
     unawaited(_loadPhotos());
     _imSub = ImService.messages.listen(_onImMessage);
+    widget.chatsController?.setActiveConversation(_emGroupId);
     if (_isJoined) {
       unawaited(_loadImHistory());
     }
@@ -123,11 +124,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
     if (m.id.isNotEmpty) _seenMsgIds.add(m.id);
     if (!mounted) return;
     setState(() => _sentMessages.add(line));
-    if (m.msgType == 'join') {
-      _notifyNewMessage(m.text);
-    } else if (!m.isSelf) {
-      _notifyNewMessage(m.text.isEmpty ? '[Message]' : m.text);
-    }
+    // List preview / unread handled by ChatsListController IM subscription.
     _scrollToBottom();
   }
 
@@ -182,62 +179,17 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
 
   Future<void> _loadPhotos() async {
     try {
-      final res = await NetworkBootstrap.api.groupPhotos(_group.id);
-      if (!mounted || !res.success) return;
-      final sections = _parsePhotoSections(res.data);
+      final res = await AppApis.group.photos(_group.id);
+      if (!mounted || !res.ok) return;
+      final sections = res.data ?? const [];
       if (sections.isEmpty) return;
       setState(() => _photoSections = sections);
     } catch (_) {}
   }
 
-  /// Forya `GroupPhotoListRsp.groupPhotoList`: each item has periodName + photoList.
-  static List<_GroupPhotoSection> _parsePhotoSections(Object? data) {
-    if (data is! Map) return const [];
-    final list = data['groupPhotoList'] ?? data['photoList'] ?? data['list'];
-    if (list is! List) return const [];
-    final out = <_GroupPhotoSection>[];
-    for (final item in list) {
-      if (item is String) {
-        final s = item.trim();
-        if (s.isNotEmpty) {
-          out.add(_GroupPhotoSection(periodName: '', urls: [s]));
-        }
-        continue;
-      }
-      if (item is! Map) continue;
-      final map = Map<String, dynamic>.from(item);
-      final period = '${map['periodName'] ?? map['period'] ?? map['name'] ?? ''}'
-          .trim();
-      final nested = map['photoList'] ?? map['photos'] ?? map['list'];
-      final urls = <String>[];
-      if (nested is List) {
-        for (final p in nested) {
-          if (p is String) {
-            final s = p.trim();
-            if (s.isNotEmpty) urls.add(s);
-            continue;
-          }
-          if (p is Map) {
-            final u =
-                '${p['url'] ?? p['photo'] ?? p['img'] ?? p['image'] ?? ''}'
-                    .trim();
-            if (u.isNotEmpty) urls.add(u);
-          }
-        }
-      } else {
-        final url =
-            '${map['url'] ?? map['photo'] ?? map['img'] ?? map['image'] ?? ''}'
-                .trim();
-        if (url.isNotEmpty) urls.add(url);
-      }
-      if (urls.isEmpty) continue;
-      out.add(_GroupPhotoSection(periodName: period, urls: urls));
-    }
-    return out;
-  }
-
   @override
   void dispose() {
+    widget.chatsController?.setActiveConversation(null);
     unawaited(_imSub?.cancel() ?? Future<void>.value());
     _inputController.dispose();
     _messagesScroll.dispose();
@@ -251,9 +203,9 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
     widget.chatsController?.joinGroup(joined);
     widget.onMembershipChanged?.call(true);
     try {
-      final res = await NetworkBootstrap.api.joinGroup([_group.id]);
+      final res = await AppApis.group.join([_group.id]);
       if (!mounted) return;
-      if (!res.success) {
+      if (!res.ok) {
         setState(() => _isJoined = false);
         widget.chatsController?.leaveGroup(_group.id);
         widget.onMembershipChanged?.call(false);
@@ -295,9 +247,9 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
     widget.chatsController?.leaveGroup(_group.id);
     widget.onMembershipChanged?.call(false);
     try {
-      final res = await NetworkBootstrap.api.leaveGroup(_group.id);
+      final res = await AppApis.group.leave(_group.id);
       if (!mounted) return;
-      if (!res.success) {
+      if (!res.ok) {
         setState(() => _isJoined = true);
         widget.chatsController?.joinGroup(_group.copyWith(isJoined: true));
         widget.onMembershipChanged?.call(true);
@@ -1030,7 +982,7 @@ class _ChatBody extends StatelessWidget {
   final int tabIndex;
   final bool isJoined;
   final List<_OutgoingMessage> sentMessages;
-  final List<_GroupPhotoSection> photos;
+  final List<GroupPhotoSection> photos;
   final ScrollController messagesScroll;
   final ValueChanged<int> onTabChanged;
   final ValueChanged<int> onPhotoTap;
@@ -1665,16 +1617,6 @@ class _SelfVoiceBubbleState extends State<_SelfVoiceBubble> {
 }
 
 
-class _GroupPhotoSection {
-  const _GroupPhotoSection({
-    required this.periodName,
-    required this.urls,
-  });
-
-  final String periodName;
-  final List<String> urls;
-}
-
 class _PhotosGrid extends StatelessWidget {
   const _PhotosGrid({
     required this.isJoined,
@@ -1683,7 +1625,7 @@ class _PhotosGrid extends StatelessWidget {
   });
 
   final bool isJoined;
-  final List<_GroupPhotoSection> sections;
+  final List<GroupPhotoSection> sections;
   final ValueChanged<int> onPhotoTap;
 
   @override

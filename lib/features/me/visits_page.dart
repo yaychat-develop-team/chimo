@@ -3,13 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_assets.dart';
-import '../../core/network/network_bootstrap.dart';
+import '../../core/network/app_apis.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_asset_image.dart';
-import '../../core/widgets/network_or_asset_avatar.dart';
+import '../../core/widgets/app_avatar.dart';
+import '../../core/widgets/app_nav_bar.dart';
+import '../../core/widgets/app_page_scaffold.dart';
 import '../home/chat_user_profile_page.dart';
 import '../home/models/chat_user_profile.dart';
-import 'data/user_dto.dart';
 import 'data/visit_dto.dart';
 
 /// Me → Visitors: list of who viewed my profile (`GET /user-relation/viewedBy`).
@@ -39,9 +40,9 @@ class _VisitsPageState extends State<VisitsPage> {
       _error = null;
     });
     try {
-      final res = await NetworkBootstrap.api.viewedBy();
+      final res = await AppApis.relation.viewedBy();
       if (!mounted) return;
-      if (!res.success) {
+      if (!res.ok) {
         setState(() {
           _loading = false;
           _error = res.message.isEmpty
@@ -52,7 +53,7 @@ class _VisitsPageState extends State<VisitsPage> {
         return;
       }
       setState(() {
-        _items = VisitDto.parseList(res);
+        _items = res.data ?? const [];
         _loading = false;
       });
     } catch (error) {
@@ -66,9 +67,9 @@ class _VisitsPageState extends State<VisitsPage> {
 
   Future<void> _delete(VisitRecord item) async {
     try {
-      final res = await NetworkBootstrap.api.deleteVisitRecord(item.uid);
+      final res = await AppApis.relation.deleteVisitRecord(item.uid);
       if (!mounted) return;
-      if (!res.success) {
+      if (!res.ok) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -95,9 +96,9 @@ class _VisitsPageState extends State<VisitsPage> {
 
   Future<void> _openProfile(VisitRecord item) async {
     try {
-      final res = await NetworkBootstrap.api.userInfoByUid(item.uid);
+      final res = await AppApis.user.profileByUidOrNull(item.uid);
       if (!mounted) return;
-      final profile = UserDto.parseChatProfile(res) ??
+      final profile = res.data ??
           ChatUserProfile(
             id: item.uid,
             nickname: item.nickname,
@@ -130,111 +131,76 @@ class _VisitsPageState extends State<VisitsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SizedBox(
-              height: 48,
-              child: Stack(
-                alignment: Alignment.center,
+    return AppPageScaffold(
+      title: 'Visits',
+      loading: _loading,
+      backIcon: AppNavBackIcon.backArrow,
+      titleStyle: const TextStyle(
+        color: AppColors.textPrimary,
+        fontSize: 17,
+        fontWeight: FontWeight.w700,
+      ),
+      body: RefreshIndicator(
+        color: AppColors.primaryBright,
+        onRefresh: _load,
+        child: _error != null && _items.isEmpty
+            ? ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
                 children: [
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        color: AppColors.textPrimary,
-                        size: 20,
+                  const SizedBox(height: 120),
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        children: [
+                          Text(
+                            _error!,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          TextButton(
+                            onPressed: () => unawaited(_load()),
+                            child: const Text('Retry'),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                  const Text(
-                    'Visits',
-                    style: TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
                 ],
-              ),
-            ),
-            if (_loading)
-              const LinearProgressIndicator(
-                minHeight: 2,
-                color: AppColors.primaryBright,
-                backgroundColor: Colors.transparent,
-              ),
-            Expanded(
-              child: RefreshIndicator(
-                color: AppColors.primaryBright,
-                onRefresh: _load,
-                child: _error != null && _items.isEmpty
-                    ? ListView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        children: [
-                          const SizedBox(height: 120),
-                          Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(24),
-                              child: Column(
-                                children: [
-                                  Text(
-                                    _error!,
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      color: AppColors.textSecondary,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  TextButton(
-                                    onPressed: () => unawaited(_load()),
-                                    child: const Text('Retry'),
-                                  ),
-                                ],
-                              ),
-                            ),
+              )
+            : _items.isEmpty && !_loading
+                ? ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: const [
+                      SizedBox(height: 140),
+                      Center(
+                        child: Text(
+                          'No visitors yet',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 14,
                           ),
-                        ],
-                      )
-                    : _items.isEmpty && !_loading
-                        ? ListView(
-                            physics: const AlwaysScrollableScrollPhysics(),
-                            children: const [
-                              SizedBox(height: 140),
-                              Center(
-                                child: Text(
-                                  'No visitors yet',
-                                  style: TextStyle(
-                                    color: AppColors.textSecondary,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          )
-                        : ListView.builder(
-                            physics: const AlwaysScrollableScrollPhysics(),
-                            padding: const EdgeInsets.only(top: 4, bottom: 24),
-                            itemCount: _items.length,
-                            itemBuilder: (context, index) {
-                              final item = _items[index];
-                              return _VisitTile(
-                                item: item,
-                                onTap: () => unawaited(_openProfile(item)),
-                                onDelete: () => unawaited(_delete(item)),
-                              );
-                            },
-                          ),
-              ),
-            ),
-          ],
-        ),
+                        ),
+                      ),
+                    ],
+                  )
+                : ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.only(top: 4, bottom: 24),
+                    itemCount: _items.length,
+                    itemBuilder: (context, index) {
+                      final item = _items[index];
+                      return _VisitTile(
+                        item: item,
+                        onTap: () => unawaited(_openProfile(item)),
+                        onDelete: () => unawaited(_delete(item)),
+                      );
+                    },
+                  ),
       ),
     );
   }
@@ -263,13 +229,10 @@ class _VisitTile extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
             child: Row(
               children: [
-                ClipOval(
-                  child: NetworkOrAssetAvatar(
-                    asset: AppAssets.avatarPlace,
-                    url: item.avatarUrl,
-                    width: 50,
-                    height: 50,
-                  ),
+                AppAvatar(
+                  asset: AppAssets.avatarPlace,
+                  url: item.avatarUrl,
+                  size: 50,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -309,7 +272,7 @@ class _VisitTile extends StatelessWidget {
                             margin: const EdgeInsets.symmetric(horizontal: 6),
                           ),
                           Text(
-                            'The ${item.viewCount} time',
+                            VisitRecord.visitCountLabel(item.viewCount),
                             style: const TextStyle(
                               color: AppColors.textSecondary,
                               fontSize: 12,

@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_asset_image.dart';
+import '../../core/widgets/app_nav_bar.dart';
+import '../../core/widgets/app_page_scaffold.dart';
 
 /// Add user page: search by User ID or nickname (messages search entry).
 class AddUserPage extends StatefulWidget {
@@ -35,93 +37,65 @@ class _AddUserPageState extends State<AddUserPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SizedBox(
+    return AppPageScaffold(
+      title: 'Add',
+      backIcon: AppNavBackIcon.backArrow,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: Container(
               height: 48,
-              child: Stack(
-                alignment: Alignment.center,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: const Color(0xFF3A3A3A),
+                  width: 1,
+                ),
+              ),
+              child: Row(
                 children: [
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        color: AppColors.textPrimary,
-                        size: 20,
-                      ),
-                    ),
+                  const AppAssetImage(
+                    AppAssets.msgSearch,
+                    width: 18,
+                    height: 18,
+                    color: AppColors.textTertiary,
                   ),
-                  const Text(
-                    'Add',
-                    style: TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: TextField(
+                      controller: _controller,
+                      focusNode: _focusNode,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 15,
+                      ),
+                      cursorColor: AppColors.primaryBright,
+                      cursorWidth: 1.5,
+                      textInputAction: TextInputAction.search,
+                      inputFormatters: [
+                        LengthLimitingTextInputFormatter(64),
+                      ],
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        border: InputBorder.none,
+                        hintText: 'Search by User ID or Nickname',
+                        hintStyle: TextStyle(
+                          color: AppColors.textTertiary,
+                          fontSize: 15,
+                        ),
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              child: Container(
-                height: 48,
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                decoration: BoxDecoration(
-                  color: Colors.transparent,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(
-                    color: const Color(0xFF3A3A3A),
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    const AppAssetImage(
-                      AppAssets.msgSearch,
-                      width: 18,
-                      height: 18,
-                      color: AppColors.textTertiary,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: TextField(
-                        controller: _controller,
-                        focusNode: _focusNode,
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 15,
-                        ),
-                        cursorColor: AppColors.primaryBright,
-                        cursorWidth: 1.5,
-                        textInputAction: TextInputAction.search,
-                        inputFormatters: [
-                          LengthLimitingTextInputFormatter(64),
-                        ],
-                        decoration: const InputDecoration(
-                          isDense: true,
-                          border: InputBorder.none,
-                          hintText: 'Search by User ID or Nickname',
-                          hintStyle: TextStyle(
-                            color: AppColors.textTertiary,
-                            fontSize: 15,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const Expanded(child: SizedBox.shrink()),
-          ],
-        ),
+          ),
+          const Expanded(child: SizedBox.shrink()),
+        ],
       ),
     );
   }

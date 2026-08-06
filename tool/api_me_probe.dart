@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
@@ -49,13 +50,13 @@ Future<void> main() async {
   ];
   for (final p in paths) {
     final r = await get(p, token);
-    print('--- $p success=${r['success']} msg=${r['message']}');
+    stdout.writeln('--- $p success=${r['success']} msg=${r['message']}');
     final data = r['data'];
     if (data == null) {
-      print('null data');
+      stdout.writeln('null data');
       continue;
     }
     final encoded = const JsonEncoder.withIndent('  ').convert(data);
-    print(encoded.length > 1500 ? encoded.substring(0, 1500) : encoded);
+    stdout.writeln(encoded.length > 1500 ? encoded.substring(0, 1500) : encoded);
   }
 }

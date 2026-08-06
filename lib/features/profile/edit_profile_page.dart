@@ -8,11 +8,12 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/constants/app_assets.dart';
+import '../../core/network/app_apis.dart';
 import '../../core/network/media_upload.dart';
-import '../../core/network/network_bootstrap.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/app_gradient_button.dart';
+import '../../core/widgets/app_top_loading_bar.dart';
 import '../../core/widgets/network_or_asset_avatar.dart';
-import '../me/data/user_dto.dart';
 import '../me/models/me_models.dart';
 import 'body_metric_page.dart';
 import 'album_photo_viewer_page.dart';
@@ -100,9 +101,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
   Future<void> _loadFromApi() async {
     try {
-      final res = await NetworkBootstrap.api.userInfo();
+      final res = await AppApis.user.profileOrNull();
       if (!mounted) return;
-      final parsed = UserDto.parseProfile(res);
+      final parsed = res.data;
       if (parsed != null) {
         setState(
           () => _applyProfile(parsed, keepLocalPhotosIfRemoteEmpty: true),
@@ -189,9 +190,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
         }
       }
 
-      final res = await NetworkBootstrap.api.updateUserInfo(fields);
+      final res = await AppApis.user.update(fields);
       if (!mounted) return;
-      if (!res.success) {
+      if (!res.ok) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(res.message.isEmpty ? 'Save failed' : res.message),
@@ -302,11 +303,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
         return;
       }
 
-      final res = await NetworkBootstrap.api.updateUserInfo({
+      final res = await AppApis.user.update({
         'newPic': [remote],
       });
       if (!mounted || !identical(_photoUploadToken, token)) return;
-      if (!res.success) {
+      if (!res.ok) {
         setState(() => _photoPaths.remove(localPath));
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -319,15 +320,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
         return;
       }
 
-      // Prefer server picList from the update response; always keep this URL.
-      final fromServer = UserDto.parseProfile(res)?.momentUrls ?? const [];
       setState(() {
         _photoPaths.remove(localPath);
-        if (fromServer.isNotEmpty) {
-          _photoPaths
-            ..clear()
-            ..addAll(fromServer);
-        }
         if (!_photoPaths.contains(remote)) {
           _photoPaths.add(remote);
         }
@@ -359,11 +353,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
     if (!path.startsWith('http')) return;
 
     try {
-      final res = await NetworkBootstrap.api.updateUserInfo({
+      final res = await AppApis.user.update({
         'delPic': [path],
       });
       if (!mounted) return;
-      if (!res.success) {
+      if (!res.ok) {
         setState(() {
           if (index <= _photoPaths.length) {
             _photoPaths.insert(index.clamp(0, _photoPaths.length), path);
@@ -598,12 +592,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 onBack: _popWithResult,
                 completionPercent: _completionPercent,
               ),
-              if (_loading)
-                const LinearProgressIndicator(
-                  minHeight: 2,
-                  color: Color(0xFFB6FF2E),
-                  backgroundColor: Colors.transparent,
-                ),
+              if (_loading) const AppTopLoadingBar(),
               Expanded(
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -668,38 +657,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
               ),
               Padding(
                 padding: EdgeInsets.fromLTRB(16, 8, 16, 12 + bottom),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: _saving ? null : _save,
-                    borderRadius: BorderRadius.circular(24),
-                    child: Ink(
-                      height: 48,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(24),
-                        gradient: AppColors.promoBannerGradient,
-                      ),
-                      child: Center(
-                        child: _saving
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.2,
-                                  color: AppColors.promoText,
-                                ),
-                              )
-                            : const Text(
-                                'Save',
-                                style: TextStyle(
-                                  color: AppColors.promoText,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                      ),
-                    ),
-                  ),
+                child: AppGradientButton(
+                  label: 'Save',
+                  onTap: _save,
+                  height: 48,
+                  borderRadius: 24,
+                  loading: _saving,
                 ),
               ),
             ],

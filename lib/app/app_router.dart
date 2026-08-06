@@ -16,9 +16,10 @@ import '../features/friends/friends_page.dart';
 import '../features/home/chat_user_profile_page.dart';
 import '../features/home/group_details_page.dart';
 import '../features/me/bind_email_page.dart';
-import '../features/me/data/me_mock_data.dart';
+import '../features/me/models/me_models.dart';
 import '../features/me/settings_page.dart';
 import '../features/profile/edit_profile_page.dart';
+import '../core/constants/app_assets.dart';
 import '../features/shell/main_tab_shell.dart';
 import '../features/splash/splash_page.dart';
 import '../shared/models/chat_conversation.dart';
@@ -129,7 +130,7 @@ GoRouter createAppRouter({required ChatsListController chatsController}) {
           conversation ??= ChatConversation(
             id: id,
             title: 'Chat',
-            avatarAsset: ChatUserProfile.elita.avatarAsset,
+            avatarAsset: AppAssets.avatarPlace,
             lastMessage: '',
             timeLabel: 'Just',
           );
@@ -151,7 +152,7 @@ GoRouter createAppRouter({required ChatsListController chatsController}) {
                   name: 'Group',
                   category: 'Community',
                   description: '',
-                  avatarAsset: ChatUserProfile.elita.avatarAsset,
+                  avatarAsset: AppAssets.avatarPlace,
                   memberCount: 0,
                   postCount: 0,
                   level: 1,
@@ -168,7 +169,9 @@ GoRouter createAppRouter({required ChatsListController chatsController}) {
         builder: (_, state) {
           final profile = state.extra is ChatUserProfile
               ? state.extra! as ChatUserProfile
-              : ChatUserProfile.elita;
+              : ChatUserProfile.placeholder(
+                  id: state.pathParameters['id'] ?? '',
+                );
           return ChatUserProfilePage(
             profile: profile,
             chatsController: chatsController,
@@ -189,7 +192,7 @@ GoRouter createAppRouter({required ChatsListController chatsController}) {
       ),
       GoRoute(
         path: AppRoutes.editProfile,
-        builder: (_, _) => EditProfilePage(profile: MeMockData.profile),
+        builder: (_, _) => const EditProfilePage(profile: MeProfile.empty),
       ),
       GoRoute(
         path: AppRoutes.bindEmail,

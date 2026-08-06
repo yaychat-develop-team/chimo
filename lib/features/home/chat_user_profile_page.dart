@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/auth/auth_session.dart';
-import '../../core/network/network_bootstrap.dart';
+import '../../core/network/app_apis.dart';
 import '../../core/utils/zodiac.dart';
 import '../../core/widgets/app_tip_dialog.dart';
 import '../../core/widgets/center_toast.dart';
@@ -11,7 +11,6 @@ import '../chats/chat_detail_page.dart';
 import '../chats/data/chats_list_controller.dart';
 import '../chats/models/chat_conversation.dart';
 import '../chats/widgets/gift_bottom_sheet.dart';
-import '../me/data/user_dto.dart';
 import '../me/models/me_models.dart';
 import '../profile/edit_profile_page.dart';
 import '../profile/widgets/user_profile_scaffold.dart';
@@ -98,14 +97,9 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
     final em = _emHint.isNotEmpty ? _emHint : raw;
     if (em.isEmpty) return raw;
     try {
-      final msgRes = await NetworkBootstrap.api.msgUser(em);
-      final data = msgRes.data;
-      if (data is Map) {
-        final user = data['user'];
-        final map = user is Map ? Map<String, dynamic>.from(user) : data;
-        final id = '${map['id'] ?? map['userId'] ?? ''}'.trim();
-        if (RegExp(r'^\d+$').hasMatch(id)) return id;
-      }
+      final msgRes = await AppApis.relation.msgUser(em);
+      final id = msgRes.data?.id.trim() ?? '';
+      if (RegExp(r'^\d+$').hasMatch(id)) return id;
     } catch (_) {}
     return raw;
   }
@@ -118,9 +112,9 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
     }
     try {
       if (_isSelf) {
-        final infoRes = await NetworkBootstrap.api.userInfo();
+        final infoRes = await AppApis.user.profileOrNull();
         if (!mounted) return;
-        final me = UserDto.parseProfile(infoRes);
+        final me = infoRes.data;
         if (me != null) {
           await AuthSession.markLoggedIn(
             userId: me.userId,
@@ -152,9 +146,9 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
       } else {
         final appUid = await _resolveAppUid();
         if (!mounted) return;
-        final infoRes = await NetworkBootstrap.api.userInfoByUid(appUid);
+        final infoRes = await AppApis.user.profileByUidOrNull(appUid);
         if (!mounted) return;
-        final parsed = UserDto.parseChatProfile(infoRes);
+        final parsed = infoRes.data;
         if (parsed != null) {
           final self = await AuthSession.isCurrentUser(parsed.userId) ||
               await AuthSession.isCurrentUser(parsed.id);
@@ -224,8 +218,8 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
 
   Future<void> _openEditProfile() async {
     try {
-      final res = await NetworkBootstrap.api.userInfo();
-      final me = UserDto.parseProfile(res);
+      final res = await AppApis.user.profileOrNull();
+      final me = res.data;
       if (!mounted) return;
       final seed = me ??
           MeProfile(
@@ -287,10 +281,10 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
     final uid = _targetUid;
     try {
       final res = _following
-          ? await NetworkBootstrap.api.unfollowUser(uid)
-          : await NetworkBootstrap.api.followUser(uid);
+          ? await AppApis.relation.unfollow(uid)
+          : await AppApis.relation.follow(uid);
       if (!mounted) return;
-      if (!res.success) {
+      if (!res.ok) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -370,7 +364,12 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
             child: ProfilePrimaryAction(label: 'Chat', onTap: _openChat),
           ),
           const SizedBox(width: 10),
-          ProfileGiftAction(onTap: () => showGiftBottomSheet(context)),
+          ProfileGiftAction(
+            onTap: () => showGiftBottomSheet(
+              context,
+              receiverUid: _profile.userId,
+            ),
+          ),
         ],
       );
     }
@@ -388,7 +387,12 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
           child: ProfileOutlineAction(label: 'Chat', onTap: _openChat),
         ),
         const SizedBox(width: 10),
-        ProfileGiftAction(onTap: () => showGiftBottomSheet(context)),
+        ProfileGiftAction(
+          onTap: () => showGiftBottomSheet(
+            context,
+            receiverUid: _profile.userId,
+          ),
+        ),
       ],
     );
   }

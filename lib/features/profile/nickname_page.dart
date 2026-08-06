@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/app_page_scaffold.dart';
 
 /// Edit nickname page.
 class NicknamePage extends StatefulWidget {
@@ -81,165 +82,133 @@ class _NicknamePageState extends State<NicknamePage> {
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
-      child: Scaffold(
-        backgroundColor: AppColors.background,
-        body: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              SizedBox(
-                height: 48,
-                child: Stack(
-                  alignment: Alignment.center,
+      child: AppPageScaffold(
+        title: 'Nickname',
+        trailing: TextButton(
+          onPressed: _onConfirm,
+          child: const Text(
+            'Confirm',
+            style: TextStyle(
+              color: AppColors.primaryBright,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              child: Container(
+                height: 52,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2A2A2A),
+                  borderRadius: BorderRadius.circular(26),
+                ),
+                child: Row(
                   children: [
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: IconButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        icon: SvgPicture.asset(
-                          AppAssets.chatBack,
-                          width: 17,
-                          height: 7,
+                    Expanded(
+                      child: TextField(
+                        controller: _controller,
+                        focusNode: _focusNode,
+                        maxLength: NicknamePage.maxLength,
+                        buildCounter: (
+                          _, {
+                          required currentLength,
+                          required isFocused,
+                          maxLength,
+                        }) =>
+                            const SizedBox.shrink(),
+                        onChanged: (_) => setState(() {}),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
                         ),
-                      ),
-                    ),
-                    const Text(
-                      'Nickname',
-                      style: TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: _onConfirm,
-                        child: const Text(
-                          'Confirm',
-                          style: TextStyle(
-                            color: AppColors.primaryBright,
+                        cursorColor: AppColors.primaryBright,
+                        decoration: const InputDecoration(
+                          border: InputBorder.none,
+                          isCollapsed: true,
+                          hintText: 'Enter nickname',
+                          hintStyle: TextStyle(
+                            color: Color(0xFF8A8A8A),
                             fontSize: 16,
-                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
                     ),
+                    if (_controller.text.isNotEmpty)
+                      GestureDetector(
+                        onTap: () {
+                          _controller.clear();
+                          setState(() {});
+                        },
+                        child: SvgPicture.asset(
+                          AppAssets.closeCircle,
+                          width: 18,
+                          height: 18,
+                        ),
+                      ),
                   ],
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                child: Container(
-                  height: 52,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2A2A2A),
-                    borderRadius: BorderRadius.circular(26),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _controller,
-                          focusNode: _focusNode,
-                          maxLength: NicknamePage.maxLength,
-                          buildCounter: (
-                            _, {
-                            required currentLength,
-                            required isFocused,
-                            maxLength,
-                          }) =>
-                              const SizedBox.shrink(),
-                          onChanged: (_) => setState(() {}),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          cursorColor: AppColors.primaryBright,
-                          decoration: const InputDecoration(
-                            border: InputBorder.none,
-                            isCollapsed: true,
-                            hintText: 'Enter nickname',
-                            hintStyle: TextStyle(
-                              color: Color(0xFF8A8A8A),
-                              fontSize: 16,
-                            ),
-                          ),
-                        ),
-                      ),
-                      if (_controller.text.isNotEmpty)
-                        GestureDetector(
-                          onTap: () {
-                            _controller.clear();
-                            setState(() {});
-                          },
-                          child: SvgPicture.asset(
-                            AppAssets.closeCircle,
-                            width: 18,
-                            height: 18,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
-                child: Row(
-                  children: [
-                    const Expanded(
-                      child: Text(
-                        'It will be displayed after review.',
-                        style: TextStyle(
-                          color: AppColors.textTertiary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      '$length/${NicknamePage.maxLength}',
-                      style: const TextStyle(
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'It will be displayed after review.',
+                      style: TextStyle(
                         color: AppColors.textTertiary,
                         fontSize: 12,
                         fontWeight: FontWeight.w400,
                       ),
                     ),
+                  ),
+                  Text(
+                    '$length/${NicknamePage.maxLength}',
+                    style: const TextStyle(
+                      color: AppColors.textTertiary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (widget.showRules)
+              const Padding(
+                padding: EdgeInsets.fromLTRB(20, 28, 20, 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Nickname Modification Rules:',
+                      style: TextStyle(
+                        color: AppColors.textTertiary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        height: 1.4,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      NicknamePage.rulesText,
+                      style: TextStyle(
+                        color: AppColors.textTertiary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w400,
+                        height: 1.5,
+                      ),
+                    ),
                   ],
                 ),
               ),
-              if (widget.showRules)
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(20, 28, 20, 20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Nickname Modification Rules:',
-                        style: TextStyle(
-                          color: AppColors.textTertiary,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          height: 1.4,
-                        ),
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        NicknamePage.rulesText,
-                        style: TextStyle(
-                          color: AppColors.textTertiary,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w400,
-                          height: 1.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
+          ],
         ),
       ),
     );

@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../../core/constants/app_assets.dart';
-import '../../core/theme/app_colors.dart';
+import '../../core/widgets/app_page_scaffold.dart';
 import 'photo_pick_sheet.dart';
 
 /// Full-size avatar preview page.
@@ -47,60 +45,23 @@ class MyPicturePage extends StatelessWidget {
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
-      child: Scaffold(
+      child: AppPageScaffold(
+        title: 'My Picture',
         backgroundColor: Colors.black,
-        body: SafeArea(
-          child: Column(
-            children: [
-              SizedBox(
-                height: 48,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: IconButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        icon: SvgPicture.asset(
-                          AppAssets.chatBack,
-                          width: 17,
-                          height: 7,
-                        ),
-                      ),
-                    ),
-                    const Text(
-                      'My Picture',
-                      style: TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: IconButton(
-                        onPressed: () => _showMoreSheet(context),
-                        icon: const Icon(
-                          Icons.more_horiz,
-                          color: Colors.white,
-                          size: 26,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: Center(
-                  child: Image.asset(
-                    avatarAsset,
-                    width: width,
-                    height: width,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
-            ],
+        trailing: IconButton(
+          onPressed: () => _showMoreSheet(context),
+          icon: const Icon(
+            Icons.more_horiz,
+            color: Colors.white,
+            size: 26,
+          ),
+        ),
+        body: Center(
+          child: Image.asset(
+            avatarAsset,
+            width: width,
+            height: width,
+            fit: BoxFit.cover,
           ),
         ),
       ),

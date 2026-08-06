@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import 'api_config.dart';
+import 'auth_request_headers.dart';
 
 /// Minimal JSON API envelope from echimo backends.
 class ApiResponse {
@@ -74,6 +75,7 @@ class ApiClient {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
       'timestamp': '${DateTime.now().millisecondsSinceEpoch}',
+      ...AuthRequestHeaders.prefixed,
     };
     final token = tokenProvider?.call();
     if (token != null && token.isNotEmpty) {

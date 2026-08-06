@@ -4,17 +4,16 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_assets.dart';
 import '../../core/im/im_system_accounts.dart';
-import '../../core/network/network_bootstrap.dart';
+import '../../core/network/app_apis.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_tip_dialog.dart';
+import '../../core/widgets/app_top_loading_bar.dart';
 import '../friends/add_user_page.dart';
 import '../friends/friends_page.dart';
 import '../home/chat_user_profile_page.dart';
 import '../home/group_details_page.dart';
 import '../home/models/chat_user_profile.dart';
 import '../home/models/group_item.dart';
-import '../me/data/me_mock_data.dart';
-import '../me/data/user_dto.dart';
 import '../me/models/me_models.dart';
 import '../profile/edit_profile_page.dart';
 import 'chat_detail_page.dart';
@@ -182,10 +181,10 @@ class _ChatsPageState extends State<ChatsPage> {
   }
 
   Future<void> _openPromoCompleteProfile() async {
-    MeProfile profile = MeMockData.profile;
+    MeProfile profile = MeProfile.empty;
     try {
-      final res = await NetworkBootstrap.api.userInfo();
-      profile = UserDto.parseProfile(res) ?? profile;
+      final res = await AppApis.user.profileOrNull();
+      profile = res.data ?? profile;
     } catch (_) {}
     if (!mounted) return;
     await Navigator.of(context).push(
@@ -236,12 +235,7 @@ class _ChatsPageState extends State<ChatsPage> {
                   onTap: _openPromoCompleteProfile,
                   onClose: () => setState(() => _showPromo = false),
                 ),
-              if (_controller.loading)
-                const LinearProgressIndicator(
-                  minHeight: 2,
-                  color: AppColors.primaryBright,
-                  backgroundColor: Colors.transparent,
-                ),
+              if (_controller.loading) const AppTopLoadingBar(),
               Expanded(
                 child: RefreshIndicator(
                   color: AppColors.primaryBright,

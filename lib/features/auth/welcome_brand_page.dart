@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../app/app_router.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/app_gradient_button.dart';
 
 /// Brand welcome → swipe up to industry selection (same-page morph animation).
 class WelcomeBrandPage extends StatefulWidget {
@@ -251,32 +252,10 @@ class _WelcomeBrandPageState extends State<WelcomeBrandPage>
                                 30,
                                 bottom + 16,
                               ),
-                              child: Material(
-                                color: Colors.transparent,
-                                child: InkWell(
-                                  onTap: _expanded ? _onNext : null,
-                                  borderRadius: BorderRadius.circular(27),
-                                  child: Ink(
-                                    height: 54,
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(27),
-                                      gradient: AppColors.promoBannerGradient,
-                                    ),
-                                    child: Center(
-                                      child: Text(
-                                        'Next Step',
-                                        style: TextStyle(
-                                          color: AppColors.promoText
-                                              .withValues(
-                                            alpha: _expanded ? 1 : 0.45,
-                                          ),
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
+                              child: AppGradientButton(
+                                label: 'Next Step',
+                                onTap: _expanded ? _onNext : null,
+                                enabled: _expanded,
                               ),
                             ),
                           ],

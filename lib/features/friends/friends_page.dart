@@ -3,15 +3,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_assets.dart';
-import '../../core/network/network_bootstrap.dart';
+import '../../core/network/app_apis.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_asset_image.dart';
-import '../../core/widgets/network_or_asset_avatar.dart';
+import '../../core/widgets/app_avatar.dart';
+import '../../core/widgets/app_top_loading_bar.dart';
 import '../chats/chat_detail_page.dart';
 import '../chats/models/chat_conversation.dart';
 import '../home/chat_user_profile_page.dart';
 import '../home/models/chat_user_profile.dart';
-import 'data/friend_dto.dart';
 import 'models/friend_user.dart';
 
 /// Friends page tabs.
@@ -68,40 +68,15 @@ class _FriendsPageState extends State<FriendsPage> {
       _error = null;
     });
     try {
-      final api = NetworkBootstrap.api;
-      final results = await Future.wait([
-        api.searchFriends(keyword: keyword),
-        api.searchFollowing(keyword: keyword),
-        api.searchFans(keyword: keyword),
-      ]);
+      final res = await AppApis.relation.friendsGraph(keyword: keyword);
       if (!mounted) return;
 
-      final friends = FriendDto.parseList(
-        results[0],
-        relation: FriendRelation.mutual,
-      );
-      final following = FriendDto.parseList(
-        results[1],
-        relation: FriendRelation.following,
-      );
-      final fans = FriendDto.parseList(
-        results[2],
-        relation: FriendRelation.follower,
-      );
-
-      final anyFail = results.any((r) => !r.success);
       setState(() {
-        _users = FriendDto.mergeGraphs(
-          friends: friends,
-          following: following,
-          fans: fans,
-        );
+        _users = res.data ?? const [];
         _loading = false;
-        if (anyFail && _users.isEmpty) {
-          final msg = results
-              .firstWhere((r) => !r.success, orElse: () => results.first)
-              .message;
-          _error = msg.isEmpty ? 'Failed to load contacts' : msg;
+        if (!res.ok && _users.isEmpty) {
+          _error =
+              res.message.isEmpty ? 'Failed to load contacts' : res.message;
         }
       });
     } catch (error) {
@@ -151,9 +126,9 @@ class _FriendsPageState extends State<FriendsPage> {
 
   Future<void> _followBack(FriendUser user) async {
     try {
-      final res = await NetworkBootstrap.api.followUser(user.id);
+      final res = await AppApis.relation.follow(user.id);
       if (!mounted) return;
-      if (!res.success) {
+      if (!res.ok) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(res.message.isEmpty ? 'Follow failed' : res.message),
@@ -246,12 +221,7 @@ class _FriendsPageState extends State<FriendsPage> {
                 hintText: _searchHint,
               ),
             ),
-            if (_loading)
-              const LinearProgressIndicator(
-                minHeight: 2,
-                color: AppColors.primaryBright,
-                backgroundColor: Colors.transparent,
-              ),
+            if (_loading) const AppTopLoadingBar(),
             Expanded(
               child: RefreshIndicator(
                 color: AppColors.primaryBright,
@@ -532,13 +502,10 @@ class _FriendTile extends StatelessWidget {
       onTap: onTap,
       child: Row(
         children: [
-          ClipOval(
-            child: NetworkOrAssetAvatar(
-              asset: user.avatarAsset,
-              url: user.avatarUrl,
-              width: 52,
-              height: 52,
-            ),
+          AppAvatar(
+            asset: user.avatarAsset,
+            url: user.avatarUrl,
+            size: 52,
           ),
           const SizedBox(width: 12),
           Expanded(

@@ -69,26 +69,24 @@ class ChatUserProfile {
   /// EaseMob chat id (preferred peer conversation target).
   final String emUsername;
 
-  static const List<String> demoMomentAssets = [
-    AppAssets.launchBg,
-    AppAssets.homeRoomBg,
-  ];
-
-  /// Sample user from the design spec.
-  static const ChatUserProfile elita = ChatUserProfile(
-    id: 'elita',
-    nickname: 'Elita 💃',
-    userId: '4757119063',
-    avatarAsset: AppAssets.avatarPlace,
-    isMale: false,
-    age: 22,
-    zodiac: 'Capricorn',
-    level: 16,
-    bio:
-        'I love listening to songs and playing gaes. Hope to find a good friend.',
-    voiceSeconds: 12,
-    momentAssets: demoMomentAssets,
-  );
+  static ChatUserProfile placeholder({
+    String id = '',
+    String nickname = 'User',
+    String? avatarUrl,
+  }) {
+    return ChatUserProfile(
+      id: id,
+      nickname: nickname,
+      userId: id,
+      avatarAsset: AppAssets.avatarPlace,
+      avatarUrl: avatarUrl,
+      isMale: true,
+      age: 0,
+      zodiac: '',
+      level: 1,
+      bio: '',
+    );
+  }
 
   static ChatUserProfile fromMember(GroupMember member) {
     return ChatUserProfile(
@@ -98,8 +96,8 @@ class ChatUserProfile {
       avatarAsset: member.avatarAsset,
       avatarUrl: member.avatarUrl,
       isMale: member.isMale,
-      age: member.isMale ? 24 : 22,
-      zodiac: member.isMale ? 'Leo' : 'Capricorn',
+      age: 0,
+      zodiac: '',
       level: 1,
       bio: '',
     );

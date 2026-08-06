@@ -5,12 +5,11 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/app_router.dart';
 import '../../../core/constants/app_assets.dart';
-import '../../../core/network/network_bootstrap.dart';
+import '../../../core/network/app_apis.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_asset_image.dart';
 import '../../../core/widgets/network_or_asset_avatar.dart';
 import '../../../shared/models/group_member.dart';
-import '../data/group_member_dto.dart';
 
 /// Group members bottom sheet with nickname search (API-backed).
 class GroupMembersSheet extends StatefulWidget {
@@ -75,18 +74,13 @@ class _GroupMembersSheetState extends State<GroupMembersSheet> {
       _needsLogin = false;
     });
     try {
-      final res = await NetworkBootstrap.withSessionRetry(
-        () => NetworkBootstrap.api.groupMembers(
-          widget.groupId,
-          searchKey: searchKey,
-        ),
+      final res = await AppApis.group.members(
+        widget.groupId,
+        searchKey: searchKey,
       );
       if (!mounted) return;
-      if (!res.success) {
-        final notLogin = res.message == 'user.not.login';
-        if (notLogin) {
-          await NetworkBootstrap.handleNotLogin();
-        }
+      if (!res.ok) {
+        final notLogin = res.isNotLogin;
         setState(() {
           _loading = false;
           _members = const [];
@@ -98,7 +92,7 @@ class _GroupMembersSheetState extends State<GroupMembersSheet> {
         return;
       }
       setState(() {
-        _members = GroupMemberDto.parseList(res);
+        _members = res.data ?? const [];
         _loading = false;
         _error = null;
         _needsLogin = false;

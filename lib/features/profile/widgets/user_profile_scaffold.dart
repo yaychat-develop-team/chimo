@@ -19,13 +19,7 @@ class ProfileFlavorTag {
   final String label;
   final String emoji;
 
-  static const List<ProfileFlavorTag> defaults = [
-    ProfileFlavorTag(label: 'Open to Flirt', emoji: '😉'),
-    ProfileFlavorTag(label: 'Talkative', emoji: '🗣️'),
-    ProfileFlavorTag(label: 'Romantic', emoji: '💘'),
-    ProfileFlavorTag(label: 'Baking', emoji: '🍰'),
-    ProfileFlavorTag(label: 'Foodie', emoji: '🍕'),
-  ];
+  static const List<ProfileFlavorTag> defaults = [];
 }
 
 String _zodiacEmoji(String zodiac) {
@@ -119,7 +113,7 @@ class UserProfileScaffold extends StatelessWidget {
     final moments = hasRemoteMoments
         ? remoteMoments.take(9).toList()
         : localMoments.take(9).toList();
-    final flavorTags = flavors ?? ProfileFlavorTag.defaults;
+    final flavorTags = flavors ?? const <ProfileFlavorTag>[];
 
     // Design: avatar top at y=289; status 44 + button area ~48 → spacer below top bar.
     final avatarTop = 289.0 - topPadding - 48;

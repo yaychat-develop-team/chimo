@@ -29,7 +29,15 @@ class VisitRecord {
     return '${seconds ~/ (60 * 60 * 24)} days';
   }
 
-  String get subtitle => '$relativeLabel visited you · The $viewCount time';
+  String get subtitle =>
+      '$relativeLabel visited you · ${_visitCountLabel(viewCount)}';
+
+  static String visitCountLabel(int count) => _visitCountLabel(count);
+
+  static String _visitCountLabel(int count) {
+    if (count <= 1) return '1 time';
+    return '$count times';
+  }
 }
 
 abstract final class VisitDto {

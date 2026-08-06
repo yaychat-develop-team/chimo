@@ -14,8 +14,7 @@ import 'package:record/record.dart';
 
 import '../../core/constants/app_assets.dart';
 import '../../core/im/im_service.dart';
-import '../../core/network/api_client.dart';
-import '../../core/network/network_bootstrap.dart';
+import '../../core/network/app_apis.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/zodiac.dart';
 import '../../core/widgets/app_asset_image.dart';
@@ -25,7 +24,6 @@ import '../../core/widgets/network_or_asset_avatar.dart';
 import '../home/chat_user_profile_page.dart';
 import '../home/home_search_page.dart';
 import '../home/models/chat_user_profile.dart';
-import '../me/data/user_dto.dart';
 import '../report/report_page.dart';
 import '../wallet/wallet_page.dart';
 import 'data/cash_gift_dto.dart';
@@ -126,6 +124,9 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     // Clear list badge + EaseMob unread when opening the thread.
     widget.chatsController?.markRead(widget.conversation.id);
     final em = _imConversationId;
+    widget.chatsController?.setActiveConversation(
+      em.isNotEmpty ? em : widget.conversation.id,
+    );
     if (em.isNotEmpty) {
       unawaited(ImService.markConversationRead(em));
     }
@@ -145,18 +146,13 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     }
 
     try {
-      final api = NetworkBootstrap.api;
       // Resolve numeric app uid when conversation key is an EM username.
       var appUid = RegExp(r'^\d+$').hasMatch(rawId) ? rawId : '';
       if (appUid.isEmpty && emHint.isNotEmpty) {
         try {
-          final msgRes = await api.msgUser(emHint);
-          final data = msgRes.data;
-          if (data is Map) {
-            final user = data['user'];
-            final map = user is Map ? user : data;
-            appUid = '${map['id'] ?? map['userId'] ?? ''}'.trim();
-          }
+          final msgRes = await AppApis.relation.msgUser(emHint);
+          final id = msgRes.data?.id.trim() ?? '';
+          if (id.isNotEmpty) appUid = id;
         } catch (_) {}
       }
       if (appUid.isEmpty && RegExp(r'^\d+$').hasMatch(rawId)) {
@@ -168,36 +164,24 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           : (rawId.isNotEmpty ? rawId : emHint);
 
       final peerFuture = infoKey.isNotEmpty
-          ? api.userInfoByUid(infoKey)
-          : Future<ApiResponse>.value(
-              const ApiResponse(
-                success: false,
-                code: null,
-                message: '',
-                raw: {},
-              ),
-            );
-      final results = await Future.wait([
-        peerFuture,
-        api.userInfo(),
-        api.getBlackList(),
-      ]);
+          ? AppApis.user.profileByUidOrNull(infoKey)
+          : Future.value(ApiResult<ChatUserProfile?>.ok(null));
+      final selfFuture = AppApis.user.profileOrNull();
+      final peerRes = await peerFuture;
+      final selfRes = await selfFuture;
       await ImService.connectFromServer();
       if (!mounted) return;
 
-      final peerRes = results[0];
-      final selfRes = results[1];
-      final blackRes = results[2];
-
-      final peer =
-          infoKey.isNotEmpty ? UserDto.parseChatProfile(peerRes) : null;
-      final self = UserDto.parseProfile(selfRes);
+      final peer = peerRes.data;
+      final self = selfRes.data;
       if (peer != null && peer.userId.isNotEmpty) {
         appUid = peer.userId;
       }
-      final blocked = appUid.isEmpty
-          ? false
-          : _isOnBlackList(blackRes.data, appUid);
+      var blocked = false;
+      if (appUid.isNotEmpty) {
+        final blackRes = await AppApis.relation.isBlocked(appUid);
+        blocked = blackRes.data ?? false;
+      }
 
       if (peer != null) {
         final em = peer.emUsername.isNotEmpty
@@ -230,6 +214,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           _peerAppUid = appUid;
           _loadingPeer = false;
         });
+        widget.chatsController?.setActiveConversation(em);
         widget.chatsController?.upsertPrivateChat(updated);
         if (em.isNotEmpty) unawaited(_loadImHistory(em));
       } else {
@@ -344,33 +329,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     setState(() {
       _messages.add(_lineFromIm(m));
     });
-    if (m.isSelf) {
-      widget.chatsController?.onNewMessage(
-        id: _conversation.id,
-        title: _conversation.title,
-        avatarAsset: _conversation.avatarAsset,
-        avatarUrl: _conversation.avatarUrl,
-        lastMessage: m.text,
-        isMale: _conversation.isMale,
-        signature: _conversation.signature,
-        zodiac: _conversation.zodiac,
-        isFollowing: _following,
-        unreadDelta: 0,
-      );
-    } else {
-      widget.chatsController?.onNewMessage(
-        id: _conversation.id,
-        title: _conversation.title,
-        avatarAsset: _conversation.avatarAsset,
-        avatarUrl: _conversation.avatarUrl,
-        lastMessage: m.text,
-        isMale: _conversation.isMale,
-        signature: _conversation.signature,
-        zodiac: _conversation.zodiac,
-        isFollowing: _following,
-        unreadDelta: 1,
-      );
-    }
+    // List preview / unread: ChatsListController listens to ImService.messages.
     _scrollToBottom();
   }
 
@@ -431,23 +390,9 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     }
   }
 
-  bool _isOnBlackList(Object? data, String uid) {
-    if (data is! Map) return false;
-    final list = data['userList'] ?? data['list'] ?? data['blackList'];
-    if (list is! List) return false;
-    for (final item in list) {
-      if (item is Map) {
-        final id = '${item['id'] ?? item['userId'] ?? ''}';
-        if (id == uid) return true;
-      } else if ('$item' == uid) {
-        return true;
-      }
-    }
-    return false;
-  }
-
   @override
   void dispose() {
+    widget.chatsController?.setActiveConversation(null);
     unawaited(_imSub?.cancel() ?? Future<void>.value());
     _introCollapse.dispose();
     _inputController.dispose();
@@ -781,10 +726,10 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     setState(() => _following = !prev);
     try {
       final res = prev
-          ? await NetworkBootstrap.api.unfollowUser(uid)
-          : await NetworkBootstrap.api.followUser(uid);
+          ? await AppApis.relation.unfollow(uid)
+          : await AppApis.relation.follow(uid);
       if (!mounted) return;
-      if (!res.success) {
+      if (!res.ok) {
         setState(() => _following = prev);
         showCenterToast(
           context,
@@ -848,12 +793,12 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
     if (_blocked) {
       try {
-        final res = await NetworkBootstrap.api.setBlackList(
+        final res = await AppApis.relation.setBlackList(
           userId: uid,
           isCancel: true,
         );
         if (!mounted) return;
-        if (!res.success) {
+        if (!res.ok) {
           showCenterToast(
             context,
             message: res.message.isEmpty ? 'Unblock failed' : res.message,
@@ -875,12 +820,12 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     final confirmed = await AppTipDialog.confirmBlockUser(context);
     if (!mounted || !confirmed) return;
     try {
-      final res = await NetworkBootstrap.api.setBlackList(
+      final res = await AppApis.relation.setBlackList(
         userId: uid,
         isCancel: false,
       );
       if (!mounted) return;
-      if (!res.success) {
+      if (!res.ok) {
         showCenterToast(
           context,
           message: res.message.isEmpty ? 'Block failed' : res.message,

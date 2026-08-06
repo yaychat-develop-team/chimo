@@ -6,8 +6,10 @@ import 'package:go_router/go_router.dart';
 import '../../app/app_router.dart';
 import '../../core/auth/auth_session.dart';
 import '../../core/constants/app_assets.dart';
+import '../../core/network/app_apis.dart';
 import '../../core/network/network_bootstrap.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/app_top_loading_bar.dart';
 import '../debug/debug_page.dart';
 import '../friends/friends_page.dart';
 import '../level/level_page.dart';
@@ -16,8 +18,7 @@ import '../profile/personal_profile_page.dart';
 import '../wallet/wallet_page.dart';
 import 'about_us_page.dart';
 import 'bind_email_page.dart';
-import 'data/me_mock_data.dart';
-import 'data/user_dto.dart';
+import 'data/me_menu_data.dart';
 import 'help_page.dart';
 import 'models/me_models.dart';
 import 'settings_page.dart';
@@ -36,7 +37,7 @@ class MePage extends StatefulWidget {
 }
 
 class _MePageState extends State<MePage> {
-  MeProfile _profile = MeMockData.profile;
+  MeProfile _profile = MeProfile.empty;
   bool _loading = true;
   bool _hasBoundEmail = false;
 
@@ -66,44 +67,50 @@ class _MePageState extends State<MePage> {
 
   List<MeStatItem> get _stats => [
         MeStatItem(label: 'Friends', value: _formatCount(_profile.friends)),
-        MeStatItem(label: 'Fans', value: _formatCount(_profile.fans)),
         MeStatItem(label: 'Follows', value: _formatCount(_profile.follows)),
+        MeStatItem(label: 'Fans', value: _formatCount(_profile.fans)),
         MeStatItem(label: 'Visitors', value: _formatCount(_profile.visitors)),
       ];
 
   /// Hide Bind Email once an email is already bound (email login or bind flow).
   List<QuickAccessItem> get _quickAccess {
     if (_hasBoundEmail) {
-      return MeMockData.quickAccess
+      return MeMenuData.quickAccess
           .where((item) => item.id != 'bind_email')
           .toList(growable: false);
     }
-    return MeMockData.quickAccess;
+    return MeMenuData.quickAccess;
   }
 
   Future<void> _loadProfile() async {
     try {
-      final res = await NetworkBootstrap.api.userInfo();
+      final profileFuture = AppApis.user.profileOrNull();
+      // Me "Visitors" = unique people in Visits list (not total viewNum times).
+      final visitsFuture = AppApis.relation.viewedBy();
+      final res = await profileFuture;
+      final visitsRes = await visitsFuture;
       if (!mounted) return;
-      final parsed = UserDto.parseProfile(res);
-      if (parsed == null) {
+      if (!res.ok || res.data == null) {
         setState(() => _loading = false);
-        if (res.message == 'user.not.login') {
-          await NetworkBootstrap.handleNotLogin();
+        if (res.isNotLogin) {
           if (!mounted) return;
           context.go(AppRoutes.login);
         }
         return;
       }
+      final parsed = res.data!;
       final sessionEmail = (await AuthSession.email())?.trim() ?? '';
       final loginMethod = await AuthSession.loginMethod();
       final email =
           parsed.email.trim().isNotEmpty ? parsed.email.trim() : sessionEmail;
       final hasBoundEmail = email.isNotEmpty || loginMethod == 'email';
-      final profile =
+      var profile =
           email.isEmpty || email == parsed.email
               ? parsed
               : parsed.copyWith(email: email);
+      if (visitsRes.ok && visitsRes.data != null) {
+        profile = profile.copyWith(visitors: visitsRes.data!.length);
+      }
       setState(() {
         _profile = profile;
         _hasBoundEmail = hasBoundEmail;
@@ -147,9 +154,12 @@ class _MePageState extends State<MePage> {
 
   void _openStatPage(MeStatItem item) {
     if (item.label == 'Visitors') {
-      Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => const VisitsPage()),
-      );
+      unawaited(() async {
+        await Navigator.of(context).push<void>(
+          MaterialPageRoute<void>(builder: (_) => const VisitsPage()),
+        );
+        if (mounted) await _loadProfile();
+      }());
       return;
     }
     final tab = switch (item.label) {
@@ -196,11 +206,7 @@ class _MePageState extends State<MePage> {
                   if (_loading)
                     const Padding(
                       padding: EdgeInsets.only(bottom: 16),
-                      child: LinearProgressIndicator(
-                        minHeight: 2,
-                        color: AppColors.primaryBright,
-                        backgroundColor: Colors.transparent,
-                      ),
+                      child: AppTopLoadingBar(),
                     ),
                   MeProfileHeader(
                     profile: _profile,
@@ -224,6 +230,9 @@ class _MePageState extends State<MePage> {
                           builder: (_) => LevelPage(
                             initialLevel: _profile.vipLevel,
                             initialExperience: _profile.experience,
+                            initialMoreExpForNextLevel:
+                                _profile.moreExpForNextLevel,
+                            initialTotalExperience: _profile.totalExperience,
                           ),
                         ),
                       );

@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
-import '../../core/constants/app_assets.dart';
 import '../../core/network/api_config.dart';
 import '../../core/network/api_config_store.dart';
 import '../../core/network/api_probe_suite.dart';
 import '../../core/network/network_bootstrap.dart';
+import '../../core/widgets/app_page_scaffold.dart';
 import '../../core/widgets/center_toast.dart';
 
 /// Debug page: server environment / toggles / proxy and shortcuts.
@@ -57,164 +56,119 @@ class _DebugPageState extends State<DebugPage> {
 
   @override
   Widget build(BuildContext context) {
-    final bottom = MediaQuery.paddingOf(context).bottom;
-
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.dark,
-      child: Scaffold(
+      child: AppPageScaffold(
+        title: 'Debug page',
         backgroundColor: Colors.white,
-        body: SafeArea(
-          bottom: false,
-          child: Column(
-            children: [
-              const _DebugAppBar(),
-              Expanded(
-                child: ListView(
-                  padding: EdgeInsets.fromLTRB(16, 8, 16, 24 + bottom),
-                  children: [
-                    _SectionHeader(
-                      title: 'Server environment',
-                      actionLabel: _saving ? 'Saving…' : 'Save & restart',
-                      onAction: _saveAndRestart,
-                    ),
-                    const SizedBox(height: 8),
-                    _EnvOption(
-                      selected: _env == ApiEnvironment.production,
-                      title: 'Production',
-                      subtitle: 'api.echimo.com/api/v1',
-                      onTap: () => setState(() => _env = ApiEnvironment.production),
-                    ),
-                    _EnvOption(
-                      selected: _env == ApiEnvironment.test,
-                      title: 'Test environment',
-                      subtitle: 'test-api.echimo.com/api/v1',
-                      onTap: () => setState(() => _env = ApiEnvironment.test),
-                    ),
-                    _EnvOption(
-                      selected: _env == ApiEnvironment.local,
-                      title: 'Local host',
-                      subtitle: '127.0.0.1:8080/api/v1',
-                      subtitleMuted: true,
-                      onTap: () => setState(() => _env = ApiEnvironment.local),
-                    ),
-                    const SizedBox(height: 6),
-                    _ToggleRow(
-                      label: 'http2',
-                      value: _http2,
-                      onChanged: (v) => setState(() => _http2 = v),
-                    ),
-                    _ToggleRow(
-                      label: 'pb',
-                      value: _pb,
-                      onChanged: (v) => setState(() => _pb = v),
-                    ),
-                    _NavRow(
-                      label: 'Proxy config',
-                      onTap: () => _toast('Proxy config'),
-                    ),
-                    _InputActionRow(
-                      label: 'Platform domain',
-                      controller: _midDomainController,
-                      action: _GreenCapsuleButton(
-                        label: 'Save & restart',
-                        onTap: _saveAndRestart,
-                      ),
-                    ),
-                    _InputActionRow(
-                      label: 'H5 jump',
-                      controller: _h5Controller,
-                      action: _GreenCircleButton(
-                        label: 'Jump',
-                        onTap: () => _toast('H5 jump'),
-                      ),
-                    ),
-                    _NavRow(
-                      label: 'Ping test API',
-                      onTap: () async {
-                        try {
-                          final ping =
-                              await NetworkBootstrap.client.pingUserOpen();
-                          _toast(
-                            '${ApiConfig.baseUrl}\n'
-                            '${ping.success ? 'OK' : ping.message} (${ping.code})',
-                          );
-                        } catch (error) {
-                          _toast('Ping failed: $error');
-                        }
-                      },
-                    ),
-                    _NavRow(
-                      label: 'Run D:\\forya API suite',
-                      onTap: () async {
-                        _toast('Probing…');
-                        try {
-                          final results = await ApiProbeSuite(
-                            NetworkBootstrap.api,
-                          ).run();
-                          final ok = results.where((e) => e.ok).length;
-                          final lines = results
-                              .take(6)
-                              .map((e) => '${e.ok ? '✓' : '✗'} ${e.name} ${e.response.message}')
-                              .join('\n');
-                          _toast('$ok/${results.length} reachable\n$lines');
-                        } catch (error) {
-                          _toast('Suite failed: $error');
-                        }
-                      },
-                    ),
-                    _NavRow(label: 'Jump test', onTap: () => _toast('Jump test')),
-                    _NavRow(label: 'Create chat group', onTap: () => _toast('Create chat group')),
-                    _NavRow(label: 'Message push banner', onTap: () => _toast('Message push banner')),
-                    _NavRow(label: 'Test push', onTap: () => _toast('Test push')),
-                    _NavRow(label: 'Global popup', onTap: () => _toast('Global popup')),
-                    _NavRow(label: 'Global floating banner', onTap: () => _toast('Global floating banner')),
-                    _NavRow(label: 'Room entry banner', onTap: () => _toast('Room entry banner')),
-                    _NavRow(label: 'Test log upload', onTap: () => _toast('Test log upload')),
-                  ],
-                ),
-              ),
-            ],
-          ),
+        titleStyle: const TextStyle(
+          color: Colors.black,
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
         ),
-      ),
-    );
-  }
-}
-
-class _DebugAppBar extends StatelessWidget {
-  const _DebugAppBar();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 48,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: IconButton(
-              onPressed: () => Navigator.of(context).pop(),
-              icon: SvgPicture.asset(
-                AppAssets.chatBack,
-                width: 17,
-                height: 7,
-                colorFilter: const ColorFilter.mode(
-                  Colors.black,
-                  BlendMode.srcIn,
-                ),
+        body: ListView(
+                padding: EdgeInsets.fromLTRB(16, 8, 16, 24),
+          children: [
+            _SectionHeader(
+              title: 'Server environment',
+              actionLabel: _saving ? 'Saving…' : 'Save & restart',
+              onAction: _saveAndRestart,
+            ),
+            const SizedBox(height: 8),
+            _EnvOption(
+              selected: _env == ApiEnvironment.production,
+              title: 'Production',
+              subtitle: 'api.echimo.com/api/v1',
+              onTap: () => setState(() => _env = ApiEnvironment.production),
+            ),
+            _EnvOption(
+              selected: _env == ApiEnvironment.test,
+              title: 'Test environment',
+              subtitle: 'test-api.echimo.com/api/v1',
+              onTap: () => setState(() => _env = ApiEnvironment.test),
+            ),
+            _EnvOption(
+              selected: _env == ApiEnvironment.local,
+              title: 'Local host',
+              subtitle: '127.0.0.1:8080/api/v1',
+              subtitleMuted: true,
+              onTap: () => setState(() => _env = ApiEnvironment.local),
+            ),
+            const SizedBox(height: 6),
+            _ToggleRow(
+              label: 'http2',
+              value: _http2,
+              onChanged: (v) => setState(() => _http2 = v),
+            ),
+            _ToggleRow(
+              label: 'pb',
+              value: _pb,
+              onChanged: (v) => setState(() => _pb = v),
+            ),
+            _NavRow(
+              label: 'Proxy config',
+              onTap: () => _toast('Proxy config'),
+            ),
+            _InputActionRow(
+              label: 'Platform domain',
+              controller: _midDomainController,
+              action: _GreenCapsuleButton(
+                label: 'Save & restart',
+                onTap: _saveAndRestart,
               ),
             ),
-          ),
-          const Text(
-            'Debug page',
-            style: TextStyle(
-              color: Colors.black,
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
+            _InputActionRow(
+              label: 'H5 jump',
+              controller: _h5Controller,
+              action: _GreenCircleButton(
+                label: 'Jump',
+                onTap: () => _toast('H5 jump'),
+              ),
             ),
-          ),
-        ],
+            _NavRow(
+              label: 'Ping test API',
+              onTap: () async {
+                try {
+                  final ping =
+                      await NetworkBootstrap.client.pingUserOpen();
+                  _toast(
+                    '${ApiConfig.baseUrl}\n'
+                    '${ping.success ? 'OK' : ping.message} (${ping.code})',
+                  );
+                } catch (error) {
+                  _toast('Ping failed: $error');
+                }
+              },
+            ),
+            _NavRow(
+              label: 'Run D:\\forya API suite',
+              onTap: () async {
+                _toast('Probing…');
+                try {
+                  final results = await ApiProbeSuite(
+                    NetworkBootstrap.api,
+                  ).run();
+                  final ok = results.where((e) => e.ok).length;
+                  final lines = results
+                      .take(6)
+                      .map((e) => '${e.ok ? '✓' : '✗'} ${e.name} ${e.response.message}')
+                      .join('\n');
+                  _toast('$ok/${results.length} reachable\n$lines');
+                } catch (error) {
+                  _toast('Suite failed: $error');
+                }
+              },
+            ),
+            _NavRow(label: 'Jump test', onTap: () => _toast('Jump test')),
+            _NavRow(label: 'Create chat group', onTap: () => _toast('Create chat group')),
+            _NavRow(label: 'Message push banner', onTap: () => _toast('Message push banner')),
+            _NavRow(label: 'Test push', onTap: () => _toast('Test push')),
+            _NavRow(label: 'Global popup', onTap: () => _toast('Global popup')),
+            _NavRow(label: 'Global floating banner', onTap: () => _toast('Global floating banner')),
+            _NavRow(label: 'Room entry banner', onTap: () => _toast('Room entry banner')),
+            _NavRow(label: 'Test log upload', onTap: () => _toast('Test log upload')),
+          ],
+        ),
       ),
     );
   }

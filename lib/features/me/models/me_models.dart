@@ -1,3 +1,5 @@
+import '../../../core/constants/app_assets.dart';
+
 /// Me page user profile model.
 class MeProfile {
   const MeProfile({
@@ -20,10 +22,23 @@ class MeProfile {
     this.voiceUrl,
     this.vipIconUrl,
     this.nicknameChangedOnce = false,
-    this.vipLevel = 1,
+    this.vipLevel = 0,
     this.experience = 0,
+    this.moreExpForNextLevel = 0,
+    this.totalExperience = 0,
     this.momentUrls = const [],
   });
+
+  /// Empty shell before `/user/info` returns.
+  static const MeProfile empty = MeProfile(
+    displayName: '',
+    userId: '',
+    avatarAsset: AppAssets.avatarPlace,
+    friends: 0,
+    fans: 0,
+    follows: 0,
+    visitors: 0,
+  );
 
   /// Display nickname.
   final String displayName;
@@ -65,11 +80,36 @@ class MeProfile {
   /// Server Level badge (`icons.smallIcon`); empty → hide like forya UserLevWidget.
   final String? vipIconUrl;
   final bool nicknameChangedOnce;
+  /// Platform wealth level (`vipLevel` in API). Starts at 0 — not paid noble.
   final int vipLevel;
+  /// Next-level total XP requirement (forya `experience`).
   final int experience;
+  /// XP still needed for next level (forya `moreExpForNextLevel`).
+  final int moreExpForNextLevel;
+  /// Lifetime XP when at max level (forya `totalExperience`).
+  final int totalExperience;
   final List<String> momentUrls;
 
   bool get isMale => gender == 'Male';
+
+  /// Forya `User.levelIndex` — picks card/badge color tier.
+  int get levelIndex {
+    if (vipLevel <= 5) return 0;
+    if (vipLevel <= 10) return 1;
+    if (vipLevel <= 20) return 2;
+    if (vipLevel <= 30) return 3;
+    if (vipLevel <= 40) return 4;
+    return 5;
+  }
+
+  bool get isMaxLevel => vipLevel >= 60;
+
+  /// Points shown under the progress label (forya `experienceText` numerator).
+  int get displayedExperience {
+    if (isMaxLevel) return totalExperience;
+    final v = experience - moreExpForNextLevel;
+    return v < 0 ? 0 : v;
+  }
 
   MeProfile copyWith({
     String? displayName,
@@ -96,6 +136,8 @@ class MeProfile {
     bool? nicknameChangedOnce,
     int? vipLevel,
     int? experience,
+    int? moreExpForNextLevel,
+    int? totalExperience,
     List<String>? momentUrls,
   }) {
     return MeProfile(
@@ -120,6 +162,8 @@ class MeProfile {
       nicknameChangedOnce: nicknameChangedOnce ?? this.nicknameChangedOnce,
       vipLevel: vipLevel ?? this.vipLevel,
       experience: experience ?? this.experience,
+      moreExpForNextLevel: moreExpForNextLevel ?? this.moreExpForNextLevel,
+      totalExperience: totalExperience ?? this.totalExperience,
       momentUrls: momentUrls ?? this.momentUrls,
     );
   }

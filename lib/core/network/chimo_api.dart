@@ -311,4 +311,18 @@ class ChimoApi {
       query: {'emoticon_id': emoticonId},
     );
   }
+
+  // ---- media upload ----
+  Future<ApiResponse> uploadUrl({
+    required int sceneCode,
+    required String filename,
+  }) {
+    return _client.get(
+      '/aws/upload-url',
+      query: {
+        'sceneCode': '$sceneCode',
+        'filename': filename,
+      },
+    );
+  }
 }

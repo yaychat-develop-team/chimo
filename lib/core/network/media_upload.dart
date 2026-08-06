@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
+import 'api_gateway.dart';
 import 'network_bootstrap.dart';
 
 /// Upload local media via `GET /aws/upload-url` then PUT to the signed URL.
@@ -28,16 +29,15 @@ abstract final class MediaUpload {
     if (length <= 0 || length > 10 * 1024 * 1024) return null;
 
     final name = filePath.split(RegExp(r'[/\\]')).last;
-    final signedRes = await NetworkBootstrap.client.get(
-      '/aws/upload-url',
-      query: {
-        'sceneCode': '$sceneCode',
-        'filename': name,
-      },
+    final signed = await ApiGateway.request(
+      () => NetworkBootstrap.api.uploadUrl(
+        sceneCode: sceneCode,
+        filename: name,
+      ),
+      map: (res) => _parseSignedUrl(res.data) ?? '',
     );
-    if (!signedRes.success) return null;
-
-    final signedUrl = _parseSignedUrl(signedRes.data);
+    if (!signed.ok) return null;
+    final signedUrl = signed.data;
     if (signedUrl == null || signedUrl.isEmpty) return null;
 
     // Forya: mime lookup, fallback application/octet-stream.

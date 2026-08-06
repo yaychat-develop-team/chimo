@@ -7,7 +7,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/app_router.dart';
 import '../../core/auth/auth_session.dart';
+import '../../core/auth/phone_auth.dart';
 import '../../core/constants/app_assets.dart';
+import '../../core/network/app_apis.dart';
 import '../../core/network/network_bootstrap.dart';
 import '../../core/theme/app_colors.dart';
 
@@ -60,17 +62,19 @@ class _VerificationCodePageState extends State<VerificationCodePage> {
     if (_submitting) return;
     setState(() => _submitting = true);
     try {
-      final res = await NetworkBootstrap.api.smsAuth(
-        phone: widget.phone,
+      final res = await AppApis.auth.smsAuth(
+        phone: PhoneAuth.toApiPhone(widget.phone),
         code: code,
       );
       if (!mounted) return;
-      if (!res.success) {
+      if (!res.ok || res.data == null) {
+        final msg = res.message.trim();
+        final friendly = msg == 'unauthorized registration'
+            ? 'This number is not allowed to register on the test server. Try 13800138000 / 123456.'
+            : (msg.isEmpty ? 'Verification failed' : msg);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              res.message.isEmpty ? 'Verification failed' : res.message,
-            ),
+            content: Text(friendly),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -80,30 +84,49 @@ class _VerificationCodePageState extends State<VerificationCodePage> {
         return;
       }
 
-      final data = res.data;
-      final map = data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
-      final token = '${map['token'] ?? ''}';
-      if (token.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Login succeeded but token missing'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-        return;
-      }
+      final payload = res.data!;
+      final map = payload.raw;
+      var token = payload.token;
+
+      final nickname = payload.nickname.isNotEmpty
+          ? payload.nickname
+          : '${map['nickName'] ?? map['nickname'] ?? ''}';
+      final avatarUrl = payload.avatarUrl.isNotEmpty
+          ? payload.avatarUrl
+          : '${map['avatar'] ?? map['avatarUrl'] ?? ''}';
 
       await AuthSession.markLoggedIn(
         method: 'phone',
         phone: widget.phone,
         token: token,
-        userId: '${map['userId'] ?? map['uid'] ?? map['id'] ?? ''}',
-        nickname: '${map['nickName'] ?? map['nickname'] ?? ''}',
-        avatarUrl: '${map['avatar'] ?? map['avatarUrl'] ?? ''}',
-        emUsername: '${map['emUsername'] ?? map['emUserName'] ?? ''}',
-        emPassword: '${map['emPwd'] ?? map['emPassword'] ?? ''}',
+        userId: payload.userId,
+        nickname: nickname,
+        avatarUrl: avatarUrl,
+        emUsername: payload.emUsername,
+        emPassword: payload.emPassword,
       );
       await NetworkBootstrap.applySessionToken(token);
+
+      // Match forya LoginManager: refresh token once after smsAuth.
+      final refresh = await NetworkBootstrap.api.refreshToken();
+      if (refresh.success && refresh.data is Map) {
+        final next = '${(refresh.data as Map)['token'] ?? ''}'.trim();
+        if (next.isNotEmpty && next != token) {
+          token = next;
+          await NetworkBootstrap.applySessionToken(token);
+          await AuthSession.markLoggedIn(
+            method: 'phone',
+            phone: widget.phone,
+            token: token,
+            userId: payload.userId,
+            nickname: nickname,
+            avatarUrl: avatarUrl,
+            emUsername: payload.emUsername,
+            emPassword: payload.emPassword,
+          );
+        }
+      }
+
       unawaited(NetworkBootstrap.connectImAfterLogin());
 
       // Existing accounts (not newUser) skip onboarding → home.
@@ -134,18 +157,13 @@ class _VerificationCodePageState extends State<VerificationCodePage> {
     if (newUserFlag == false) return true;
 
     try {
-      final infoRes = await NetworkBootstrap.api.userInfo();
-      final info = infoRes.data;
-      if (infoRes.success && info is Map) {
-        final registered = _readBool(info['isRegister']);
-        if (registered == true) return true;
-        if (registered == false) return false;
-
-        final nick =
-            '${info['nickName'] ?? info['nickname'] ?? authData['nickName'] ?? ''}';
-        final gender = '${info['gender'] ?? authData['gender'] ?? ''}';
+      final profileRes = await AppApis.user.profileOrNull();
+      if (profileRes.ok && profileRes.data != null) {
+        final me = profileRes.data!;
         // Profile already filled → treat as existing user.
-        if (nick.trim().isNotEmpty && gender.trim().isNotEmpty) return true;
+        if (me.displayName.trim().isNotEmpty && me.gender.trim().isNotEmpty) {
+          return true;
+        }
       }
     } catch (_) {
       // Fall through: prefer onboarding when uncertain.

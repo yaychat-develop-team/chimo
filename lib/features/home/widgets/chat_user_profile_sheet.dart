@@ -313,7 +313,10 @@ class _ChatUserProfileSheetState extends State<ChatUserProfileSheet> {
                             ),
                             const SizedBox(width: 12),
                             _GiftButton(
-                              onTap: () => showGiftBottomSheet(context),
+                              onTap: () => showGiftBottomSheet(
+                                context,
+                                receiverUid: widget.profile.userId,
+                              ),
                             ),
                           ],
                         )
@@ -367,7 +370,10 @@ class _ChatUserProfileSheetState extends State<ChatUserProfileSheet> {
                             ),
                             const SizedBox(width: 10),
                             _GiftButton(
-                              onTap: () => showGiftBottomSheet(context),
+                              onTap: () => showGiftBottomSheet(
+                                context,
+                                receiverUid: widget.profile.userId,
+                              ),
                             ),
                           ],
                         ),

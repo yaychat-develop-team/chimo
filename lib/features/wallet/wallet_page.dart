@@ -1,33 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../core/constants/app_assets.dart';
-import '../../core/network/api_client.dart';
-import '../../core/network/network_bootstrap.dart';
+import '../../core/network/app_apis.dart';
 import '../../core/theme/app_colors.dart';
-import '../chats/data/cash_gift_dto.dart';
-
-/// Recharge tier option.
-class _RechargeOption {
-  const _RechargeOption({
-    required this.coins,
-    required this.price,
-    this.goodsId = '',
-    this.productId = '',
-  });
-
-  final int coins;
-  final double price;
-  final String goodsId;
-  final String productId;
-
-  String get priceLabel {
-    if (price <= 0) return '—';
-    return '\$${price.toStringAsFixed(2)}';
-  }
-}
+import '../../core/widgets/app_nav_bar.dart';
+import '../../core/widgets/app_primary_button.dart';
+import '../../core/widgets/app_top_loading_bar.dart';
 
 /// My wallet: balance + recharge packages from cash APIs.
 class WalletPage extends StatefulWidget {
@@ -38,23 +18,13 @@ class WalletPage extends StatefulWidget {
 }
 
 class _WalletPageState extends State<WalletPage> {
-  static const _fallbackOptions = [
-    _RechargeOption(coins: 50, price: 0.99),
-    _RechargeOption(coins: 150, price: 2.99),
-    _RechargeOption(coins: 250, price: 4.99),
-    _RechargeOption(coins: 500, price: 9.99),
-    _RechargeOption(coins: 1000, price: 19.99),
-    _RechargeOption(coins: 2500, price: 49.99),
-    _RechargeOption(coins: 5000, price: 99.99),
-  ];
-
   int _balance = 0;
-  List<_RechargeOption> _options = _fallbackOptions;
+  List<CashChargeProduct> _options = const [];
   int _selectedIndex = 0;
   bool _loading = true;
 
-  _RechargeOption get _selected {
-    if (_options.isEmpty) return _fallbackOptions.first;
+  CashChargeProduct? get _selected {
+    if (_options.isEmpty) return null;
     return _options[_selectedIndex.clamp(0, _options.length - 1)];
   }
 
@@ -80,20 +50,14 @@ class _WalletPageState extends State<WalletPage> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final api = NetworkBootstrap.api;
-      final results = await Future.wait([
-        api.cashCurrent(),
-        api.cashChargeProducts(),
-      ]);
+      final balanceFuture = AppApis.cash.balance();
+      final optionsFuture = AppApis.cash.rechargeOptions();
+      final balanceRes = await balanceFuture;
+      final optionsRes = await optionsFuture;
       if (!mounted) return;
 
-      final balance = CashGiftDto.parseBalance(results[0]);
-      var products = _parseChargeProducts(results[1]);
-      if (products.isEmpty) {
-        final goods = await api.cashGoods();
-        if (!mounted) return;
-        products = _parseGoods(goods);
-      }
+      final balance = balanceRes.data ?? 0;
+      final products = optionsRes.data ?? const [];
 
       setState(() {
         _balance = balance;
@@ -115,69 +79,6 @@ class _WalletPageState extends State<WalletPage> {
     }
   }
 
-  static List<_RechargeOption> _parseChargeProducts(ApiResponse response) {
-    if (!response.success) return const [];
-    final data = response.data;
-    if (data is! Map) return const [];
-    final product = data['product'] ?? data['products'] ?? data['list'];
-    if (product is! List) return const [];
-    final out = <_RechargeOption>[];
-    for (final item in product) {
-      if (item is! Map) continue;
-      if (item['isCustomPay'] == true) continue;
-      final coins = int.tryParse('${item['coin'] ?? 0}') ?? 0;
-      if (coins <= 0) continue;
-      out.add(
-        _RechargeOption(
-          coins: coins,
-          price: _parsePrice(item),
-          goodsId: '${item['goodsId'] ?? ''}',
-          productId: '${item['id'] ?? ''}',
-        ),
-      );
-    }
-    return out;
-  }
-
-  static List<_RechargeOption> _parseGoods(ApiResponse response) {
-    if (!response.success) return const [];
-    final data = response.data;
-    if (data is! Map) return const [];
-    final list = data['item'] ?? data['items'] ?? data['list'] ?? data['goods'];
-    if (list is! List) return const [];
-    final out = <_RechargeOption>[];
-    for (final item in list) {
-      if (item is! Map) continue;
-      final coins = int.tryParse(
-            '${item['coin'] ?? item['amount'] ?? item['count'] ?? 0}',
-          ) ??
-          0;
-      if (coins <= 0) continue;
-      out.add(
-        _RechargeOption(
-          coins: coins,
-          price: _parsePrice(item),
-          goodsId: '${item['goodsId'] ?? item['id'] ?? ''}',
-          productId: '${item['id'] ?? ''}',
-        ),
-      );
-    }
-    return out;
-  }
-
-  static double _parsePrice(Map item) {
-    final local = '${item['localPrice'] ?? item['priceText'] ?? ''}';
-    if (local.isNotEmpty) {
-      final n = double.tryParse(local.replaceAll(RegExp(r'[^0-9.]'), ''));
-      if (n != null && n > 0) return n;
-    }
-    final price = double.tryParse('${item['price'] ?? ''}');
-    if (price != null && price > 0) return price;
-    final cent = int.tryParse('${item['cent'] ?? 0}') ?? 0;
-    if (cent > 0) return cent / 100.0;
-    return 0;
-  }
-
   void _onDetails() {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -189,6 +90,15 @@ class _WalletPageState extends State<WalletPage> {
 
   void _onTopUp() {
     final selected = _selected;
+    if (selected == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No recharge packages available'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
     final id = selected.goodsId.isNotEmpty
         ? selected.goodsId
         : selected.productId;
@@ -229,13 +139,8 @@ class _WalletPageState extends State<WalletPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const _WalletAppBar(),
-                if (_loading)
-                  const LinearProgressIndicator(
-                    minHeight: 2,
-                    color: AppColors.primaryBright,
-                    backgroundColor: Colors.transparent,
-                  ),
+                const AppNavBar(title: 'My Wallet'),
+                AppTopLoadingBar(visible: _loading),
                 Expanded(
                   child: RefreshIndicator(
                     color: AppColors.primaryBright,
@@ -285,49 +190,14 @@ class _WalletPageState extends State<WalletPage> {
                 ),
                 Padding(
                   padding: EdgeInsets.fromLTRB(16, 8, 16, 16 + bottom),
-                  child: _TopUpButton(
+                  child: AppPrimaryButton(
                     label: _options.isEmpty
                         ? 'Top Up'
-                        : 'Top Up ${_selected.priceLabel} Now',
+                        : 'Top Up ${_selected!.priceLabel} Now',
                     onTap: _onTopUp,
                   ),
                 ),
               ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _WalletAppBar extends StatelessWidget {
-  const _WalletAppBar();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 48,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: IconButton(
-              onPressed: () => Navigator.of(context).pop(),
-              icon: SvgPicture.asset(
-                AppAssets.chatBack,
-                width: 17,
-                height: 7,
-              ),
-            ),
-          ),
-          const Text(
-            'My Wallet',
-            style: TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
             ),
           ),
         ],
@@ -422,7 +292,7 @@ class _RechargeTile extends StatelessWidget {
     required this.onTap,
   });
 
-  final _RechargeOption option;
+  final CashChargeProduct option;
   final bool selected;
   final VoidCallback onTap;
 
@@ -472,39 +342,6 @@ class _RechargeTile extends StatelessWidget {
                   ],
                 ),
               ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _TopUpButton extends StatelessWidget {
-  const _TopUpButton({required this.label, required this.onTap});
-
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.primaryBright,
-      borderRadius: BorderRadius.circular(28),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(28),
-        child: SizedBox(
-          height: 54,
-          width: double.infinity,
-          child: Center(
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: Colors.black,
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-              ),
             ),
           ),
         ),

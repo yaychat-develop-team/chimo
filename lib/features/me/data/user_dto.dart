@@ -60,8 +60,14 @@ abstract final class UserDto {
       height: _asIntOrNull(json['height']),
       weight: _asIntOrNull(json['weight']),
       tags: _parseTags(json['makeFriendsLabel']),
-      vipLevel: _asInt(json['vipLevel'], fallback: 1),
-      experience: _asInt(json['experience'] ?? json['exp'] ?? 0),
+      vipLevel: _asInt(json['vipLevel']),
+      experience: _asInt(json['experience'] ?? json['exp']),
+      moreExpForNextLevel: _asInt(
+        json['moreExpForNextLevel'] ?? json['moreExp'],
+      ),
+      totalExperience: _asInt(
+        json['totalExperience'] ?? json['totalExp'],
+      ),
       momentUrls: _parsePicUrls(json['picList']),
       voiceSeconds: _asIntOrNull(json['voiceDuration']),
       voiceUrl: () {

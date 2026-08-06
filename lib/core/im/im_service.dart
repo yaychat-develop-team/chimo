@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:im_flutter_sdk/im_flutter_sdk.dart';
 
 import '../auth/auth_session.dart';
-import '../network/network_bootstrap.dart';
+import '../network/app_apis.dart';
 import 'im_system_accounts.dart';
 
 /// Lightweight DM message event for UI (peer or self).
@@ -33,6 +33,7 @@ class ImChatMessage {
     this.emoteName = '',
     this.joinName = '',
     this.joinUid = '',
+    this.isGroup = false,
   });
 
   final String id;
@@ -73,6 +74,9 @@ class ImChatMessage {
   /// Join-group tip (JoinGroupMessage).
   final String joinName;
   final String joinUid;
+
+  /// GroupChat vs Chat (DM / system).
+  final bool isGroup;
 
   /// Prefer existing local file, else remote URL, else thumbnail.
   String get playableOrDisplayUrl {
@@ -144,25 +148,13 @@ abstract final class ImService {
 
   static Future<void> _ensureAppKey() async {
     if (_appKey != null && _appKey!.isNotEmpty) return;
-    final conf = await NetworkBootstrap.api.userConf();
-    final key = _parseAppKey(conf.data);
-    if (key == null || key.isEmpty) {
+    final conf = await AppApis.user.imAppKey();
+    final key = conf.data;
+    if (!conf.ok || key == null || key.isEmpty) {
       throw StateError('imConfig.appKey missing from /user/conf');
     }
     _appKey = key;
     debugPrint('ImService appKey loaded (${key.length} chars)');
-  }
-
-  static String? _parseAppKey(Object? data) {
-    if (data is! Map) return null;
-    final map = Map<String, dynamic>.from(data);
-    final im = map['imConfig'] ?? map['im'] ?? map['ImConfig'];
-    if (im is Map) {
-      final k = '${im['appKey'] ?? im['app_key'] ?? im['appId'] ?? ''}';
-      if (k.isNotEmpty) return k;
-    }
-    final direct = '${map['appKey'] ?? map['imAppKey'] ?? ''}';
-    return direct.isEmpty ? null : direct;
   }
 
   static Future<(String, String)?> _loadCredentials() async {
@@ -175,26 +167,21 @@ abstract final class ImService {
       return (emUser, emPwd);
     }
 
-    final info = await NetworkBootstrap.api.userInfo();
-    if (!info.success || info.data is! Map) return null;
-    final root = Map<String, dynamic>.from(info.data as Map);
-    final user = root['user'] is Map
-        ? Map<String, dynamic>.from(root['user'] as Map)
-        : root;
-    emUser = '${user['emUsername'] ?? user['emUserName'] ?? ''}'.trim();
-    emPwd = '${user['emPwd'] ?? user['emPassword'] ?? ''}'.trim();
-    final uid = '${user['id'] ?? ''}'.trim();
-    final nick = '${user['nickname'] ?? user['nickName'] ?? ''}'.trim();
-    final avatar = '${user['avatar'] ?? ''}'.trim();
-    if (emUser.isEmpty || emPwd.isEmpty) return null;
+    final info = await AppApis.user.imCredentials();
+    if (!info.ok || info.data == null) return null;
+    final creds = info.data!;
     await AuthSession.markLoggedIn(
-      userId: uid.isEmpty ? null : uid,
-      nickname: nick.isEmpty ? null : nick,
-      avatarUrl: avatar.isEmpty ? null : avatar,
-      emUsername: emUser,
-      emPassword: emPwd,
+      userId: creds.profile.userId.isEmpty ? null : creds.profile.userId,
+      nickname:
+          creds.profile.displayName.isEmpty ? null : creds.profile.displayName,
+      avatarUrl: (creds.profile.avatarUrl == null ||
+              creds.profile.avatarUrl!.isEmpty)
+          ? null
+          : creds.profile.avatarUrl,
+      emUsername: creds.emUser,
+      emPassword: creds.emPwd,
     );
-    return (emUser, emPwd);
+    return (creds.emUser, creds.emPwd);
   }
 
   static Future<void> _initSdk() async {
@@ -566,6 +553,48 @@ abstract final class ImService {
     }
   }
 
+  /// Delete local (+ remote) conversation — forya `ConversationController.removeItem`.
+  static Future<void> deleteConversation(
+    String conversationId, {
+    bool isGroup = false,
+    bool deleteMessages = true,
+  }) async {
+    final id = conversationId.trim();
+    if (id.isEmpty) return;
+    if (!_sdkInited) await connectFromServer();
+    final type =
+        isGroup ? EMConversationType.GroupChat : EMConversationType.Chat;
+    try {
+      final conv = await EMClient.getInstance.chatManager.getConversation(
+        id,
+        type: type,
+        createIfNeed: false,
+      );
+      if (conv != null) {
+        try {
+          await conv.deleteAllMessages();
+        } catch (error) {
+          debugPrint('ImService deleteAllMessages: $error');
+        }
+      }
+      await EMClient.getInstance.chatManager.deleteConversation(
+        id,
+        deleteMessages: deleteMessages,
+      );
+      try {
+        await EMClient.getInstance.chatManager.deleteRemoteConversation(
+          id,
+          conversationType: type,
+          isDeleteMessage: deleteMessages,
+        );
+      } catch (error) {
+        debugPrint('ImService deleteRemoteConversation: $error');
+      }
+    } catch (error) {
+      debugPrint('ImService.deleteConversation failed: $error');
+    }
+  }
+
   /// Open EM conversations for list merge (1v1 Chat + GroupChat).
   static Future<List<EMConversation>> loadListConversations() async {
     if (!_sdkInited) await connectFromServer();
@@ -662,7 +691,7 @@ abstract final class ImService {
         final params = body.params;
         if (params != null) {
           for (final key in ['text', 'content', 'title', 'body']) {
-            final v = '${params[key] ?? ''}'.trim();
+            final v = (params[key] ?? '').trim();
             if (v.isNotEmpty && !v.startsWith('{') && !v.startsWith('[')) {
               return v;
             }
@@ -803,6 +832,7 @@ abstract final class ImService {
       giftIconUrl: giftIconUrl,
       emoteUrl: emoteUrl,
       emoteName: emoteName,
+      isGroup: message.chatType == ChatType.GroupChat,
     );
   }
 
@@ -849,6 +879,7 @@ abstract final class ImService {
 
     final event = body.event;
     final params = body.params ?? const <String, String>{};
+    final isGroup = message.chatType == ChatType.GroupChat;
 
     if (event == 'SendGift') {
       final gift = _parseGiftParams(params);
@@ -871,11 +902,12 @@ abstract final class ImService {
         giftQty: qty,
         giftName: name,
         giftIconUrl: gift.iconUrl,
+        isGroup: isGroup,
       );
     }
 
     if (event == 'im_follow_message') {
-      final followed = (int.tryParse('${params['follow'] ?? '1'}') ?? 1) > 0;
+      final followed = (int.tryParse(params['follow'] ?? '1') ?? 1) > 0;
       final text = isSelf
           ? (followed
               ? 'You have followed the user'
@@ -893,6 +925,7 @@ abstract final class ImService {
         serverTimeMs: message.serverTime,
         msgType: 'follow',
         customEvent: event,
+        isGroup: isGroup,
       );
     }
 
@@ -911,6 +944,7 @@ abstract final class ImService {
         customEvent: event,
         joinName: name,
         joinUid: join.uid,
+        isGroup: isGroup,
       );
     }
 
@@ -933,6 +967,7 @@ abstract final class ImService {
         serverTimeMs: message.serverTime,
         msgType: 'txt',
         customEvent: event,
+        isGroup: isGroup,
       );
     }
 
@@ -947,6 +982,7 @@ abstract final class ImService {
       serverTimeMs: message.serverTime,
       msgType: 'custom',
       customEvent: event,
+      isGroup: isGroup,
     );
   }
 
@@ -998,9 +1034,9 @@ abstract final class ImService {
     if (params == null || params.isEmpty) {
       return (name: '', uid: '');
     }
-    var name = '${params['name'] ?? ''}'.trim();
-    var uid = '${params['uid'] ?? params['userId'] ?? ''}'.trim();
-    final raw = '${params['content'] ?? ''}'.trim();
+    var name = (params['name'] ?? '').trim();
+    var uid = (params['uid'] ?? params['userId'] ?? '').trim();
+    final raw = (params['content'] ?? '').trim();
     if (raw.startsWith('{')) {
       try {
         final decoded = jsonDecode(raw);
@@ -1018,7 +1054,7 @@ abstract final class ImService {
 
   static String _firstParam(Map<String, String> params, List<String> keys) {
     for (final k in keys) {
-      final v = '${params[k] ?? ''}'.trim();
+      final v = (params[k] ?? '').trim();
       if (v.isNotEmpty && !v.startsWith('{') && !v.startsWith('[')) return v;
     }
     return '';

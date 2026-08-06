@@ -4,8 +4,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/constants/app_assets.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_avatar.dart';
 import '../../../core/widgets/center_toast.dart';
-import '../../../core/widgets/network_or_asset_avatar.dart';
 import '../models/me_models.dart';
 
 /// Avatar on top; row below: left = name + ID, right = My Profile.
@@ -37,11 +37,10 @@ class MeProfileHeader extends StatelessWidget {
               shape: BoxShape.circle,
               border: Border.all(color: Colors.white, width: 2),
             ),
-            child: ClipOval(
-              child: NetworkOrAssetAvatar(
-                asset: profile.avatarAsset,
-                url: profile.avatarUrl,
-              ),
+            child: AppAvatar(
+              asset: profile.avatarAsset,
+              url: profile.avatarUrl,
+              size: avatarSize,
             ),
           ),
         ),

@@ -872,13 +872,13 @@ class _ChatEmojiPanelState extends State<_ChatEmojiPanel> {
       _packsError = null;
     });
     try {
-      final res = await NetworkBootstrap.api.emoticonsList(scene: 'CHAT');
+      final res = await AppApis.emote.packs(scene: 'CHAT');
       if (!mounted) return;
-      final packs = EmoteDto.parsePacks(res.data);
+      final packs = res.data ?? const [];
       setState(() {
         _packs = packs;
         _packsLoading = false;
-        if (packs.isEmpty && !res.success) {
+        if (packs.isEmpty && !res.ok) {
           _packsError =
               res.message.isEmpty ? 'Failed to load stickers' : res.message;
         }
@@ -900,9 +900,9 @@ class _ChatEmojiPanelState extends State<_ChatEmojiPanel> {
     _loadingPacks.add(pack.id);
     setState(() {});
     try {
-      final res = await NetworkBootstrap.api.emoteItemList(pack.id);
+      final res = await AppApis.emote.stickers(pack.id);
       if (!mounted) return;
-      final items = EmoteDto.parseStickers(res.data);
+      final items = res.data ?? const [];
       setState(() {
         _stickersByPack[pack.id] = items;
         _loadingPacks.remove(pack.id);

@@ -148,22 +148,16 @@ abstract final class AppAssets {
   static const String infoBg = '$_forya/info_bg.webp';
   static const String protocolBg = '$_forya/protocol_bg.webp';
 
-  /// Level page: background / current level card / badge / privilege icons.
-  static const String levelBg = '$_forya/Level_bg.webp';
-  static const String levelCardBg = '$_forya/Group 5642.png';
-  static const String levelBadgeHero = '$_forya/Mask group.png';
-  static const String levelPrivilegeAccent = '$_forya/Mask group-2.png';
-  static const String levelPrivilegeBadge = mineLevelIconAsset;
-  static const String levelPrivilegeAssist = '$_forya/Mask group-2.png';
-  static const String levelPrivilegeCar = '$_forya/Mask group-5.png';
-  static const String levelMask1 = '$_forya/Mask group-1.png';
-  static const String levelMask3 = '$_forya/Mask group-3.png';
-  static const String levelMask4 = '$_forya/Mask group-4.png';
-  static const String levelGroup5643 = '$_forya/Group 5643.png';
-  static const String levelGroup5644 = '$_forya/Group 5644.png';
-  static const String levelGroup5645 = '$_forya/Group 5645.png';
-  static const String levelGroup5646 = '$_forya/Group 5646.png';
-  static const String levelGroup5647 = '$_forya/Group 5647.png';
+  /// Level page (forya MineLevelPage remote assets).
+  static const String levelBg = '$_forya/level_page_bg.webp';
+  static const String levelPrivilegeAccent = '$_forya/level_page_tag.webp';
+  static const String levelPrivilegeBadge = '$_forya/level_page_icon_1.webp';
+  static const String levelPrivilegeAssist = '$_forya/level_page_icon_2.webp';
+  /// Card / hero badge by forya `levelIndex` (0–5 → files 1–6).
+  static String levelCardBg(int levelIndex) =>
+      '$_forya/level_bg_${levelIndex.clamp(0, 5) + 1}.webp';
+  static String levelBadgeHero(int levelIndex) =>
+      '$_forya/level_bg_icon_${levelIndex.clamp(0, 5) + 1}.webp';
 
   // ---------- Messages / chat ----------
   static const String msgBg = homeTopBg;

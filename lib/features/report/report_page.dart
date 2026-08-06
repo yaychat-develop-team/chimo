@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
-import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/app_page_scaffold.dart';
 
 /// Report page: pick type, upload proof images, enter feedback.
 class ReportPage extends StatefulWidget {
@@ -66,138 +65,100 @@ class _ReportPageState extends State<ReportPage> {
     final bottom = MediaQuery.paddingOf(context).bottom;
     final feedbackLen = _feedbackController.text.length;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const _ReportAppBar(),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                children: [
-                  const Text(
-                    'Type',
-                    style: TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
+    return AppPageScaffold(
+      title: 'Report',
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+              children: [
+                const Text(
+                  'Type',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
                   ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: [
-                      for (final type in _types)
-                        _TypeChip(
-                          label: type,
-                          selected: type == _selectedType,
-                          onTap: () => setState(() => _selectedType = type),
-                        ),
-                    ],
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    for (final type in _types)
+                      _TypeChip(
+                        label: type,
+                        selected: type == _selectedType,
+                        onTap: () => setState(() => _selectedType = type),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 28),
+                Text(
+                  'Feedback (${_images.length}/$_maxImages)',
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
                   ),
-                  const SizedBox(height: 28),
-                  Text(
-                    'Feedback (${_images.length}/$_maxImages)',
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    for (var i = 0; i < _images.length; i++)
+                      _ImageThumb(
+                        color: _images[i],
+                        onRemove: () => _removeImage(i),
+                      ),
+                    if (_images.length < _maxImages)
+                      _AddImageButton(onTap: _addImage),
+                  ],
+                ),
+                const SizedBox(height: 28),
+                const Text(
+                  'Feedback',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
                   ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: [
-                      for (var i = 0; i < _images.length; i++)
-                        _ImageThumb(
-                          color: _images[i],
-                          onRemove: () => _removeImage(i),
-                        ),
-                      if (_images.length < _maxImages)
-                        _AddImageButton(onTap: _addImage),
-                    ],
-                  ),
-                  const SizedBox(height: 28),
-                  const Text(
-                    'Feedback',
-                    style: TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _FeedbackField(
-                    controller: _feedbackController,
-                    maxLength: _maxFeedbackLength,
-                    length: feedbackLen,
-                    onChanged: (_) => setState(() {}),
-                  ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 12),
+                _FeedbackField(
+                  controller: _feedbackController,
+                  maxLength: _maxFeedbackLength,
+                  length: feedbackLen,
+                  onChanged: (_) => setState(() {}),
+                ),
+              ],
             ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(16, 8, 16, 12 + bottom),
-              child: SizedBox(
-                height: 52,
-                child: Material(
-                  color: AppColors.primaryBright,
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(16, 8, 16, 12 + bottom),
+            child: SizedBox(
+              height: 52,
+              child: Material(
+                color: AppColors.primaryBright,
+                borderRadius: BorderRadius.circular(26),
+                child: InkWell(
+                  onTap: _submit,
                   borderRadius: BorderRadius.circular(26),
-                  child: InkWell(
-                    onTap: _submit,
-                    borderRadius: BorderRadius.circular(26),
-                    child: const Center(
-                      child: Text(
-                        'Submit',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
-                        ),
+                  child: const Center(
+                    child: Text(
+                      'Submit',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ReportAppBar extends StatelessWidget {
-  const _ReportAppBar();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 48,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: IconButton(
-              onPressed: () => Navigator.of(context).pop(),
-              icon: SvgPicture.asset(
-                AppAssets.chatBack,
-                width: 17,
-                height: 7,
-              ),
-            ),
-          ),
-          const Text(
-            'Report',
-            style: TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
             ),
           ),
         ],

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
@@ -41,21 +42,21 @@ Future<void> main() async {
     'code': '123456',
     'userInfoKey': '',
   });
-  print('auth success=${auth['success']} msg=${auth['message']}');
+  stdout.writeln('auth success=${auth['success']} msg=${auth['message']}');
   final data = auth['data'];
   if (data is! Map) {
-    print('no data');
+    stdout.writeln('no data');
     return;
   }
   final token = '${data['token']}';
-  print('token len=${token.length} nick=${data['nickName']}');
+  stdout.writeln('token len=${token.length} nick=${data['nickName']}');
   final list = await get('/chat/group/list?pageNum=1&pageSize=5', token);
-  print('list success=${list['success']} msg=${list['message']}');
+  stdout.writeln('list success=${list['success']} msg=${list['message']}');
   final gl = (list['data'] as Map?)?['groupList'] as List?;
-  print('count=${gl?.length}');
+  stdout.writeln('count=${gl?.length}');
   if (gl != null && gl.isNotEmpty) {
-    print('first=${gl.first}');
+    stdout.writeln('first=${gl.first}');
   }
   final mine = await get('/chat/group/myGroups', token);
-  print('mine success=${mine['success']} dataKeys=${(mine['data'] as Map?)?.keys}');
+  stdout.writeln('mine success=${mine['success']} dataKeys=${(mine['data'] as Map?)?.keys}');
 }

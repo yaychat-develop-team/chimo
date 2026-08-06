@@ -6,8 +6,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/app_router.dart';
 import '../../core/constants/app_assets.dart';
-import '../../core/network/group_dto.dart';
-import '../../core/network/network_bootstrap.dart';
+import '../../core/navigation/app_scheme_helper.dart';
+import '../../core/network/app_apis.dart';
 import '../../core/theme/app_colors.dart';
 import '../chats/data/chats_list_controller.dart';
 import 'chat_user_profile_page.dart';
@@ -186,9 +186,9 @@ class _HomePageState extends State<HomePage> {
     _setJoined(latest, true);
 
     try {
-      final res = await NetworkBootstrap.api.joinGroup([latest.id]);
+      final res = await AppApis.group.join([latest.id]);
       if (!mounted) return;
-      if (!res.success) {
+      if (!res.ok) {
         _setJoined(latest, false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -255,44 +255,24 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _loadFromApi({bool showError = false}) async {
     try {
-      final api = NetworkBootstrap.api;
-      final results = await Future.wait([
-        api.groupList(pageNum: 1, pageSize: 20),
-        api.myGroups(),
-        api.homeMain(),
-      ]);
-      final popularRes = results[0];
-      final mineRes = results[1];
-      final homeRes = results[2];
+      final popularFuture = AppApis.group.list(pageNum: 1, pageSize: 20);
+      final mineFuture = AppApis.group.myGroups();
+      final homeFuture = AppApis.app.homeBanners();
+      final popularRes = await popularFuture;
+      final mineRes = await mineFuture;
+      final homeRes = await homeFuture;
 
       if (!mounted) return;
 
-      if (!popularRes.success && popularRes.message == 'user.not.login') {
-        await NetworkBootstrap.handleNotLogin();
+      if (!popularRes.ok && popularRes.isNotLogin) {
         if (!mounted) return;
         context.go(AppRoutes.login);
         return;
       }
 
-      final popular = GroupDto.parseList(popularRes);
-      var mine = GroupDto.parseList(mineRes);
-      if (mine.isEmpty && mineRes.success) {
-        final data = mineRes.data;
-        if (data is Map) {
-          final list = data['groupList'] ?? data['myGroups'] ?? data['list'];
-          if (list is List) {
-            mine = [
-              for (final item in list)
-                if (item is Map)
-                  GroupDto.fromMap(Map<String, dynamic>.from(item)),
-            ];
-          }
-        }
-      }
-
-      final banners = homeRes.success
-          ? BannerDto.parseHomeMain(homeRes.data)
-          : const <HomeBannerItem>[];
+      final popular = popularRes.data ?? const [];
+      final mine = mineRes.data ?? const [];
+      final banners = homeRes.ok ? (homeRes.data ?? const []) : const <HomeBannerItem>[];
 
       final controllerIds = widget.chatsController.joinedGroupIds;
       final mineIds = {for (final g in mine) g.id, ...controllerIds};
@@ -315,7 +295,7 @@ class _HomePageState extends State<HomePage> {
         _joinedGroups = joined;
         _banners = banners;
         _initialLoading = false;
-        _loadError = popularRes.success
+        _loadError = popularRes.ok
             ? null
             : (popularRes.message.isEmpty
                 ? 'Failed to load groups'
@@ -445,7 +425,16 @@ class _HomePageState extends State<HomePage> {
                         );
                       },
                     ),
-                    HomeHeroBanner(banners: _banners),
+                    HomeHeroBanner(
+                      banners: _banners,
+                      onBannerTap: (banner) {
+                        AppSchemeHelper.open(
+                          context,
+                          banner.link,
+                          chatsController: widget.chatsController,
+                        );
+                      },
+                    ),
                   ],
                 ),
               ),

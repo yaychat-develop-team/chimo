@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/app_assets.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_asset_image.dart';
+import '../../../core/widgets/app_avatar.dart';
 import '../../../core/widgets/network_or_asset_avatar.dart';
 import '../models/chat_conversation.dart';
 
@@ -343,13 +344,6 @@ class _Avatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final image = NetworkOrAssetAvatar(
-      asset: asset,
-      url: url,
-      width: _size,
-      height: _size,
-    );
-
     return SizedBox(
       width: _size,
       height: _size,
@@ -359,10 +353,19 @@ class _Avatar extends StatelessWidget {
           if (isGroup)
             ClipRRect(
               borderRadius: BorderRadius.circular(_groupRadius),
-              child: image,
+              child: NetworkOrAssetAvatar(
+                asset: asset,
+                url: url,
+                width: _size,
+                height: _size,
+              ),
             )
           else
-            ClipOval(child: image),
+            AppAvatar(
+              asset: asset,
+              url: url,
+              size: _size,
+            ),
           if (isOnline)
             Positioned(
               right: 0,

@@ -2,9 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../../core/network/network_bootstrap.dart';
+import '../../core/network/app_apis.dart';
 import '../../core/utils/zodiac.dart';
-import '../me/data/user_dto.dart';
 import '../me/models/me_models.dart';
 import 'edit_profile_page.dart';
 import 'widgets/user_profile_scaffold.dart';
@@ -75,9 +74,9 @@ class _PersonalProfilePageState extends State<PersonalProfilePage> {
 
   Future<void> _loadFromApi() async {
     try {
-      final infoRes = await NetworkBootstrap.api.userInfo();
+      final infoRes = await AppApis.user.profileOrNull();
       if (!mounted) return;
-      final parsed = UserDto.parseProfile(infoRes);
+      final parsed = infoRes.data;
       if (parsed != null) {
         setState(() => _profile = parsed);
       }

@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../app/app_router.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/app_gradient_button.dart';
 
 enum _Gender { male, female }
 
@@ -207,35 +208,11 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                 ),
                 const SizedBox(height: 60),
                 Center(
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: _canNext ? _onNext : null,
-                      borderRadius: BorderRadius.circular(27),
-                      child: Ink(
-                        width: 134,
-                        height: 54,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(27),
-                          gradient: _canNext
-                              ? AppColors.promoBannerGradient
-                              : null,
-                          color: _canNext ? null : const Color(0xFF2A2A2A),
-                        ),
-                        child: Center(
-                          child: Text(
-                            'Next',
-                            style: TextStyle(
-                              color: _canNext
-                                  ? AppColors.promoText
-                                  : const Color(0xFF6E6E6E),
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
+                  child: AppGradientButton(
+                    label: 'Next',
+                    onTap: _canNext ? _onNext : null,
+                    enabled: _canNext,
+                    width: 134,
                   ),
                 ),
                 const Spacer(),

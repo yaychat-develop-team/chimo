@@ -152,6 +152,15 @@ abstract final class AuthSession {
     return value is String && value.isNotEmpty ? value : null;
   }
 
+  /// Persist last-used email without marking the session logged-in.
+  static Future<void> rememberEmail(String email) async {
+    final trimmed = email.trim();
+    if (trimmed.isEmpty) return;
+    final data = await _read();
+    data['email'] = trimmed;
+    await _write(data);
+  }
+
   static Future<String?> loginMethod() async {
     final data = await _read();
     final value = data['method'];

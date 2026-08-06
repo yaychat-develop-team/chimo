@@ -4,9 +4,11 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/app_router.dart';
+import '../../core/auth/phone_auth.dart';
 import '../../core/constants/app_assets.dart';
-import '../../core/network/network_bootstrap.dart';
+import '../../core/network/app_apis.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/app_primary_button.dart';
 
 /// Phone login page (white background design).
 class PhoneLoginPage extends StatefulWidget {
@@ -56,9 +58,11 @@ class _PhoneLoginPageState extends State<PhoneLoginPage> {
 
     setState(() => _sending = true);
     try {
-      final res = await NetworkBootstrap.api.sendSms(phone: _phone);
+      final res = await AppApis.auth.sendSms(
+        phone: PhoneAuth.toApiPhone(_phone),
+      );
       if (!mounted) return;
-      if (!res.success) {
+      if (!res.ok) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(res.message.isEmpty ? 'SMS send failed' : res.message),
@@ -67,7 +71,7 @@ class _PhoneLoginPageState extends State<PhoneLoginPage> {
         );
         return;
       }
-      context.push(AppRoutes.verifyPath(_phone));
+      context.push(AppRoutes.verifyPath(PhoneAuth.digitsOnly(_phone)));
     } catch (error) {
       if (!mounted) return;
       final text = '$error';
@@ -189,39 +193,11 @@ class _PhoneLoginPageState extends State<PhoneLoginPage> {
                   ),
                 ],
                 const SizedBox(height: 20),
-                Material(
-                  color: _canLogin
-                      ? AppColors.primaryBright
-                      : const Color(0xFFE8E8E8),
-                  borderRadius: BorderRadius.circular(28),
-                  child: InkWell(
-                    onTap: _canLogin ? _onLogin : null,
-                    borderRadius: BorderRadius.circular(28),
-                    child: SizedBox(
-                      height: 54,
-                      child: Center(
-                        child: _sending
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.2,
-                                  color: Colors.black54,
-                                ),
-                              )
-                            : Text(
-                                'Login',
-                                style: TextStyle(
-                                  color: _canLogin
-                                      ? Colors.black
-                                      : const Color(0xFFB0B0B0),
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                      ),
-                    ),
-                  ),
+                AppPrimaryButton(
+                  label: 'Login',
+                  onTap: _onLogin,
+                  enabled: _canLogin,
+                  loading: _sending,
                 ),
               ],
             ),

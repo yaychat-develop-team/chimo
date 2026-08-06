@@ -1,7 +1,8 @@
 import '../auth/auth_session.dart';
 import 'repositories.dart';
 
-class MockAuthRepository implements AuthRepository {
+/// [AuthRepository] backed by [AuthSession] (local JSON session).
+class SessionAuthRepository implements AuthRepository {
   @override
   Future<bool> isLoggedIn() => AuthSession.isLoggedIn();
 
