@@ -36,6 +36,8 @@ abstract final class AppRoutes {
   static const almostIn = '/onboarding/almost-in';
   static const welcomeBrand = '/onboarding/welcome';
   static const tribes = '/onboarding/tribes';
+  /// New email accounts complete profile here before home.
+  static const editProfileOnboarding = '/onboarding/edit-profile';
   static const shell = '/app';
   static const chat = '/app/chat/:id';
   static const group = '/app/group/:id';
@@ -98,6 +100,13 @@ GoRouter createAppRouter({required ChatsListController chatsController}) {
       GoRoute(
         path: AppRoutes.almostIn,
         builder: (_, _) => const AlmostInPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.editProfileOnboarding,
+        builder: (_, _) => const EditProfilePage(
+          profile: MeProfile.empty,
+          fromOnboarding: true,
+        ),
       ),
       GoRoute(
         path: AppRoutes.welcomeBrand,

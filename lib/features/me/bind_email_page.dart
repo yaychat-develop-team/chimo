@@ -6,9 +6,11 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/app_router.dart';
+import '../../core/auth/auth_onboarding_gate.dart';
 import '../../core/auth/auth_session.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/network/app_apis.dart';
+import '../../core/network/email_auth_messages.dart';
 import '../../core/network/network_bootstrap.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_primary_button.dart';
@@ -99,30 +101,23 @@ class _BindEmailPageState extends State<BindEmailPage> {
   @override
   Widget build(BuildContext context) {
     final canSubmit = _isValidEmail && !_sending;
+    final screenWidth = MediaQuery.sizeOf(context).width;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
-        backgroundColor: AppColors.background,
+        backgroundColor: AppColors.surface,
         body: Stack(
           children: [
-            const Positioned(
+            Positioned(
               top: 0,
               left: 0,
               right: 0,
-              height: 220,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Color(0x5524B572),
-                      Color(0x33203A8C),
-                      Color(0x00000000),
-                    ],
-                  ),
-                ),
+              child: Image.asset(
+                AppAssets.homeTopBg,
+                width: screenWidth,
+                fit: BoxFit.fitWidth,
+                alignment: Alignment.topCenter,
               ),
             ),
             SafeArea(
@@ -303,7 +298,10 @@ class _BindEmailCodePageState extends State<_BindEmailCodePage> {
       if (!res.ok) {
         showCenterToast(
           context,
-          message: res.message.isEmpty ? 'Failed to send code' : res.message,
+          message: EmailAuthMessages.friendly(
+            res.message,
+            fallback: 'Failed to send code',
+          ),
         );
         if (initial) {
           // Allow immediate retry when first send fails.
@@ -341,16 +339,12 @@ class _BindEmailCodePageState extends State<_BindEmailCodePage> {
         );
         if (!mounted) return;
         if (!res.ok || res.data == null) {
-          var msg =
-              res.message.isEmpty ? 'Verification failed' : res.message;
-          if (widget.forLogin &&
-              msg.toLowerCase().contains('unauthorized')) {
-            msg =
-                'This email is not registered in the current test backend. Please use phone login or bind email first.';
-          }
           showCenterToast(
             context,
-            message: msg,
+            message: EmailAuthMessages.friendly(
+              res.message,
+              fallback: 'Verification failed',
+            ),
           );
           return;
         }
@@ -394,11 +388,16 @@ class _BindEmailCodePageState extends State<_BindEmailCodePage> {
         }
 
         unawaited(NetworkBootstrap.connectImAfterLogin());
+        final goHome = await AuthOnboardingGate.shouldEnterHome(
+          payload.raw,
+          email: widget.email,
+        );
         if (!mounted) return;
-        context.go(AppRoutes.shell);
+        context.go(goHome ? AppRoutes.shell : AppRoutes.editProfileOnboarding);
         return;
       }
 
+      // Phone-login bind flow (forya EmailLoginCodePage isBind=true).
       final res = await AppApis.auth.bindEmail(
         email: widget.email,
         code: code,
@@ -407,14 +406,23 @@ class _BindEmailCodePageState extends State<_BindEmailCodePage> {
       if (!res.ok) {
         showCenterToast(
           context,
-          message: res.message.isEmpty ? 'Bind failed' : res.message,
+          message: EmailAuthMessages.friendly(
+            res.message,
+            fallback: 'Unable to bind email. Please try again.',
+          ),
         );
+        _controller.clear();
+        setState(() {});
+        _focusNode.requestFocus();
         return;
       }
+
+      // Persist email locally, then let Me page refresh user/info (hides Bind Email).
       await AuthSession.markLoggedIn(email: widget.email);
       if (!mounted) return;
-      showCenterToast(context, message: 'Email bound successfully');
+      // Forya: pop code page + email page; Me reloads profile on result.
       Navigator.of(context).pop(true);
+      return;
     } catch (error) {
       if (!mounted) return;
       showCenterToast(context, message: 'Verification failed: $error');
@@ -426,30 +434,23 @@ class _BindEmailCodePageState extends State<_BindEmailCodePage> {
   @override
   Widget build(BuildContext context) {
     final canVerify = _canVerify;
+    final screenWidth = MediaQuery.sizeOf(context).width;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
-        backgroundColor: AppColors.background,
+        backgroundColor: AppColors.surface,
         body: Stack(
           children: [
-            const Positioned(
+            Positioned(
               top: 0,
               left: 0,
               right: 0,
-              height: 220,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Color(0x5524B572),
-                      Color(0x33203A8C),
-                      Color(0x00000000),
-                    ],
-                  ),
-                ),
+              child: Image.asset(
+                AppAssets.homeTopBg,
+                width: screenWidth,
+                fit: BoxFit.fitWidth,
+                alignment: Alignment.topCenter,
               ),
             ),
             SafeArea(

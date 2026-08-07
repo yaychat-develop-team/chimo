@@ -6,12 +6,16 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/app_router.dart';
 import '../../core/constants/app_assets.dart';
+import '../../core/network/app_apis.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_gradient_button.dart';
+import 'onboarding_profile_draft.dart';
 
 enum _Gender { male, female }
 
 /// Post-registration profile setup: gender + birthday (Figma 完善资料).
+///
+/// Used after phone OTP and email login when the profile is incomplete.
 class ProfileSetupPage extends StatefulWidget {
   const ProfileSetupPage({super.key});
 
@@ -22,8 +26,9 @@ class ProfileSetupPage extends StatefulWidget {
 class _ProfileSetupPageState extends State<ProfileSetupPage> {
   _Gender? _gender;
   DateTime? _birthday;
+  bool _saving = false;
 
-  bool get _canNext => _gender != null && _birthday != null;
+  bool get _canNext => _gender != null && _birthday != null && !_saving;
 
   String get _birthdayLabel {
     final d = _birthday;
@@ -105,9 +110,51 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
     }
   }
 
-  void _onNext() {
+  Future<void> _onNext() async {
     if (!_canNext) return;
-    context.push(AppRoutes.almostIn);
+    final d = _birthday!;
+    final y = d.year.toString().padLeft(4, '0');
+    final m = d.month.toString().padLeft(2, '0');
+    final day = d.day.toString().padLeft(2, '0');
+    final gender = _gender == _Gender.female ? 'female' : 'male';
+    final birthday = '$y-$m-$day';
+
+    OnboardingProfileDraft.setGenderAndBirthday(
+      gender: gender,
+      birthday: birthday,
+    );
+
+    setState(() => _saving = true);
+    try {
+      final res = await AppApis.user.update({
+        'gender': gender,
+        'birthday': birthday,
+        'register': true,
+      });
+      if (!mounted) return;
+      if (!res.ok) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              res.message.isEmpty ? 'Unable to save profile' : res.message,
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+      context.push(AppRoutes.almostIn);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Unable to save profile: $error'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   @override
@@ -154,6 +201,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                   children: [
                     _GenderCard(
                       label: "I'm male",
+                      selected: _gender == _Gender.male,
                       image: _gender == _Gender.male
                           ? AppAssets.genderMaleSelected
                           : AppAssets.genderMaleImg,
@@ -162,6 +210,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                     const SizedBox(width: 18),
                     _GenderCard(
                       label: "I'm female",
+                      selected: _gender == _Gender.female,
                       image: _gender == _Gender.female
                           ? AppAssets.genderFemaleSelected
                           : AppAssets.genderFemaleImg,
@@ -209,7 +258,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                 const SizedBox(height: 60),
                 Center(
                   child: AppGradientButton(
-                    label: 'Next',
+                    label: _saving ? 'Saving…' : 'Next',
                     onTap: _canNext ? _onNext : null,
                     enabled: _canNext,
                     width: 134,
@@ -263,39 +312,46 @@ class _GenderCard extends StatelessWidget {
     required this.label,
     required this.image,
     required this.onTap,
+    required this.selected,
   });
 
   final String label;
   final String image;
   final VoidCallback onTap;
+  final bool selected;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: SizedBox(
-        width: 148,
-        height: 148,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            // Unselected: man_img / woman_img; selected: man_select / woman_select
-            Image.asset(image, fit: BoxFit.contain),
-            Positioned(
-              top: 6,
-              left: 0,
-              right: 0,
-              child: Text(
-                label,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Color(0xFFB0B0B0),
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: SizedBox(
+          width: 148,
+          height: 148,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.asset(image, fit: BoxFit.contain),
+              Positioned(
+                top: 6,
+                left: 0,
+                right: 0,
+                child: Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: selected
+                        ? AppColors.accentLime
+                        : const Color(0xFFB0B0B0),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

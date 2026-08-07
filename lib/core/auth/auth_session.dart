@@ -205,6 +205,11 @@ abstract final class AuthSession {
   static Future<void> clear() async {
     try {
       final file = await _sessionFile();
+      // Always overwrite first so isLoggedIn() flips even if delete fails.
+      await file.writeAsString(
+        jsonEncode(<String, dynamic>{'loggedIn': false}),
+        flush: true,
+      );
       if (await file.exists()) await file.delete();
     } catch (error, stack) {
       debugPrint('AuthSession clear failed: $error\n$stack');

@@ -180,7 +180,8 @@ class _MePageState extends State<MePage> {
     final screenWidth = MediaQuery.sizeOf(context).width;
 
     return ColoredBox(
-      color: AppColors.background,
+      // Match `mine_bg` bottom (#0F0F0F) so Quick Access isn't pure black.
+      color: AppColors.surface,
       child: Stack(
         children: [
           Positioned(

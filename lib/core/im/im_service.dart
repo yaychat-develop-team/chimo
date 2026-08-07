@@ -269,7 +269,17 @@ abstract final class ImService {
   static Future<void> logout() async {
     try {
       if (_sdkInited) {
-        await EMClient.getInstance.logout(true);
+        // unbindDeviceToken can hang on bad networks; keep logout snappy.
+        try {
+          await EMClient.getInstance
+              .logout(true)
+              .timeout(const Duration(seconds: 2));
+        } on TimeoutException {
+          debugPrint('ImService logout(true) timed out; retry without unbind');
+          await EMClient.getInstance
+              .logout(false)
+              .timeout(const Duration(seconds: 1));
+        }
       }
     } catch (error) {
       debugPrint('ImService logout error: $error');

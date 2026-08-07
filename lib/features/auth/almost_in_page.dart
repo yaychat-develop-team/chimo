@@ -1,14 +1,22 @@
+import 'dart:async';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../app/app_router.dart';
+import '../../core/auth/auth_session.dart';
 import '../../core/constants/app_assets.dart';
+import '../../core/network/app_apis.dart';
+import '../../core/network/media_upload.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_gradient_button.dart';
+import '../profile/photo_pick_sheet.dart';
+import 'onboarding_profile_draft.dart';
 
 /// Registration finale: avatar + nickname (Figma 完善资料 — You're almost in!).
 class AlmostInPage extends StatefulWidget {
@@ -20,12 +28,26 @@ class AlmostInPage extends StatefulWidget {
 
 class _AlmostInPageState extends State<AlmostInPage> {
   late final TextEditingController _nickController;
+  String? _localAvatarPath;
+  String? _remoteAvatarUrl;
+  bool _submitting = false;
+  bool _uploadingAvatar = false;
 
   @override
   void initState() {
     super.initState();
     final id = 1000000 + Random().nextInt(9000000);
-    _nickController = TextEditingController(text: 's·$id');
+    _nickController = TextEditingController(text: 'S·$id');
+    // Prefer a real session nickname; email placeholders stay as generated.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_prefillNickname());
+    });
+  }
+
+  Future<void> _prefillNickname() async {
+    final nick = (await AuthSession.nickname() ?? '').trim();
+    if (!mounted || nick.isEmpty || nick.contains('@')) return;
+    _nickController.text = nick;
   }
 
   @override
@@ -34,7 +56,106 @@ class _AlmostInPageState extends State<AlmostInPage> {
     super.dispose();
   }
 
-  void _onLetsGo() {
+  Future<void> _pickAvatar() async {
+    if (_submitting || _uploadingAvatar) return;
+    final action = await showPhotoPickSheet(context);
+    if (!mounted || action == null) return;
+
+    final source = switch (action) {
+      PhotoPickAction.takePhoto => ImageSource.camera,
+      PhotoPickAction.gallery => ImageSource.gallery,
+    };
+
+    XFile? file;
+    try {
+      file = await ImagePicker().pickImage(
+        source: source,
+        imageQuality: 85,
+        maxWidth: 1920,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            source == ImageSource.camera
+                ? 'Camera unavailable. Check app permissions.'
+                : 'Gallery unavailable. Check app permissions.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    if (!mounted || file == null) return;
+
+    if (file.path.toLowerCase().endsWith('.gif')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('GIF uploads are not supported'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _localAvatarPath = file!.path;
+      _uploadingAvatar = true;
+    });
+
+    final remote = await MediaUpload.uploadFile(file.path);
+    if (!mounted) return;
+
+    if (remote == null || remote.isEmpty) {
+      setState(() {
+        _uploadingAvatar = false;
+        _localAvatarPath = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Avatar upload failed. Try again.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    // Persist immediately (same as forya AddUserInfoController.saveAvatar).
+    final res = await AppApis.user.update({
+      'avatarUrl': remote,
+      'register': true,
+    });
+    if (!mounted) return;
+
+    if (!res.ok) {
+      setState(() {
+        _uploadingAvatar = false;
+        _localAvatarPath = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            res.message.isEmpty ? 'Unable to update avatar' : res.message,
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    await AuthSession.markLoggedIn(avatarUrl: remote);
+    if (!mounted) return;
+
+    setState(() {
+      _remoteAvatarUrl = remote;
+      _localAvatarPath = null;
+      _uploadingAvatar = false;
+    });
+  }
+
+  Future<void> _onLetsGo() async {
+    if (_submitting) return;
     final nick = _nickController.text.trim();
     if (nick.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -45,7 +166,161 @@ class _AlmostInPageState extends State<AlmostInPage> {
       );
       return;
     }
-    context.go(AppRoutes.welcomeBrand);
+    if (nick.contains('@')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please choose a nickname (not your email)'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (!OnboardingProfileDraft.isReady) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select gender and birthday first'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      context.go(AppRoutes.profileSetup);
+      return;
+    }
+
+    if (_uploadingAvatar) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Avatar is still uploading…'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _submitting = true);
+    try {
+      final fields = <String, dynamic>{
+        'nickname': nick,
+        'gender': OnboardingProfileDraft.gender,
+        'birthday': OnboardingProfileDraft.birthday,
+        'register': true,
+      };
+      final avatar = (_remoteAvatarUrl ?? '').trim();
+      if (avatar.isNotEmpty) {
+        fields['avatarUrl'] = avatar;
+      }
+
+      final res = await AppApis.user.update(fields);
+      if (!mounted) return;
+      if (!res.ok) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              res.message.isEmpty ? 'Unable to update profile' : res.message,
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+
+      await AuthSession.markLoggedIn(
+        nickname: nick,
+        avatarUrl: avatar.isEmpty ? null : avatar,
+      );
+      OnboardingProfileDraft.clear();
+      if (!mounted) return;
+      context.go(AppRoutes.welcomeBrand);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Unable to update profile: $error'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  Widget _buildAvatar() {
+    final local = _localAvatarPath;
+    final remote = _remoteAvatarUrl;
+    Widget image;
+    if (local != null && local.isNotEmpty) {
+      image = Image.file(
+        File(local),
+        width: 112,
+        height: 112,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => Image.asset(
+          AppAssets.defaultAvatar,
+          width: 112,
+          height: 112,
+          fit: BoxFit.cover,
+        ),
+      );
+    } else if (remote != null && remote.isNotEmpty) {
+      image = Image.network(
+        remote,
+        width: 112,
+        height: 112,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => Image.asset(
+          AppAssets.defaultAvatar,
+          width: 112,
+          height: 112,
+          fit: BoxFit.cover,
+        ),
+      );
+    } else {
+      image = Image.asset(
+        AppAssets.defaultAvatar,
+        width: 112,
+        height: 112,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => Image.asset(
+          AppAssets.friendsEmpty,
+          width: 112,
+          height: 112,
+          fit: BoxFit.cover,
+        ),
+      );
+    }
+
+    return SizedBox(
+      width: 112,
+      height: 112,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          ClipOval(child: image),
+          if (_uploadingAvatar)
+            const Positioned.fill(
+              child: ColoredBox(
+                color: Color(0x66000000),
+                child: Center(
+                  child: SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+              ),
+            ),
+          Positioned(
+            right: 0,
+            bottom: 0,
+            child: Image.asset(
+              AppAssets.cameraIcon,
+              width: 32,
+              height: 32,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -76,7 +351,9 @@ class _AlmostInPageState extends State<AlmostInPage> {
                           color: const Color(0xFF2A2A2A),
                           borderRadius: BorderRadius.circular(12),
                           child: InkWell(
-                            onTap: () => Navigator.of(context).pop(),
+                            onTap: _submitting
+                                ? null
+                                : () => Navigator.of(context).pop(),
                             borderRadius: BorderRadius.circular(12),
                             child: SizedBox(
                               width: 36,
@@ -118,36 +395,12 @@ class _AlmostInPageState extends State<AlmostInPage> {
                       ),
                       SizedBox(height: keyboardOpen ? 20 : 40),
                       Center(
-                        child: SizedBox(
-                          width: 112,
-                          height: 112,
-                          child: Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              ClipOval(
-                                child: Image.asset(
-                                  AppAssets.defaultAvatar,
-                                  width: 112,
-                                  height: 112,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, _, _) => Image.asset(
-                                    AppAssets.friendsEmpty,
-                                    width: 112,
-                                    height: 112,
-                                    fit: BoxFit.cover,
-                                  ),
-                                ),
-                              ),
-                              Positioned(
-                                right: 0,
-                                bottom: 0,
-                                child: Image.asset(
-                                  AppAssets.cameraIcon,
-                                  width: 32,
-                                  height: 32,
-                                ),
-                              ),
-                            ],
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: _pickAvatar,
+                            customBorder: const CircleBorder(),
+                            child: _buildAvatar(),
                           ),
                         ),
                       ),
@@ -162,6 +415,7 @@ class _AlmostInPageState extends State<AlmostInPage> {
                         ),
                         child: TextField(
                           controller: _nickController,
+                          enabled: !_submitting,
                           textAlign: TextAlign.center,
                           style: const TextStyle(
                             color: Colors.white,
@@ -186,8 +440,9 @@ class _AlmostInPageState extends State<AlmostInPage> {
                       SizedBox(height: keyboardOpen ? 28 : 48),
                       Center(
                         child: AppGradientButton(
-                          label: "Let's Go!",
-                          onTap: _onLetsGo,
+                          label: _submitting ? 'Saving…' : "Let's Go!",
+                          onTap: _submitting ? null : _onLetsGo,
+                          enabled: !_submitting,
                           width: 134,
                         ),
                       ),

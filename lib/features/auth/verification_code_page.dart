@@ -6,6 +6,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/app_router.dart';
+import '../../core/auth/auth_onboarding_gate.dart';
 import '../../core/auth/auth_session.dart';
 import '../../core/auth/phone_auth.dart';
 import '../../core/constants/app_assets.dart';
@@ -129,9 +130,8 @@ class _VerificationCodePageState extends State<VerificationCodePage> {
 
       unawaited(NetworkBootstrap.connectImAfterLogin());
 
-      // Existing accounts (not newUser) skip onboarding → home.
-      // Mirrors forya: AuthRsp.newUser / User.isRegister.
-      final goHome = await _shouldEnterHome(map);
+      // Only skip onboarding when nickname + gender are already set.
+      final goHome = await AuthOnboardingGate.shouldEnterHome(map);
       if (!mounted) return;
       context.go(goHome ? AppRoutes.shell : AppRoutes.profileSetup);
     } catch (error) {
@@ -148,41 +148,6 @@ class _VerificationCodePageState extends State<VerificationCodePage> {
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
-  }
-
-  /// True when this phone already has a registered profile → skip setup.
-  Future<bool> _shouldEnterHome(Map<String, dynamic> authData) async {
-    final newUserFlag = _readBool(authData['newUser']);
-    if (newUserFlag == true) return false;
-    if (newUserFlag == false) return true;
-
-    try {
-      final profileRes = await AppApis.user.profileOrNull();
-      if (profileRes.ok && profileRes.data != null) {
-        final me = profileRes.data!;
-        // Profile already filled → treat as existing user.
-        if (me.displayName.trim().isNotEmpty && me.gender.trim().isNotEmpty) {
-          return true;
-        }
-      }
-    } catch (_) {
-      // Fall through: prefer onboarding when uncertain.
-    }
-
-    // No clear signal of a completed profile → setup flow.
-    final nick = '${authData['nickName'] ?? authData['nickname'] ?? ''}';
-    final gender = '${authData['gender'] ?? ''}';
-    return nick.trim().isNotEmpty && gender.trim().isNotEmpty;
-  }
-
-  static bool? _readBool(Object? value) {
-    if (value == null) return null;
-    if (value is bool) return value;
-    if (value is num) return value != 0;
-    final text = '$value'.trim().toLowerCase();
-    if (text == 'true' || text == '1') return true;
-    if (text == 'false' || text == '0') return false;
-    return null;
   }
 
   @override

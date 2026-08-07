@@ -69,6 +69,15 @@ class ChimoApi {
     return _client.post('/user/info', bizParam: fields);
   }
 
+  Future<ApiResponse> accountSecurityInfo() {
+    return _client.get('/user/account-security-info');
+  }
+
+  /// Apply to cancel account. [code] may be empty for email-only accounts.
+  Future<ApiResponse> cancelAccount({String code = ''}) {
+    return _client.post('/user/cancel-account', bizParam: {'code': code});
+  }
+
   Future<ApiResponse> userInfoByUid(String uid, {int scene = 0}) {
     return _client.get('/user/info/$uid', query: {'scene': '$scene'});
   }

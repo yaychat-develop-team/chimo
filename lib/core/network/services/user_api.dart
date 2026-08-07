@@ -70,6 +70,28 @@ class UserApi {
     );
   }
 
+  Future<ApiResult<bool>> hasApplyForCancel() {
+    return ApiGateway.request(
+      () => NetworkBootstrap.api.accountSecurityInfo(),
+      map: (res) {
+        final data = res.data;
+        if (data is! Map) return false;
+        final map = Map<String, dynamic>.from(data);
+        final raw = map['hasApplyForCancel'] ?? map['has_apply_for_cancel'];
+        if (raw is bool) return raw;
+        if (raw is num) return raw != 0;
+        final text = '$raw'.trim().toLowerCase();
+        return text == 'true' || text == '1';
+      },
+    );
+  }
+
+  Future<ApiResult<void>> cancelAccount({String code = ''}) {
+    return ApiGateway.action(
+      () => NetworkBootstrap.api.cancelAccount(code: code),
+    );
+  }
+
   Future<ApiResult<Map<String, dynamic>>> conf() {
     return ApiGateway.request(
       () => NetworkBootstrap.api.userConf(),

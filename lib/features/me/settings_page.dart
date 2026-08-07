@@ -6,12 +6,19 @@ import '../../core/network/network_bootstrap.dart';
 import '../../core/widgets/app_page_scaffold.dart';
 import '../../core/widgets/app_settings_tile.dart';
 import '../../core/widgets/app_tip_dialog.dart';
-import 'bind_email_page.dart';
+import 'account_security_page.dart';
 import 'privacy_settings_page.dart';
 
 /// Settings: account security, privacy, clear cache, log out.
-class SettingsPage extends StatelessWidget {
+class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
+
+  @override
+  State<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<SettingsPage> {
+  bool _loggingOut = false;
 
   Future<void> _onClearCache(BuildContext context) async {
     final confirmed = await AppTipDialog.show(
@@ -29,6 +36,8 @@ class SettingsPage extends StatelessWidget {
   }
 
   Future<void> _onLogout(BuildContext context) async {
+    if (_loggingOut) return;
+
     final confirmed = await AppTipDialog.show(
       context,
       message: 'Are you sure you want to log out?',
@@ -36,8 +45,32 @@ class SettingsPage extends StatelessWidget {
     );
     if (!context.mounted || !confirmed) return;
 
-    await NetworkBootstrap.clearSession();
+    setState(() => _loggingOut = true);
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      useRootNavigator: true,
+      builder: (_) => const PopScope(
+        canPop: false,
+        child: Center(
+          child: Card(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: CircularProgressIndicator(),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    try {
+      await NetworkBootstrap.clearSession();
+    } catch (_) {
+      // Still leave the app; local session clear is best-effort inside.
+    }
     if (!context.mounted) return;
+    final nav = Navigator.of(context, rootNavigator: true);
+    if (nav.canPop()) nav.pop();
     context.go(AppRoutes.login);
   }
 
@@ -61,7 +94,10 @@ class SettingsPage extends StatelessWidget {
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute<void>(
-                          builder: (_) => const BindEmailPage(),
+                          settings: const RouteSettings(
+                            name: AccountSecurityPage.routeName,
+                          ),
+                          builder: (_) => const AccountSecurityPage(),
                         ),
                       );
                     },
@@ -105,16 +141,18 @@ class SettingsPage extends StatelessWidget {
               color: const Color(0xFF1C1C1E),
               borderRadius: BorderRadius.circular(16),
               child: InkWell(
-                onTap: () => _onLogout(context),
+                onTap: _loggingOut ? null : () => _onLogout(context),
                 borderRadius: BorderRadius.circular(16),
-                child: const SizedBox(
+                child: SizedBox(
                   height: 54,
                   width: double.infinity,
                   child: Center(
                     child: Text(
                       'Log out',
                       style: TextStyle(
-                        color: Color(0xFFE44E50),
+                        color: _loggingOut
+                            ? const Color(0x66E44E50)
+                            : const Color(0xFFE44E50),
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                       ),

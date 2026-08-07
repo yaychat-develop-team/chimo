@@ -5,8 +5,11 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../app/app_router.dart';
+import '../../core/auth/auth_session.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/network/app_apis.dart';
 import '../../core/network/media_upload.dart';
@@ -29,9 +32,13 @@ class EditProfilePage extends StatefulWidget {
   const EditProfilePage({
     super.key,
     required this.profile,
+    this.fromOnboarding = false,
   });
 
   final MeProfile profile;
+
+  /// Email signup: after Save, enter home instead of popping.
+  final bool fromOnboarding;
 
   static const int maxPhotos = 9;
 
@@ -136,21 +143,42 @@ class _EditProfilePageState extends State<EditProfilePage> {
     );
   }
 
-  void _popWithResult() {
+  void _leave() {
+    if (widget.fromOnboarding) {
+      context.go(AppRoutes.shell);
+      return;
+    }
     Navigator.of(context).pop(_buildResult());
   }
 
+  void _popWithResult() => _leave();
+
   Future<void> _save() async {
     if (_saving) return;
+    final nick = _nickname.trim();
+    if (widget.fromOnboarding) {
+      if (nick.isEmpty || nick.contains('@')) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please set a nickname (not your email)'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+    }
     setState(() => _saving = true);
     try {
       final genderApi = _gender.toLowerCase() == 'female' ? 'female' : 'male';
       final fields = <String, dynamic>{
-        'nickname': _nickname.trim(),
+        'nickname': nick,
         'birthday': _birthday,
         'gender': genderApi,
         'personalSignature': _signature.trim(),
       };
+      if (widget.fromOnboarding) {
+        fields['register'] = true;
+      }
       if (_height != null) {
         fields['height'] = _height;
       } else {
@@ -201,7 +229,16 @@ class _EditProfilePageState extends State<EditProfilePage> {
         );
         return;
       }
-      _popWithResult();
+      if (widget.fromOnboarding) {
+        await AuthSession.markLoggedIn(
+          nickname: nick,
+          avatarUrl: _profile.avatarUrl,
+        );
+        if (!mounted) return;
+        context.go(AppRoutes.shell);
+        return;
+      }
+      _leave();
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -600,13 +637,18 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     _AvatarCard(
                       avatarAsset: _profile.avatarAsset,
                       avatarUrl: _profile.avatarUrl,
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute<void>(
+                      onTap: () async {
+                        final url = await Navigator.of(context).push<String?>(
+                          MaterialPageRoute(
                             builder: (_) => MyPicturePage(
                               avatarAsset: _profile.avatarAsset,
+                              avatarUrl: _profile.avatarUrl,
                             ),
                           ),
+                        );
+                        if (!mounted || url == null || url.isEmpty) return;
+                        setState(
+                          () => _profile = _profile.copyWith(avatarUrl: url),
                         );
                       },
                     ),

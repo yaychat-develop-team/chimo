@@ -111,7 +111,8 @@ class AppTipDialog extends StatelessWidget {
                     label: cancelLabel,
                     background: const Color(0xFFF0F0F0),
                     foreground: const Color(0xFF666666),
-                    onTap: () => Navigator.of(context).pop(false),
+                    onTap: () =>
+                        Navigator.of(context, rootNavigator: true).pop(false),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -120,7 +121,8 @@ class AppTipDialog extends StatelessWidget {
                     label: confirmLabel,
                     background: Colors.black,
                     foreground: Colors.white,
-                    onTap: () => Navigator.of(context).pop(true),
+                    onTap: () =>
+                        Navigator.of(context, rootNavigator: true).pop(true),
                   ),
                 ),
               ],

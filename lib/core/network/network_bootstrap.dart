@@ -150,11 +150,13 @@ abstract final class NetworkBootstrap {
     await clearSession();
   }
 
+  /// Clears local auth immediately; IM logout is best-effort with a short cap
+  /// so Settings "Log out" never feels stuck.
   static Future<void> clearSession() async {
     authToken = null;
     await AuthSession.clear();
     try {
-      await ImService.logout();
+      await ImService.logout().timeout(const Duration(seconds: 3));
     } catch (_) {}
   }
 

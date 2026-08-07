@@ -126,15 +126,23 @@ class AuthTokenPayload {
   static AuthTokenPayload? fromResponse(ApiResponse response) {
     if (!response.success) return null;
     final data = response.data;
-    final map =
-        data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+    if (data is! Map) return null;
+    var map = Map<String, dynamic>.from(data);
+
+    // Email / third-party login returns ExternalAuthRsp: { authed: AuthRsp }.
+    // SMS login returns AuthRsp fields at the top level.
+    final authed = map['authed'];
+    if (authed is Map) {
+      map = Map<String, dynamic>.from(authed);
+    }
+
     final token = '${map['token'] ?? ''}'.trim();
     if (token.isEmpty) return null;
     return AuthTokenPayload(
       token: token,
       userId: '${map['userId'] ?? map['uid'] ?? map['id'] ?? ''}',
       nickname: '${map['nickname'] ?? map['nickName'] ?? ''}',
-      avatarUrl: '${map['avatar'] ?? ''}',
+      avatarUrl: '${map['avatar'] ?? map['avatarUrl'] ?? ''}',
       emUsername: '${map['emUsername'] ?? map['emUserName'] ?? ''}',
       emPassword: '${map['emPwd'] ?? map['emPassword'] ?? ''}',
       raw: map,

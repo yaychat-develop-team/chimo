@@ -8,15 +8,18 @@ class AppSettingsTile extends StatelessWidget {
     super.key,
     required this.title,
     required this.onTap,
+    this.subtitle,
     this.showChevron = true,
   });
 
   final String title;
+  final String? subtitle;
   final VoidCallback onTap;
   final bool showChevron;
 
   @override
   Widget build(BuildContext context) {
+    final trailing = (subtitle ?? '').trim();
     return InkWell(
       onTap: onTap,
       child: Padding(
@@ -33,6 +36,22 @@ class AppSettingsTile extends StatelessWidget {
                 ),
               ),
             ),
+            if (trailing.isNotEmpty) ...[
+              Flexible(
+                child: Text(
+                  trailing,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+            ],
             if (showChevron)
               const Icon(
                 Icons.chevron_right_rounded,
