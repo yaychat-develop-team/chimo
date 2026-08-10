@@ -55,9 +55,44 @@ _load_r2_from_joyride() {
   return 1
 }
 
+_load_appstore_from_joyride() {
+  local candidates=(
+    "/Users/doufeng/Documents/work/joyride_flutter/ci/build_ipa.sh"
+    "D:/forya/joyride_flutter/ci/build_ipa.sh"
+    "${HOME}/Documents/work/joyride_flutter/ci/build_ipa.sh"
+  )
+  local src="" f
+  for f in "${candidates[@]}"; do
+    if [ -f "$f" ]; then
+      src=$f
+      break
+    fi
+  done
+  [ -z "$src" ] && return 1
+  if [ -z "${APP_STORE_API_KEY:-}" ]; then
+    APP_STORE_API_KEY=$(sed -n 's/^apiKey="\([^"]*\)".*/\1/p' "$src" | head -n 1)
+    export APP_STORE_API_KEY
+  fi
+  if [ -z "${APP_STORE_API_ISSUER:-}" ]; then
+    APP_STORE_API_ISSUER=$(sed -n 's/^apiIssuer="\([^"]*\)".*/\1/p' "$src" | head -n 1)
+    export APP_STORE_API_ISSUER
+  fi
+  if [ -n "${APP_STORE_API_KEY:-}" ] && [ -n "${APP_STORE_API_ISSUER:-}" ]; then
+    echo "Loaded App Store API ids from joyride build_ipa.sh (migration fallback)"
+    return 0
+  fi
+  return 1
+}
+
 if [ -z "${R2_ACCESS_KEY_ID:-}" ] || [ -z "${R2_SECRET_ACCESS_KEY:-}" ]; then
-  _load_r2_from_joyride || echo "No ci.env found (optional). Relying on process environment for R2/App Store keys."
+  _load_r2_from_joyride || true
+fi
+if [ -z "${APP_STORE_API_KEY:-}" ] || [ -z "${APP_STORE_API_ISSUER:-}" ]; then
+  _load_appstore_from_joyride || true
+fi
+if [ -z "${R2_ACCESS_KEY_ID:-}" ] || [ -z "${R2_SECRET_ACCESS_KEY:-}" ]; then
+  echo "No R2 credentials in env/ci.env yet (upload will fail until configured)."
 fi
 unset _f _ci_env_candidates
-unset -f _load_r2_from_joyride 2>/dev/null || true
+unset -f _load_r2_from_joyride _load_appstore_from_joyride 2>/dev/null || true
 return 0 2>/dev/null || true
