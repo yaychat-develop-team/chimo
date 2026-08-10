@@ -21,9 +21,8 @@ dependencies:
   audioplayers: ^6.4.0
   record: ^6.0.0
   webview_flutter: ^4.13.0
-  # Path-vendor EaseMob IM (same SDK as forya; Android via pub, iOS via forya_im).
-  im_flutter_sdk:
-    path: ../../forya/joyride_flutter/third_party/im_flutter_sdk-4.15.0
+  # EaseMob IM（pub.dev，避免依赖本机 forya 路径，便于 CI 打包）
+  im_flutter_sdk: 4.15.0
   package_info_plus: ^10.2.1
   device_info_plus: ^13.2.0
 

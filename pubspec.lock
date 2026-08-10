@@ -264,13 +264,6 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
-  forya_im:
-    dependency: transitive
-    description:
-      path: "../../forya/joyride_flutter/third_party/im_flutter_sdk_ios-4.15.0+2"
-      relative: true
-    source: path
-    version: "4.15.0+2"
   go_router:
     dependency: "direct main"
     description:
@@ -306,9 +299,10 @@ packages:
   im_flutter_sdk:
     dependency: "direct main"
     description:
-      path: "../../forya/joyride_flutter/third_party/im_flutter_sdk-4.15.0"
-      relative: true
-    source: path
+      name: im_flutter_sdk
+      sha256: cdc155b1bb4629daa3b675a3f8d09a79714ce89fb2f806614cb5d230e538bf50
+      url: "https://mirrors.tuna.tsinghua.edu.cn/dart-pub/"
+    source: hosted
     version: "4.15.0"
   im_flutter_sdk_android:
     dependency: transitive
@@ -326,6 +320,14 @@ packages:
       url: "https://mirrors.tuna.tsinghua.edu.cn/dart-pub/"
     source: hosted
     version: "4.15.0+2"
+  im_flutter_sdk_ios:
+    dependency: transitive
+    description:
+      name: im_flutter_sdk_ios
+      sha256: a4c3c6c6c5b30f307627324772b3f1052eef47c575a10252084cab3cfa0a28fe
+      url: "https://mirrors.tuna.tsinghua.edu.cn/dart-pub/"
+    source: hosted
+    version: "4.17.1"
   image_picker:
     dependency: "direct main"
     description:
