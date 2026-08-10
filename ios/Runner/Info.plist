@@ -26,6 +26,14 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Allow camera access to take profile photos.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Allow microphone access to send voice messages.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Allow saving profile photos to your library.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Allow photo library access to choose photos for chat and profile.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -66,13 +74,5 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>NSCameraUsageDescription</key>
-	<string>Allow camera access to take profile photos.</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>Allow microphone access to send voice messages.</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Allow photo library access to choose photos for chat and profile.</string>
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Allow saving profile photos to your library.</string>
 </dict>
 </plist>
