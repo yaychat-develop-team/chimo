@@ -1389,15 +1389,18 @@ class _GroupChatBubble extends StatelessWidget {
           )
         : const SizedBox(width: _avatar);
 
-    final imageBubble = ClipRRect(
-      borderRadius: BorderRadius.only(
-        topLeft: Radius.circular(isSelf ? 18 : 4),
-        topRight: Radius.circular(isSelf ? 4 : 18),
-        bottomLeft: const Radius.circular(18),
-        bottomRight: const Radius.circular(18),
-      ),
-      child: _OutgoingImage(path: message.imagePath!),
-    );
+    Widget imageBubble() {
+      final path = (message.imagePath ?? '').trim();
+      return ClipRRect(
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(isSelf ? 18 : 4),
+          topRight: Radius.circular(isSelf ? 4 : 18),
+          bottomLeft: const Radius.circular(18),
+          bottomRight: const Radius.circular(18),
+        ),
+        child: _OutgoingImage(path: path),
+      );
+    }
 
     final bubble = ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: _bubbleMax),
@@ -1406,11 +1409,11 @@ class _GroupChatBubble extends StatelessWidget {
             seconds: message.voiceSeconds ?? 0,
           ),
         _OutgoingKind.image => onImageTap == null
-            ? imageBubble
+            ? imageBubble()
             : GestureDetector(
                 onTap: onImageTap,
                 behavior: HitTestBehavior.opaque,
-                child: imageBubble,
+                child: imageBubble(),
               ),
         _ => Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),

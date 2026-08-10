@@ -13,4 +13,4 @@ checkout_and_pull $BRANCH
 flutter pub get
 cd ci
 chmod +x *.sh
-./build_app.sh iOS "$buildType" "$versionName" 10 enable "$ciNum" Giant $BRANCH "armeabi-v7a,arm64-v8a"
+./build_app.sh chimo iOS "$buildType" "$versionName" 10 enable "$ciNum" Giant $BRANCH "armeabi-v7a,arm64-v8a"
