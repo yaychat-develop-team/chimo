@@ -8,7 +8,7 @@ debugModel=$6
 ciNum=$7
 buildUser=$8
 buildBranch=$9
-abis=${10}
+abis=${10:-arm64-v8a}
 
 
 function currentTimeStamp(){
@@ -48,7 +48,7 @@ CHANGE_LOG=$(git shortlog --pretty=format:"- **%s** %ar" $last_commit..$lastest_
 
 apkPath="$projectPath/build/app/outputs/apk/chimo_${buildType}_${ciNum}.apk"
 if [ $buildPlatform == 'Android' ]; then
-    ./build_apk.sh $buildType $versionName $versionCode $debugModel $ciNum $abis
+    ./build_apk.sh "$buildType" "$versionName" "$versionCode" "$debugModel" "$ciNum" "$abis"
     if [ $buildType == 'store' ];then
         bundlePath="$projectPath/build/app/outputs/bundle/chimo_$versionName.aab"
         if [[ ! -f $bundlePath ]]; then
@@ -84,7 +84,7 @@ elif [ $buildPlatform == 'iOS' ]; then
     fi
 else
     errorCount=0
-    ./build_apk.sh $buildType $versionName $versionCode $debugModel $ciNum $abis
+    ./build_apk.sh "$buildType" "$versionName" "$versionCode" "$debugModel" "$ciNum" "$abis"
     if [ $buildType == 'store' ];then
         bundlePath="$projectPath/build/app/outputs/bundle/chimo_$versionName.aab"
         if [[ ! -f $bundlePath ]]; then

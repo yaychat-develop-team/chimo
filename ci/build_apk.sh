@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-buildType=$1
-versionName=$2
-versionCode=$3
-debugModel=$4
-ciNum=$5
-abis=$6
+buildType=${1:?missing buildType}
+versionName=${2:?missing versionName}
+versionCode=${3:?missing versionCode}
+debugModel=${4:-disable}
+ciNum=${5:?missing ciNum}
+# Jenkins 未传 ABIS 时，未加引号的空 $abis 会丢参；默认 arm64-v8a
+abis=${6:-arm64-v8a}
 
 projectPath=$(dirname "$PWD")
 
