@@ -1,8 +1,12 @@
 #!/bin/bash
 export LANG=en_US.UTF-8
 
-apiKey="${APP_STORE_API_KEY:?APP_STORE_API_KEY is not set}"
-apiIssuer="${APP_STORE_API_ISSUER:?APP_STORE_API_ISSUER is not set}"
+apiKey="${APP_STORE_API_KEY:-}"
+apiIssuer="${APP_STORE_API_ISSUER:-}"
+if [ -z "$apiKey" ] || [ -z "$apiIssuer" ]; then
+    echo "ERROR: APP_STORE_API_KEY / APP_STORE_API_ISSUER is not set" >&2
+    exit 1
+fi
 versionName=$1
 versionNumber=$2
 projectPath="$(dirname "$(dirname "$0")")"

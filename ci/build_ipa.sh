@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
-set -e
-source ios_uploader.sh
+set -euo pipefail
+
+# shellcheck source=load_ci_env.sh
+source "$(dirname "$0")/load_ci_env.sh"
+# shellcheck source=ios_uploader.sh
+source "$(dirname "$0")/ios_uploader.sh"
 
 buildType=$1
 versionName=$2
@@ -11,8 +15,13 @@ ciNum=$6
 
 projectPath=$(dirname "$PWD")
 
-apiKey="${APP_STORE_API_KEY:?APP_STORE_API_KEY is not set}"
-apiIssuer="${APP_STORE_API_ISSUER:?APP_STORE_API_ISSUER is not set}"
+apiKey="${APP_STORE_API_KEY:-}"
+apiIssuer="${APP_STORE_API_ISSUER:-}"
+if [ -z "$apiKey" ] || [ -z "$apiIssuer" ]; then
+    echo "ERROR: APP_STORE_API_KEY / APP_STORE_API_ISSUER is not set (needed for xcodebuild -exportArchive)." >&2
+    echo "Configure Jenkins credentials or create ci/ci.env from ci/ci.env.example." >&2
+    exit 1
+fi
 
 function buildStore() {
     cd $projectPath

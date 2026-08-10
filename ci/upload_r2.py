@@ -2,6 +2,7 @@ import os
 import json
 import datetime
 import argparse
+from pathlib import Path
 import boto3
 from botocore.client import Config
 import zipfile
@@ -11,15 +12,78 @@ import plistlib
 BUILD_DIR = "../build"
 BUILD_JSON_KEY_TEMPLATE = "test-apps/{app_name}/{platform}/builds.json"
 
-R2_BUCKET = "test-ci"             # ⚠️ 替换为你的 R2 Bucket
+def _load_dotenv_file(path: Path) -> None:
+    """把 KEY=VALUE 写入 os.environ（已存在的环境变量不覆盖）。"""
+    if not path.is_file():
+        return
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        value = value.strip().strip("'").strip('"')
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
+def _load_r2_from_joyride_script() -> None:
+    """迁移回退：从本机 joyride 仍硬编码密钥的 upload_r2.py 读取。"""
+    if os.environ.get("R2_ACCESS_KEY_ID") and os.environ.get("R2_SECRET_ACCESS_KEY"):
+        return
+    candidates = [
+        Path("/Users/doufeng/Documents/work/joyride_flutter/ci/upload_r2.py"),
+        Path(r"D:\forya\joyride_flutter\ci\upload_r2.py"),
+        Path.home() / "Documents/work/joyride_flutter/ci/upload_r2.py",
+    ]
+    for path in candidates:
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        import re
+
+        access = re.search(r'aws_access_key_id="([^"]+)"', text)
+        secret = re.search(r'aws_secret_access_key="([^"]+)"', text)
+        if access and "R2_ACCESS_KEY_ID" not in os.environ:
+            os.environ["R2_ACCESS_KEY_ID"] = access.group(1)
+        if secret and "R2_SECRET_ACCESS_KEY" not in os.environ:
+            os.environ["R2_SECRET_ACCESS_KEY"] = secret.group(1)
+        if os.environ.get("R2_ACCESS_KEY_ID") and os.environ.get("R2_SECRET_ACCESS_KEY"):
+            print(f"Loaded R2 credentials from {path} (migration fallback)")
+            return
+
+
+def _load_ci_env() -> None:
+    here = Path(__file__).resolve().parent
+    home = Path.home()
+    candidates = [
+        os.environ.get("CI_ENV_FILE", ""),
+        str(here / "ci.env"),
+        str(home / ".chimo" / "ci.env"),
+        str(home / ".jenkins" / "chimo-ci.env"),
+        "/Users/doufeng/Documents/work/joyride_flutter/ci/ci.env",
+    ]
+    for item in candidates:
+        if item:
+            _load_dotenv_file(Path(item))
+    _load_r2_from_joyride_script()
+
+
+_load_ci_env()
+
+R2_BUCKET = os.environ.get("R2_BUCKET", "test-ci")
 R2_ENDPOINT = os.environ.get(
     "R2_ENDPOINT",
     "https://ed51c713ac21656b4478d8f140ddfd99.r2.cloudflarestorage.com",
 )
-R2_ACCESS_KEY_ID = os.environ.get("R2_ACCESS_KEY_ID", "")
-R2_SECRET_ACCESS_KEY = os.environ.get("R2_SECRET_ACCESS_KEY", "")
+R2_ACCESS_KEY_ID = os.environ.get("R2_ACCESS_KEY_ID") or os.environ.get("AWS_ACCESS_KEY_ID", "")
+R2_SECRET_ACCESS_KEY = os.environ.get("R2_SECRET_ACCESS_KEY") or os.environ.get("AWS_SECRET_ACCESS_KEY", "")
 if not R2_ACCESS_KEY_ID or not R2_SECRET_ACCESS_KEY:
-    raise SystemExit("R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY must be set")
+    raise SystemExit(
+        "R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY must be set.\n"
+        "Put them in Jenkins env, or create ci/ci.env from ci/ci.env.example "
+        "(or ~/.chimo/ci.env / ~/.jenkins/chimo-ci.env)."
+    )
 
 # ================= 初始化 R2 客户端 =================
 s3 = boto3.client(

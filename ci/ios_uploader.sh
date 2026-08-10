@@ -1,14 +1,24 @@
 #!/usr/bin/env bash
 #!/usr/local/bin
 
-apiKey="${APP_STORE_API_KEY:?APP_STORE_API_KEY is not set}"
-apiIssuer="${APP_STORE_API_ISSUER:?APP_STORE_API_ISSUER is not set}"
+# 勿在 source 时强制要求密钥（Android-only / 未配 iOS 凭据时不应直接失败）
+apiKey="${APP_STORE_API_KEY:-}"
+apiIssuer="${APP_STORE_API_ISSUER:-}"
+
+require_app_store_api() {
+    if [ -z "${apiKey}" ] || [ -z "${apiIssuer}" ]; then
+        echo "ERROR: APP_STORE_API_KEY / APP_STORE_API_ISSUER is not set" >&2
+        echo "Set them in Jenkins credentials or ci/ci.env (see ci/ci.env.example)." >&2
+        return 1
+    fi
+}
 
 function upload_ipa() {
+    require_app_store_api || return 1
     local ipa_file=${1}
-    if [ ! -f $ipa ];then
-        echo -e "033[31m file $ipa_file not exists \033[0m"
-        return 
+    if [ ! -f "$ipa_file" ]; then
+        echo -e "\033[31m file $ipa_file not exists \033[0m"
+        return 1
     fi
 
     upload="xcrun altool --upload-app -f $ipa_file -t iOS --apiKey $apiKey --apiIssuer $apiIssuer --verbose"
@@ -23,12 +33,12 @@ function upload_ipa() {
 }
 
 function validate_and_upload(){
+    require_app_store_api || return 1
     local ipa_file=${1}
-    if [ ! -f $ipa ];then
-        echo -e "033[31m file $ipa_file not exists \033[0m" 
-        return 
+    if [ ! -f "$ipa_file" ]; then
+        echo -e "\033[31m file $ipa_file not exists \033[0m"
+        return 1
     fi
-
 
     validate="xcrun altool --validate-app -f $ipa_file -t iOS --apiKey $apiKey --apiIssuer $apiIssuer --verbose"
     echo "running validate cmd" $validate
