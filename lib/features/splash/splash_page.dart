@@ -7,14 +7,14 @@ import '../../app/app_router.dart';
 import '../../core/auth/auth_session.dart';
 import '../../core/constants/app_assets.dart';
 
-/// App launch screen: launch_bg (top) + bottom slogan, then login or main.
+/// 启动页：上方 launch_bg + 底部 slogan，随后进入登录或主页。
 class SplashPage extends StatefulWidget {
   const SplashPage({
     super.key,
     this.displayDuration = const Duration(milliseconds: 1800),
   });
 
-  /// Display duration (navigates when elapsed).
+  /// 展示时长（结束后跳转）。
   final Duration displayDuration;
 
   @override
@@ -52,7 +52,7 @@ class _SplashPageState extends State<SplashPage> {
       backgroundColor: const Color(0xFF0F0F0F),
       body: Column(
         children: [
-          // Logo + wordmark live in the asset; fit width so they stay upper-screen.
+          // Logo 与字标已在资源内；按宽度适配以保持在屏幕上方。
           Image.asset(
             AppAssets.launchBg,
             width: screenW,

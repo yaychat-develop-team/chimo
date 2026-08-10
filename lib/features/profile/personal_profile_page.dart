@@ -8,7 +8,7 @@ import '../me/models/me_models.dart';
 import 'edit_profile_page.dart';
 import 'widgets/user_profile_scaffold.dart';
 
-/// Own profile page: same layout as others; bottom bar is Edit Profile.
+/// 自己的资料页：布局与他人一致；底栏为编辑资料。
 class PersonalProfilePage extends StatefulWidget {
   const PersonalProfilePage({
     super.key,
@@ -81,7 +81,7 @@ class _PersonalProfilePageState extends State<PersonalProfilePage> {
         setState(() => _profile = parsed);
       }
     } catch (_) {
-      // Keep seed profile from Me page if refresh fails.
+      // 刷新失败时保留 Me 页带来的种子资料。
     } finally {
       if (mounted) setState(() => _loading = false);
     }

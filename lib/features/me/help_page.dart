@@ -8,7 +8,7 @@ import '../../core/widgets/app_settings_tile.dart';
 import 'joy_coins_help_page.dart';
 import 'levels_help_page.dart';
 
-/// Help entry: loads conf on open; FAQ bodies remain local design copy.
+/// 帮助入口：打开时加载配置；FAQ 正文仍用本地设计文案。
 class HelpPage extends StatefulWidget {
   const HelpPage({super.key});
 
@@ -34,7 +34,7 @@ class _HelpPageState extends State<HelpPage> {
         AppApis.app.settings(),
       ]);
     } catch (_) {
-      // Static FAQ still usable offline.
+      // 静态 FAQ 离线仍可用。
     } finally {
       if (mounted) setState(() => _loading = false);
     }

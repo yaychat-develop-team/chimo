@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/app_assets.dart';
 import '../data/banner_dto.dart';
 
-/// Home promo banner carousel (network images with local fallback).
+/// 首页推广横幅轮播（网络图，本地资源回退）。
 class HomeHeroBanner extends StatefulWidget {
   const HomeHeroBanner({
     super.key,
@@ -16,10 +16,10 @@ class HomeHeroBanner extends StatefulWidget {
     this.onBannerTap,
   });
 
-  /// Remote banners from `/home_page/main`.
+  /// 来自 `/home_page/main` 的远程横幅。
   final List<HomeBannerItem> banners;
 
-  /// Local assets used when API banners are empty.
+  /// API 横幅为空时使用的本地资源。
   final List<String> fallbackAssets;
 
   final bool autoPlay;

@@ -4,7 +4,7 @@ import '../models/group_item.dart';
 import 'my_group_card.dart';
 import 'section_header.dart';
 
-/// My Groups section: header + horizontal scrolling cards.
+/// 我的群组区块：标题 + 横向滚动卡片。
 class MyGroupsSection extends StatelessWidget {
   const MyGroupsSection({
     super.key,
@@ -15,10 +15,10 @@ class MyGroupsSection extends StatelessWidget {
 
   final List<MyGroupItem> groups;
 
-  /// More action tap.
+  /// 「更多」操作点击。
   final VoidCallback? onMoreTap;
 
-  /// Single group card tap.
+  /// 单个群组卡片点击。
   final ValueChanged<MyGroupItem>? onGroupTap;
 
   @override

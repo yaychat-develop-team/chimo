@@ -7,7 +7,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_page_scaffold.dart';
 import '../../core/widgets/app_settings_tile.dart';
 
-/// Privacy switches backed by GET/POST `/app/settings`.
+/// 隐私开关，由 GET/POST `/app/settings` 驱动。
 class PrivacySettingsPage extends StatefulWidget {
   const PrivacySettingsPage({super.key});
 

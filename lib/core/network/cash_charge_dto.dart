@@ -1,6 +1,6 @@
 import 'api_client.dart';
 
-/// One wallet recharge package from `/cash/charge/product` or `/cash/goods`.
+/// 来自 `/cash/charge/product` 或 `/cash/goods` 的一条钱包充值套餐。
 class CashChargeProduct {
   const CashChargeProduct({
     required this.coins,

@@ -4,7 +4,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Best-effort subset of forya `GlobalConfig.commonParam` for auth/network headers.
+/// forya `GlobalConfig.commonParam` 的尽力子集，用于认证 / 网络请求头。
 abstract final class AuthRequestHeaders {
   static const _distinctIdKey = 'te_distinct_id';
 

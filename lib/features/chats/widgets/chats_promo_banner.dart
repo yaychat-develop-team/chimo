@@ -4,8 +4,8 @@ import '../../../core/constants/app_assets.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_asset_image.dart';
 
-/// Promo banner above list (Figma 39:428 / Group 7463).
-/// Gradient pill + hand/Hi art + copy + close.
+/// 列表上方推广横幅（Figma 39:428 / Group 7463）。
+/// 渐变胶囊 + 手势/Hi 插图 + 文案 + 关闭。
 class ChatsPromoBanner extends StatelessWidget {
   const ChatsPromoBanner({
     super.key,
@@ -66,7 +66,7 @@ class ChatsPromoBanner extends StatelessWidget {
                   ),
                 ),
               ),
-              // Hand poking through (48×42).
+              // 伸出的手（48×42）。
               const Positioned(
                 left: 24,
                 top: 12,
@@ -77,7 +77,7 @@ class ChatsPromoBanner extends StatelessWidget {
                   fit: BoxFit.contain,
                 ),
               ),
-              // Hi bubble above hand.
+              // 手上方的 Hi 气泡。
               const Positioned(
                 left: 52,
                 top: 0,

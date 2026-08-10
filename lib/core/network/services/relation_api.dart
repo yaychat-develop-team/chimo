@@ -7,7 +7,7 @@ import '../app_meta_dto.dart';
 import '../blacklist_dto.dart';
 import '../network_bootstrap.dart';
 
-/// Follow / search / blacklist / visits.
+/// 关注 / 搜索 / 黑名单 / 访客。
 class RelationApi {
   const RelationApi();
 

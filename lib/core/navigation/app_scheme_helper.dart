@@ -14,17 +14,17 @@ import '../constants/app_assets.dart';
 import '../widgets/app_webview_page.dart';
 import '../widgets/center_toast.dart' show showCenterToast;
 
-/// Resolves banner / deep-link schemes (`chimo://`, `yqdf://`) and http(s) URLs.
+/// 解析 banner / 深链 scheme（`chimo://`、`yqdf://`）以及 http(s) URL。
 ///
-/// Mirrors forya [SchemeHelper] for the subset Chimo supports.
-/// Return value (same contract as forya):
-/// - `false` — not handled
-/// - `true` — handled (no JS)
-/// - `String` — JS snippet to `runJavaScript` (e.g. `get_user_info` callback)
+/// 对齐 forya [SchemeHelper] 中 Chimo 支持的子集。
+/// 返回值（与 forya 约定一致）：
+/// - `false` — 未处理
+/// - `true` — 已处理（无 JS）
+/// - `String` — 交给 `runJavaScript` 的 JS 片段（如 `get_user_info` 回调）
 abstract final class AppSchemeHelper {
   static const _schemes = {'chimo', 'yqdf'};
 
-  /// Banner / external entry: fire-and-forget navigation.
+  /// Banner / 外部入口：即发即弃导航。
   static void open(
     BuildContext context,
     String raw, {
@@ -33,7 +33,7 @@ abstract final class AppSchemeHelper {
     unawaited(handle(context, raw, chatsController: chatsController));
   }
 
-  /// WebView bridge / navigation interceptor.
+  /// WebView 桥接 / 导航拦截。
   static Future<Object?> handle(
     BuildContext context,
     String raw, {

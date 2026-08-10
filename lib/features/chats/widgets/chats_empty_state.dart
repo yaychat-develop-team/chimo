@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/app_assets.dart';
 import '../../../core/theme/app_colors.dart';
 
-/// Empty state when no conversations: illustration + prompt.
+/// 无会话时的空态：插图 + 提示文案。
 class ChatsEmptyState extends StatelessWidget {
   const ChatsEmptyState({super.key});
 

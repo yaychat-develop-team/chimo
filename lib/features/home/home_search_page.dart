@@ -17,7 +17,7 @@ import '../chats/models/chat_conversation.dart';
 
 enum _SearchRelation { self, notFollowing, following }
 
-/// User hit from home search (`/user-relation/searchUser`).
+/// 首页搜索命中的用户（`/user-relation/searchUser`）。
 class _SearchUser {
   const _SearchUser({
     required this.id,
@@ -56,7 +56,7 @@ class _SearchUser {
   }
 }
 
-/// Home search: contacts / messages, history, and user results.
+/// 首页搜索：联系人 / 消息、历史记录与用户结果。
 class HomeSearchPage extends StatefulWidget {
   const HomeSearchPage({super.key, this.chatsController});
 
@@ -78,7 +78,7 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
   Timer? _searchDebounce;
   int _searchSeq = 0;
 
-  /// Matches forya `searchHistoryKey`.
+  /// 与 forya `searchHistoryKey` 一致。
   static const _historyPrefsKey = 'searchHistoryKey';
   static final RegExp _idPattern = RegExp(r'^\d{5,}$');
 
@@ -160,8 +160,8 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
       return;
     }
 
-    // Forya: throttle search on input (~500ms). Skip toast while typing
-    // incomplete IDs; only auto-search when the ID looks complete.
+    // Forya：输入节流搜索（约 500ms）。输入不完整 ID 时不弹 toast；
+    // 仅当 ID 看起来完整时才自动搜索。
     if (!_isValidId(query)) {
       setState(() {
         _result = null;
@@ -307,7 +307,7 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
         hit = hit.copyWith(relation: _SearchRelation.self);
       }
 
-      // forya: only record history when search returns a hit.
+      // forya：仅在搜索有命中时写入历史。
       if (hit != null) {
         _addHistory(query);
       }
@@ -328,7 +328,7 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
     _searchDebounce?.cancel();
     _controller.text = item;
     _controller.selection = TextSelection.collapsed(offset: item.length);
-    // Listener schedules a debounce; cancel it and search immediately.
+    // 输入监听会安排防抖；取消后立即搜索。
     _searchDebounce?.cancel();
     unawaited(_runSearch(item, unfocus: true, showInvalidToast: true));
   }
@@ -384,7 +384,7 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
   @override
   Widget build(BuildContext context) {
     final hasText = _controller.text.isNotEmpty;
-    // After submit, show result / empty / loading; clear input returns to History.
+    // 提交后显示结果 / 空态 / 加载；清空输入回到 History。
     final showResults = _hasSearched;
 
     return Scaffold(
@@ -604,8 +604,8 @@ class _SearchEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Mirrors forya `JREmptyView(desc: 'Sorry. No relevant content.')`
-    // with `empty_no_search` illustration.
+    // 对齐 forya `JREmptyView(desc: 'Sorry. No relevant content.')`，
+    // 使用 `empty_no_search` 插图。
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),

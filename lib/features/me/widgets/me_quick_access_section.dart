@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../models/me_models.dart';
 
-/// Quick Access: title + 4-column grid, 42×42 icons.
+/// 快捷入口：标题 + 四列网格，42×42 图标。
 class MeQuickAccessSection extends StatelessWidget {
   const MeQuickAccessSection({
     super.key,

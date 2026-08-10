@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 
-/// Camera / gallery picker.
+/// 相机 / 相册选择器。
 enum PhotoPickAction { takePhoto, gallery }
 
-/// Shows Take Photo / Choose from Gallery / Cancel sheet.
+/// 展示拍照 / 从相册选择 / 取消底部弹层。
 Future<PhotoPickAction?> showPhotoPickSheet(BuildContext context) {
   return showModalBottomSheet<PhotoPickAction>(
     context: context,

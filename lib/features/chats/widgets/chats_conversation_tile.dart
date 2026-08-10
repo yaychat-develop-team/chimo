@@ -7,10 +7,10 @@ import '../../../core/widgets/app_avatar.dart';
 import '../../../core/widgets/network_or_asset_avatar.dart';
 import '../models/chat_conversation.dart';
 
-/// List row: pill card, badge, online dot, unread; swipe to pin/delete.
-/// Spec from Figma 39:428 — height 72, radius 36, avatar 54.
+/// 列表行：胶囊卡片、徽章、在线点、未读；左滑置顶/删除。
+/// 规格来自 Figma 39:428 — 高 72，圆角 36，头像 54。
 ///
-/// [openSwipeId] shared by list: only one row swipe-open at a time.
+/// [openSwipeId] 由列表共享：同一时间仅一行左滑打开。
 class ChatsConversationTile extends StatefulWidget {
   const ChatsConversationTile({
     super.key,
@@ -24,12 +24,12 @@ class ChatsConversationTile extends StatefulWidget {
 
   final ChatConversation conversation;
 
-  /// Id of swipe-open row; `null` means all closed.
+  /// 左滑打开行的 id；`null` 表示全部关闭。
   final ValueNotifier<String?> openSwipeId;
 
   final VoidCallback? onTap;
 
-  /// Avatar tap (DM → profile; mutually exclusive with [onTap]).
+  /// 头像点击（私聊 → 资料；与 [onTap] 互斥）。
   final VoidCallback? onAvatarTap;
   final VoidCallback? onPin;
   final VoidCallback? onDelete;
@@ -39,10 +39,10 @@ class ChatsConversationTile extends StatefulWidget {
 }
 
 class _ChatsConversationTileState extends State<ChatsConversationTile> {
-  /// Swipe offset exposing actions (negative = left).
+  /// 露出操作区的滑动偏移（负值 = 向左）。
   double _dragOffset = 0;
 
-  /// Action strip width (two 36 buttons + gaps; Figma ~52px exposed).
+  /// 操作条宽度（两个 36 按钮 + 间距；Figma 约露出 52px）。
   static const double _actionsWidth = 100;
 
   String get _id => widget.conversation.id;
@@ -68,7 +68,7 @@ class _ChatsConversationTileState extends State<ChatsConversationTile> {
     super.dispose();
   }
 
-  /// Collapse this row when another starts swiping.
+  /// 另一行开始滑动时收起本行。
   void _onOpenSwipeChanged() {
     final openId = widget.openSwipeId.value;
     if (openId != _id && _dragOffset != 0) {
@@ -112,7 +112,7 @@ class _ChatsConversationTileState extends State<ChatsConversationTile> {
 
   bool get _useBrandTitle {
     final c = widget.conversation;
-    // Solid titleColor wins; verified badge without color uses brand gradient.
+    // 实色 titleColor 优先；无颜色的认证徽章用品牌渐变。
     if (c.titleColor != null) return false;
     return c.badge == ChatBadgeType.verified;
   }
@@ -137,7 +137,7 @@ class _ChatsConversationTileState extends State<ChatsConversationTile> {
                       asset: conversation.isPinned
                           ? AppAssets.msgUnpin
                           : AppAssets.msgPin,
-                      // Pin SVG already includes the 36 circle; unpin.webp needs a fill.
+                      // 置顶 SVG 已含 36 圆；unpin.webp 需要额外填充。
                       wrapInCircle: conversation.isPinned,
                       onTap: () {
                         _close();
@@ -174,8 +174,8 @@ class _ChatsConversationTileState extends State<ChatsConversationTile> {
                   }
                 },
                 child: Material(
-                  // Opaque surface under the 8% white fill so swipe actions
-                  // stay hidden until the row is dragged open.
+                  // 8% 白色填充下的不透明底，使左滑操作
+                  // 在行被拖开前保持隐藏。
                   color: AppColors.surface,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(36),
@@ -282,7 +282,7 @@ class _ChatsConversationTileState extends State<ChatsConversationTile> {
   }
 }
 
-/// Title: solid white / brand gradient for official accounts.
+/// 标题：纯白 / 官方账号品牌渐变。
 class _TitleText extends StatelessWidget {
   const _TitleText({
     required this.text,
@@ -325,7 +325,7 @@ class _TitleText extends StatelessWidget {
   }
 }
 
-/// Avatar: circle for DM, rounded square for group; online dot bottom-right.
+/// 头像：私聊圆形、群组圆角方；右下在线点。
 class _Avatar extends StatelessWidget {
   const _Avatar({
     required this.asset,
@@ -386,7 +386,7 @@ class _Avatar extends StatelessWidget {
   }
 }
 
-/// Title badge: verified / Group / Soulmate.
+/// 标题徽章：认证 / Group / Soulmate。
 class _TitleBadge extends StatelessWidget {
   const _TitleBadge({required this.type});
 
@@ -416,7 +416,7 @@ class _TitleBadge extends StatelessWidget {
   }
 }
 
-/// Red unread count badge (Figma: h16, r8, #FD4B4B, 11 SemiBold).
+/// 红色未读数角标（Figma：h16，r8，#FD4B4B，11 SemiBold）。
 class _UnreadBadge extends StatelessWidget {
   const _UnreadBadge({required this.count});
 
@@ -446,7 +446,7 @@ class _UnreadBadge extends StatelessWidget {
   }
 }
 
-/// Swipe action circle: prefer design asset (built-in circle).
+/// 左滑操作圆：优先设计资源（自带圆形）。
 class _ActionCircle extends StatelessWidget {
   const _ActionCircle({
     this.color,

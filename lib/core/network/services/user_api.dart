@@ -6,7 +6,7 @@ import '../api_result.dart';
 import '../app_meta_dto.dart';
 import '../network_bootstrap.dart';
 
-/// Current user / profile endpoints.
+/// 当前用户 / 资料相关接口。
 class UserApi {
   const UserApi();
 
@@ -46,7 +46,7 @@ class UserApi {
     );
   }
 
-  /// Soft profile fetch — `ok` with null data when envelope succeeds but body empty.
+  /// 软拉取资料——信封成功但 body 为空时返回 `ok` 且 data 为 null。
   Future<ApiResult<MeProfile?>> profileOrNull() {
     return ApiGateway.request(
       () => NetworkBootstrap.api.userInfo(),

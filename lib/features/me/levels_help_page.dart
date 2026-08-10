@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_page_scaffold.dart';
 
-/// Levels FAQ.
+/// 等级常见问题。
 class LevelsHelpPage extends StatelessWidget {
   const LevelsHelpPage({super.key});
 

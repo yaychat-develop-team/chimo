@@ -3,7 +3,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/utils/zodiac.dart';
 import '../../../shared/models/friend_user.dart';
 
-/// Maps `/user-relation/search-*` JSON into [FriendUser].
+/// 将 `/user-relation/search-*` JSON 映射为 [FriendUser]。
 abstract final class FriendDto {
   static List<FriendUser> parseList(
     ApiResponse response, {
@@ -62,7 +62,7 @@ abstract final class FriendDto {
     );
   }
 
-  /// Merge friends / following / fans lists into one graph with correct relations.
+  /// 合并好友 / 关注 / 粉丝列表为带正确关系的一张图。
   static List<FriendUser> mergeGraphs({
     required List<FriendUser> friends,
     required List<FriendUser> following,

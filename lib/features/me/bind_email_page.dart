@@ -16,7 +16,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_primary_button.dart';
 import '../../core/widgets/center_toast.dart';
 
-/// Email page: shared Welcome Back flow for login and binding.
+/// 邮箱页：登录与绑定共用的 Welcome Back 流程。
 class BindEmailPage extends StatefulWidget {
   const BindEmailPage({
     super.key,
@@ -26,7 +26,7 @@ class BindEmailPage extends StatefulWidget {
 
   final String initialEmail;
 
-  /// `true`: login flow, go to main after verify; `false`: bind then pop.
+  /// `true`：登录流程，验证后进入主页；`false`：绑定后 pop。
   final bool forLogin;
 
   @override
@@ -35,14 +35,14 @@ class BindEmailPage extends StatefulWidget {
 
 class _BindEmailPageState extends State<BindEmailPage> {
   static const Color _green = Color(0xFF1CFF8A);
-  // Keep validation permissive: some IMEs / copy-paste strings may include
-  // subtle characters; we only need "looks like an email" to enable the CTA.
+  // 校验保持宽松：部分输入法 / 粘贴内容可能含隐蔽字符；
+  // 只需「看起来像邮箱」即可启用 CTA。
   static final RegExp _emailRegExp = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
   late final TextEditingController _emailController;
   bool _sending = false;
 
-  // Normalize: strip hidden whitespace (copy/paste / IME can inject).
+  // 规范化：去除隐藏空白（粘贴 / 输入法可能注入）。
   String get _email =>
       _emailController.text.replaceAll(RegExp(r'\s+'), '').trim();
 
@@ -75,7 +75,7 @@ class _BindEmailPageState extends State<BindEmailPage> {
     if (!_isValidEmail || _sending) return;
     setState(() => _sending = true);
     try {
-      // Match forya: just cache email and navigate; code page will request OTP.
+      // 对齐 forya：仅缓存邮箱并跳转；验证码页再请求 OTP。
       await AuthSession.rememberEmail(_email);
       if (!mounted) return;
       final bound = await Navigator.of(context).push<bool>(
@@ -223,7 +223,7 @@ class _BindEmailCodePage extends StatefulWidget {
   final String email;
   final bool forLogin;
 
-  /// When true, request `/auth/send-email-code` on open (forya EmailLoginCodePage).
+  /// 为 true 时，打开即请求 `/auth/send-email-code`（forya EmailLoginCodePage）。
   final bool sendOnOpen;
 
   @override
@@ -252,7 +252,7 @@ class _BindEmailCodePageState extends State<_BindEmailCodePage> {
     super.initState();
     _controller.addListener(() => setState(() {}));
     if (widget.sendOnOpen) {
-      // Start countdown only after a successful send (or keep prior timer UX).
+      // 仅在发送成功后开始倒计时（或沿用先前倒计时 UX）。
       WidgetsBinding.instance.addPostFrameCallback((_) {
         unawaited(_sendCode(initial: true));
       });
@@ -304,7 +304,7 @@ class _BindEmailCodePageState extends State<_BindEmailCodePage> {
           ),
         );
         if (initial) {
-          // Allow immediate retry when first send fails.
+          // 首次发送失败时允许立即重试。
           setState(() => _resendLeft = 0);
         }
         return;
@@ -367,7 +367,7 @@ class _BindEmailCodePageState extends State<_BindEmailCodePage> {
 
         await NetworkBootstrap.applySessionToken(token);
 
-        // Match forya LoginManager: refresh token once after emailAuth.
+        // 对齐 forya LoginManager：emailAuth 后刷新一次 token。
         final refresh = await NetworkBootstrap.api.refreshToken();
         if (refresh.success && refresh.data is Map) {
           final next = '${(refresh.data as Map)['token'] ?? ''}'.trim();
@@ -397,7 +397,7 @@ class _BindEmailCodePageState extends State<_BindEmailCodePage> {
         return;
       }
 
-      // Phone-login bind flow (forya EmailLoginCodePage isBind=true).
+      // 手机登录后的绑定流程（forya EmailLoginCodePage isBind=true）。
       final res = await AppApis.auth.bindEmail(
         email: widget.email,
         code: code,
@@ -417,10 +417,10 @@ class _BindEmailCodePageState extends State<_BindEmailCodePage> {
         return;
       }
 
-      // Persist email locally, then let Me page refresh user/info (hides Bind Email).
+      // 本地持久化邮箱，随后由 Me 页刷新 user/info（隐藏 Bind Email）。
       await AuthSession.markLoggedIn(email: widget.email);
       if (!mounted) return;
-      // Forya: pop code page + email page; Me reloads profile on result.
+      // Forya：pop 验证码页 + 邮箱页；Me 根据结果重新加载资料。
       Navigator.of(context).pop(true);
       return;
     } catch (error) {

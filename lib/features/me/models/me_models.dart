@@ -1,6 +1,6 @@
 import '../../../core/constants/app_assets.dart';
 
-/// Me page user profile model.
+/// 「我的」页用户资料模型。
 class MeProfile {
   const MeProfile({
     required this.displayName,
@@ -29,7 +29,7 @@ class MeProfile {
     this.momentUrls = const [],
   });
 
-  /// Empty shell before `/user/info` returns.
+  /// `/user/info` 返回前的空壳。
   static const MeProfile empty = MeProfile(
     displayName: '',
     userId: '',
@@ -40,31 +40,31 @@ class MeProfile {
     visitors: 0,
   );
 
-  /// Display nickname.
+  /// 展示昵称。
   final String displayName;
 
-  /// User ID (for copy).
+  /// 用户 ID（用于复制）。
   final String userId;
 
-  /// Bound login email; empty when not bound.
+  /// 已绑定登录邮箱；未绑定时为空。
   final String email;
 
-  /// Local avatar asset path (fallback).
+  /// 本地头像资源路径（回退）。
   final String avatarAsset;
 
-  /// Remote avatar URL from API when available.
+  /// 接口返回的远程头像 URL（若有）。
   final String? avatarUrl;
 
-  /// Friend count.
+  /// 好友数。
   final int friends;
 
-  /// Fan count.
+  /// 粉丝数。
   final int fans;
 
-  /// Following count.
+  /// 关注数。
   final int follows;
 
-  /// Visitor count.
+  /// 访客数。
   final int visitors;
 
   final String gender;
@@ -74,25 +74,25 @@ class MeProfile {
   final String signature;
   final List<String> tags;
   final int? voiceSeconds;
-  /// Remote CDN URL (or pending local path before save).
+  /// 远程 CDN URL（或保存前的待定本地路径）。
   final String? voiceUrl;
 
-  /// Server Level badge (`icons.smallIcon`); empty → hide like forya UserLevWidget.
+  /// 服务端等级徽章（`icons.smallIcon`）；空 → 像 forya UserLevWidget 一样隐藏。
   final String? vipIconUrl;
   final bool nicknameChangedOnce;
-  /// Platform wealth level (`vipLevel` in API). Starts at 0 — not paid noble.
+  /// 平台财富等级（API 中的 `vipLevel`）。从 0 起——不是付费贵族。
   final int vipLevel;
-  /// Next-level total XP requirement (forya `experience`).
+  /// 下一级所需总经验（forya `experience`）。
   final int experience;
-  /// XP still needed for next level (forya `moreExpForNextLevel`).
+  /// 距下一级还需的经验（forya `moreExpForNextLevel`）。
   final int moreExpForNextLevel;
-  /// Lifetime XP when at max level (forya `totalExperience`).
+  /// 满级时的终身经验（forya `totalExperience`）。
   final int totalExperience;
   final List<String> momentUrls;
 
   bool get isMale => gender == 'Male';
 
-  /// Forya `User.levelIndex` — picks card/badge color tier.
+  /// Forya `User.levelIndex` — 选择卡片/徽章色阶。
   int get levelIndex {
     if (vipLevel <= 5) return 0;
     if (vipLevel <= 10) return 1;
@@ -104,7 +104,7 @@ class MeProfile {
 
   bool get isMaxLevel => vipLevel >= 60;
 
-  /// Points shown under the progress label (forya `experienceText` numerator).
+  /// 进度文案下方展示的点数（forya `experienceText` 分子）。
   int get displayedExperience {
     if (isMaxLevel) return totalExperience;
     final v = experience - moreExpForNextLevel;
@@ -169,7 +169,7 @@ class MeProfile {
   }
 }
 
-/// Quick access menu item.
+/// 快捷入口菜单项。
 class QuickAccessItem {
   const QuickAccessItem({
     required this.id,
@@ -180,11 +180,11 @@ class QuickAccessItem {
   final String id;
   final String label;
 
-  /// Icon asset path (webp).
+  /// 图标资源路径（webp）。
   final String iconAsset;
 }
 
-/// Stats row item (Friends / Fans, etc.).
+/// 统计行项（好友 / 粉丝等）。
 class MeStatItem {
   const MeStatItem({required this.label, required this.value});
 

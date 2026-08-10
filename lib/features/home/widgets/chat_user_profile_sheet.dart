@@ -13,7 +13,7 @@ import '../../chats/widgets/gift_bottom_sheet.dart';
 import '../../report/report_page.dart';
 import '../models/chat_user_profile.dart';
 
-/// Bottom profile sheet when tapping a peer avatar in group chat.
+/// 群聊中点击对方头像时的底部资料弹层。
 class ChatUserProfileSheet extends StatefulWidget {
   const ChatUserProfileSheet({
     super.key,

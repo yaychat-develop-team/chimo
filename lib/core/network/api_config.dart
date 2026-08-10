@@ -1,14 +1,14 @@
-/// Backend environment used by [ApiClient].
+/// [ApiClient] 使用的后端环境。
 enum ApiEnvironment {
   production,
   test,
   local,
 }
 
-/// API host configuration for Chimo backends.
+/// Chimo 后端 API 主机配置。
 ///
-/// Persistence lives in [ApiConfigStore] (Flutter prefs) so this file stays
-/// usable from plain `dart run` tools.
+/// 持久化放在 [ApiConfigStore]（Flutter prefs），本文件保持
+/// 可被普通 `dart run` 工具使用。
 abstract final class ApiConfig {
   static const String productionBaseUrl = 'https://api.echimo.com/api/v1';
   static const String testBaseUrl = 'https://test-api.echimo.com/api/v1';
@@ -24,7 +24,7 @@ abstract final class ApiConfig {
         ApiEnvironment.local => localBaseUrl,
       };
 
-  /// In-memory switch (tests / CLI / before prefs are ready).
+  /// 内存中切换环境（测试 / CLI / prefs 尚未就绪时）。
   static void useEnvironment(ApiEnvironment env) {
     _environment = env;
   }

@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:photo_manager/photo_manager.dart';
 
-/// Full-screen swipe preview of album selections with basic photo info.
+/// 相册所选照片的全屏滑动预览，含基础照片信息。
 class AlbumSelectionPreviewPage extends StatefulWidget {
   const AlbumSelectionPreviewPage({
     super.key,
@@ -69,7 +69,7 @@ class _AlbumSelectionPreviewPageState extends State<AlbumSelectionPreviewPage> {
 
   String _formatDate(DateTime? dt) {
     if (dt == null) return '';
-    // Epoch default from photo_manager when date is missing.
+    // 缺少日期时 photo_manager 的 Epoch 默认值。
     if (dt.millisecondsSinceEpoch <= 0) return '';
     final y = dt.year.toString().padLeft(4, '0');
     final m = dt.month.toString().padLeft(2, '0');

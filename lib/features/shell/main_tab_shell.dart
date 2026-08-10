@@ -10,7 +10,7 @@ import 'models/app_bottom_nav_destination.dart';
 import 'models/main_tab.dart';
 import 'widgets/app_bottom_nav_bar.dart';
 
-/// Main shell: hosts three tab pages with the bottom nav bar.
+/// 主壳层：承载三个 Tab 页面与底部导航栏。
 class MainTabShell extends StatefulWidget {
   const MainTabShell({super.key});
 
@@ -36,7 +36,7 @@ class _MainTabShellState extends State<MainTabShell> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      // IndexedStack keeps tabs alive so state (e.g. joined groups) survives tab switches.
+      // IndexedStack 保活各 Tab，状态（如已加入群组）在切换后仍保留。
       body: IndexedStack(
         index: _currentTab.index,
         children: [

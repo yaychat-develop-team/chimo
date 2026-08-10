@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_assets.dart';
 
-/// Home app bar: Chimo logo left (~91×28), search right (36×36).
+/// 首页应用栏：左侧 Chimo Logo（约 91×28），右侧搜索（36×36）。
 class HomeAppBar extends StatelessWidget {
   const HomeAppBar({super.key, this.onSearchTap});
 
-  /// Search button tap callback.
+  /// 搜索按钮点击回调。
   final VoidCallback? onSearchTap;
 
   static const double logoHeight = 28;

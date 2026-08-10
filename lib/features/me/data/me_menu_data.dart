@@ -1,7 +1,7 @@
 import '../../../core/constants/app_assets.dart';
 import '../models/me_models.dart';
 
-/// Me page Quick Access menu (static UI config, not user data).
+/// Me 页快捷入口菜单（静态 UI 配置，非用户数据）。
 abstract final class MeMenuData {
   static const List<QuickAccessItem> quickAccess = [
     QuickAccessItem(

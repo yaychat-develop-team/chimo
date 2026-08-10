@@ -6,7 +6,7 @@ import '../theme/app_colors.dart';
 
 enum AppNavBackIcon { chatBack, backArrow }
 
-/// Standard secondary-page nav: height 48, back + centered title + optional trailing.
+/// 标准二级页导航：高度 48，返回 + 居中标题 + 可选尾部。
 class AppNavBar extends StatelessWidget {
   const AppNavBar({
     super.key,

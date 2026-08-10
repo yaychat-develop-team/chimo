@@ -29,7 +29,7 @@ cp $projectPath/build/app/outputs/bundle/banban_localeRelease/app-banban_locale-
 
 sleep 2
 
-# build ios
+# 构建 iOS
 cd $projectPath/ci
 ./build_ipa_223.sh "store" "$versionName" 1 "disable" "Bug fixes and optimizations." 1
 sleep 2

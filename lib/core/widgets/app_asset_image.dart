@@ -3,9 +3,9 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../constants/app_assets.dart';
 
-/// Unified local asset image: picks [Image.asset] or [SvgPicture.asset] by extension.
+/// 统一本地资源图片：按扩展名选择 [Image.asset] 或 [SvgPicture.asset]。
 ///
-/// Prefer [AppAssets] constants; do not hardcode `assets/images/...`.
+/// 优先使用 [AppAssets] 常量，勿硬编码 `assets/images/...`。
 class AppAssetImage extends StatelessWidget {
   const AppAssetImage(
     this.asset, {

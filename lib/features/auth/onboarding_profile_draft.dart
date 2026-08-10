@@ -1,4 +1,4 @@
-/// Holds gender + birthday between profile-setup and almost-in screens.
+/// 在资料完善页与 almost-in 页之间暂存性别 + 生日。
 abstract final class OnboardingProfileDraft {
   static String gender = '';
   static String birthday = '';

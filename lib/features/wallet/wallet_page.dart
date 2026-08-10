@@ -9,7 +9,7 @@ import '../../core/widgets/app_nav_bar.dart';
 import '../../core/widgets/app_primary_button.dart';
 import '../../core/widgets/app_top_loading_bar.dart';
 
-/// My wallet: balance + recharge packages from cash APIs.
+/// 我的钱包：余额 + 来自 cash 接口的充值套餐。
 class WalletPage extends StatefulWidget {
   const WalletPage({super.key});
 

@@ -14,7 +14,7 @@ import '../../core/network/app_apis.dart';
 import '../../core/network/network_bootstrap.dart';
 import '../../core/theme/app_colors.dart';
 
-/// Phone verification code page (white background design).
+/// 手机验证码页（白底设计）。
 class VerificationCodePage extends StatefulWidget {
   const VerificationCodePage({super.key, required this.phone});
 
@@ -108,7 +108,7 @@ class _VerificationCodePageState extends State<VerificationCodePage> {
       );
       await NetworkBootstrap.applySessionToken(token);
 
-      // Match forya LoginManager: refresh token once after smsAuth.
+      // 对齐 forya LoginManager：smsAuth 后刷新一次 token。
       final refresh = await NetworkBootstrap.api.refreshToken();
       if (refresh.success && refresh.data is Map) {
         final next = '${(refresh.data as Map)['token'] ?? ''}'.trim();
@@ -130,7 +130,7 @@ class _VerificationCodePageState extends State<VerificationCodePage> {
 
       unawaited(NetworkBootstrap.connectImAfterLogin());
 
-      // Only skip onboarding when nickname + gender are already set.
+      // 仅当昵称 + 性别已设置时跳过引导。
       final goHome = await AuthOnboardingGate.shouldEnterHome(map);
       if (!mounted) return;
       context.go(goHome ? AppRoutes.shell : AppRoutes.profileSetup);

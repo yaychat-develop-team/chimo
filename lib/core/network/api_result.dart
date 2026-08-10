@@ -1,4 +1,4 @@
-/// Typed result for business API calls (after envelope + DTO mapping).
+/// 业务 API 调用的类型化结果（信封解析 + DTO 映射之后）。
 class ApiResult<T> {
   const ApiResult._({
     required this.ok,

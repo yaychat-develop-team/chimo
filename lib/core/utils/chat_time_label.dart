@@ -1,6 +1,6 @@
-/// Conversation-list / message time labels (forya TimeAgo.timeForMsg style).
+/// 会话列表 / 消息时间文案（forya TimeAgo.timeForMsg 风格）。
 abstract final class ChatTimeLabel {
-  /// List row time from message server time (ms). Empty if [ms] ≤ 0.
+  /// 列表行时间，取消息服务端时间（毫秒）。[ms] ≤ 0 时返回空串。
   static String forList(int ms) {
     if (ms <= 0) return '';
     final now = DateTime.now();
@@ -19,7 +19,7 @@ abstract final class ChatTimeLabel {
     return _clock(time);
   }
 
-  /// Fresh local send / receive.
+  /// 本地刚发送 / 刚接收。
   static String get justNow => forList(DateTime.now().millisecondsSinceEpoch);
 
   static String _clock(DateTime dt) {

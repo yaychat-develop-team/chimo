@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-/// Shared Tip confirm dialog: white rounded card, Cancel / Confirm.
+/// 共用 Tip 确认弹窗：白色圆角卡片，Cancel / Confirm。
 ///
-/// Use [show] for one-off copy, or the named presets for common flows.
+/// 一次性文案用 [show]，常见流程用具名预设。
 class AppTipDialog extends StatelessWidget {
   const AppTipDialog({
     super.key,
@@ -17,7 +17,7 @@ class AppTipDialog extends StatelessWidget {
   final String cancelLabel;
   final String confirmLabel;
 
-  /// Shows the confirm dialog; returns `true` if the user taps Confirm.
+  /// 显示确认弹窗；用户点 Confirm 时返回 `true`。
   static Future<bool> show(
     BuildContext context, {
     required String message,
@@ -38,7 +38,7 @@ class AppTipDialog extends StatelessWidget {
     return result ?? false;
   }
 
-  /// Chats list: swipe-delete conversation.
+  /// 会话列表：滑动删除会话。
   static Future<bool> confirmDeleteConversation(BuildContext context) {
     return show(
       context,
@@ -46,7 +46,7 @@ class AppTipDialog extends StatelessWidget {
     );
   }
 
-  /// DM / profile: block user.
+  /// 私聊 / 资料：拉黑用户。
   static Future<bool> confirmBlockUser(BuildContext context) {
     return show(
       context,
@@ -56,7 +56,7 @@ class AppTipDialog extends StatelessWidget {
     );
   }
 
-  /// Group details: leave group.
+  /// 群详情：退出群组。
   static Future<bool> confirmLeaveGroup(BuildContext context) {
     return show(
       context,

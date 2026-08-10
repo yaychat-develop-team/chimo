@@ -10,10 +10,9 @@ import '../../core/network/media_upload.dart';
 import '../../core/widgets/app_page_scaffold.dart';
 import 'photo_pick_sheet.dart';
 
-/// Full-size avatar preview / replace page.
+/// 全尺寸头像预览 / 更换页。
 ///
-/// Pops with the new remote [avatarUrl] when the avatar was changed; otherwise
-/// pops `null`.
+/// 头像已更换时 pop 新的远程 [avatarUrl]；否则 pop `null`。
 class MyPicturePage extends StatefulWidget {
   const MyPicturePage({
     super.key,

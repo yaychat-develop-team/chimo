@@ -1,6 +1,6 @@
 import '../../../core/network/api_client.dart';
 
-/// One gift SKU from `/cash/item`.
+/// `/cash/item` 中的单个礼物 SKU。
 class CashGiftItem {
   const CashGiftItem({
     required this.id,
@@ -19,7 +19,7 @@ class CashGiftItem {
   final String tabName;
 }
 
-/// Parse gift catalog + wallet balance.
+/// 解析礼物目录 + 钱包余额。
 abstract final class CashGiftDto {
   static int parseBalance(ApiResponse response) {
     if (!response.success) return 0;
@@ -46,7 +46,7 @@ abstract final class CashGiftDto {
     if (data is! Map) return const [];
     final tabs = data['itemTab'] ?? data['tabs'] ?? data['list'];
     if (tabs is! List) {
-      // Flat list fallback.
+      // 扁平列表回退。
       final flat = data['item'] ?? data['items'];
       if (flat is List) return _parseItemList(flat, tabName: '');
       return const [];

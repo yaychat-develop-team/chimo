@@ -1,6 +1,6 @@
 import 'api_client.dart';
 
-/// User on the blacklist (`/user-relation/get-black-list`).
+/// 黑名单用户（`/user-relation/get-black-list`）。
 class BlacklistUser {
   const BlacklistUser({
     required this.id,

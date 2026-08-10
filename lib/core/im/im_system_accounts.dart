@@ -1,6 +1,6 @@
 import '../../core/constants/app_assets.dart';
 
-/// EaseMob system / official conversation ids (match forya CusTomMessage).
+/// EaseMob 系统 / 官方会话 id（与 forya CusTomMessage 一致）。
 abstract final class ImSystemAccounts {
   static const String official = 'man-official-account';
   static const String officialCmd = 'officical-account-cmd-push';
@@ -30,9 +30,9 @@ abstract final class ImSystemAccounts {
     };
   }
 
-  /// Local avatar asset for system rows.
+  /// 系统会话行的本地头像资源。
   static String avatarAsset(String conversationId) {
-    // Dedicated icons not vendored yet; reuse system icon.
+    // 专用图标尚未纳入资源包，暂复用系统图标。
     return AppAssets.sysIcon;
   }
 

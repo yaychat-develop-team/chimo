@@ -2,7 +2,7 @@ import 'api_client.dart';
 import 'api_result.dart';
 import 'network_bootstrap.dart';
 
-/// Unified request path: session retry → map → optional not-login clear.
+/// 统一请求路径：会话重试 → 映射 → 可选的未登录清理。
 abstract final class ApiGateway {
   static Future<ApiResult<T>> request<T>(
     Future<ApiResponse> Function() call, {
@@ -23,7 +23,7 @@ abstract final class ApiGateway {
     }
   }
 
-  /// Success with no mapped payload (mutations / fire-and-forget confirms).
+  /// 成功且无映射载荷（变更操作 / 发后即忘的确认）。
   static Future<ApiResult<void>> action(
     Future<ApiResponse> Function() call, {
     bool clearSessionOnNotLogin = true,

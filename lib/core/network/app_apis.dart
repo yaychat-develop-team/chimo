@@ -19,9 +19,9 @@ export 'services/group_api.dart';
 export 'services/relation_api.dart';
 export 'services/user_api.dart';
 
-/// Static facade for typed domain API services.
+/// 各领域类型化 API 服务的静态门面。
 ///
-/// Prefer `AppApis.user.profile()` over `NetworkBootstrap.api.userInfo()`.
+/// 优先使用 `AppApis.user.profile()`，而非 `NetworkBootstrap.api.userInfo()`。
 abstract final class AppApis {
   static const auth = AuthApi();
   static const user = UserApi();

@@ -12,7 +12,7 @@ import '../../../core/widgets/center_toast.dart';
 import '../../../core/widgets/network_or_asset_avatar.dart';
 import '../album_photo_viewer_page.dart';
 
-/// Flavor tag (emoji + label).
+/// Flavor 标签（emoji + 文案）。
 class ProfileFlavorTag {
   const ProfileFlavorTag({required this.label, this.emoji = ''});
 
@@ -39,7 +39,7 @@ String _zodiacEmoji(String zodiac) {
   return '✨';
 }
 
-/// Shared shell for own / other profiles: background, info, Moments, Flavor; caller supplies bottom bar.
+/// 自己 / 他人资料共用外壳：背景、信息、Moments、Flavor；底部栏由调用方提供。
 class UserProfileScaffold extends StatelessWidget {
   const UserProfileScaffold({
     super.key,
@@ -74,21 +74,21 @@ class UserProfileScaffold extends StatelessWidget {
   final String zodiac;
   final String bio;
 
-  /// Matches Edit Profile Voice Note; hides player when no recording.
+  /// 与编辑资料 Voice Note 一致；无录音时隐藏播放器。
   final int? voiceSeconds;
 
-  /// Remote URL or local path for real playback.
+  /// 真实播放用的远程 URL 或本地路径。
   final String? voiceUrl;
 
-  /// Level badge from server (`icons.smallIcon`); empty → hide (forya UserLevWidget).
+  /// 服务端等级徽章（`icons.smallIcon`）；空 → 隐藏（forya UserLevWidget）。
   final String? vipIconUrl;
   final List<String> momentAssets;
   final List<String> momentUrls;
 
-  /// `null` → show default mock tags; empty → hide tags section.
+  /// `null` → 显示默认 mock 标签；空 → 隐藏标签区。
   final List<ProfileFlavorTag>? flavors;
 
-  /// When non-null, shows the “In Party: …” pill next to the avatar.
+  /// 非 null 时在头像旁显示 “In Party: …” 胶囊。
   final String? inPartyName;
   final bool showMore;
   final VoidCallback? onBack;
@@ -109,13 +109,13 @@ class UserProfileScaffold extends StatelessWidget {
     final remoteMoments = momentUrls.where((u) => u.trim().isNotEmpty).toList();
     final localMoments = momentAssets.where((u) => u.trim().isNotEmpty).toList();
     final hasRemoteMoments = remoteMoments.isNotEmpty;
-    // Match Edit Profile album cap (9); previously hard-capped at 4.
+    // 对齐编辑资料相册上限（9）；此前硬限制为 4。
     final moments = hasRemoteMoments
         ? remoteMoments.take(9).toList()
         : localMoments.take(9).toList();
     final flavorTags = flavors ?? const <ProfileFlavorTag>[];
 
-    // Design: avatar top at y=289; status 44 + button area ~48 → spacer below top bar.
+    // 设计：头像顶在 y=289；状态栏 44 + 按钮区约 48 → 顶栏下方 spacer。
     final avatarTop = 289.0 - topPadding - 48;
 
     return Scaffold(
@@ -190,7 +190,7 @@ class UserProfileScaffold extends StatelessWidget {
                 ),
                 Expanded(
                   child: SingleChildScrollView(
-                    // Original om_personal: start-only padding so voice can sit flush right.
+                    // 原 om_personal：仅 start 侧 padding，使语音条可贴右边缘。
                     padding: EdgeInsets.fromLTRB(
                       16,
                       math.max(8, avatarTop),
@@ -483,7 +483,7 @@ class UserProfileScaffold extends StatelessWidget {
   }
 }
 
-/// Primary solid bottom-bar button (Edit Profile / Follow / Chat).
+/// 底部栏实心主按钮（编辑资料 / 关注 / 聊天）。
 class ProfilePrimaryAction extends StatelessWidget {
   const ProfilePrimaryAction({
     super.key,
@@ -518,7 +518,7 @@ class ProfilePrimaryAction extends StatelessWidget {
   }
 }
 
-/// Outlined bottom-bar button.
+/// 底部栏描边按钮。
 class ProfileOutlineAction extends StatelessWidget {
   const ProfileOutlineAction({
     super.key,
@@ -554,7 +554,7 @@ class ProfileOutlineAction extends StatelessWidget {
   }
 }
 
-/// Circular gift button.
+/// 圆形礼物按钮。
 class ProfileGiftAction extends StatelessWidget {
   const ProfileGiftAction({super.key, required this.onTap});
 
@@ -682,7 +682,7 @@ class _ProfileChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Avoid Container.alignment inside Wrap — it expands to full row width.
+    // 避免在 Wrap 内用 Container.alignment — 会撑满整行宽度。
     return DecoratedBox(
       decoration: BoxDecoration(
         color: background,
@@ -703,7 +703,7 @@ class _ProfileChip extends StatelessWidget {
   }
 }
 
-/// Forya [UserLevWidget]: remote `icons.smallIcon`, height 22.
+/// Forya [UserLevWidget]：远程 `icons.smallIcon`，高度 22。
 class _VipLevelIcon extends StatelessWidget {
   const _VipLevelIcon({required this.url});
 
@@ -723,7 +723,7 @@ class _VipLevelIcon extends StatelessWidget {
   }
 }
 
-/// Profile voice bar: static [AppAssets.voiceWaveLine]; animated webp while playing.
+/// 资料语音条：静态 [AppAssets.voiceWaveLine]；播放时用动态 webp。
 class _VoiceCard extends StatefulWidget {
   const _VoiceCard({required this.seconds, this.source});
 
@@ -793,7 +793,7 @@ class _VoiceCardState extends State<_VoiceCard> {
     }
     final source = (widget.source ?? '').trim();
     if (source.isEmpty) {
-      // No file yet — keep visual countdown only.
+      // 尚无文件 — 仅保留视觉倒计时。
       setState(() {
         _playing = true;
         _remaining = widget.seconds;
@@ -855,7 +855,7 @@ class _VoiceCardState extends State<_VoiceCard> {
   Widget build(BuildContext context) {
     final displaySeconds = _playing ? _remaining : widget.seconds;
 
-    // Match forya AudioPlayerWidget (borderEnd: false) — flush to screen edge.
+    // 对齐 forya AudioPlayerWidget（borderEnd: false）— 贴齐屏幕边缘。
     return GestureDetector(
       onTap: () => unawaited(_togglePlay()),
       behavior: HitTestBehavior.opaque,
@@ -922,7 +922,7 @@ class _FlavorChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Original My Flavor tags are text-only (no emoji prefix).
+    // 原 My Flavor 标签仅为文字（无 emoji 前缀）。
     return DecoratedBox(
       decoration: BoxDecoration(
         color: const Color(0x1FFFFFFF),

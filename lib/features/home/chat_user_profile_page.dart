@@ -90,7 +90,7 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
     await _loadProfile();
   }
 
-  /// Prefer numeric app uid; resolve EaseMob username via `/user/msg-user`.
+  /// 优先数字应用 uid；EaseMob 用户名经 `/user/msg-user` 解析。
   Future<String> _resolveAppUid() async {
     final raw = _targetUid;
     if (RegExp(r'^\d+$').hasMatch(raw)) return raw;
@@ -158,7 +158,7 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
           setState(() {
             _profile = parsed.copyWith(
               emUsername: em,
-              // Keep seed moments/tags only if API omitted them (rare).
+              // 仅当 API 未返回时保留种子 Moments/标签（少见）。
             );
             _following = parsed.isFollowing;
             _isSelf = self;
@@ -166,7 +166,7 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
         }
       }
     } catch (_) {
-      // Keep seed profile from list if refresh fails.
+      // 刷新失败时保留列表带来的种子资料。
     } finally {
       if (mounted) setState(() => _loading = false);
     }

@@ -9,7 +9,7 @@ import '../auth/auth_session.dart';
 import '../network/app_apis.dart';
 import 'im_system_accounts.dart';
 
-/// Lightweight DM message event for UI (peer or self).
+/// 供 UI 使用的轻量私聊消息事件（对端或自己）。
 class ImChatMessage {
   const ImChatMessage({
     required this.id,
@@ -44,22 +44,22 @@ class ImChatMessage {
   final bool isSelf;
   final int serverTimeMs;
 
-  /// `txt` | `image` | `voice` | `gift` | `follow` | `emote` | `join` | `custom`
+  /// 消息类型：`txt` | `image` | `voice` | `gift` | `follow` | `emote` | `join` | `custom`
   final String msgType;
 
-  /// Local file path when available (sent / already downloaded).
+  /// 可用时的本地文件路径（已发送 / 已下载）。
   final String mediaLocalPath;
 
-  /// Remote CDN / EaseMob path for image or voice.
+  /// 图片或语音的远程 CDN / 环信路径。
   final String mediaRemoteUrl;
 
-  /// Image thumbnail (prefer when full image is large).
+  /// 图片缩略图（大图时优先使用）。
   final String thumbnailUrl;
 
-  /// Voice duration in seconds.
+  /// 语音时长（秒）。
   final int durationSecs;
 
-  /// EaseMob custom body event (SendGift, Smiley, …).
+  /// 环信自定义消息体事件（SendGift、Smiley 等）。
   final String customEvent;
 
   final int giftId;
@@ -67,18 +67,18 @@ class ImChatMessage {
   final String giftName;
   final String giftIconUrl;
 
-  /// Sticker image URL (emote message).
+  /// 贴纸图片 URL（表情消息）。
   final String emoteUrl;
   final String emoteName;
 
-  /// Join-group tip (JoinGroupMessage).
+  /// 入群提示（JoinGroupMessage）。
   final String joinName;
   final String joinUid;
 
-  /// GroupChat vs Chat (DM / system).
+  /// GroupChat 与 Chat（私聊 / 系统）。
   final bool isGroup;
 
-  /// Prefer existing local file, else remote URL, else thumbnail.
+  /// 优先已有本地文件，否则远程 URL，再否则缩略图。
   String get playableOrDisplayUrl {
     final local = mediaLocalPath.trim();
     if (local.isNotEmpty) {
@@ -92,7 +92,7 @@ class ImChatMessage {
   }
 }
 
-/// One page of DM history for lazy loading.
+/// 私聊历史一页，用于懒加载。
 class ImHistoryPage {
   const ImHistoryPage({
     required this.messages,
@@ -103,10 +103,10 @@ class ImHistoryPage {
   final bool hasMore;
 }
 
-/// EaseMob IM facade for Chimo (init / login / DM send-receive).
+/// Chimo 的环信 IM 门面（初始化 / 登录 / 私聊收发）。
 ///
-/// Credentials: `/user/conf` → imConfig.appKey; `/user/info` → emUsername/emPwd.
-/// Conversation id for 1v1 is the peer's **emUsername** (e.g. yqdf-...).
+/// 凭证：`/user/conf` → imConfig.appKey；`/user/info` → emUsername/emPwd。
+/// 1v1 会话 id 为对端的 **emUsername**（如 yqdf-...）。
 abstract final class ImService {
   static const _handlerId = 'chimo_im';
   static bool _sdkInited = false;
@@ -121,7 +121,7 @@ abstract final class ImService {
   static final StreamController<void> _connectionController =
       StreamController<void>.broadcast();
 
-  /// Incoming + outgoing text (and simple status) for open chats / list.
+  /// 打开中的会话 / 列表用的收发文本（及简单状态）。
   static Stream<ImChatMessage> get messages => _messagesController.stream;
 
   static Stream<void> get connectionChanges => _connectionController.stream;
@@ -130,7 +130,7 @@ abstract final class ImService {
 
   static String? get currentEmUser => _currentEmUser;
 
-  /// Load conf + credentials and connect. Safe to call multiple times.
+  /// 加载配置 + 凭证并连接。可安全多次调用。
   static Future<void> connectFromServer() async {
     try {
       await _ensureAppKey();
@@ -253,13 +253,13 @@ abstract final class ImService {
           await EMClient.getInstance.isLoginBefore()) {
         await EMClient.getInstance.logout(true);
       }
-      // Prefer password API (login() is deprecated on 4.15).
+      // 优先使用密码 API（4.15 上 login() 已弃用）。
       await EMClient.getInstance.loginWithPassword(user, password);
       _currentEmUser = user;
       debugPrint('ImService loginWithPassword ok: $user');
     } on EMError catch (e) {
       debugPrint('ImService login failed code=${e.code} desc=${e.description}');
-      // Already logged in same account is often OK.
+      // 同一账号已登录通常可接受。
       if (e.code == 200 || e.description.contains('already')) {
         _currentEmUser = user;
       }
@@ -269,7 +269,7 @@ abstract final class ImService {
   static Future<void> logout() async {
     try {
       if (_sdkInited) {
-        // unbindDeviceToken can hang on bad networks; keep logout snappy.
+        // 弱网下 unbindDeviceToken 可能卡住；保持登出快速。
         try {
           await EMClient.getInstance
               .logout(true)
@@ -288,9 +288,9 @@ abstract final class ImService {
     _connected = false;
   }
 
-  /// Send text. [peerEmUsername] is peer EM id, or group id when [isGroup].
+  /// 发送文本。[peerEmUsername] 为对端环信 id；[isGroup] 时为群 id。
   ///
-  /// [extra] is stored under message attributes `extra` (forya emote payload).
+  /// [extra] 写入消息 attributes 的 `extra`（forya 表情载荷）。
   static Future<ImChatMessage?> sendText({
     required String peerEmUsername,
     required String content,
@@ -320,7 +320,7 @@ abstract final class ImService {
     }
   }
 
-  /// Send sticker (forya sendEmote): text `[name]` + attributes.extra.emote.
+  /// 发送贴纸（forya sendEmote）：文本 `[name]` + attributes.extra.emote。
   static Future<ImChatMessage?> sendEmote({
     required String peerEmUsername,
     required String packId,
@@ -345,7 +345,7 @@ abstract final class ImService {
     );
   }
 
-  /// Forya `im_follow_message` tip after follow / unfollow.
+  /// 关注 / 取消关注后的 forya `im_follow_message` 提示。
   static Future<ImChatMessage?> sendFollowTip({
     required String peerEmUsername,
     required bool followed,
@@ -368,7 +368,7 @@ abstract final class ImService {
     }
   }
 
-  /// Send voice file (local path + duration seconds).
+  /// 发送语音文件（本地路径 + 时长秒数）。
   static Future<ImChatMessage?> sendVoice({
     required String peerEmUsername,
     required String filePath,
@@ -407,7 +407,7 @@ abstract final class ImService {
     }
   }
 
-  /// Send image (local file path).
+  /// 发送图片（本地文件路径）。
   static Future<ImChatMessage?> sendImage({
     required String peerEmUsername,
     required String filePath,
@@ -464,10 +464,10 @@ abstract final class ImService {
     return out;
   }
 
-  /// Local + server history page for a conversation.
+  /// 某会话的本地 + 服务端历史分页。
   ///
-  /// [startMsgId] empty = first page (newest). Non-empty = older page before that id.
-  /// Matches forya ChatController.loadMessages pagination.
+  /// [startMsgId] 为空 = 第一页（最新）。非空 = 该 id 之前的更早一页。
+  /// 对齐 forya ChatController.loadMessages 分页。
   static Future<ImHistoryPage> loadHistory(
     String conversationId, {
     String startMsgId = '',
@@ -496,7 +496,7 @@ abstract final class ImService {
         direction: EMSearchDirection.Up,
       );
 
-      // Pull from server when opening older pages, or when local page is short.
+      // 打开更早分页或本地页不足时，从服务端拉取。
       if (startMsgId.isNotEmpty || list.length < count) {
         try {
           final cursorResult =
@@ -510,7 +510,7 @@ abstract final class ImService {
             cursor: startMsgId.isEmpty ? null : startMsgId,
             pageSize: count,
           );
-          // Server Up returns newest-first; flip to oldest-first.
+          // 服务端 Up 为最新在前；翻转为最旧在前。
           list = cursorResult.data.reversed.toList();
         } catch (error) {
           debugPrint('ImService fetchHistory: $error');
@@ -533,9 +533,9 @@ abstract final class ImService {
     }
   }
 
-  /// Mark a 1v1 conversation as read in EaseMob (local + read ack).
+  /// 在环信将 1v1 会话标为已读（本地 + 已读回执）。
   ///
-  /// Without this, list badges clear in UI but come back after restart.
+  /// 否则列表角标在 UI 清除后，重启又会回来。
   static Future<void> markConversationRead(
     String peerEmUsername, {
     bool isGroup = false,
@@ -563,7 +563,7 @@ abstract final class ImService {
     }
   }
 
-  /// Delete local (+ remote) conversation — forya `ConversationController.removeItem`.
+  /// 删除本地（+ 远程）会话 — forya `ConversationController.removeItem`。
   static Future<void> deleteConversation(
     String conversationId, {
     bool isGroup = false,
@@ -605,7 +605,7 @@ abstract final class ImService {
     }
   }
 
-  /// Open EM conversations for list merge (1v1 Chat + GroupChat).
+  /// 打开环信会话供列表合并（1v1 Chat + GroupChat）。
   static Future<List<EMConversation>> loadListConversations() async {
     if (!_sdkInited) await connectFromServer();
     try {
@@ -623,7 +623,7 @@ abstract final class ImService {
     }
   }
 
-  /// Open EM conversations of Chat type for list previews.
+  /// 打开 Chat 类型环信会话供列表预览。
   static Future<List<EMConversation>> loadDmConversations() async {
     final all = await loadListConversations();
     return [
@@ -733,7 +733,7 @@ abstract final class ImService {
   static String _pickRemote(String? path) {
     final p = path?.trim() ?? '';
     if (p.startsWith('http://') || p.startsWith('https://')) return p;
-    // EaseMob sometimes yields bare paths; keep if non-empty for download.
+    // 环信有时只给裸路径；非空则保留以便下载。
     return p;
   }
 
@@ -958,7 +958,7 @@ abstract final class ImService {
       );
     }
 
-    // Stickers / Smiley and similar: prefer raw emoji / text in params.
+    // 贴纸 / Smiley 等：优先取 params 中的原始 emoji / 文本。
     if (event == 'Smiley' || event == 'Emoji' || event == 'sticker') {
       final emoji = _firstParam(params, const [
         'emoji',
@@ -1037,7 +1037,7 @@ abstract final class ImService {
     return (id: id, qty: qty, name: name, iconUrl: iconUrl);
   }
 
-  /// Join tip params: flat `name`/`uid`, or JSON `content` (server / forya).
+  /// 入群提示参数：扁平 `name`/`uid`，或 JSON `content`（服务端 / forya）。
   static ({String name, String uid}) _parseJoinGroupParams(
     Map<String, String>? params,
   ) {
@@ -1070,7 +1070,7 @@ abstract final class ImService {
     return '';
   }
 
-  /// For tests / hot restart.
+  /// 供测试 / 热重启。
   static Future<void> dispose() async {
     await _noop?.cancel();
     await logout();

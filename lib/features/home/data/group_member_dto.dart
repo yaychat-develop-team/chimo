@@ -2,12 +2,12 @@ import '../../../core/constants/app_assets.dart';
 import '../../../core/network/api_client.dart';
 import '../../../shared/models/group_member.dart';
 
-/// Maps `/chat/group/searchUsers/$gid` JSON into [GroupMember].
+/// 将 `/chat/group/searchUsers/$gid` JSON 映射为 [GroupMember]。
 abstract final class GroupMemberDto {
   static List<GroupMember> parseList(ApiResponse response) {
     if (!response.success) return const [];
     final data = response.data;
-    // Envelope: { userList: [...] } or bare list.
+    // 响应包络：{ userList: [...] } 或裸列表。
     if (data is List) {
       return [
         for (final item in data)

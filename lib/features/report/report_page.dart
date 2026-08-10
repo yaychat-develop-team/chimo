@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_page_scaffold.dart';
 
-/// Report page: pick type, upload proof images, enter feedback.
+/// 举报页：选择类型、上传凭证图、填写反馈。
 class ReportPage extends StatefulWidget {
   const ReportPage({super.key});
 
@@ -36,7 +36,7 @@ class _ReportPageState extends State<ReportPage> {
 
   void _addImage() {
     if (_images.length >= _maxImages) return;
-    // UI demo: color blocks as placeholders; hook up gallery picker later.
+    // UI 演示：色块占位；后续再接入相册选择。
     const palette = [
       Color(0xFF3A3A3C),
       Color(0xFF2C3A34),

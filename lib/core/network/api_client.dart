@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 import 'api_config.dart';
 import 'auth_request_headers.dart';
 
-/// Minimal JSON API envelope from echimo backends.
+/// echimo 后端的最小 JSON API 信封。
 class ApiResponse {
   const ApiResponse({
     required this.success,
@@ -43,7 +43,7 @@ class ApiResponse {
   }
 }
 
-/// Lightweight HTTP client matching D:\forya HeaderInterceptor shapes.
+/// 轻量 HTTP 客户端，请求头形态对齐 D:\forya HeaderInterceptor。
 class ApiClient {
   ApiClient({http.Client? httpClient, this.tokenProvider})
       : _http = httpClient ?? http.Client();
@@ -55,9 +55,9 @@ class ApiClient {
     final normalized = path.startsWith('/') ? path : '/$path';
     final base = Uri.parse('${ApiConfig.baseUrl}$normalized');
     if (query == null || query.isEmpty) return base;
-    // Uri.replace(queryParameters:) drops "=" for empty values ("keyword"
-    // instead of "keyword="), which breaks echimo list APIs that expect an
-    // explicit empty keyword the same way forya builds: keyword=$searchStr.
+    // Uri.replace(queryParameters:) 会丢掉空值的 "="（变成 "keyword"
+    // 而不是 "keyword="），而 echimo 列表接口与 forya 一样期望显式空关键字：
+    // keyword=$searchStr。
     final merged = <String, String>{
       ...base.queryParameters,
       ...query,
@@ -120,7 +120,7 @@ class ApiClient {
     return _decode(response);
   }
 
-  /// Retry transient TLS / socket failures (emulator network is flaky).
+  /// 重试瞬时 TLS / socket 失败（模拟器网络不稳定）。
   Future<http.Response> _send(
     Future<http.Response> Function() call, {
     int maxAttempts = 3,
@@ -146,7 +146,7 @@ class ApiClient {
         await Future<void>.delayed(Duration(milliseconds: 350 * attempt));
       }
     }
-    // Unreachable; keeps analyzer happy.
+    // 不可达；让 analyzer 满意。
     throw lastError ?? StateError('ApiClient send failed');
   }
 

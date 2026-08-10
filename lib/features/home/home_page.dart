@@ -23,7 +23,7 @@ import 'widgets/home_hero_banner.dart';
 import 'widgets/my_groups_section.dart';
 import 'widgets/popular_groups_section.dart';
 
-/// Home pull-to-refresh phase labels.
+/// 首页下拉刷新阶段文案。
 enum _HomeRefreshPhase {
   idle,
   pull,
@@ -32,11 +32,11 @@ enum _HomeRefreshPhase {
   success,
 }
 
-/// Home: app bar, promo banner, My Groups, Popular Groups.
+/// 首页：应用栏、推广横幅、我的群组、热门群组。
 class HomePage extends StatefulWidget {
   const HomePage({super.key, required this.chatsController});
 
-  /// Shared with shell: sync chat list on join / leave.
+  /// 与壳层共用：加入 / 离开时同步会话列表。
   final ChatsListController chatsController;
 
   @override

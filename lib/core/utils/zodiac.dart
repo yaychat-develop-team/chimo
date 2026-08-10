@@ -1,4 +1,4 @@
-/// Western zodiac name from a `yyyy-MM-dd` birthday.
+/// 由 `yyyy-MM-dd` 生日得到西方星座名。
 String zodiacFromBirthday(String birthday) {
   final date = DateTime.tryParse(birthday);
   if (date == null) return 'Capricorn';
@@ -18,7 +18,7 @@ String zodiacFromBirthday(String birthday) {
   return 'Pisces';
 }
 
-/// Emoji prefix matching forya chat card constellation labels.
+/// 与 forya 聊天卡片星座标签匹配的 Emoji 前缀。
 String zodiacEmoji(String zodiac) {
   return switch (zodiac.toLowerCase()) {
     'aries' => '♈️',

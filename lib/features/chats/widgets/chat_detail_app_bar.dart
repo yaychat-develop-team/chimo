@@ -16,7 +16,7 @@ class _DmAppBar extends StatelessWidget {
   final ChatConversation conversation;
   final bool following;
 
-  /// 0 expanded → 1 collapsed.
+  /// 0 = 展开，1 = 收起。
   final double collapse;
   final VoidCallback onFollowTap;
   final VoidCallback onAvatarTap;
@@ -95,7 +95,7 @@ class _DmAppBar extends StatelessWidget {
                             ),
                           ],
                         ),
-                        // Match forya: only show presence when online.
+                        // 对齐 forya：仅在线时展示在线状态。
                         if (conversation.isOnline) ...[
                           const SizedBox(height: 2),
                           Row(
@@ -130,7 +130,7 @@ class _DmAppBar extends StatelessWidget {
                     widthFactor: followVisible.clamp(0.0, 1.0),
                     child: Opacity(
                       opacity: followVisible.clamp(0.0, 1.0),
-                      // forya: Follow only while not following; hide after follow.
+                      // forya：未关注时才显示关注；关注后隐藏。
                       child: following
                           ? const SizedBox.shrink()
                           : Padding(
@@ -306,7 +306,7 @@ class _ProfileTag extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Do not set Container.alignment — it expands to max width inside Wrap.
+    // 不要设置 Container.alignment — 在 Wrap 内会撑满最大宽度。
     return Container(
       height: 22,
       padding: const EdgeInsets.symmetric(horizontal: 10),

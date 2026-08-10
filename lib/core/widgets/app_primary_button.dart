@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
 
-/// Solid primary pill CTA (wallet / phone login style).
+/// 实心主色胶囊按钮（钱包 / 手机登录风格）。
 class AppPrimaryButton extends StatelessWidget {
   const AppPrimaryButton({
     super.key,

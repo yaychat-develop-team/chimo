@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_page_scaffold.dart';
 
-/// Interest tag selection page.
+/// 兴趣标签选择页。
 class MyTagsPage extends StatefulWidget {
   const MyTagsPage({super.key, this.initialSelected = const []});
 

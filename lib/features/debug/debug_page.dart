@@ -8,7 +8,7 @@ import '../../core/network/network_bootstrap.dart';
 import '../../core/widgets/app_page_scaffold.dart';
 import '../../core/widgets/center_toast.dart';
 
-/// Debug page: server environment / toggles / proxy and shortcuts.
+/// 调试页：服务端环境 / 开关 / 代理与快捷入口。
 class DebugPage extends StatefulWidget {
   const DebugPage({super.key});
 

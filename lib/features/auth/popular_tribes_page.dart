@@ -30,8 +30,8 @@ class _TribeOption {
   final String? avatarUrl;
 }
 
-/// Registration flow: pick tribes from `/chat/group/listByType` (forya) /
-/// fallback `/chat/group/list`, then join selected on Next Step.
+/// 注册流程：从 `/chat/group/listByType`（forya）选取部落 /
+/// 回退 `/chat/group/list`，在 Next Step 时加入所选。
 class PopularTribesPage extends StatefulWidget {
   const PopularTribesPage({super.key});
 
@@ -60,7 +60,7 @@ class _PopularTribesPageState extends State<PopularTribesPage> {
       _error = null;
     });
     try {
-      // Same as forya SelectTribesPage: listByType (empty typeList = all).
+      // 对齐 forya SelectTribesPage：listByType（空 typeList = 全部）。
       var res = await AppApis.group.listByType('');
       if ((!res.ok || (res.data?.isEmpty ?? true))) {
         res = await AppApis.group.list(pageNum: 1, pageSize: 50);
@@ -82,7 +82,7 @@ class _PopularTribesPageState extends State<PopularTribesPage> {
               _TribeOption(
                 id: g.id,
                 name: g.name.trim().isEmpty ? 'Tribe' : g.name.trim(),
-                // Forya shows GroupInfo.type under the name.
+                // Forya 在名称下方展示 GroupInfo.type。
                 subtitle: g.category.trim().isNotEmpty
                     ? g.category.trim()
                     : g.description.trim(),

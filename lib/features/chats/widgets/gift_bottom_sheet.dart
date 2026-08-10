@@ -8,7 +8,7 @@ import '../../../core/widgets/center_toast.dart';
 import '../../wallet/wallet_page.dart';
 import '../data/cash_gift_dto.dart';
 
-/// Profile / overlay Gift sheet — same `/cash/item` catalog as chat gift sheet.
+/// 资料 / 浮层礼物弹层 — 与聊天礼物弹层共用 `/cash/item` 目录。
 Future<void> showGiftBottomSheet(
   BuildContext context, {
   required String receiverUid,

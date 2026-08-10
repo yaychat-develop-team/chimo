@@ -24,11 +24,11 @@ import 'widgets/chats_conversation_tile.dart';
 import 'widgets/chats_empty_state.dart';
 import 'widgets/chats_promo_banner.dart';
 
-/// Chats list: app bar, dismissible promo banner, list or empty state.
+/// 会话列表：应用栏、可关闭推广横幅、列表或空态。
 class ChatsPage extends StatefulWidget {
   const ChatsPage({super.key, required this.controller});
 
-  /// Shared with shell; unread badge derived from this.
+  /// 与壳层共用；未读角标由此推导。
   final ChatsListController controller;
 
   @override
@@ -109,7 +109,7 @@ class _ChatsPageState extends State<ChatsPage> {
       return;
     }
 
-    // New Friends system account → contacts (followers), not a blank DM.
+    // 「新朋友」系统账号 → 通讯录（粉丝），不是空白私聊。
     final em = item.emUserName.isNotEmpty
         ? item.emUserName
         : (item.id.startsWith('sys_')

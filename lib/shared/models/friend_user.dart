@@ -1,12 +1,12 @@
-/// Friend relation user.
+/// 好友关系用户。
 enum FriendRelation {
-  /// Mutual follow → Friends tab; also appears in Follow + Followers.
+  /// 互相关注 → 好友页；同时出现在关注与粉丝。
   mutual,
 
-  /// I follow them, they do not follow back → Follow tab only.
+  /// 我关注对方、对方未回关 → 仅关注页。
   following,
 
-  /// They follow me, I do not follow back → Followers tab only.
+  /// 对方关注我、我未回关 → 仅粉丝页。
   follower,
 }
 

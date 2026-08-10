@@ -10,9 +10,9 @@ import 'models/group_item.dart';
 import 'widgets/group_members_sheet.dart';
 import 'widgets/popular_group_card.dart';
 
-/// Joined groups list (Home My Groups → More).
+/// 已加入群组列表（首页我的群组 → 更多）。
 ///
-/// Same card layout as Popular Groups, without the join / leave control.
+/// 卡片布局与热门群组相同，但不含加入 / 退出控件。
 class JoinedGroupsPage extends StatelessWidget {
   const JoinedGroupsPage({
     super.key,

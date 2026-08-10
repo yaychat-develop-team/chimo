@@ -6,7 +6,7 @@ import '../../../core/widgets/network_or_asset_avatar.dart';
 import '../models/group_item.dart';
 import 'group_level_badge.dart';
 
-/// Popular group large card: fixed height, same visual style as design.
+/// 热门群大卡片：固定高度，视觉风格与设计稿一致。
 class PopularGroupCard extends StatelessWidget {
   const PopularGroupCard({
     super.key,
@@ -19,19 +19,19 @@ class PopularGroupCard extends StatelessWidget {
 
   final PopularGroupItem group;
 
-  /// Top-right Join / Joined button tap.
+  /// 右上角 Join / Joined 按钮点击。
   final VoidCallback? onJoinTap;
 
-  /// Whole card tap.
+  /// 整卡点击。
   final VoidCallback? onTap;
 
-  /// Member count tap (opens member list).
+  /// 成员数点击（打开成员列表）。
   final VoidCallback? onMembersTap;
 
-  /// Home Popular list shows join control; My Groups list hides it.
+  /// 首页 Popular 列表显示加入控件；My Groups 列表隐藏。
   final bool showJoinAction;
 
-  /// Tall enough for title + tag + 2-line description + stats.
+  /// 高度足够容纳标题 + 标签 + 两行简介 + 统计。
   static const double cardHeight = 172;
   static const double avatarSize = 72;
   static const double _joinIconSize = 32;
@@ -68,7 +68,7 @@ class PopularGroupCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Title row: name + level + optional join button
+                  // 标题行：名称 + 等级 + 可选加入按钮
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
@@ -95,7 +95,7 @@ class PopularGroupCard extends StatelessWidget {
                       ),
                       if (showJoinAction) ...[
                         const SizedBox(width: 4),
-                        // Joined = status only (not leave). Join = tappable +.
+                        // Joined = 仅状态展示（非退出）。Join = 可点的 +。
                         if (group.isJoined)
                           IgnorePointer(
                             child: Opacity(
@@ -113,7 +113,7 @@ class PopularGroupCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 6),
-                  // Category pill tag
+                  // 分类胶囊标签
                   Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -132,7 +132,7 @@ class PopularGroupCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  // Description: fixed 2-line slot so it never gets half-clipped.
+                  // 简介：固定两行槽位，避免半截裁切。
                   Text(
                     group.description,
                     maxLines: 2,
@@ -144,7 +144,7 @@ class PopularGroupCard extends StatelessWidget {
                     ),
                   ),
                   const Spacer(),
-                  // Member count / post count
+                  // 成员数 / 帖子数
                   Row(
                     children: [
                       GestureDetector(
@@ -194,7 +194,7 @@ class _JoinIcon extends StatelessWidget {
   }
 }
 
-/// Bottom stat row: icon + number.
+/// 底部统计行：图标 + 数字。
 class _Stat extends StatelessWidget {
   const _Stat({required this.iconAsset, required this.value});
 

@@ -1,4 +1,4 @@
-/// Maps echimo auth/bind email API message keys to user-facing copy.
+/// 将 echimo 邮箱认证 / 绑定 API 的 message key 映射为面向用户的文案。
 abstract final class EmailAuthMessages {
   static String friendly(String raw, {required String fallback}) {
     final text = raw.trim();
@@ -39,7 +39,7 @@ abstract final class EmailAuthMessages {
       return 'Wrong or expired code. Tap Resend, then enter the newest code.';
     }
 
-    // Raw dotted keys (e.g. email.already.bound) are not user-friendly.
+    // 原始点分 key（如 email.already.bound）对用户不友好。
     if (RegExp(r'^[a-z0-9_.]+$').hasMatch(key) && key.contains('.')) {
       return fallback;
     }

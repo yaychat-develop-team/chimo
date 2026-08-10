@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import 'app_page_scaffold.dart';
 
-/// Agreement placeholder page (shared by login / About Us).
+/// 协议占位页（登录 / 关于我们共用）。
 class AgreementPage extends StatelessWidget {
   const AgreementPage({super.key, required this.title});
 

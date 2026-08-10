@@ -11,7 +11,7 @@ import 'package:record/record.dart';
 
 import '../../core/constants/app_assets.dart';
 
-/// Result returned when the user confirms a recording.
+/// 用户确认录音后返回的结果。
 class VoiceNoteResult {
   const VoiceNoteResult({required this.path, required this.seconds});
 
@@ -21,7 +21,7 @@ class VoiceNoteResult {
 
 enum _VoicePhase { idle, recording, preview }
 
-/// Voice signature recording page: mic → preview → confirm.
+/// 语音签名录制页：麦克风 → 预览 → 确认。
 class VoiceNotePage extends StatefulWidget {
   const VoiceNotePage({super.key});
 

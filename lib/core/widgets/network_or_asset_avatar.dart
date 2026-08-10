@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Avatar that prefers a remote [url], falling back to a local [asset].
+/// 头像优先使用远程 [url]，否则回退到本地 [asset]。
 class NetworkOrAssetAvatar extends StatelessWidget {
   const NetworkOrAssetAvatar({
     super.key,

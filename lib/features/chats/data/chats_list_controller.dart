@@ -12,14 +12,14 @@ import '../../../core/utils/chat_time_label.dart';
 import '../../../shared/models/chat_conversation.dart';
 import '../../../shared/models/group_item.dart';
 
-/// Shared chats list state for chats page and nav unread badge.
+/// 会话页与底部导航未读角标共用的会话列表状态。
 ///
-/// Session rows for groups come from `GET /chat/group/myGroups`.
-/// Last-message previews need IM (EaseMob); until then we show member count /
-/// group desc as subtitle, and keep any local previews from this device.
+/// 群组会话行来自 `GET /chat/group/myGroups`。
+/// 最近消息预览依赖 IM（环信）；在此之前用成员数 /
+/// 群简介作副标题，并保留本机已有本地预览。
 ///
-/// Listens to [ImService.messages] so previews / unread update without pull
-/// refresh (forya ConversationController pattern).
+/// 监听 [ImService.messages]，使预览 / 未读无需下拉
+/// 刷新即可更新（forya ConversationController 模式）。
 class ChatsListController extends ChangeNotifier {
   ChatsListController() {
     _imSub = ImService.messages.listen(_onImMessage);
@@ -28,9 +28,9 @@ class ChatsListController extends ChangeNotifier {
   final List<ChatConversation> _conversations = [];
   final List<String> _pinnedIds = [];
   final Set<String> _joinedGroupIds = {};
-  /// Swipe-deleted rows; survive API/IM refresh until a new message restores them.
+  /// 左滑删除的行；在新消息恢复前，API/IM 刷新后仍保持隐藏。
   final Set<String> _hiddenIds = {};
-  /// Open chat/group detail key (list id or EM id) — no unread bump while viewing.
+  /// 当前打开的聊天/群详情 key（列表 id 或环信 id）— 查看中不增加未读。
   String? _activeConversationKey;
   StreamSubscription<ImChatMessage>? _imSub;
   bool _loading = false;
@@ -43,16 +43,16 @@ class ChatsListController extends ChangeNotifier {
 
   List<String> get pinnedIds => List.unmodifiable(_pinnedIds);
 
-  /// Group ids still joined (independent of conversation row).
+  /// 仍在加入中的群组 id（与会话行无关）。
   Set<String> get joinedGroupIds => Set.unmodifiable(_joinedGroupIds);
 
   bool isGroupJoined(String groupId) => _joinedGroupIds.contains(groupId);
 
-  /// Sum of unread counts for bottom nav badge.
+  /// 底部导航角标用的未读总数。
   int get totalUnread =>
       _conversations.fold(0, (sum, c) => sum + c.unreadCount);
 
-  /// Pinned first, then by latest message time (desc).
+  /// 置顶优先，再按最近消息时间降序。
   List<ChatConversation> get visibleConversations {
     final byId = {for (final c in _conversations) c.id: c};
     final pinned = <ChatConversation>[];
@@ -69,7 +69,7 @@ class ChatsListController extends ChangeNotifier {
     return [...pinned, ...unpinned];
   }
 
-  /// Load my groups from API and rebuild list (keeps pin/unread/local previews).
+  /// 从 API 加载我的群组并重建列表（保留置顶/未读/本地预览）。
   Future<void> refreshFromApi() async {
     _loading = true;
     _loadError = null;
@@ -89,7 +89,7 @@ class ChatsListController extends ChangeNotifier {
         next.add(_conversationFromGroup(g, prev));
       }
 
-      // Keep non-group rows started in-app (real DMs / system), not bulk friends.
+      // 保留应用内发起的非群组行（真实私聊 / 系统），不是批量好友。
       for (final c in _conversations) {
         if (c.badge == ChatBadgeType.group) continue;
         if (_isHidden(c.id, c.emUserName)) continue;
@@ -97,8 +97,8 @@ class ChatsListController extends ChangeNotifier {
         next.add(c);
       }
 
-      // If API myGroups is empty but we locally joined, keep those rows and
-      // re-pull detail so the list still reflects server group cards.
+      // 若 API myGroups 为空但本地已加入，保留这些行并
+      // 重新拉取详情，使列表仍反映服务端群组卡片。
       for (final id in _joinedGroupIds) {
         if (nextJoined.contains(id)) continue;
         if (_isHidden(id)) continue;
@@ -170,7 +170,7 @@ class ChatsListController extends ChangeNotifier {
           continue;
         }
 
-        // —— Chat (DM / system) ——
+        // —— Chat（私聊 / 系统）——
         final isSystem = ImSystemAccounts.isSystemAccount(emId);
         final listId = isSystem ? 'sys_$emId' : 'dm_$emId';
         if (_isHidden(listId, emId)) continue;
@@ -267,7 +267,7 @@ class ChatsListController extends ChangeNotifier {
       title: g.name.isEmpty ? 'Group' : g.name,
       avatarAsset: g.avatarAsset,
       avatarUrl: g.avatarUrl,
-      // Only keep real previews written by onNewMessage / IM later.
+      // 仅保留后续由 onNewMessage / IM 写入的真实预览。
       lastMessage: hadLocalPreview ? prev.lastMessage : '',
       timeLabel: hadLocalPreview
           ? (prev.timeLabel.isEmpty ? 'Just' : prev.timeLabel)
@@ -292,11 +292,11 @@ class ChatsListController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Remove conversation only; group join state unchanged.
+  /// 仅移除会话；群组加入状态不变。
   ///
-  /// Persists hide across refresh (myGroups / IM merge). New messages restore
-  /// the row via [onNewMessage] / [upsertPrivateChat]. Also deletes EaseMob
-  /// local+remote session like forya `removeItem`.
+  /// 刷新后仍保持隐藏（myGroups / IM 合并）。新消息会通过
+  /// [onNewMessage] / [upsertPrivateChat] 恢复该行。同时删除环信
+  /// 本地+远程会话，对齐 forya `removeItem`。
   void delete(String id) {
     final index = _conversations.indexWhere((c) => c.id == id);
     ChatConversation? removed;
@@ -368,7 +368,7 @@ class ChatsListController extends ChangeNotifier {
       _conversations[index] = prev.copyWith(unreadCount: 0);
       notifyListeners();
     }
-    // Persist to EaseMob so restart does not restore the badge.
+    // 持久化到环信，避免重启后角标恢复。
     final emId = prev.emUserName.isNotEmpty
         ? prev.emUserName
         : prev.id.startsWith('dm_')
@@ -393,7 +393,7 @@ class ChatsListController extends ChangeNotifier {
     _unhide(group.id);
     _upsertConversation(group);
     notifyListeners();
-    // Sync list fields from server detail when available.
+    // 有服务端详情时同步列表字段。
     unawaited(_syncJoinedGroup(group.id));
   }
 
@@ -535,7 +535,7 @@ class ChatsListController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Mark which conversation is open so realtime pushes don't bump unread.
+  /// 标记当前打开的会话，使实时推送不增加未读。
   void setActiveConversation(String? idOrEm) {
     final key = idOrEm?.trim();
     _activeConversationKey = (key == null || key.isEmpty) ? null : key;
@@ -582,7 +582,7 @@ class ChatsListController extends ChangeNotifier {
 
     final isGroup = m.isGroup || _joinedGroupIds.contains(emId);
     if (isGroup) {
-      // Don't surface groups we never joined (local IM ghosts).
+      // 不展示从未加入过的群组（本地 IM 幽灵会话）。
       if (!_joinedGroupIds.contains(emId) && !_isHidden(emId)) return;
       onNewMessage(
         id: emId,

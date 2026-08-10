@@ -3,7 +3,7 @@ import '../api_result.dart';
 import '../app_meta_dto.dart';
 import '../network_bootstrap.dart';
 
-/// Auth / login endpoints.
+/// 认证 / 登录相关接口。
 class AuthApi {
   const AuthApi();
 

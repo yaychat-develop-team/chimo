@@ -7,7 +7,7 @@ import '../../core/widgets/app_page_scaffold.dart';
 import '../../core/widgets/app_webview_page.dart';
 import 'account_cancel_result_page.dart';
 
-/// Cancel-account agreement page (forya AccountCancellationPage).
+/// 注销账号协议页（对齐 forya AccountCancellationPage）。
 class AccountCancellationPage extends StatefulWidget {
   const AccountCancellationPage({super.key});
 

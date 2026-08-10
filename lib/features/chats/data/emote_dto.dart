@@ -1,4 +1,4 @@
-/// Sticker pack tab from `/emote/emoticons-list`.
+/// 贴纸包 Tab，来自 `/emote/emoticons-list`。
 class EmotePack {
   const EmotePack({
     required this.id,
@@ -22,7 +22,7 @@ class EmotePack {
   }
 }
 
-/// One sticker in a pack from `/emote/item-list`.
+/// 贴纸包中的单个贴纸，来自 `/emote/item-list`。
 class EmoteSticker {
   const EmoteSticker({
     required this.id,
@@ -36,7 +36,7 @@ class EmoteSticker {
   final String url;
   final String showUrl;
 
-  /// Prefer thumbnail for grid; full [url] when sending.
+  /// 网格优先缩略图；发送时用完整 [url]。
   String get gridUrl {
     final s = showUrl.trim();
     if (s.isNotEmpty) return s;
@@ -53,7 +53,7 @@ class EmoteSticker {
   }
 }
 
-/// Parses emote API JSON envelopes into models.
+/// 将表情接口 JSON 包络解析为模型。
 abstract final class EmoteDto {
   static List<EmotePack> parsePacks(Object? data) {
     final list = _extractList(data, const ['list', 'emoticons', 'items']);

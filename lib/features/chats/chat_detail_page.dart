@@ -48,7 +48,7 @@ class ChatDetailPage extends StatefulWidget {
 
   final ChatConversation conversation;
 
-  /// Sync list when sending (including re-show after swipe-delete).
+  /// 发送时同步列表（含左滑删除后重新出现）。
   final ChatsListController? chatsController;
 
   @override
@@ -61,20 +61,20 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   final ScrollController _messagesScroll = ScrollController();
   final GlobalKey<_DmInputBarState> _inputBarKey = GlobalKey<_DmInputBarState>();
 
-  /// 0 = intro expanded, 1 = intro collapsed (app bar row only).
+  /// 0 = 简介展开，1 = 简介收起（仅导航栏行）。
   late final AnimationController _introCollapse;
 
-  /// Intro is taller with Moments thumbs; increase drag range for handle.
+  /// 有 Moments 缩略图时简介更高；加大把手拖拽范围。
   static const double _introDragRange = 120;
 
-  /// Local + EaseMob 1v1 history.
+  /// 本地 + 环信 1v1 历史。
   final List<_ChatLine> _messages = [];
   final Set<String> _seenMsgIds = {};
   StreamSubscription<ImChatMessage>? _imSub;
   bool _historyHasMore = true;
   bool _historyLoading = false;
   String _historyCursor = '';
-  /// After first open, only then allow pull-up history (avoids racing scroll-to-bottom).
+  /// 首次打开后才允许上拉历史（避免与滚到底部竞态）。
   bool _allowHistoryLoadMore = false;
 
   late ChatConversation _conversation = widget.conversation;
@@ -84,7 +84,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   bool _blocked = false;
   bool _loadingPeer = true;
   String _peerEmUser = '';
-  /// Backend numeric user id (for follow / block / gifts). Distinct from EM id.
+  /// 后端数字用户 id（关注 / 拉黑 / 礼物）。与环信 id 不同。
   String _peerAppUid = '';
 
   String get _peerUid {
@@ -93,7 +93,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     return id;
   }
 
-  /// Prefer resolved app uid; fall back to conversation id only if numeric.
+  /// 优先已解析的应用 uid；仅当会话 id 为数字时才回退。
   String get _relationUid {
     final fromProfile = (_peerProfile?.userId ?? '').trim();
     if (fromProfile.isNotEmpty) return fromProfile;
@@ -121,7 +121,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     );
     _imSub = ImService.messages.listen(_onImMessage);
     _messagesScroll.addListener(_onMessagesScroll);
-    // Clear list badge + EaseMob unread when opening the thread.
+    // 打开会话时清除列表角标 + 环信未读。
     widget.chatsController?.markRead(widget.conversation.id);
     final em = _imConversationId;
     widget.chatsController?.setActiveConversation(
@@ -146,7 +146,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     }
 
     try {
-      // Resolve numeric app uid when conversation key is an EM username.
+      // 会话 key 为环信用户名时解析数字应用 uid。
       var appUid = RegExp(r'^\d+$').hasMatch(rawId) ? rawId : '';
       if (appUid.isEmpty && emHint.isNotEmpty) {
         try {
@@ -158,7 +158,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       if (appUid.isEmpty && RegExp(r'^\d+$').hasMatch(rawId)) {
         appUid = rawId;
       }
-      // user/info accepts either numeric id or emUsername on this backend.
+      // 该后端 user/info 接受数字 id 或 emUsername。
       final infoKey = appUid.isNotEmpty
           ? appUid
           : (rawId.isNotEmpty ? rawId : emHint);
@@ -309,7 +309,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     if (_historyLoading || !_historyHasMore) return;
     final peerEm = _imConversationId;
     if (peerEm.isEmpty) return;
-    // Near the top → load older messages.
+    // 接近顶部 → 加载更早消息。
     if (_messagesScroll.position.pixels <= 64) {
       unawaited(_loadImHistory(peerEm, loadMore: true));
     }
@@ -322,14 +322,14 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         m.from == convId ||
         m.to == convId;
     if (!match) return;
-    // Follow tips are not shown in the DM stream.
+    // 关注提示不在私聊消息流中展示。
     if (m.msgType == 'follow') return;
     if (m.id.isNotEmpty && !_seenMsgIds.add(m.id)) return;
     if (!mounted) return;
     setState(() {
       _messages.add(_lineFromIm(m));
     });
-    // List preview / unread: ChatsListController listens to ImService.messages.
+    // 列表预览 / 未读：ChatsListController 监听 ImService.messages。
     _scrollToBottom();
   }
 
@@ -440,7 +440,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         if (sent != null && sent.id.isNotEmpty) {
           _seenMsgIds.add(sent.id);
         }
-        // Stream may also deliver; add immediately for snappy UI.
+        // Stream 也可能再投递；先立即添加以保证 UI 跟手。
         if (!mounted) return;
         setState(() {
           _messages.add(_ChatLine(side: _ChatSide.self, text: text));
@@ -459,7 +459,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       }
     }
 
-    // No emUserName yet — local-only fallback.
+    // 尚无 emUserName — 仅本地回退。
     setState(() {
       _messages.add(_ChatLine(side: _ChatSide.self, text: text));
     });
@@ -527,7 +527,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     final peerEm = _imConversationId;
     final localPath = path.trim();
 
-    // Optimistic UI immediately.
+    // 立即乐观更新 UI。
     setState(() {
       _messages.add(
         _ChatLine(
@@ -581,7 +581,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     final files = paths.map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
     if (files.isEmpty) return;
 
-    // Optimistic UI for each path (file or temporary asset export).
+    // 对每个路径做乐观 UI（文件或临时资源导出）。
     setState(() {
       for (final path in files) {
         _messages.add(
@@ -673,7 +673,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     void jump({required bool animate}) {
       if (!mounted || !_messagesScroll.hasClients) return;
       final max = _messagesScroll.position.maxScrollExtent;
-      // Content shorter than viewport: stay at 0 so messages sit under the handle.
+      // 内容短于视口：停在 0，使消息落在把手下方。
       if (max <= 0) return;
       if (animate) {
         _messagesScroll.animateTo(

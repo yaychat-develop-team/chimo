@@ -3,7 +3,7 @@ import 'package:chimo/shared/models/chat_conversation.dart';
 import 'package:chimo/shared/models/group_item.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Fixture helpers for unit tests only (not app mock data).
+/// 仅供单元测试的夹具辅助（非应用内 mock 数据）。
 ChatConversation _dm(String id, {int unread = 0, String last = 'hi'}) {
   return ChatConversation(
     id: id,
@@ -32,7 +32,7 @@ void main() {
 
   setUp(() {
     controller = ChatsListController();
-    // Seed via public APIs — list starts empty (no repository seed).
+    // 通过公开 API 注入种子数据——列表初始为空（无仓库种子）。
     controller.upsertPrivateChat(_dm('user_a', unread: 2, last: 'hi'));
     controller.upsertPrivateChat(_dm('user_b', unread: 3, last: 'yo'));
   });
@@ -81,7 +81,7 @@ void main() {
     controller.delete('g1');
     controller.delete('user_a');
 
-    // Simulates refresh re-upserting a joined group (must stay hidden).
+    // 模拟刷新时重新 upsert 已加入的群（必须保持隐藏）。
     controller.upsertJoinedGroup(_group('g1'));
     expect(controller.conversations.any((c) => c.id == 'g1'), isFalse);
     expect(controller.isGroupJoined('g1'), isTrue);

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_page_scaffold.dart';
 
-/// Joy Coins recharge FAQ.
+/// Joy Coins 充值常见问题。
 class JoyCoinsHelpPage extends StatelessWidget {
   const JoyCoinsHelpPage({super.key});
 

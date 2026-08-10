@@ -10,7 +10,7 @@ import '../../core/network/app_apis.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_primary_button.dart';
 
-/// Phone login page (white background design).
+/// 手机登录页（白底设计）。
 class PhoneLoginPage extends StatefulWidget {
   const PhoneLoginPage({super.key});
 
@@ -22,7 +22,7 @@ class _PhoneLoginPageState extends State<PhoneLoginPage> {
   final TextEditingController _phoneController = TextEditingController();
   bool _sending = false;
 
-  /// Mainland China phone: starts with 1, second digit 3–9, 11 digits total.
+  /// 中国大陆手机号：以 1 开头，第二位 3–9，共 11 位。
   static final RegExp _phoneRegExp = RegExp(r'^1[3-9]\d{9}$');
 
   String get _phone => _phoneController.text.trim();

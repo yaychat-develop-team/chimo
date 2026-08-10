@@ -31,16 +31,16 @@ echo "" >$last_commit_id
 
 build_info="version: $versionName"
 
-# save last_base_commit of submodule b
+# 保存 submodule b 的 last_base_commit
 last_commit=$(git log -1 --pretty=%h)
-# save the last commit for rollback
+# 保存最近一次 commit，便于回滚
 echo "$last_commit" >$last_commit_id
 
 if [ -f "$last_branch_commit_id" ]; then
     last_commit="$(cat $last_branch_commit_id)"
 fi
 
-# send success msg to wecom
+# 向企业微信发送开始构建消息
 python3 wechat_notify.py 0 "Start Building $ciNum 号包..." "" "" "" "" $ciNum "$buildUser" "$buildBranch"
 
 lastest_commit=$(git log -1 --pretty=%h)
@@ -119,9 +119,9 @@ else
     fi
 fi
 
-# send success msg to wecom
+# 向企业微信发送成功消息
 python3 wechat_notify.py $versionCode "$CHANGE_LOG" $buildType $versionName "$buildPlatform" "$build_info" $ciNum "$buildUser" "$buildBranch"
 
-# save the latest commit id into local file.
+# 将最新 commit id 写入本地文件。
 last_commit=$(git log -1 --pretty=%h)
 echo "$last_commit" >$last_branch_commit_id

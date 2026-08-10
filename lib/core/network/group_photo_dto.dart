@@ -1,6 +1,6 @@
 import 'api_client.dart';
 
-/// Period bucket of group album photos.
+/// 群相册按时间段分组的照片桶。
 class GroupPhotoSection {
   const GroupPhotoSection({
     required this.periodName,
@@ -12,7 +12,7 @@ class GroupPhotoSection {
 }
 
 abstract final class GroupPhotoDto {
-  /// Forya `GroupPhotoListRsp.groupPhotoList`: periodName + photoList.
+  /// Forya `GroupPhotoListRsp.groupPhotoList`：periodName + photoList。
   static List<GroupPhotoSection> parseSections(ApiResponse response) {
     if (!response.success) return const [];
     return parseData(response.data);

@@ -134,7 +134,7 @@ class _GiftSheetState extends State<_GiftSheet> {
         return;
       }
 
-      // Refresh balance after successful spend.
+      // 成功消费后刷新余额。
       try {
         final bal = await AppApis.cash.balance();
         if (mounted) {

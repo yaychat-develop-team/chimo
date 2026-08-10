@@ -6,7 +6,7 @@ import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_page_scaffold.dart';
 
-/// Edit nickname page.
+/// 编辑昵称页。
 class NicknamePage extends StatefulWidget {
   const NicknamePage({
     super.key,
@@ -16,7 +16,7 @@ class NicknamePage extends StatefulWidget {
 
   final String initialText;
 
-  /// Show rules when re-entering after one prior edit.
+  /// 曾编辑过一次后再次进入时展示规则。
   final bool showRules;
 
   static const int maxLength = 20;

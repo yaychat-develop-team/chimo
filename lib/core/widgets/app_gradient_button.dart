@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
 
-/// Promo gradient pill CTA (`AppColors.promoBannerGradient`).
+/// 促销渐变胶囊按钮（`AppColors.promoBannerGradient`）。
 class AppGradientButton extends StatelessWidget {
   const AppGradientButton({
     super.key,

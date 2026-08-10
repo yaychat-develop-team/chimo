@@ -3,9 +3,9 @@ import 'dart:io';
 import 'package:chimo/core/network/api_config.dart';
 import 'package:chimo/core/network/api_probe_suite.dart';
 
-/// Probe core D:\forya endpoints against test-api.echimo.com.
+/// 探测核心 D:\forya 接口（目标 test-api.echimo.com）。
 ///
-/// Run: `dart run tool/api_smoke.dart`
+/// 运行：`dart run tool/api_smoke.dart`
 Future<void> main() async {
   ApiConfig.useEnvironment(ApiEnvironment.test);
   stdout.writeln('Base: ${ApiConfig.baseUrl}');

@@ -10,7 +10,7 @@ import '../../core/widgets/app_top_loading_bar.dart';
 import '../me/levels_help_page.dart';
 import '../me/models/me_models.dart';
 
-/// My Level — mirrors forya `MineLevelPage` / `MineLevelModel`.
+/// 我的等级 — 对齐 forya `MineLevelPage` / `MineLevelModel`。
 class LevelPage extends StatefulWidget {
   const LevelPage({
     super.key,

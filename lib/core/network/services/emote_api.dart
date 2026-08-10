@@ -3,7 +3,7 @@ import '../api_gateway.dart';
 import '../api_result.dart';
 import '../network_bootstrap.dart';
 
-/// Emote / sticker packs.
+/// 表情 / 贴纸包。
 class EmoteApi {
   const EmoteApi();
 

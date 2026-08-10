@@ -6,7 +6,7 @@ import '../../core/widgets/app_settings_tile.dart';
 import 'account_cancel_result_page.dart';
 import 'account_cancellation_page.dart';
 
-/// Account Security hub (forya AccountSecurityPage).
+/// 账号安全入口（对齐 forya AccountSecurityPage）。
 class AccountSecurityPage extends StatefulWidget {
   const AccountSecurityPage({super.key});
 

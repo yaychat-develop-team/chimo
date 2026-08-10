@@ -4,7 +4,7 @@ import '../api_result.dart';
 import '../cash_charge_dto.dart';
 import '../network_bootstrap.dart';
 
-/// Wallet / gift cash endpoints.
+/// 钱包 / 礼物现金相关接口。
 class CashApi {
   const CashApi();
 
@@ -29,7 +29,7 @@ class CashApi {
     );
   }
 
-  /// Charge products, falling back to goods catalog when empty.
+  /// 充值商品；为空时回退到 goods 目录。
   Future<ApiResult<List<CashChargeProduct>>> rechargeOptions() async {
     final products = await chargeProducts();
     if (!products.ok) return products;

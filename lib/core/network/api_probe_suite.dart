@@ -2,7 +2,7 @@ import 'api_client.dart';
 import 'api_config.dart';
 import 'chimo_api.dart';
 
-/// Result of probing one endpoint.
+/// 探测单个接口的结果。
 class ApiProbeResult {
   const ApiProbeResult({
     required this.name,
@@ -21,7 +21,7 @@ class ApiProbeResult {
       '${response.message} (${response.code})';
 }
 
-/// Runs the core endpoints used by D:\forya against the configured base URL.
+/// 对已配置的 base URL 运行 D:\forya 所用的核心接口探测。
 class ApiProbeSuite {
   ApiProbeSuite(this.api);
 
@@ -47,7 +47,7 @@ class ApiProbeSuite {
     for (final (name, path, call) in checks) {
       try {
         final response = await call();
-        // Reachable backend + known auth gate counts as a successful probe.
+        // 后端可达且命中已知鉴权门控时，视为探测成功。
         final ok = response.reachable ||
             response.message == 'user.not.login' ||
             response.httpStatus == 200;
@@ -76,7 +76,7 @@ class ApiProbeSuite {
   static Future<List<ApiProbeResult>> runDefault({bool loadPrefs = false}) async {
     if (loadPrefs) {
       try {
-        // Lazy import avoided: caller uses ApiConfigStore when needed.
+        // 避免惰性导入：调用方按需使用 ApiConfigStore。
       } catch (_) {
         ApiConfig.useEnvironment(ApiEnvironment.test);
       }

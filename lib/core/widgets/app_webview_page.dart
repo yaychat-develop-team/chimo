@@ -7,9 +7,9 @@ import '../navigation/app_scheme_helper.dart';
 import '../theme/app_colors.dart';
 import 'app_nav_bar.dart';
 
-/// In-app browser for banner / scheme `web` links.
+/// 应用内浏览器，用于 banner / scheme `web` 链接。
 ///
-/// Bridges H5 via `CallFlutter` + scheme navigation (same as forya JRWebView).
+/// 通过 `CallFlutter` + scheme 导航桥接 H5（与 forya JRWebView 相同）。
 class AppWebViewPage extends StatefulWidget {
   const AppWebViewPage({
     super.key,
@@ -73,7 +73,7 @@ class _AppWebViewPageState extends State<AppWebViewPage> {
           onNavigationRequest: (request) async {
             if (!mounted) return NavigationDecision.prevent;
             final url = request.url;
-            // Let normal http(s) pages load; intercept custom schemes.
+            // 普通 http(s) 页面放行；拦截自定义 scheme。
             if (url.startsWith('http://') || url.startsWith('https://')) {
               return NavigationDecision.navigate;
             }
@@ -144,7 +144,7 @@ class _AppWebViewPageState extends State<AppWebViewPage> {
       ],
     );
 
-    // Full-screen activity H5 draws its own back / title (forya CommonWebView).
+    // 全屏活动 H5 自行绘制返回 / 标题（forya CommonWebView）。
     if (_fullScreen) {
       return Scaffold(
         backgroundColor: AppColors.background,

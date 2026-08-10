@@ -5,7 +5,7 @@ import '../models/app_bottom_nav_destination.dart';
 import '../models/main_tab.dart';
 import 'main_tab_icons.dart';
 
-/// Single bottom nav item: 30×30 icon + ~15pt label below.
+/// 单个底部导航项：30×30 图标 + 下方约 15pt 文案。
 class AppBottomNavItem extends StatelessWidget {
   const AppBottomNavItem({
     super.key,

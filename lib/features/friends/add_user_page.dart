@@ -7,7 +7,7 @@ import '../../core/widgets/app_asset_image.dart';
 import '../../core/widgets/app_nav_bar.dart';
 import '../../core/widgets/app_page_scaffold.dart';
 
-/// Add user page: search by User ID or nickname (messages search entry).
+/// 添加用户页：按用户 ID 或昵称搜索（消息搜索入口）。
 class AddUserPage extends StatefulWidget {
   const AddUserPage({super.key});
 
@@ -22,7 +22,7 @@ class _AddUserPageState extends State<AddUserPage> {
   @override
   void initState() {
     super.initState();
-    // Auto-focus on entry to match design cursor state.
+    // 进入时自动聚焦，对齐设计中的光标状态。
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _focusNode.requestFocus();
     });

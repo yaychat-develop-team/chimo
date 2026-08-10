@@ -1,10 +1,10 @@
-# test if the branch is in the local repository.
-# return 1 if the branch exists in the local, or 0 if not.
+# 检测分支是否存在于本地仓库。
+# 本地存在返回 1，否则返回 0。
 function branch_is_in_local() {
     local branch=${1}
     local git_dir='./.git/'
     
-    # if $2 is set, git_dir=$2
+    # 若设置了 $2，则 git_dir=$2
     [ -z ${2} ] || git_dir=${2}
 
     local existed_in_local=`git --git-dir ${git_dir} branch --list ${branch}`
@@ -15,13 +15,13 @@ function branch_is_in_local() {
     fi
 }
 
-# test if the branch is in the remote repository.
-# return 1 if its remote branch exists, or 0 if not.
+# 检测分支是否存在于远程仓库。
+# 远程存在返回 1，否则返回 0。
 function branch_is_in_remote() {
     local branch=${1}
     local git_dir='./.git/'
     
-    # if $2 is set, git_dir=$2
+    # 若设置了 $2，则 git_dir=$2
     [ -z ${2} ] || git_dir=${2}
 
     local existed_in_remote=$(git --git-dir ${git_dir} ls-remote --heads origin ${branch})
@@ -33,13 +33,13 @@ function branch_is_in_remote() {
     fi
 }
 
-# test if the branch is in the remote repository.
-# return 1 if its remote branch exists, or 0 if not.
+# 检测分支是否存在于远程仓库。
+# 远程存在返回 1，否则返回 0。
 function is_branch_exist() {
     local branch=${1}
     local git_dir='./.git/'
     
-    # if $2 is set, git_dir=$2
+    # 若设置了 $2，则 git_dir=$2
     [ -z ${2} ] || git_dir=${2}
 
     retval=1
@@ -59,23 +59,23 @@ function checkout_and_pull() {
     local branch=${1}
     local git_dir='./.git/'
 
-    # if $2 is set, git_dir=$2
+    # 若设置了 $2，则 git_dir=$2
     [ -z ${2} ] || git_dir=${2}
 
-    # clear all local changes
+    # 清除所有本地改动
     git --git-dir $git_dir checkout .
     git --git-dir $git_dir clean -df
 
-    # fetch new branch that might not in local
+    # 拉取本地可能尚不存在的新分支
     git --git-dir $git_dir fetch origin $branch
 
-    # force to checkout the $branch
+    # 强制切换到 $branch
     git --git-dir $git_dir checkout -f $branch
 
-    # clear all changes inclueds by checkouting new branch
+    # 清除切换新分支带来的所有改动
     git --git-dir $git_dir checkout .
     git --git-dir $git_dir clean -df
 
-    # pull the new changes into local
+    # 将远程新改动拉取到本地
     git --git-dir $git_dir pull origin $branch --progress -v
 } 

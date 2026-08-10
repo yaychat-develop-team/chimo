@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 
-/// Section header: title left, optional action right (e.g. More).
+/// 区块标题：左侧标题，右侧可选操作（如更多）。
 class SectionHeader extends StatelessWidget {
   const SectionHeader({
     super.key,
@@ -11,13 +11,13 @@ class SectionHeader extends StatelessWidget {
     this.onActionTap,
   });
 
-  /// Section title.
+  /// 区块标题。
   final String title;
 
-  /// Right action label; hidden when null.
+  /// 右侧操作文案；为 null 时隐藏。
   final String? actionLabel;
 
-  /// Right action tap callback.
+  /// 右侧操作点击回调。
   final VoidCallback? onActionTap;
 
   @override

@@ -10,7 +10,7 @@ class _ChatLine {
     this.kind = _ChatLineKind.text,
     this.text = '',
     this.voiceSeconds = 0,
-    /// Asset path, absolute file path, or http(s) URL (image / voice / emote).
+    /// 资源路径、绝对文件路径或 http(s) URL（图片 / 语音 / 表情）。
     this.mediaSource = '',
     this.imageAssets = const [],
     this.giftId = 0,
@@ -39,7 +39,7 @@ class _ChatLine {
   final String emoteName;
   final int serverTimeMs;
 
-  /// EaseMob message id (cursor for history pagination).
+  /// EaseMob 消息 id（历史分页游标）。
   final String msgId;
 
   String get displayMedia {
@@ -68,7 +68,7 @@ class _ChatLine {
   }
 }
 
-/// Design spec bubble sizes (DM message stream — Figma 55:274 + forya media proportion).
+/// 设计稿气泡尺寸（私聊消息流 — Figma 55:274 + forya 媒体比例）。
 abstract final class _BubbleLayout {
   static const double avatar = 40;
   static const double avatarGap = 10;
@@ -76,15 +76,15 @@ abstract final class _BubbleLayout {
   static const double padV = 12;
   static const double peerMax = 243;
   static const double selfMax = 260;
-  /// Consecutive same-sender messages (especially media stack).
+  /// 连续同发送者消息间距（尤其媒体堆叠）。
   static const double sameGap = 6;
   static const double sameMediaGap = 4;
   static const double otherGap = 20;
-  /// Thumbnail-like media (closer to forya 110×~196).
+  /// 缩略图式媒体（接近 forya 110×~196）。
   static const double imageW = 132;
   static const double imageH = 176;
   static const double imageRadius = 12;
-  /// Sticker bubble (forya _EmoteItem: width 65, fitWidth).
+  /// 贴纸气泡（forya _EmoteItem：宽 65，fitWidth）。
   static const double emoteSize = 65;
   static const Color peerColor = Color(0xFFF0F0F0);
   static const Color selfColor = Color(0xFFB8FF6A);
@@ -109,7 +109,7 @@ abstract final class _BubbleLayout {
   );
 }
 
-/// Result from gift sheet → chat stream.
+/// 礼物面板结果 → 聊天消息流。
 class _GiftSendResult {
   const _GiftSendResult({
     required this.id,
@@ -128,4 +128,4 @@ class _GiftSendResult {
   final int cost;
 }
 
-/// DM detail: black app bar + white message area (drag handle) + input bar.
+/// 私聊详情：黑色应用栏 + 白色消息区（拖动手柄）+ 输入栏。

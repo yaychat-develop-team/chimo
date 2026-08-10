@@ -13,7 +13,7 @@ import '../home/chat_user_profile_page.dart';
 import '../home/models/chat_user_profile.dart';
 import 'data/visit_dto.dart';
 
-/// Me → Visitors: list of who viewed my profile (`GET /user-relation/viewedBy`).
+/// Me → 访客：谁看过我的资料列表（`GET /user-relation/viewedBy`）。
 class VisitsPage extends StatefulWidget {
   const VisitsPage({super.key});
 

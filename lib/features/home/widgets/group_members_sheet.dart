@@ -11,7 +11,7 @@ import '../../../core/widgets/app_asset_image.dart';
 import '../../../core/widgets/network_or_asset_avatar.dart';
 import '../../../shared/models/group_member.dart';
 
-/// Group members bottom sheet with nickname search (API-backed).
+/// 群成员底部弹层，支持昵称搜索（接口驱动）。
 class GroupMembersSheet extends StatefulWidget {
   const GroupMembersSheet({
     super.key,
@@ -125,8 +125,8 @@ class _GroupMembersSheetState extends State<GroupMembersSheet> {
     final bottom = MediaQuery.paddingOf(context).bottom;
     final height = MediaQuery.sizeOf(context).height * 0.72;
 
-    // isScrollControlled sheets fill the screen; Align alone still hits the
-    // transparent top and blocks barrier dismiss — tap empty area to close.
+    // isScrollControlled 弹层会铺满屏幕；仅用 Align 仍会点到透明顶部
+    // 并挡住遮罩关闭 — 点击空白区域关闭。
     return SizedBox.expand(
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,

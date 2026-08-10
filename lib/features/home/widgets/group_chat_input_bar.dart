@@ -14,7 +14,7 @@ enum GroupChatPanel { none, voice, photo, emoji }
 
 enum _VoicePhase { idle, recording, preview }
 
-/// Group chat composer: voice / image / emoji + text send.
+/// 群聊输入栏：语音 / 图片 / 表情 + 文本发送。
 class GroupChatInputBar extends StatefulWidget {
   const GroupChatInputBar({
     super.key,
@@ -31,7 +31,7 @@ class GroupChatInputBar extends StatefulWidget {
   final ValueChanged<String> onSendText;
   final ValueChanged<int> onSendVoice;
   final ValueChanged<List<String>> onSendImages;
-  /// Called when voice / photo / emoji panel opens or closes.
+  /// 语音 / 相册 / 表情面板打开或关闭时回调。
   final ValueChanged<bool>? onPanelChanged;
 
   @override
@@ -42,7 +42,7 @@ class GroupChatInputBarState extends State<GroupChatInputBar> {
   static const int _maxVoiceSeconds = 60;
   static const int _albumPageSize = 80;
 
-  /// Match DM photo / voice panel height.
+  /// 与私聊相册 / 语音面板高度一致。
   static const double _panelHeight = 300;
 
   static const ColorFilter _iconFilter = ColorFilter.matrix(<double>[
@@ -114,7 +114,7 @@ class GroupChatInputBarState extends State<GroupChatInputBar> {
     _notifyPanel(false);
   }
 
-  /// Tap message blank area: dismiss keyboard + voice/photo/emoji panels.
+  /// 点击消息空白区：收起键盘 + 语音/相册/表情面板。
   void dismissComposer() {
     _dismissKeyboard();
     _closePanel();
@@ -162,7 +162,7 @@ class GroupChatInputBarState extends State<GroupChatInputBar> {
     unawaited(_loadAlbumPhotos());
   }
 
-  /// Image-only: same as DM — avoid VIDEO permission on Android 13+.
+  /// 仅图片：与私聊相同 — 避免 Android 13+ 的 VIDEO 权限。
   static const _albumPermissionOption = PermissionRequestOption(
     androidPermission: AndroidPermission(
       type: RequestType.image,

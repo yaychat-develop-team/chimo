@@ -4,7 +4,7 @@
 # https://www.pgyer.com/doc/view/api#fastUploadApp
 #
 
-# Display log. 1=enable, 0=disable
+# 是否打印日志。1=开启，0=关闭
 LOG_ENABLE=1
 
 printHelp() {
@@ -45,19 +45,19 @@ done
 shift $(($OPTIND - 1))
 readonly file=$1
 
-# check api_key exists
+# 检查 api_key 是否存在
 if [ -z "$api_key" ]; then
     echo "api_key is empty"
     printHelp
 fi
 
-# check file exists
+# 检查文件是否存在
 if [ ! -f "$file" ]; then
     echo "file not exists"
     printHelp
 fi
 
-# check ext supported
+# 检查扩展名是否支持
 buildType=${file##*.}
 if [ "$buildType" != "ipa" ] && [ "$buildType" != "apk" ]; then
     echo "file ext is not supported"
@@ -65,7 +65,7 @@ if [ "$buildType" != "ipa" ] && [ "$buildType" != "apk" ]; then
 fi
 
 # ---------------------------------------------------------------
-# functions
+# 函数
 # ---------------------------------------------------------------
 
 log() {

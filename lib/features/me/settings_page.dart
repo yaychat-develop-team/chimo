@@ -9,7 +9,7 @@ import '../../core/widgets/app_tip_dialog.dart';
 import 'account_security_page.dart';
 import 'privacy_settings_page.dart';
 
-/// Settings: account security, privacy, clear cache, log out.
+/// 设置：账号安全、隐私、清除缓存、退出登录。
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
 
@@ -66,7 +66,7 @@ class _SettingsPageState extends State<SettingsPage> {
     try {
       await NetworkBootstrap.clearSession();
     } catch (_) {
-      // Still leave the app; local session clear is best-effort inside.
+      // 仍退出应用；本地会话清理在内部尽力而为。
     }
     if (!context.mounted) return;
     final nav = Navigator.of(context, rootNavigator: true);

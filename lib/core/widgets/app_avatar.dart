@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'network_or_asset_avatar.dart';
 
-/// Circular avatar convenience wrapper around [NetworkOrAssetAvatar].
+/// 圆形头像便捷封装，基于 [NetworkOrAssetAvatar]。
 class AppAvatar extends StatelessWidget {
   const AppAvatar({
     super.key,

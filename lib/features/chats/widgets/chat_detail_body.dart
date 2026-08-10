@@ -98,7 +98,7 @@ class _DmMessagesFeed extends StatelessWidget {
 
   bool _showAvatar(int index) {
     if (messages[index].kind == _ChatLineKind.tip) return false;
-    // Walk back past tip lines so avatar grouping stays correct.
+    // 回退跳过 tip 行，使头像分组保持正确。
     var prev = index - 1;
     while (prev >= 0 && messages[prev].kind == _ChatLineKind.tip) {
       prev--;
@@ -118,7 +118,7 @@ class _DmMessagesFeed extends StatelessWidget {
     if (index == 0) return 0;
     final sameSide = messages[index].side == messages[index - 1].side;
     if (!sameSide) return _BubbleLayout.otherGap;
-    // Tighter when stacking media → media / media → voice.
+    // 媒体叠媒体 / 媒体叠语音时间距更紧。
     if (_isMedia(index) && _isMedia(index - 1)) {
       return _BubbleLayout.sameMediaGap;
     }
@@ -131,7 +131,7 @@ class _DmMessagesFeed extends StatelessWidget {
     if (index == 0) return true;
     final prev = messages[index - 1].serverTimeMs;
     if (prev <= 0) return true;
-    // Show when gap ≥ 5 minutes (matches common IM rhythm).
+    // 间隔 ≥ 5 分钟时显示（对齐常见 IM 节奏）。
     return (t - prev).abs() >= 5 * 60 * 1000;
   }
 
@@ -140,9 +140,9 @@ class _DmMessagesFeed extends StatelessWidget {
     final time = DateTime.fromMillisecondsSinceEpoch(ms);
     final clock = _formatClock(time);
 
-    // Match forya TimeAgo.timeForMsg(showTime: true):
-    // same calendar day → clock; next calendar day within 24h → yesterday;
-    // older → month/day (and year when needed).
+    // 对齐 forya TimeAgo.timeForMsg(showTime: true)：
+    // 同一自然日 → 时钟；24h 内的下一自然日 → yesterday；
+    // 更早 → 月/日（需要时带年）。
     if (now.year != time.year) {
       return '${_monthAbbr(time.month)} ${time.day}, ${time.year} $clock';
     }
@@ -199,8 +199,8 @@ class _DmMessagesFeed extends StatelessWidget {
       onTap: onBlankTap,
       child: ListView.builder(
         controller: scrollController,
-        // Non-reverse: short threads start under the handle (no huge top blank).
-        // Entering still pins to the latest via jumpTo(maxScrollExtent).
+        // 非 reverse：短会话从把手下方开始（无大块顶部空白）。
+        // 进入时仍通过 jumpTo(maxScrollExtent) 钉到最新。
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         padding: const EdgeInsets.fromLTRB(14, 8, 14, 24),
         itemCount: itemCount,
@@ -352,7 +352,7 @@ class _ChatAvatar extends StatelessWidget {
   }
 }
 
-/// Shared left/right row so text / image / voice share the same column rhythm.
+/// 共用左右行布局，使文本 / 图片 / 语音列节奏一致。
 class _ChatRow extends StatelessWidget {
   const _ChatRow({
     required this.isSelf,
@@ -521,7 +521,7 @@ class _VoiceBubble extends StatefulWidget {
 
 class _VoiceBubbleState extends State<_VoiceBubble>
     with SingleTickerProviderStateMixin {
-  /// Only one voice message may play at a time.
+  /// 同一时间只能播放一条语音。
   static VoidCallback? _activeStop;
   static final AudioPlayer _player = AudioPlayer();
 
@@ -600,7 +600,7 @@ class _VoiceBubbleState extends State<_VoiceBubble>
         } else if (File(src).existsSync()) {
           await _player.play(DeviceFileSource(src));
         } else {
-          // Unknown path — fall through to tick timer only.
+          // 未知路径 — 仅走倒计时计时器。
         }
         await _completeSub?.cancel();
         _completeSub = _player.onPlayerComplete.listen((_) {
@@ -611,7 +611,7 @@ class _VoiceBubbleState extends State<_VoiceBubble>
       }
     }
 
-    // UI countdown even if audio fails (keeps bars animating).
+    // 即使音频失败也做 UI 倒计时（保持波形条动画）。
     _playTimer?.cancel();
     if (widget.seconds > 0) {
       _playTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -654,7 +654,7 @@ class _VoiceBubbleState extends State<_VoiceBubble>
             bottomRight: const Radius.circular(16),
           ),
         ),
-        // Match forya: waveform left, duration right (spaceBetween).
+        // 对齐 forya：波形在左，时长在右（spaceBetween）。
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -699,7 +699,7 @@ class _VoiceBubbleState extends State<_VoiceBubble>
   }
 }
 
-/// Design: three waveform bars left of voice bubble; animate while playing.
+/// 设计：语音气泡左侧三条波形；播放时动画。
 class _VoiceBarsIcon extends StatelessWidget {
   const _VoiceBarsIcon({
     this.playing = false,
@@ -776,7 +776,7 @@ class _VoiceBarsPainter extends CustomPainter {
   }
 }
 
-/// Image message: network / file / asset; optional locked blur + Join to view.
+/// 图片消息：网络 / 文件 / 资源；可选锁定模糊 + Join to view。
 class _ImageBubble extends StatelessWidget {
   const _ImageBubble({
     required this.side,
@@ -960,7 +960,7 @@ class _ImageBubble extends StatelessWidget {
   }
 }
 
-/// Sticker message: network URL with contain fit (not cropped like photo).
+/// 贴纸消息：网络 URL，contain 适配（不像照片那样裁切）。
 class _EmoteBubble extends StatelessWidget {
   const _EmoteBubble({
     required this.side,
@@ -982,7 +982,7 @@ class _EmoteBubble extends StatelessWidget {
 
   Widget _sticker() {
     final src = source.trim();
-    // Match forya `_EmoteItem`: fixed width 65, fitWidth (no cover crop).
+    // 对齐 forya `_EmoteItem`：固定宽 65，fitWidth（无 cover 裁切）。
     const size = _BubbleLayout.emoteSize;
     if (src.isEmpty) {
       return const SizedBox(
@@ -1089,7 +1089,7 @@ class _GiftMessageCard extends StatelessWidget {
   final String? selfAvatarUrl;
   final bool showAvatar;
 
-  /// Match forya GiftItemV2: padding 16, icon 56, gap 16, font 14.
+  /// 对齐 forya GiftItemV2：padding 16，图标 56，间距 16，字号 14。
   static const _qtyYellow = Color(0xFFFDF652);
   static const _labelStyle = TextStyle(
     color: Color(0xFF1A1A1A),
@@ -1198,7 +1198,7 @@ class _GiftMessageCard extends StatelessWidget {
             ],
           ),
         ),
-        // Match forya box-item badge on gift bubble corner.
+        // 对齐 forya 礼物气泡角上的 box-item 徽章。
         const PositionedDirectional(
           end: -8,
           bottom: -8,

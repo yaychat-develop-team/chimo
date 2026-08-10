@@ -7,7 +7,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
 
-/// Full-screen photo detail with swipe; supports asset paths and file paths.
+/// 全屏照片详情（可滑动）；支持资源路径与文件路径。
 class AlbumPhotoViewerPage extends StatefulWidget {
   const AlbumPhotoViewerPage({
     super.key,
@@ -18,7 +18,7 @@ class AlbumPhotoViewerPage extends StatefulWidget {
   final List<String> paths;
   final int initialIndex;
 
-  /// Push full-screen viewer; no-op when [paths] has no usable entries.
+  /// 打开全屏查看器；[paths] 无可用项时为 no-op。
   static Future<void> open(
     BuildContext context, {
     required List<String> paths,

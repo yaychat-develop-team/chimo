@@ -3,9 +3,9 @@ import 'package:flutter/services.dart';
 
 import 'app_colors.dart';
 
-/// App theme configuration.
+/// 应用主题配置。
 abstract final class AppTheme {
-  /// Dark theme: black background, green primary, light status-bar icons.
+  /// 深色主题：黑底、绿色主色、浅色状态栏图标。
   static ThemeData get dark {
     final base = ThemeData(
       useMaterial3: true,
@@ -24,7 +24,7 @@ abstract final class AppTheme {
         backgroundColor: AppColors.background,
         elevation: 0,
         scrolledUnderElevation: 0,
-        // Light system status bar on a dark background.
+        // 深色背景上使用浅色系统状态栏。
         systemOverlayStyle: SystemUiOverlayStyle.light,
       ),
       textTheme: base.textTheme.apply(

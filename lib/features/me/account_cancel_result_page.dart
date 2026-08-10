@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// Submitted cancel-account review status (forya AccountCancelResultPage).
+/// 已提交的注销账号审核状态（对齐 forya AccountCancelResultPage）。
 class AccountCancelResultPage extends StatelessWidget {
   const AccountCancelResultPage({super.key});
 
@@ -74,7 +74,7 @@ class AccountCancelResultPage extends StatelessWidget {
   }
 }
 
-/// Yellow review badge matching forya `ic_accountapprove` look.
+/// 黄色审核徽章，对齐 forya `ic_accountapprove` 样式。
 class _ReviewBadge extends StatelessWidget {
   const _ReviewBadge();
 
@@ -102,7 +102,7 @@ class _ReviewBadgePainter extends CustomPainter {
       Paint()..color = const Color(0xFFFFD400),
     );
 
-    // White clock hands (under-review mark).
+    // 白色表针（审核中标记）。
     final hand = Paint()
       ..color = Colors.white
       ..strokeWidth = 5

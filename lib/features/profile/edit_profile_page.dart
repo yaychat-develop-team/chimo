@@ -27,7 +27,7 @@ import 'personal_signature_page.dart';
 import 'photo_pick_sheet.dart';
 import 'voice_note_page.dart';
 
-/// Edit profile page.
+/// 编辑资料页。
 class EditProfilePage extends StatefulWidget {
   const EditProfilePage({
     super.key,
@@ -37,7 +37,7 @@ class EditProfilePage extends StatefulWidget {
 
   final MeProfile profile;
 
-  /// Email signup: after Save, enter home instead of popping.
+  /// 邮箱注册：保存后进入首页，而不是 pop。
   final bool fromOnboarding;
 
   static const int maxPhotos = 9;
@@ -56,7 +56,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   int? _weight;
   int? _voiceSeconds;
   String? _voiceUrl;
-  /// Local pending recording path (uploaded on Save).
+  /// 本地待上传录音路径（Save 时上传）。
   String? _pendingVoicePath;
   List<String> _tags = const [];
   bool _nicknameChangedOnce = false;
@@ -93,8 +93,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
     _photoPaths
       ..clear()
       ..addAll(p.momentUrls);
-    // Avoid wiping pics the user just added while user/info was still loading,
-    // or when the backend omits pending-audit items from parse.
+    // 避免在 user/info 仍在加载时清空用户刚添加的图片，
+    // 或后端解析时省略待审核项的情况。
     if (keepLocalPhotosIfRemoteEmpty &&
         _photoPaths.isEmpty &&
         previousPhotos.isNotEmpty) {
@@ -117,7 +117,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         );
       }
     } catch (_) {
-      // Keep seed profile if refresh fails.
+      // 刷新失败时保留种子资料。
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -252,7 +252,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     }
   }
 
-  /// Profile fill progress for the app bar (0–100).
+  /// 资料完善进度（应用栏用，0–100）。
   int get _completionPercent {
     var filled = 0;
     const total = 10;
@@ -315,12 +315,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
     }
 
     if (!forAlbum) {
-      // Avatar path (profile picture) is handled on its own page for now.
+      // 头像路径（个人头像）暂由独立页面处理。
       return;
     }
     if (_photoCount >= EditProfilePage.maxPhotos) return;
 
-    // Optimistic local preview while upload runs.
+    // 上传进行中先做本地乐观预览。
     final localPath = file.path;
     final token = Object();
     _photoUploadToken = token;
@@ -1091,7 +1091,7 @@ class _VoiceNoteCard extends StatefulWidget {
   });
 
   final int? seconds;
-  /// Remote URL or local file path for playback.
+  /// 远程 URL 或本地文件路径，用于播放。
   final String? source;
   final VoidCallback onTap;
   final VoidCallback onDelete;

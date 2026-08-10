@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -5,10 +7,10 @@ import 'package:go_router/go_router.dart';
 import '../../app/app_router.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/widgets/agreement_page.dart';
+import '../../core/widgets/app_webview_page.dart';
 import '../debug/debug_page.dart';
 
-/// Login page per design: Email primary button, agreement, Debug, phone entry.
+/// 登录页（按设计）：邮箱主按钮、协议、Debug、手机入口。
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -17,14 +19,28 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
+  static const _userAgreementUrl =
+      'https://www.chimoapp.com/agreements/yonghufuwu.html';
+  static const _privacyAgreementUrl =
+      'https://www.chimoapp.com/agreements/yinsi.html';
+
   bool _agreed = false;
 
-  void _openAgreement(String title) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => AgreementPage(title: title),
-      ),
-    );
+  Future<void> _openAgreement(String title) {
+    final url = title.contains('Privacy')
+        ? _privacyAgreementUrl
+        : _userAgreementUrl;
+    return AppWebViewPage.open(context, url: url, title: title);
+  }
+
+  Future<void> _openAgreementFromSheet(
+    BuildContext sheetContext,
+    String title,
+  ) {
+    final url = title.contains('Privacy')
+        ? _privacyAgreementUrl
+        : _userAgreementUrl;
+    return AppWebViewPage.open(sheetContext, url: url, title: title);
   }
 
   Future<void> _openEmailLogin() async {
@@ -36,11 +52,7 @@ class _LoginPageState extends State<LoginPage> {
         barrierColor: Colors.black.withValues(alpha: 0.55),
         builder: (sheetContext) => _WelcomeAgreementSheet(
           onOpenAgreement: (title) {
-            Navigator.of(sheetContext).push(
-              MaterialPageRoute<void>(
-                builder: (_) => AgreementPage(title: title),
-              ),
-            );
+            unawaited(_openAgreementFromSheet(sheetContext, title));
           },
         ),
       );
@@ -60,11 +72,7 @@ class _LoginPageState extends State<LoginPage> {
         barrierColor: Colors.black.withValues(alpha: 0.55),
         builder: (sheetContext) => _WelcomeAgreementSheet(
           onOpenAgreement: (title) {
-            Navigator.of(sheetContext).push(
-              MaterialPageRoute<void>(
-                builder: (_) => AgreementPage(title: title),
-              ),
-            );
+            unawaited(_openAgreementFromSheet(sheetContext, title));
           },
         ),
       );
@@ -393,7 +401,7 @@ class _AgreementRowState extends State<_AgreementRow> {
   }
 }
 
-/// Welcome confirmation bottom sheet when agreement is unchecked.
+/// 未勾选协议时的欢迎确认底部弹层。
 class _WelcomeAgreementSheet extends StatefulWidget {
   const _WelcomeAgreementSheet({required this.onOpenAgreement});
 

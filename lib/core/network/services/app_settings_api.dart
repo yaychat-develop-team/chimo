@@ -4,7 +4,7 @@ import '../api_result.dart';
 import '../app_meta_dto.dart';
 import '../network_bootstrap.dart';
 
-/// App settings, version, home banners.
+/// 应用设置、版本、首页横幅。
 class AppSettingsApi {
   const AppSettingsApi();
 

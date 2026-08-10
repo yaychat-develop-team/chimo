@@ -7,7 +7,7 @@ import '../group_dto.dart';
 import '../group_photo_dto.dart';
 import '../network_bootstrap.dart';
 
-/// Group / tribe endpoints.
+/// 群组 / 部落相关接口。
 class GroupApi {
   const GroupApi();
 
@@ -24,7 +24,7 @@ class GroupApi {
     );
   }
 
-  /// Onboarding / filter by tribe types (`typeList`, comma-separated; empty = all).
+  /// 引导页 / 按部落类型筛选（`typeList`，逗号分隔；空表示全部）。
   Future<ApiResult<List<PopularGroupItem>>> listByType(String typeList) {
     return ApiGateway.request(
       () => NetworkBootstrap.api.groupListByType(typeList),

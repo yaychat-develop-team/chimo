@@ -5,26 +5,26 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/network_or_asset_avatar.dart';
 import '../models/group_item.dart';
 
-/// My Groups card (design: width 100, base card height 70, avatar 54).
+/// My Groups 卡片（设计：宽 100，底卡高 70，头像 54）。
 class MyGroupCard extends StatelessWidget {
   const MyGroupCard({super.key, required this.group, this.onTap});
 
   final MyGroupItem group;
   final VoidCallback? onTap;
 
-  /// Card body width.
+  /// 卡片主体宽度。
   static const double cardWidth = 100;
 
-  /// Background card height (excluding avatar overlap).
+  /// 背景卡高度（不含头像重叠）。
   static const double cardHeight = 70;
 
-  /// Circular avatar side length.
+  /// 圆形头像边长。
   static const double avatarSize = 54;
 
-  /// Half of avatar height overlapping above the card top edge.
+  /// 头像高度的一半，重叠在卡片上边缘之上。
   static const double avatarOverlap = avatarSize / 2;
 
-  /// Total card height (avatar overlap + base card).
+  /// 卡片总高度（头像重叠 + 底卡）。
   static const double totalHeight = cardHeight + avatarOverlap;
 
   @override
@@ -38,7 +38,7 @@ class MyGroupCard extends StatelessWidget {
           clipBehavior: Clip.none,
           alignment: Alignment.topCenter,
           children: [
-            // Background card + group name
+            // 背景卡 + 群名称
             Positioned(
               top: avatarOverlap,
               left: 0,
@@ -68,7 +68,7 @@ class MyGroupCard extends StatelessWidget {
                 ),
               ),
             ),
-            // Circular avatar (overlapping card top)
+            // 圆形头像（叠在卡片顶部）
             Positioned(
               top: 0,
               child: Container(

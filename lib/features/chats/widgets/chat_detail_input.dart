@@ -16,7 +16,7 @@ class _DmInputBar extends StatefulWidget {
   final double bottomInset;
   final TextEditingController controller;
   final ValueChanged<String?> onSend;
-  /// (filePath, durationSeconds) — path empty means local-only mock failed.
+  /// (filePath, durationSeconds) — path 为空表示仅本地 mock 失败。
   final void Function(String path, int seconds) onSendVoice;
   final ValueChanged<List<String>> onSendImages;
   final ValueChanged<_GiftSendResult> onSendGift;
@@ -35,7 +35,7 @@ class _DmInputBarState extends State<_DmInputBar> {
   static const int _maxVoiceSeconds = 60;
   static const int _albumPageSize = 80;
 
-  /// Voice / photo panels share the same bottom area height (excl. safe inset).
+  /// 语音 / 相册面板共用同一底部区域高度（不含安全区）。
   static const double _panelHeight = 300;
 
   final FocusNode _inputFocus = FocusNode();
@@ -51,12 +51,12 @@ class _DmInputBarState extends State<_DmInputBar> {
   Timer? _voiceTimer;
   String? _voicePath;
 
-  /// Device album photos for the grid (excluding camera cell).
+  /// 网格用的设备相册照片（不含相机格）。
   List<AssetEntity> _albumPhotos = const [];
   bool _albumLoading = false;
   String? _albumError;
 
-  /// Selection order (photo indices into [_albumPhotos]); empty = none selected.
+  /// 选择顺序（[_albumPhotos] 中的照片下标）；空 = 未选。
   final List<int> _selectedPhotos = [];
   bool _originalPhoto = true;
 
@@ -86,13 +86,13 @@ class _DmInputBarState extends State<_DmInputBar> {
     }
   }
 
-  /// Dismiss keyboard before opening bottom function panel.
+  /// 打开底部功能面板前收起键盘。
   void _dismissKeyboard() {
     _inputFocus.unfocus();
     FocusManager.instance.primaryFocus?.unfocus();
   }
 
-  /// Close voice/photo panel when input is focused.
+  /// 输入框获焦时关闭语音/相册面板。
   void _closeFunctionPanel() {
     if (_panel == _DmPanel.none) return;
     unawaited(_stopRecorderIfNeeded(deleteFile: true));
@@ -110,7 +110,7 @@ class _DmInputBarState extends State<_DmInputBar> {
     });
   }
 
-  /// Tap message blank area: dismiss keyboard + function panels.
+  /// 点击消息空白区：收起键盘 + 功能面板。
   void dismissComposer() {
     _dismissKeyboard();
     _closeFunctionPanel();
@@ -216,8 +216,8 @@ class _DmInputBarState extends State<_DmInputBar> {
     unawaited(_loadAlbumPhotos());
   }
 
-  /// Image-only: default RequestType.common also asks for VIDEO and fails
-  /// when READ_MEDIA_IMAGES is granted but READ_MEDIA_VIDEO is not.
+  /// 仅图片：默认 RequestType.common 也会申请 VIDEO，在已授权
+  /// READ_MEDIA_IMAGES 但未授权 READ_MEDIA_VIDEO 时会失败。
   static const _albumPermissionOption = PermissionRequestOption(
     androidPermission: AndroidPermission(
       type: RequestType.image,
@@ -479,7 +479,7 @@ class _DmInputBarState extends State<_DmInputBar> {
       );
       return;
     }
-    // Keep file for send/play; panel closes without deleting.
+    // 保留文件供发送/播放；关闭面板时不删除。
     await _closeVoicePanel(deleteFile: false);
     widget.onSendVoice(path, seconds);
   }
@@ -547,7 +547,7 @@ class _DmInputBarState extends State<_DmInputBar> {
   }
 
   Future<void> _pickFromAlbum() async {
-    // System multi-picker as fallback / full album.
+    // 系统多选作为回退 / 完整相册。
     try {
       final files = await ImagePicker().pickMultiImage(
         imageQuality: _originalPhoto ? 100 : 85,
@@ -571,7 +571,7 @@ class _DmInputBarState extends State<_DmInputBar> {
 
   Future<void> _pickFromCamera() async {
     try {
-      // Close photo panel first so camera activity is not covered.
+      // 先关闭相册面板，避免挡住相机界面。
       if (_panel != _DmPanel.none) {
         setState(() => _panel = _DmPanel.none);
       }
@@ -583,7 +583,7 @@ class _DmInputBarState extends State<_DmInputBar> {
       );
       if (!mounted) return;
       if (file == null) {
-        // User cancelled or no camera activity available.
+        // 用户取消或无可用相机界面。
         return;
       }
       widget.onSendImages([file.path]);
@@ -636,7 +636,7 @@ class _DmInputBarState extends State<_DmInputBar> {
   Widget build(BuildContext context) {
     final showPanel = _panel != _DmPanel.none;
     final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
-    // Panel open: safe area only; keyboard open (no panel): pad by keyboard height.
+    // 面板打开：仅安全区；键盘打开（无面板）：按键盘高度垫底。
     final bottomPad =
         showPanel ? widget.bottomInset : math.max(widget.bottomInset, keyboardInset);
 
@@ -831,7 +831,7 @@ class _ChatEmojiPanel extends StatefulWidget {
 }
 
 class _ChatEmojiPanelState extends State<_ChatEmojiPanel> {
-  /// Match forya EmojiSubPanel set (common chat emoji).
+  /// 对齐 forya EmojiSubPanel 集合（常用聊天表情）。
   static const List<String> _emojis = [
     '😀', '😁', '😂', '🤣', '😃', '😄',
     '😅', '😆', '😉', '😊', '😋', '😎',
@@ -852,7 +852,7 @@ class _ChatEmojiPanelState extends State<_ChatEmojiPanel> {
     '💕', '💞', '💓', '💗', '💖', '✨',
   ];
 
-  /// Tab 0 = system emoji; 1..n = sticker packs.
+  /// Tab 0 = 系统 emoji；1..n = 贴纸包。
   int _tab = 0;
   List<EmotePack> _packs = const [];
   final Map<String, List<EmoteSticker>> _stickersByPack = {};
@@ -1124,7 +1124,7 @@ class _ChatEmojiPanelState extends State<_ChatEmojiPanel> {
 
   @override
   Widget build(BuildContext context) {
-    // Match forya EmotePanel: emoji tab + pack tabs; stickers 4-col.
+    // 对齐 forya EmotePanel：emoji tab + 包 tab；贴纸 4 列。
     final showEmoji = _tab == 0;
     final packIndex = _tab - 1;
     final activePack =
@@ -1231,7 +1231,7 @@ class _ChatPhotoPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasSelection = selected.isNotEmpty;
-    // Camera cell + album photos.
+    // 相机格 + 相册照片。
     final itemCount = photos.length + 1;
 
     return Column(
@@ -1559,7 +1559,7 @@ class _ChatVoicePanel extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Design: 33×18 timer text
+        // 设计：33×18 计时文案
         Text(
           timeLabel,
           style: const TextStyle(
@@ -1573,7 +1573,7 @@ class _ChatVoicePanel extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Design: 44×44 side actions (preview only)
+            // 设计：44×44 侧边操作（仅预览）
             SizedBox(
               width: 44,
               height: 44,
@@ -1635,10 +1635,10 @@ class _ChatVoiceMainButton extends StatelessWidget {
   final double progress;
   final VoidCallback onTap;
 
-  /// Design outer size for the main control (86×86).
+  /// 主控件外径设计尺寸（86×86）。
   static const double _outer = 86;
 
-  /// Inset yellow fill so the ring around it stays visible.
+  /// 内缩黄色填充，使外围圆环仍可见。
   static const double _fill = 78;
 
   @override
@@ -1661,7 +1661,7 @@ class _ChatVoiceMainButton extends StatelessWidget {
           else if (phase == _ChatVoicePhase.preview)
             CustomPaint(
               size: const Size(_outer, _outer),
-              // Preview: light track ring only (design white/grey border).
+              // 预览：仅浅色轨道环（设计白/灰描边）。
               painter: const _ChatVoiceProgressPainter(progress: 0),
             ),
           Material(
@@ -1675,7 +1675,7 @@ class _ChatVoiceMainButton extends StatelessWidget {
                 height: fillSize,
                 child: Center(
                   child: switch (phase) {
-                    // Design: mic 42×42
+                    // 设计：麦克风 42×42
                     _ChatVoicePhase.idle ||
                     _ChatVoicePhase.recording => Image.asset(
                       AppAssets.audioRecordIcon,
@@ -1683,7 +1683,7 @@ class _ChatVoiceMainButton extends StatelessWidget {
                       height: 42,
                       fit: BoxFit.contain,
                     ),
-                    // Design: waveform
+                    // 设计：波形
                     _ChatVoicePhase.preview => Image.asset(
                       AppAssets.audioPlayingIcon,
                       width: 36,

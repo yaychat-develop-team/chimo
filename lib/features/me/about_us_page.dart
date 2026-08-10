@@ -6,10 +6,10 @@ import 'package:flutter/services.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/network/app_apis.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/widgets/agreement_page.dart';
 import '../../core/widgets/app_page_scaffold.dart';
+import '../../core/widgets/app_webview_page.dart';
 
-/// About Us: logo, version (version-check), website, agreement links.
+/// 关于我们：Logo、版本（version-check）、官网、协议链接。
 class AboutUsPage extends StatefulWidget {
   const AboutUsPage({
     super.key,
@@ -91,12 +91,16 @@ class _AboutUsPageState extends State<AboutUsPage> {
     );
   }
 
-  void _openAgreement(String title) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => AgreementPage(title: title),
-      ),
-    );
+  static const _userAgreementUrl =
+      'https://www.chimoapp.com/agreements/yonghufuwu.html';
+  static const _privacyAgreementUrl =
+      'https://www.chimoapp.com/agreements/yinsi.html';
+
+  Future<void> _openAgreement({
+    required String title,
+    required String url,
+  }) {
+    return AppWebViewPage.open(context, url: url, title: title);
   }
 
   @override
@@ -171,7 +175,10 @@ class _AboutUsPageState extends State<AboutUsPage> {
                       color: AppColors.textSecondary,
                       size: 20,
                     ),
-                    onTap: () => _openAgreement('User Service Agreement'),
+                    onTap: () => _openAgreement(
+                      title: 'User Service Agreement',
+                      url: _userAgreementUrl,
+                    ),
                   ),
                   const Divider(
                     height: 1,
@@ -187,7 +194,10 @@ class _AboutUsPageState extends State<AboutUsPage> {
                       color: AppColors.textSecondary,
                       size: 20,
                     ),
-                    onTap: () => _openAgreement('Privacy Agreement'),
+                    onTap: () => _openAgreement(
+                      title: 'Privacy Agreement',
+                      url: _privacyAgreementUrl,
+                    ),
                   ),
                 ],
               ),

@@ -1,4 +1,4 @@
-/// A group member entry.
+/// 群成员条目。
 class GroupMember {
   const GroupMember({
     required this.id,

@@ -1,8 +1,8 @@
 import 'api_client.dart';
 
-/// Endpoints mirrored from D:\forya `lib_network` (login / user / group / app).
+/// 接口与 D:\forya `lib_network`（login / user / group / app）对齐。
 ///
-/// Source of truth:
+/// 权威来源：
 /// - packages_local/lib_network/lib/src/api/*.dart
 /// - api_endpoints.txt
 class ChimoApi {
@@ -10,7 +10,7 @@ class ChimoApi {
 
   final ApiClient _client;
 
-  // ---- auth / login ----
+  // ---- 认证 / 登录 ----
   Future<ApiResponse> sendSms({required String phone}) {
     return _client.post('/auth/sms-send', bizParam: {'phone': phone});
   }
@@ -58,7 +58,7 @@ class ChimoApi {
     );
   }
 
-  // ---- user ----
+  // ---- 用户 ----
   Future<ApiResponse> userOpen({bool open = false}) {
     return _client.post('/user/open', bizParam: {'open': open});
   }
@@ -73,7 +73,7 @@ class ChimoApi {
     return _client.get('/user/account-security-info');
   }
 
-  /// Apply to cancel account. [code] may be empty for email-only accounts.
+  /// 申请注销账号。[code] 对仅邮箱账号可为空。
   Future<ApiResponse> cancelAccount({String code = ''}) {
     return _client.post('/user/cancel-account', bizParam: {'code': code});
   }
@@ -88,7 +88,7 @@ class ChimoApi {
     return _client.get('/user-relation/searchUser', query: {'key': key});
   }
 
-  /// People I follow (`Follow` tab). Empty keyword = full list.
+  /// 我关注的人（`Follow` 标签）。空关键字 = 完整列表。
   Future<ApiResponse> searchFollowing({
     int pageNum = 1,
     int pageSize = 20,
@@ -104,7 +104,7 @@ class ChimoApi {
     );
   }
 
-  /// Fans who follow me (`Followers` tab).
+  /// 关注我的粉丝（`Followers` 标签）。
   Future<ApiResponse> searchFans({
     int pageNum = 1,
     int pageSize = 20,
@@ -120,7 +120,7 @@ class ChimoApi {
     );
   }
 
-  /// Mutual friends (`Friends` tab).
+  /// 互相关注好友（`Friends` 标签）。
   Future<ApiResponse> searchFriends({
     int pageNum = 1,
     int pageSize = 20,
@@ -160,10 +160,10 @@ class ChimoApi {
   Future<ApiResponse> getBlackList() =>
       _client.get('/user-relation/get-black-list');
 
-  /// Who viewed my profile (Visits page).
+  /// 谁看过我的资料（Visits 页面）。
   Future<ApiResponse> viewedBy() => _client.get('/user-relation/viewedBy');
 
-  /// Remove one visit record from Visits list.
+  /// 从 Visits 列表删除一条访问记录。
   Future<ApiResponse> deleteVisitRecord(String visitorId) {
     return _client.post(
       '/user-relation/delete-visit-record',
@@ -173,14 +173,14 @@ class ChimoApi {
 
   Future<ApiResponse> cashCurrent() => _client.get('/cash/current');
 
-  /// Coin recharge packages for wallet.
+  /// 钱包金币充值套餐。
   Future<ApiResponse> cashChargeProducts() =>
       _client.get('/cash/charge/product');
 
-  /// Shop goods catalog (optional wallet/goods source).
+  /// 商城商品目录（可选钱包/商品来源）。
   Future<ApiResponse> cashGoods() => _client.get('/cash/goods');
 
-  /// Gift catalog for room/private (tabs + items).
+  /// 房间/私聊礼物目录（标签页 + 商品）。
   Future<ApiResponse> cashItems({int version = 1, int rid = 0}) {
     return _client.get(
       '/cash/item',
@@ -191,7 +191,7 @@ class ChimoApi {
     );
   }
 
-  /// Send gift to one or more users.
+  /// 向一个或多个用户赠送礼物。
   Future<ApiResponse> cashGift({
     required List<String> receiverIds,
     required String itemId,
@@ -209,7 +209,7 @@ class ChimoApi {
     );
   }
 
-  /// Batch users for conversation list avatars / nicknames.
+  /// 批量获取会话列表用的用户头像 / 昵称。
   Future<ApiResponse> msgUsers(String emUserNames) {
     return _client.get(
       '/user/msglist-users',
@@ -224,7 +224,7 @@ class ChimoApi {
     );
   }
 
-  // ---- group / chat ----
+  // ---- 群组 / 聊天 ----
   Future<ApiResponse> groupTypeList() => _client.get('/chat/group/getTypeList');
 
   Future<ApiResponse> groupList({int pageNum = 1, int pageSize = 10}) {
@@ -269,7 +269,7 @@ class ChimoApi {
     return _client.post('/chat/group/leave/$gid');
   }
 
-  // ---- app / home ----
+  // ---- 应用 / 首页 ----
   Future<ApiResponse> appSettings() => _client.get('/app/settings');
 
   Future<ApiResponse> updateAppSettings(Map<String, dynamic> fields) {
@@ -309,7 +309,7 @@ class ChimoApi {
     return _client.get('/banner/list', query: {'type': '$type'});
   }
 
-  // ---- emote / stickers (forya EmoteApi) ----
+  // ---- 表情 / 贴纸（forya EmoteApi） ----
   Future<ApiResponse> emoticonsList({String scene = 'CHAT'}) {
     return _client.get('/emote/emoticons-list', query: {'scene': scene});
   }
@@ -321,7 +321,7 @@ class ChimoApi {
     );
   }
 
-  // ---- media upload ----
+  // ---- 媒体上传 ----
   Future<ApiResponse> uploadUrl({
     required int sceneCode,
     required String filename,

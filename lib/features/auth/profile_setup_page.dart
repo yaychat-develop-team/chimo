@@ -13,9 +13,9 @@ import 'onboarding_profile_draft.dart';
 
 enum _Gender { male, female }
 
-/// Post-registration profile setup: gender + birthday (Figma 完善资料).
+/// 注册后资料完善：性别 + 生日（Figma 完善资料）。
 ///
-/// Used after phone OTP and email login when the profile is incomplete.
+/// 用于手机 OTP 与邮箱登录后资料尚未完整时。
 class ProfileSetupPage extends StatefulWidget {
   const ProfileSetupPage({super.key});
 

@@ -28,7 +28,7 @@ import 'widgets/me_profile_header.dart';
 import 'widgets/me_quick_access_section.dart';
 import 'widgets/me_stats_row.dart';
 
-/// Me page: `mine_bg` background matches screen width.
+/// Me 页：`mine_bg` 背景与屏幕宽度一致。
 class MePage extends StatefulWidget {
   const MePage({super.key});
 
@@ -49,7 +49,7 @@ class _MePageState extends State<MePage> {
     });
   }
 
-  /// Compact social count (e.g. 208, 1.2K, 88K).
+  /// 紧凑社交计数（如 208、1.2K、88K）。
   static String _formatCount(int value) {
     if (value < 1000) return '$value';
     if (value < 10000) {
@@ -72,7 +72,7 @@ class _MePageState extends State<MePage> {
         MeStatItem(label: 'Visitors', value: _formatCount(_profile.visitors)),
       ];
 
-  /// Hide Bind Email once an email is already bound (email login or bind flow).
+  /// 邮箱已绑定后隐藏 Bind Email（邮箱登录或绑定流程）。
   List<QuickAccessItem> get _quickAccess {
     if (_hasBoundEmail) {
       return MeMenuData.quickAccess
@@ -85,7 +85,7 @@ class _MePageState extends State<MePage> {
   Future<void> _loadProfile() async {
     try {
       final profileFuture = AppApis.user.profileOrNull();
-      // Me "Visitors" = unique people in Visits list (not total viewNum times).
+      // Me「Visitors」= Visits 列表中的去重人数（不是 viewNum 总次数）。
       final visitsFuture = AppApis.relation.viewedBy();
       final res = await profileFuture;
       final visitsRes = await visitsFuture;
@@ -122,7 +122,7 @@ class _MePageState extends State<MePage> {
         userId: profile.userId,
         email: email.isEmpty ? null : email,
       );
-      // Keep IM online after app-token refresh paths.
+      // 应用 token 刷新路径后保持 IM 在线。
       unawaited(NetworkBootstrap.connectImAfterLogin());
     } catch (error) {
       if (!mounted) return;
@@ -180,7 +180,7 @@ class _MePageState extends State<MePage> {
     final screenWidth = MediaQuery.sizeOf(context).width;
 
     return ColoredBox(
-      // Match `mine_bg` bottom (#0F0F0F) so Quick Access isn't pure black.
+      // 对齐 `mine_bg` 底部（#0F0F0F），避免 Quick Access 纯黑。
       color: AppColors.surface,
       child: Stack(
         children: [

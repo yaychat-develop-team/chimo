@@ -10,7 +10,7 @@ import 'api_config.dart';
 import 'api_config_store.dart';
 import 'chimo_api.dart';
 
-/// App-wide network bootstrap: load env and optional heartbeat.
+/// 应用级网络启动：加载环境与可选心跳。
 abstract final class NetworkBootstrap {
   static ApiClient? _client;
   static ChimoApi? _api;
@@ -31,18 +31,18 @@ abstract final class NetworkBootstrap {
       'NetworkBootstrap baseUrl=${ApiConfig.baseUrl} hasToken=${authToken != null}',
     );
 
-    // Matches forya LoginManager auto-login: refresh token on cold start.
+    // 对齐 forya LoginManager 自动登录：冷启动时刷新 token。
     if (authToken != null && authToken!.isNotEmpty) {
       await _tryRefreshToken(clearOnFailure: false);
     }
 
     final result = await api.userOpen(open: false);
     if (!result.success && result.message == 'user.not.login') {
-      // Only wipe after open confirms the stored token is dead.
+      // 仅在 open 确认本地 token 已失效后才清空。
       await clearSession();
     } else if (result.success ||
         (authToken != null && authToken!.isNotEmpty)) {
-      // Best-effort EaseMob login after app token is valid.
+      // 应用 token 有效后尽力登录环信。
       unawaited(ImService.connectFromServer());
     }
     if (startHeartbeat) {
@@ -54,7 +54,7 @@ abstract final class NetworkBootstrap {
     return result;
   }
 
-  /// Rehydrate memory token from disk and optionally refresh once.
+  /// 从磁盘恢复内存中的 token，并可选择再刷新一次。
   static Future<bool> ensureSession({bool tryRefresh = true}) async {
     if (authToken == null || authToken!.isEmpty) {
       authToken = await AuthSession.token();
@@ -64,7 +64,7 @@ abstract final class NetworkBootstrap {
     return _tryRefreshToken(clearOnFailure: false);
   }
 
-  /// Returns true when a usable token still exists after the attempt.
+  /// 尝试后若仍存在可用 token 则返回 true。
   static Future<bool> _tryRefreshToken({required bool clearOnFailure}) async {
     try {
       final refresh = await api.refreshToken();
@@ -76,12 +76,12 @@ abstract final class NetworkBootstrap {
           debugPrint('NetworkBootstrap token refreshed');
           return true;
         }
-        // Refresh ok but no new token — keep current token.
+        // 刷新成功但无新 token —— 保留当前 token。
         return authToken != null && authToken!.isNotEmpty;
       }
 
-      // `unauthorized registration` and similar do not always mean the JWT is
-      // dead; only clear on explicit not-login.
+      // `unauthorized registration` 等并不总表示 JWT 已死；
+      // 仅在明确 not-login 时清空。
       if (refresh.message == 'user.not.login') {
         debugPrint('NetworkBootstrap refresh: user.not.login');
         if (clearOnFailure) await clearSession();
@@ -111,7 +111,7 @@ abstract final class NetworkBootstrap {
     if (res.success) return;
     if (res.message != 'user.not.login') return;
 
-    // Soft recover: disk token / refresh, then re-probe once.
+    // 软恢复：磁盘 token / 刷新，再探测一次。
     final ok = await ensureSession(tryRefresh: true);
     if (!ok) {
       await clearSession();
@@ -123,8 +123,7 @@ abstract final class NetworkBootstrap {
     }
   }
 
-  /// Re-run [request] after a single session recovery when the first call
-  /// returns `user.not.login`.
+  /// 首次调用返回 `user.not.login` 时，做一次会话恢复后重跑 [request]。
   static Future<ApiResponse> withSessionRetry(
     Future<ApiResponse> Function() request,
   ) async {
@@ -140,18 +139,18 @@ abstract final class NetworkBootstrap {
     authToken = (token != null && token.isNotEmpty) ? token : null;
   }
 
-  /// After successful OTP / token apply — pull EM creds and login.
+  /// OTP / token 应用成功后 — 拉取环信凭证并登录。
   static Future<void> connectImAfterLogin() async {
     await ImService.connectFromServer();
   }
 
-  /// Clears local session when the server reports the token is invalid.
+  /// 服务端报告 token 无效时清空本地会话。
   static Future<void> handleNotLogin() async {
     await clearSession();
   }
 
-  /// Clears local auth immediately; IM logout is best-effort with a short cap
-  /// so Settings "Log out" never feels stuck.
+  /// 立即清空本地登录态；环信登出尽力而为并设短超时，
+  /// 避免设置页「退出登录」卡住。
   static Future<void> clearSession() async {
     authToken = null;
     await AuthSession.clear();

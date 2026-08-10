@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_page_scaffold.dart';
 
-/// Edit personal signature page.
+/// 编辑个性签名页。
 class PersonalSignaturePage extends StatefulWidget {
   const PersonalSignaturePage({super.key, this.initialText = ''});
 

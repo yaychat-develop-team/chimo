@@ -4,7 +4,7 @@ import '../theme/app_colors.dart';
 import 'app_nav_bar.dart';
 import 'app_top_loading_bar.dart';
 
-/// Standard dark push-page shell: Scaffold + SafeArea + AppNavBar + body.
+/// 标准深色二级页外壳：Scaffold + SafeArea + AppNavBar + body。
 class AppPageScaffold extends StatelessWidget {
   const AppPageScaffold({
     super.key,

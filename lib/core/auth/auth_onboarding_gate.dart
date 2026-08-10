@@ -1,21 +1,21 @@
 import '../network/network_bootstrap.dart';
 
-/// Decides whether post-login should skip onboarding and enter home.
+/// 判断登录后是否应跳过引导直接进入首页。
 ///
-/// Callers pick the destination:
-/// - phone incomplete → profile setup / almost-in
-/// - email incomplete → Edit Profile onboarding
-/// - complete profile → home
+/// 由调用方选择目的地：
+/// - 手机号资料未完成 → 资料设置 / almost-in
+/// - 邮箱资料未完成 → 编辑资料引导
+/// - 资料完整 → 首页
 ///
-/// Email signup often returns `isRegister: true` while nickname is still the
-/// email address — those must still onboard; do not trust `isRegister` alone.
+/// 邮箱注册常返回 `isRegister: true`，但昵称仍是邮箱地址——这类仍须走引导；
+/// 不要仅依赖 `isRegister`。
 abstract final class AuthOnboardingGate {
-  /// `true` → go shell/home; `false` → profile setup onboarding.
+  /// `true` → 进入壳/首页；`false` → 资料设置引导。
   static Future<bool> shouldEnterHome(
     Map<String, dynamic> authData, {
     String? email,
   }) async {
-    // Explicit new-user from AuthRsp.
+    // AuthRsp 明确标记为新用户。
     if (_readBool(authData['newUser']) == true) return false;
 
     try {
@@ -27,8 +27,8 @@ abstract final class AuthOnboardingGate {
             ? Map<String, dynamic>.from(user)
             : data;
 
-        // Incomplete placeholder profiles always need onboarding, even when the
-        // server marks `isRegister: true` (common after email-auth).
+        // 不完整的占位资料一律需要引导，即使服务端标了 `isRegister: true`
+        // （邮箱登录后很常见）。
         if (!_profileLooksComplete(map, email: email)) return false;
 
         final registered = _readBool(map['isRegister']);
@@ -36,13 +36,13 @@ abstract final class AuthOnboardingGate {
         return true;
       }
     } catch (_) {
-      // Fall through to auth payload.
+      // 回退到登录载荷。
     }
 
     return _profileLooksComplete(authData, email: email);
   }
 
-  /// Raw fields only — do not use [MeProfile] (it defaults empty gender to Male).
+  /// 仅看原始字段——不要用 [MeProfile]（它会把空性别默认成 Male）。
   static bool _profileLooksComplete(
     Map<String, dynamic> data, {
     String? email,
@@ -53,17 +53,17 @@ abstract final class AuthOnboardingGate {
     final birthday = '${data['birthday'] ?? ''}'.trim();
     if (nick.isEmpty || gender.isEmpty) return false;
 
-    // Treat unset / unknown gender codes as incomplete.
+    // 未设置 / 未知性别码视为未完成。
     if (gender == '0' || gender == 'unknown' || gender == 'null') {
       return false;
     }
 
-    // Email auth placeholders: nickname is often the email address.
+    // 邮箱登录占位：昵称经常就是邮箱地址。
     if (nick.contains('@')) return false;
     final mail = (email ?? '').trim().toLowerCase();
     if (mail.isNotEmpty && nick.toLowerCase() == mail) return false;
 
-    // Profile-setup collects birthday; missing → still onboarding.
+    // 资料设置会采集生日；缺失 → 仍需引导。
     if (birthday.isEmpty) return false;
 
     return true;

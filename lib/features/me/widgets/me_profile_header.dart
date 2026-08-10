@@ -8,7 +8,7 @@ import '../../../core/widgets/app_avatar.dart';
 import '../../../core/widgets/center_toast.dart';
 import '../models/me_models.dart';
 
-/// Avatar on top; row below: left = name + ID, right = My Profile.
+/// 上方头像；下方一行：左侧名称 + ID，右侧 My Profile。
 class MeProfileHeader extends StatelessWidget {
   const MeProfileHeader({
     super.key,

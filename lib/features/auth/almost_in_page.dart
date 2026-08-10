@@ -18,7 +18,7 @@ import '../../core/widgets/app_gradient_button.dart';
 import '../profile/photo_pick_sheet.dart';
 import 'onboarding_profile_draft.dart';
 
-/// Registration finale: avatar + nickname (Figma 完善资料 — You're almost in!).
+/// 注册收尾：头像 + 昵称（Figma 完善资料 — You're almost in!）。
 class AlmostInPage extends StatefulWidget {
   const AlmostInPage({super.key});
 
@@ -38,7 +38,7 @@ class _AlmostInPageState extends State<AlmostInPage> {
     super.initState();
     final id = 1000000 + Random().nextInt(9000000);
     _nickController = TextEditingController(text: 'S·$id');
-    // Prefer a real session nickname; email placeholders stay as generated.
+    // 优先使用真实会话昵称；邮箱占位名保持生成结果。
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(_prefillNickname());
     });
@@ -121,7 +121,7 @@ class _AlmostInPageState extends State<AlmostInPage> {
       return;
     }
 
-    // Persist immediately (same as forya AddUserInfoController.saveAvatar).
+    // 立即持久化（对齐 forya AddUserInfoController.saveAvatar）。
     final res = await AppApis.user.update({
       'avatarUrl': remote,
       'register': true,

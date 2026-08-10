@@ -7,7 +7,7 @@ import '../features/chats/data/chats_list_controller.dart';
 import 'app_providers.dart';
 import 'app_router.dart';
 
-/// Chimo root: DI + [MaterialApp.router].
+/// Chimo 根组件：依赖注入 + [MaterialApp.router]。
 class ChimoApp extends StatelessWidget {
   const ChimoApp({super.key});
 

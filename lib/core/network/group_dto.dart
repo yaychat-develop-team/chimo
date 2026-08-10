@@ -2,7 +2,7 @@ import '../../core/constants/app_assets.dart';
 import '../../core/network/api_client.dart';
 import '../../shared/models/group_item.dart';
 
-/// Maps D:\forya group JSON (proto3) into UI models.
+/// 将 D:\forya 群组 JSON（proto3）映射为 UI 模型。
 abstract final class GroupDto {
   static List<PopularGroupItem> parseList(ApiResponse response) {
     if (!response.success) return const [];

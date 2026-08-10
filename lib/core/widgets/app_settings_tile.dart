@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
 
-/// Settings / help / privacy chevron row.
+/// 设置 / 帮助 / 隐私等带箭头的列表行。
 class AppSettingsTile extends StatelessWidget {
   const AppSettingsTile({
     super.key,

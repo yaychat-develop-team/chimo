@@ -4,9 +4,9 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
-/// Local auth session: cold start uses this to skip phone / OTP.
+/// 本地登录会话：冷启动据此跳过手机号 / OTP。
 ///
-/// Stored as JSON under the application support directory.
+/// 以 JSON 形式存储在应用支持目录下。
 abstract final class AuthSession {
   static const _fileName = 'auth_session.json';
 
@@ -77,7 +77,7 @@ abstract final class AuthSession {
       final text = '$value'.trim();
       if (text.isNotEmpty && text != 'null') return text;
     }
-    // Recover uid from JWT when missing from session file.
+    // 会话文件缺少 uid 时，从 JWT 恢复。
     final t = data['token'];
     if (t is String && t.isNotEmpty) {
       final fromJwt = userIdFromJwt(t);
@@ -118,7 +118,7 @@ abstract final class AuthSession {
     return text.isEmpty || text == 'null' ? null : text;
   }
 
-  /// True when [otherId] is the logged-in user (group member, search hit…).
+  /// 当 [otherId] 为当前登录用户时为 true（群成员、搜索命中等）。
   static Future<bool> isCurrentUser(String? otherId) async {
     final a = (otherId ?? '').trim();
     if (a.isEmpty) return false;
@@ -127,7 +127,7 @@ abstract final class AuthSession {
     return me == a;
   }
 
-  /// Best-effort uid from JWT (forya tokens put `uid` in the protected header).
+  /// 尽力从 JWT 解析 uid（forya token 把 `uid` 放在 protected header）。
   static String? userIdFromJwt(String token) {
     try {
       final parts = token.split('.');
@@ -152,7 +152,7 @@ abstract final class AuthSession {
     return value is String && value.isNotEmpty ? value : null;
   }
 
-  /// Persist last-used email without marking the session logged-in.
+  /// 持久化最近使用的邮箱，但不将会话标记为已登录。
   static Future<void> rememberEmail(String email) async {
     final trimmed = email.trim();
     if (trimmed.isEmpty) return;
@@ -167,7 +167,7 @@ abstract final class AuthSession {
     return value is String && value.isNotEmpty ? value : null;
   }
 
-  /// [method]: `phone` / `email`. Omit to keep the previously stored method.
+  /// [method]：`phone` / `email`。省略则保留先前存储的方式。
   static Future<void> markLoggedIn({
     String? method,
     String? phone,
@@ -205,7 +205,7 @@ abstract final class AuthSession {
   static Future<void> clear() async {
     try {
       final file = await _sessionFile();
-      // Always overwrite first so isLoggedIn() flips even if delete fails.
+      // 始终先覆写，确保即使删除失败 isLoggedIn() 也会翻转。
       await file.writeAsString(
         jsonEncode(<String, dynamic>{'loggedIn': false}),
         flush: true,

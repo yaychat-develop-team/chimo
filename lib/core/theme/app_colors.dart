@@ -1,97 +1,97 @@
 import 'package:flutter/material.dart';
 
-/// Design palette sampled from the home mock; shared app-wide.
+/// 从首页设计稿取样的调色板；全应用共用。
 abstract final class AppColors {
-  // ---------- Background / surface ----------
-  /// Page background (pure black).
+  // ---------- 背景 / 表面 ----------
+  /// 页面背景（纯黑）。
   static const Color background = Color(0xFF000000);
 
-  /// Secondary surface.
+  /// 次级表面。
   static const Color surface = Color(0xFF0F0F0F);
 
-  /// Card fill.
+  /// 卡片填充。
   static const Color card = Color(0xFF151815);
 
-  /// Card border / edge.
+  /// 卡片描边 / 边缘。
   static const Color cardEdge = Color(0xFF1C2420);
 
-  // ---------- Brand accent ----------
-  /// Primary: selected tab, accents.
+  // ---------- 品牌强调色 ----------
+  /// 主色：选中 Tab、强调色。
   static const Color primary = Color(0xFF24B572);
 
-  /// Brighter primary: join buttons, etc.
+  /// 更亮的主色：加入按钮等。
   static const Color primaryBright = Color(0xFF1BBA77);
 
-  /// Chats / brand gradient start (Figma #00FEA8).
+  /// 会话 / 品牌渐变起点（Figma #00FEA8）。
   static const Color accentMint = Color(0xFF00FEA8);
 
-  /// Chats / brand gradient end (Figma #00F875).
+  /// 会话 / 品牌渐变终点（Figma #00F875）。
   static const Color accentLime = Color(0xFF00F875);
 
-  /// Official name / selected tab label gradient (left → right in UI).
+  /// 官方名称 / 选中 Tab 文案渐变（UI 中从左到右）。
   static const LinearGradient brandTextGradient = LinearGradient(
     begin: Alignment.centerLeft,
     end: Alignment.centerRight,
     colors: [accentLime, accentMint],
   );
 
-  /// Promo banner fill (Figma: left lime → right mint).
+  /// 推广 Banner 填充（Figma：左 lime → 右 mint）。
   static const LinearGradient promoBannerGradient = LinearGradient(
     begin: Alignment.centerLeft,
     end: Alignment.centerRight,
     colors: [accentLime, accentMint],
   );
 
-  // ---------- Text ----------
-  /// Primary text (white).
+  // ---------- 文字 ----------
+  /// 主文字（白）。
   static const Color textPrimary = Color(0xFFFFFFFF);
 
-  /// Secondary text (grey).
+  /// 次要文字（灰）。
   static const Color textSecondary = Color(0xFF9A9A9A);
 
-  /// Tertiary text / stats.
+  /// 三级文字 / 统计。
   static const Color textTertiary = Color(0xFF6E6E6E);
 
-  /// Conversation preview (Figma white 70%).
+  /// 会话预览文案（Figma 白色 70%）。
   static const Color textPreview = Color(0xB3FFFFFF);
 
-  /// Conversation timestamp (Figma white 36%).
+  /// 会话时间戳（Figma 白色 36%）。
   static const Color textTime = Color(0x5CFFFFFF);
 
-  /// Promo banner body text.
+  /// 推广 Banner 正文。
   static const Color promoText = Color(0xFF232518);
 
-  // ---------- Functional ----------
-  /// Unread badge red (Figma #FD4B4B).
+  // ---------- 功能色 ----------
+  /// 未读角标红（Figma #FD4B4B）。
   static const Color badge = Color(0xFFFD4B4B);
 
-  /// Search button fill.
+  /// 搜索按钮填充。
   static const Color searchButton = Color(0xFF1A1A1A);
 
-  /// Chats header icon / conversation row fill (white 8%).
+  /// 会话页顶栏图标 / 会话行填充（白色 8%）。
   static const Color chatsRowFill = Color(0x14FFFFFF);
 
-  /// Online status dot (matches brand lime).
+  /// 在线状态圆点（与品牌 lime 一致）。
   static const Color onlineDot = accentLime;
 
-  /// Category tag fill.
+  /// 分类标签填充。
   static const Color tagBackground = Color(0xFF2A2A2A);
 
-  /// Joined button fill.
+  /// 已加入按钮填充。
   static const Color joinedButton = Color(0xFF2C2C2C);
 
-  /// Level badge gradient start / end.
+  /// 等级徽章渐变起点 / 终点。
   static const Color levelBadgeStart = Color(0xFF9B6BFF);
   static const Color levelBadgeEnd = Color(0xFF6B4EFF);
 
-  /// My Groups card background gradient (green to black).
+  /// 「我的群组」卡片背景渐变（绿到黑）。
   static const LinearGradient myGroupCardGradient = LinearGradient(
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
     colors: [Color(0xFF1A2A22), Color(0xFF0A0C0B)],
   );
 
-  /// Popular Groups card background gradient.
+  /// 「热门群组」卡片背景渐变。
   static const LinearGradient popularCardGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,

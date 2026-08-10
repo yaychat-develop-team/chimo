@@ -1,7 +1,7 @@
 import '../../core/constants/app_assets.dart';
 import 'group_member.dart';
 
-/// Other user's profile in chat (avatar sheet / profile page).
+/// 聊天中对方用户资料（头像浮层 / 资料页）。
 class ChatUserProfile {
   const ChatUserProfile({
     required this.id,
@@ -41,19 +41,19 @@ class ChatUserProfile {
   final int level;
   final String bio;
 
-  /// Height in inches; 0 means not set / hide tag.
+  /// 身高（英寸）；0 表示未设置 / 隐藏标签。
   final int heightInches;
 
-  /// Weight in LB; 0 means not set / hide tag.
+  /// 体重（LB）；0 表示未设置 / 隐藏标签。
   final int weightLb;
 
-  /// Voice note duration in seconds; null if none.
+  /// 语音签名时长（秒）；无则 null。
   final int? voiceSeconds;
 
-  /// Remote voice URL for playback.
+  /// 远程语音 URL，用于播放。
   final String? voiceUrl;
 
-  /// Server Level badge URL (`icons.smallIcon`); empty → hide.
+  /// 服务端 Level 徽章 URL（`icons.smallIcon`）；空则隐藏。
   final String? vipIconUrl;
   final int giftUnlocked;
   final int giftTotal;
@@ -63,10 +63,10 @@ class ChatUserProfile {
   final bool isFollowing;
   final String? inPartyName;
 
-  /// Presence from `/user/info` (`onlineStatus == 1` and not hidden).
+  /// 在线状态，来自 `/user/info`（`onlineStatus == 1` 且未隐藏）。
   final bool isOnline;
 
-  /// EaseMob chat id (preferred peer conversation target).
+  /// EaseMob 聊天 id（优先的私聊会话目标）。
   final String emUsername;
 
   static ChatUserProfile placeholder({

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
 
-/// Thin top progress strip used under nav bars.
+/// 导航栏下方的顶部细进度条。
 class AppTopLoadingBar extends StatelessWidget {
   const AppTopLoadingBar({super.key, this.visible = true});
 

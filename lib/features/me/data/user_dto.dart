@@ -4,7 +4,7 @@ import '../../../core/utils/zodiac.dart';
 import '../../../shared/models/chat_user_profile.dart';
 import '../models/me_models.dart';
 
-/// Maps `/user/info` JSON into [MeProfile] / [ChatUserProfile].
+/// 将 `/user/info` JSON 映射为 [MeProfile] / [ChatUserProfile]。
 abstract final class UserDto {
   static MeProfile? parseProfile(ApiResponse response) {
     final user = _userMap(response);
@@ -136,7 +136,7 @@ abstract final class UserDto {
     );
   }
 
-  /// Forya UserLevWidget: show only when `icons.smallIcon` is non-empty.
+  /// Forya UserLevWidget：仅当 `icons.smallIcon` 非空时展示。
   static String? _parseVipSmallIcon(Map<String, dynamic> json) {
     final icons = json['icons'] ?? json['vipIcons'];
     if (icons is Map) {
@@ -164,13 +164,13 @@ abstract final class UserDto {
         continue;
       }
       if (item is Map) {
-        // AuditItem: { content, ok, ... } — show pending (ok:false) too.
+        // AuditItem: { content, ok, ... } — 待审核项（ok:false）也展示。
         final content =
             '${item['content'] ?? item['url'] ?? item['value'] ?? ''}'.trim();
         if (content.isNotEmpty) urls.add(content);
       }
     }
-    // de-dupe keep order
+    // 去重并保持顺序
     final seen = <String>{};
     return [
       for (final u in urls)

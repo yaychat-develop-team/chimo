@@ -6,14 +6,14 @@ import 'package:http/http.dart' as http;
 import 'api_gateway.dart';
 import 'network_bootstrap.dart';
 
-/// Upload local media via `GET /aws/upload-url` then PUT to the signed URL.
+/// 通过 `GET /aws/upload-url` 获取签名 URL，再 PUT 上传本地媒体。
 ///
-/// Mirrors D:\forya `S3UploadApi` (sceneCode 101 = images, 102 = voice).
+/// 对齐 D:\forya `S3UploadApi`（sceneCode 101 = 图片，102 = 语音）。
 abstract final class MediaUpload {
   static const _cdnDomain = 'https://cdn.echimo.com';
   static const _maxAttempts = 3;
 
-  /// Returns a CDN-facing URL on success; otherwise `null`.
+  /// 成功返回面向 CDN 的 URL；否则 `null`。
   static Future<String?> uploadFile(
     String path, {
     int sceneCode = 101,
@@ -40,9 +40,9 @@ abstract final class MediaUpload {
     final signedUrl = signed.data;
     if (signedUrl == null || signedUrl.isEmpty) return null;
 
-    // Forya: mime lookup, fallback application/octet-stream.
-    // Voice scene always uses octet-stream — audio/* often causes S3 resets
-    // on emulator when the signed URL only covers `host`.
+    // Forya：按扩展名猜 mime，回退 application/octet-stream。
+    // 语音场景始终用 octet-stream——签名 URL 仅覆盖 `host` 时，
+    // 模拟器上 audio/* 常导致 S3 重置连接。
     final contentType = sceneCode == 102 || sceneCode == 103
         ? 'application/octet-stream'
         : _guessMime(name);
@@ -71,7 +71,7 @@ abstract final class MediaUpload {
         request.headers['Content-Type'] = contentType;
         request.contentLength = length;
 
-        // Stream file like forya Dio openRead(); avoids loading whole file twice.
+        // 与 forya Dio openRead() 一样流式读取；避免整文件加载两次。
         unawaited(
           file.openRead().pipe(request.sink).catchError((Object error, _) {
             // ignore: avoid_print
@@ -83,7 +83,7 @@ abstract final class MediaUpload {
           const Duration(seconds: 60),
         );
         final status = streamed.statusCode;
-        // Drain body so the connection can close cleanly.
+        // 排空响应体，以便连接干净关闭。
         await streamed.stream.drain<void>();
         // ignore: avoid_print
         print('MediaUpload PUT attempt=$attempt status=$status bytes=$length');

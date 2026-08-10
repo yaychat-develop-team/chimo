@@ -1,6 +1,6 @@
-/// Phone helpers for auth APIs (forya uses `+86` on `/auth/sms-auth`).
+/// 认证 API 的手机号工具（forya 在 `/auth/sms-auth` 使用 `+86`）。
 abstract final class PhoneAuth {
-  /// Digits only (strip spaces / leading `+86` / `86`).
+  /// 仅保留数字（去除空格 / 前导 `+86` / `86`）。
   static String digitsOnly(String raw) {
     var p = raw.trim().replaceAll(RegExp(r'\s+'), '');
     if (p.startsWith('+86')) p = p.substring(3);
@@ -8,7 +8,7 @@ abstract final class PhoneAuth {
     return p.replaceAll(RegExp(r'\D'), '');
   }
 
-  /// E.164-style CN number for sms-send / sms-auth.
+  /// 用于 sms-send / sms-auth 的 E.164 风格中国号码。
   static String toApiPhone(String raw) {
     final digits = digitsOnly(raw);
     if (digits.isEmpty) return raw.trim();

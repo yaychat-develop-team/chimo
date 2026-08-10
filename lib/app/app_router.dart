@@ -26,7 +26,7 @@ import '../shared/models/chat_conversation.dart';
 import '../shared/models/chat_user_profile.dart';
 import '../shared/models/group_item.dart';
 
-/// Central app routes.
+/// 应用集中路由。
 abstract final class AppRoutes {
   static const splash = '/';
   static const login = '/login';
@@ -36,7 +36,7 @@ abstract final class AppRoutes {
   static const almostIn = '/onboarding/almost-in';
   static const welcomeBrand = '/onboarding/welcome';
   static const tribes = '/onboarding/tribes';
-  /// New email accounts complete profile here before home.
+  /// 新邮箱账号在进入首页前在此完善资料。
   static const editProfileOnboarding = '/onboarding/edit-profile';
   static const shell = '/app';
   static const chat = '/app/chat/:id';
@@ -46,7 +46,7 @@ abstract final class AppRoutes {
   static const addUser = '/app/add-user';
   static const settings = '/app/settings';
   static const editProfile = '/app/edit-profile';
-  /// Outside `/app` so email login works before auth redirect.
+  /// 位于 `/app` 外，便于认证重定向前完成邮箱登录。
   static const bindEmail = '/bind-email';
 
   static String chatPath(String id) => '/app/chat/$id';
@@ -62,14 +62,14 @@ GoRouter createAppRouter({required ChatsListController chatsController}) {
     initialLocation: AppRoutes.splash,
     redirect: (context, state) async {
       final loc = state.matchedLocation;
-      // Splash decides after its own delay.
+      // Splash 在自身延时后决定去向。
       if (loc == AppRoutes.splash) return null;
 
       final loggedIn = await context.read<AuthRepository>().isLoggedIn();
       final goingToApp = loc.startsWith('/app');
 
       if (!loggedIn && goingToApp) return AppRoutes.login;
-      // Allow onboarding while already marked logged-in (post-OTP).
+      // 已标记登录（OTP 后）时仍允许走 onboarding。
       if (loggedIn && loc == AppRoutes.login) return AppRoutes.shell;
       return null;
     },

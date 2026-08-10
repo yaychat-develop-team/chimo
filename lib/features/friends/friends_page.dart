@@ -14,10 +14,10 @@ import '../home/chat_user_profile_page.dart';
 import '../home/models/chat_user_profile.dart';
 import 'models/friend_user.dart';
 
-/// Friends page tabs.
+/// 好友页 Tab。
 enum FriendsTab { friends, follow, followers }
 
-/// Contacts: Friends (mutual) / Follow (I follow) / Followers (follow me).
+/// 通讯录：好友（互关）/ 关注（我关注的）/ 粉丝（关注我的）。
 class FriendsPage extends StatefulWidget {
   const FriendsPage({super.key, this.initialTab = FriendsTab.friends});
 

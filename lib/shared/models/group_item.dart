@@ -1,4 +1,4 @@
-/// Data for a My Groups list item.
+/// 「我的群组」列表项数据。
 class MyGroupItem {
   const MyGroupItem({
     required this.id,
@@ -7,20 +7,20 @@ class MyGroupItem {
     this.avatarUrl,
   });
 
-  /// Unique identifier.
+  /// 唯一标识。
   final String id;
 
-  /// Group name.
+  /// 群组名称。
   final String name;
 
-  /// Local asset path for the circular avatar (fallback).
+  /// 圆形头像的本地资源路径（回退）。
   final String avatarAsset;
 
-  /// Remote avatar URL from API when available.
+  /// 接口返回的远程头像 URL（若有）。
   final String? avatarUrl;
 }
 
-/// Data for a popular group list item.
+/// 热门群组列表项数据。
 class PopularGroupItem {
   const PopularGroupItem({
     required this.id,
@@ -35,34 +35,34 @@ class PopularGroupItem {
     this.isJoined = false,
   });
 
-  /// Unique identifier.
+  /// 唯一标识。
   final String id;
 
-  /// Group name.
+  /// 群组名称。
   final String name;
 
-  /// Category tag label.
+  /// 分类标签文案。
   final String category;
 
-  /// Short description.
+  /// 简短描述。
   final String description;
 
-  /// Local asset path for the rounded-square avatar (fallback).
+  /// 圆角方形头像的本地资源路径（回退）。
   final String avatarAsset;
 
-  /// Remote avatar URL from API when available.
+  /// 接口返回的远程头像 URL（若有）。
   final String? avatarUrl;
 
-  /// Member count.
+  /// 成员数。
   final int memberCount;
 
-  /// Post / image count.
+  /// 帖子 / 图片数。
   final int postCount;
 
-  /// Level (shown as Vn).
+  /// 等级（展示为 Vn）。
   final int level;
 
-  /// Whether joined; affects top-right button style.
+  /// 是否已加入；影响右上角按钮样式。
   final bool isJoined;
 
   PopularGroupItem copyWith({
@@ -91,7 +91,7 @@ class PopularGroupItem {
     );
   }
 
-  /// Data for a horizontal My Groups card.
+  /// 横向「我的群组」卡片数据。
   MyGroupItem toMyGroupItem() => MyGroupItem(
         id: id,
         name: name,

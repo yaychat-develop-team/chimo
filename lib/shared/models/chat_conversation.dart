@@ -1,21 +1,21 @@
 import 'package:flutter/material.dart';
 
-/// Badge type beside conversation title.
+/// 会话标题旁的徽章类型。
 enum ChatBadgeType {
-  /// No badge
+  /// 无徽章
   none,
 
-  /// Official verified check
+  /// 官方认证勾
   verified,
 
-  /// Green Group badge
+  /// 绿色 Group 徽章
   group,
 
-  /// Pink Soulmate script badge
+  /// 粉色 Soulmate 手写徽章
   soulmate,
 }
 
-/// Single conversation row in the list.
+/// 列表中的单条会话行。
 class ChatConversation {
   const ChatConversation({
     required this.id,
@@ -52,59 +52,59 @@ class ChatConversation {
   final String avatarAsset;
   final String? avatarUrl;
 
-  /// Last chat preview. Empty until IM / local send provides one.
+  /// 最近聊天预览。在 IM / 本地发送提供内容前为空。
   final String lastMessage;
   final String timeLabel;
   final int unreadCount;
   final ChatBadgeType badge;
 
-  /// Green online dot on avatar bottom-right.
+  /// 头像右下角绿色在线点。
   final bool isOnline;
 
-  /// Whether pinned.
+  /// 是否置顶。
   final bool isPinned;
 
-  /// Optional title color (e.g. official green name).
+  /// 可选标题颜色（如官方绿色名称）。
   final Color? titleColor;
 
-  /// Peer gender (DM app bar).
+  /// 对端性别（私聊导航栏）。
   final bool isMale;
 
-  /// Peer signature; default placeholder if empty.
+  /// 对端签名；为空时用默认占位。
   final String signature;
 
-  /// Peer zodiac label.
+  /// 对端星座文案。
   final String zodiac;
 
-  /// Peer height in inches (0 = hidden).
+  /// 对端身高（英寸；0 = 不展示）。
   final int heightInches;
 
-  /// Peer weight in LB (0 = hidden).
+  /// 对端体重（磅；0 = 不展示）。
   final int weightLb;
 
-  /// Whether following (DM app bar Follow).
+  /// 是否已关注（私聊导航栏 Follow）。
   final bool isFollowing;
 
-  /// Profile Moments local assets for DM header preview.
+  /// 资料 Moments 本地资源，供私聊顶栏预览。
   final List<String> momentAssets;
 
-  /// Profile Moments remote URLs for DM header preview.
+  /// 资料 Moments 远程 URL，供私聊顶栏预览。
   final List<String> momentUrls;
 
-  /// Group profile fields from `/chat/group/*` (not last message).
+  /// 来自 `/chat/group/*` 的群组资料字段（不是最后一条消息）。
   final String groupDescription;
   final String category;
   final int memberCount;
   final int postCount;
   final int level;
 
-  /// Peer EaseMob username for 1v1 (empty for groups).
+  /// 1v1 对端环信用户名（群组为空）。
   final String emUserName;
 
-  /// Latest message server time (ms) for sort / relative labels.
+  /// 最近消息服务端时间（毫秒），用于排序 / 相对时间文案。
   final int lastMsgAtMs;
 
-  /// Official / system conversation (New Friends, etc.).
+  /// 官方 / 系统会话（新朋友等）。
   final bool isSystem;
 
   String get signatureDisplay {
@@ -114,7 +114,7 @@ class ChatConversation {
         : "She doesn't have a signature yet.";
   }
 
-  /// Subtitle under the title for list rows.
+  /// 列表行标题下方的副标题。
   String get listSubtitle {
     if (lastMessage.trim().isNotEmpty) return lastMessage.trim();
     if (badge == ChatBadgeType.group) {

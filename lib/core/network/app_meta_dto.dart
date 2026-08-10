@@ -1,6 +1,6 @@
 import 'api_client.dart';
 
-/// Payload from `/app/version-check`.
+/// 来自 `/app/version-check` 的载荷。
 class AppVersionInfo {
   const AppVersionInfo({
     required this.version,
@@ -42,7 +42,7 @@ abstract final class AppVersionDto {
   }
 }
 
-/// Privacy / visibility flags from `/app/settings`.
+/// 来自 `/app/settings` 的隐私 / 可见性开关。
 class AppPrivacySettings {
   const AppPrivacySettings({
     this.isHidden = false,
@@ -71,7 +71,7 @@ class AppPrivacySettings {
   }
 }
 
-/// Loose `/user/conf` map helpers (IM appKey, website URLs).
+/// 宽松的 `/user/conf` map 辅助（IM appKey、官网 URL）。
 abstract final class UserConfDto {
   static String? parseAppKey(Object? data) {
     if (data is! Map) return null;
@@ -103,7 +103,7 @@ abstract final class UserConfDto {
   }
 }
 
-/// Auth / bind email success payload (token + ids).
+/// 登录 / 绑定邮箱成功载荷（token + ids）。
 class AuthTokenPayload {
   const AuthTokenPayload({
     required this.token,
@@ -129,8 +129,8 @@ class AuthTokenPayload {
     if (data is! Map) return null;
     var map = Map<String, dynamic>.from(data);
 
-    // Email / third-party login returns ExternalAuthRsp: { authed: AuthRsp }.
-    // SMS login returns AuthRsp fields at the top level.
+    // 邮箱 / 第三方登录返回 ExternalAuthRsp：{ authed: AuthRsp }。
+    // 短信登录则在顶层直接返回 AuthRsp 字段。
     final authed = map['authed'];
     if (authed is Map) {
       map = Map<String, dynamic>.from(authed);
@@ -150,7 +150,7 @@ class AuthTokenPayload {
   }
 }
 
-/// Brief user from `/user/msg-user` (resolve EM → app uid / avatar).
+/// 来自 `/user/msg-user` 的简要用户（EM → 应用 uid / 头像）。
 class MsgUserBrief {
   const MsgUserBrief({
     required this.id,

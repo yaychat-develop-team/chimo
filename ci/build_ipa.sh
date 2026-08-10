@@ -42,7 +42,7 @@ function buildStore() {
        fastlane ios submit versionName:$versionName buildNum:$versionCode ipa:$ipaPath
     fi
 
-    # upload dSYM
+    # 上传 dSYM
     uploadymbolsPath=$projectPath/ios/Pods/FirebaseCrashlytics/upload-symbols
     plistPath=$projectPath/ios/Runner/GoogleService-Info.plist
     dsymPath=$projectPath/build/ios/archive/Runner.xcarchive/dSYMs/

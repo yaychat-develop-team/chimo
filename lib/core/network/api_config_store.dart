@@ -2,7 +2,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_config.dart';
 
-/// Persists [ApiConfig.environment] via SharedPreferences.
+/// 通过 SharedPreferences 持久化 [ApiConfig.environment]。
 abstract final class ApiConfigStore {
   static const _prefsKey = 'api_environment';
 

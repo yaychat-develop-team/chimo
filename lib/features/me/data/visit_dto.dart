@@ -1,6 +1,6 @@
 import '../../../core/network/api_client.dart';
 
-/// One person who viewed my profile (`/user-relation/viewedBy`).
+/// 查看过我资料的一人（`/user-relation/viewedBy`）。
 class VisitRecord {
   const VisitRecord({
     required this.uid,
@@ -14,7 +14,7 @@ class VisitRecord {
   final String nickname;
   final String? avatarUrl;
 
-  /// Server timestamp in ms (same as forya ViewedByItem.lastViewTimestamp).
+  /// 服务端时间戳（毫秒，对齐 forya ViewedByItem.lastViewTimestamp）。
   final int lastViewTimestampMs;
   final int viewCount;
 
@@ -62,7 +62,7 @@ abstract final class VisitDto {
             item['viewTime'] ??
             item['timestamp'],
       );
-      // Some backends return seconds; treat values under year-2001-ms as seconds.
+      // 部分后端返回秒；小于 2001 年毫秒阈值时按秒处理。
       final tsMs = ts > 0 && ts < 100000000000 ? ts * 1000 : ts;
       final cnt = _asInt(item['viewCnt'] ?? item['viewCount'] ?? item['count']);
       out.add(

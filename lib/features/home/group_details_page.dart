@@ -24,7 +24,7 @@ import 'widgets/group_chat_input_bar.dart';
 import 'widgets/group_level_badge.dart';
 import 'widgets/group_members_sheet.dart';
 
-/// Group chat page: not joined = limited view + Join; joined = messages + input.
+/// 群聊页：未加入 = 有限浏览 + 加入；已加入 = 消息 + 输入。
 class GroupDetailsPage extends StatefulWidget {
   const GroupDetailsPage({
     super.key,
@@ -35,10 +35,10 @@ class GroupDetailsPage extends StatefulWidget {
 
   final PopularGroupItem group;
 
-  /// On join, add chat session; on leave, update membership only, keep session.
+  /// 加入时添加聊天会话；离开时仅更新成员身份，保留会话。
   final ChatsListController? chatsController;
 
-  /// Join-state callback (syncs home My Groups).
+  /// 加入状态回调（同步首页「我的群组」）。
   final ValueChanged<bool>? onMembershipChanged;
 
   @override
@@ -100,7 +100,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
       }
       if (added.isEmpty) return;
       setState(() {
-        // Drop provisional join tips (no EaseMob id) once history arrives.
+        // 历史到达后丢弃无环信 id 的临时入群提示。
         _sentMessages.removeWhere(
           (m) => m.kind == _OutgoingKind.join && m.msgId.isEmpty,
         );
@@ -124,7 +124,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
     if (m.id.isNotEmpty) _seenMsgIds.add(m.id);
     if (!mounted) return;
     setState(() => _sentMessages.add(line));
-    // List preview / unread handled by ChatsListController IM subscription.
+    // 列表预览 / 未读由 ChatsListController 的 IM 订阅处理。
     _scrollToBottom();
   }
 
@@ -217,7 +217,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
         );
         return;
       }
-      // Server pushes JoinGroupMessage; also show a local tip immediately.
+      // 服务端会推送 JoinGroupMessage；同时立即展示本地提示。
       final nick = (await AuthSession.nickname())?.trim();
       final name = (nick == null || nick.isEmpty) ? 'You' : nick;
       if (!mounted) return;
@@ -292,7 +292,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
       }
     }
 
-    // Entering / history load: jump repeatedly until layout settles on last msg.
+    // 进入 / 加载历史：反复跳转直到布局稳定到最后一条消息。
     if (force) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         jump(animate: false);
@@ -485,7 +485,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      // Match DM: input bar owns keyboard / panel insets (avoid double shrink).
+      // 对齐私聊：输入栏自行处理键盘 / 面板 inset（避免双重收缩）。
       resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
@@ -532,7 +532,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
                 onToggleDesc: () =>
                     setState(() => _descExpanded = !_descExpanded),
               ),
-              // forya: `if (!_foldInfo) _groupInfoWidget` — fold whole header, not expand text.
+              // forya：`if (!_foldInfo) _groupInfoWidget` — 折叠整个头部，不是展开正文。
               if (_descExpanded)
                 _ProfileHeader(
                   group: _group,
@@ -540,8 +540,8 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
                   onCollapse: () => setState(() => _descExpanded = false),
                   onMembersTap: _openMembersSheet,
                 ),
-              // forya: tip + chat share one rounded shell; non-member shell is
-              // translucent lime `0x1FC0F600` peeking above the white panel.
+              // forya：提示 + 聊天共用一个圆角外壳；非成员外壳为
+              // 半透明 lime `0x1FC0F600`，从白色面板上方露出。
               Expanded(
                 child: DecoratedBox(
                   decoration: BoxDecoration(
@@ -595,7 +595,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
                   onSendVoice: _sendVoice,
                   onSendImages: _sendImages,
                   onPanelChanged: (open) {
-                    // Free vertical space when voice/photo/emoji panel opens.
+                    // 语音/相册/表情面板打开时腾出纵向空间。
                     if (open && _descExpanded) {
                       setState(() => _descExpanded = false);
                     }
@@ -686,7 +686,7 @@ class _DetailsAppBar extends StatelessWidget {
   }
 }
 
-/// Description expand/collapse chip; joined style uses dark green bg + bright green text.
+/// 简介展开/折叠芯片；已加入样式为深绿底 + 亮绿字。
 class _DescToggleChip extends StatelessWidget {
   const _DescToggleChip({
     required this.expanded,
@@ -720,7 +720,7 @@ class _DescToggleChip extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              // forya always labels this chip "See More" (up = fold, down = expand).
+              // forya 始终将该芯片标为 "See More"（上 = 折叠，下 = 展开）。
               'See More',
               style: TextStyle(
                 color: fg,
@@ -740,7 +740,7 @@ class _DescToggleChip extends StatelessWidget {
   }
 }
 
-/// Joined group: top-right more sheet (Report / Leave Group).
+/// 已加入群组：右上角更多面板（举报 / 退出群组）。
 class _GroupMoreSheet extends StatelessWidget {
   const _GroupMoreSheet({required this.showLeave});
 
@@ -942,7 +942,7 @@ class _ProfileHeader extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          // forya chat_group_page: desc always maxLines: 3; chip folds the header.
+          // forya chat_group_page：简介始终 maxLines: 3；芯片折叠整个头部。
           Text(
             group.description,
             maxLines: 3,
@@ -1096,8 +1096,8 @@ class _MessagesFeed extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Group history is IM (EaseMob), not REST. Until SDK is wired, only show
-    // messages composed in this session so the feed is never fake layout data.
+    // 群历史走 IM（环信），不是 REST。在 SDK 接通前，仅展示
+    // 本会话内发出的消息，避免信息流出现假布局数据。
     if (sentMessages.isEmpty) {
       return GestureDetector(
         behavior: HitTestBehavior.opaque,
@@ -1203,7 +1203,7 @@ class _OutgoingKind {
   static const join = 3;
 }
 
-/// Show a time divider when first message or gap ≥ 5 minutes.
+/// 首条消息或间隔 ≥ 5 分钟时显示时间分隔。
 bool _shouldShowOutgoingTimestamp(List<_OutgoingMessage> list, int index) {
   if (index <= 0) return true;
   final prev = list[index - 1].sentAt;
@@ -1314,7 +1314,7 @@ class _OutgoingMessage {
   final bool isSelf;
 }
 
-/// Forya CustomGroupJoinItem: teal name + grey "joined the community".
+/// Forya CustomGroupJoinItem：青绿昵称 + 灰色 "joined the community"。
 class _JoinCommunityTip extends StatelessWidget {
   const _JoinCommunityTip({required this.name});
 
@@ -1466,7 +1466,7 @@ class _OutgoingImage extends StatelessWidget {
 
   final String path;
 
-  /// Match DM / forya media bubble: ~3:4 portrait, not square.
+  /// 对齐私聊 / forya 媒体气泡：约 3:4 竖图，非正方形。
   static const double _w = 132;
   static const double _h = 176;
 
@@ -1676,7 +1676,7 @@ class _PhotosGrid extends StatelessWidget {
       );
     }
 
-    // Match forya ChatGroupPhotosPage: periodName headers + 4-col grids.
+    // 对齐 forya ChatGroupPhotosPage：periodName 标题 + 4 列网格。
     var globalIndex = 0;
     final slivers = <Widget>[];
     for (final section in sections) {

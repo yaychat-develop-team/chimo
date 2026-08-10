@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'app/chimo_app.dart';
 import 'core/network/network_bootstrap.dart';
 
-/// App entry: initialize Flutter bindings, then run [ChimoApp].
+/// 应用入口：初始化 Flutter 绑定，然后运行 [ChimoApp]。
 Future<void> main() async {
-  // Ensure plugins and platform channels are ready before runApp.
+  // 确保插件与平台通道在 runApp 之前就绪。
   WidgetsFlutterBinding.ensureInitialized();
   try {
     final ping = await NetworkBootstrap.initialize();

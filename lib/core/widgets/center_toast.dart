@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-/// Centered short toast (e.g. copy success).
+/// 居中短时提示（如复制成功）。
 void showCenterToast(
   BuildContext context, {
   required String message,

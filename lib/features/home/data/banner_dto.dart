@@ -1,4 +1,4 @@
-/// One home carousel banner from `/home_page/main` or `/banner/list`.
+/// 首页轮播横幅一项，来自 `/home_page/main` 或 `/banner/list`。
 class HomeBannerItem {
   const HomeBannerItem({
     required this.imageUrl,
@@ -9,11 +9,11 @@ class HomeBannerItem {
   final String link;
 }
 
-/// Parses banner payloads from home APIs.
+/// 解析首页接口的横幅载荷。
 abstract final class BannerDto {
   static List<HomeBannerItem> parseHomeMain(Object? data) {
     if (data is! Map) return const [];
-    // Same as D:\forya home_controller: carousel only uses `image` banners.
+    // 对齐 D:\forya home_controller：轮播仅使用 `image` 横幅。
     // `gift` / `game` entries belong to other home widgets.
     return parseList(data['banners'], imageOnly: true);
   }

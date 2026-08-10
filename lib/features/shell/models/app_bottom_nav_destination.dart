@@ -1,22 +1,22 @@
 import 'main_tab.dart';
 
-/// Bottom nav item config: binds [MainTab] with optional unread badge.
+/// 底部导航项配置：绑定 [MainTab] 与可选未读角标。
 class AppBottomNavDestination {
   const AppBottomNavDestination({required this.tab, this.badgeCount = 0});
 
-  /// Associated main tab.
+  /// 关联的主 Tab。
   final MainTab tab;
 
-  /// Unread / notification count; no badge when `0`.
+  /// 未读 / 通知数；为 `0` 时不显示角标。
   final int badgeCount;
 
-  /// Display label, forwarded from [MainTab.label].
+  /// 展示文案，转发自 [MainTab.label]。
   String get label => tab.label;
 
-  /// Whether to draw a badge.
+  /// 是否绘制角标。
   bool get hasBadge => badgeCount > 0;
 
-  /// Badge text: shows `99+` when count exceeds 99.
+  /// 角标文案：超过 99 显示 `99+`。
   String get badgeLabel {
     if (badgeCount <= 0) return '';
     if (badgeCount > 99) return '99+';

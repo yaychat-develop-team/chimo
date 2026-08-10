@@ -4,7 +4,7 @@ import '../models/app_bottom_nav_destination.dart';
 import '../models/main_tab.dart';
 import 'app_bottom_nav_item.dart';
 
-/// Bottom nav bar (design: 30×30 icons, ~15pt label area).
+/// 底部导航栏（设计：30×30 图标，约 15pt 文案区）。
 class AppBottomNavBar extends StatelessWidget {
   const AppBottomNavBar({
     super.key,
@@ -17,7 +17,7 @@ class AppBottomNavBar extends StatelessWidget {
   final List<AppBottomNavDestination> destinations;
   final ValueChanged<MainTab> onTabSelected;
 
-  /// Content height: icon 30 + gap 4 + label 15 + vertical padding.
+  /// 内容高度：图标 30 + 间距 4 + 文案 15 + 纵向内边距。
   static const double barHeight = 62;
 
   @override
