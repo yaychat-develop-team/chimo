@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+set -euo pipefail
+
 buildType=$1
 versionName=$2
 versionCode=$3
@@ -8,53 +10,64 @@ abis=$6
 
 projectPath=$(dirname "$PWD")
 
+# 国内 Flutter 存储镜像偶发返回 HTML，导致 profile/release 引擎 POM 解析失败
+if [ -z "${FLUTTER_STORAGE_BASE_URL:-}" ]; then
+  export FLUTTER_STORAGE_BASE_URL="https://storage.googleapis.com"
+fi
+
 targetPlatform="android-arm"
 
-if [ $abis == "armeabi-v7a,arm64-v8a" ]; then
+if [ "$abis" == "armeabi-v7a,arm64-v8a" ]; then
   targetPlatform="android-arm,android-arm64"
-elif [ $abis == 'arm64-v8a' ]; then
+elif [ "$abis" == 'arm64-v8a' ]; then
   targetPlatform="android-arm64"
 fi
 
-echo "targetPlatform=" $targetPlatform
+echo "targetPlatform=" "$targetPlatform"
+echo "FLUTTER_STORAGE_BASE_URL=" "$FLUTTER_STORAGE_BASE_URL"
 
-if [ $buildType == "debug" ]; then
+finish_apk() {
+  local src=$1
+  local outName="chimo_${buildType}_${ciNum}.apk"
+  if [ ! -f "$src" ]; then
+    echo "ERROR: APK not found after build: $src" >&2
+    exit 1
+  fi
+  mkdir -p "$projectPath/build/app/outputs/apk" "$projectPath/apks"
+  mv "$src" "$projectPath/build/app/outputs/apk/$outName"
+  cp "$projectPath/build/app/outputs/apk/$outName" "$projectPath/apks/$outName"
+  echo "OK: $projectPath/apks/$outName"
+}
+
+if [ "$buildType" == "debug" ]; then
     apkPath="$projectPath/build/app/outputs/flutter-apk/app-debug.apk"
     if [ -d "$projectPath/build/app/outputs" ]; then
-        rm -rf $projectPath/build/app/outputs
+        rm -rf "$projectPath/build/app/outputs"
     fi
-#    cur_timestamp=$(date +%s)
-    flutter build apk --debug --build-number $versionCode --build-name $versionName --dart-define=DEBUG_MODE=true --dart-define=CI_NUM="$ciNum" --dart-define=ABI_FILTERS=$abis --target-platform=$targetPlatform -v
-
-    mkdir -p "$projectPath/build/app/outputs/apk" "$projectPath/apks"
-    mv $apkPath $projectPath/build/app/outputs/apk/chimo_${buildType}_${ciNum}.apk
-    cp $projectPath/build/app/outputs/apk/chimo_${buildType}_${ciNum}.apk $projectPath/apks/chimo_${buildType}_${ciNum}.apk
-elif [ $buildType == "profile" ]; then
-         apkPath="$projectPath/build/app/outputs/flutter-apk/app-profile.apk"
-         if [ -d "$projectPath/build/app/outputs" ]; then
-             rm -rf $projectPath/build/app/outputs
-         fi
-         cur_timestamp=$(date +%s)
-         flutter build apk --profile --build-number $versionCode --build-name $versionName --dart-define=DEBUG_MODE=true --dart-define=CI_NUM="$ciNum" --dart-define=ABI_FILTERS=$abis --target-platform=$targetPlatform -v
-
-         mkdir -p "$projectPath/build/app/outputs/apk" "$projectPath/apks"
-         mv $apkPath $projectPath/build/app/outputs/apk/chimo_${buildType}_${ciNum}.apk
-         cp $projectPath/build/app/outputs/apk/chimo_${buildType}_${ciNum}.apk $projectPath/apks/chimo_${buildType}_${ciNum}.apk
-elif [ $buildType == "release" ]; then
+    flutter build apk --debug --build-number "$versionCode" --build-name "$versionName" --dart-define=DEBUG_MODE=true --dart-define=CI_NUM="$ciNum" --dart-define=ABI_FILTERS="$abis" --target-platform="$targetPlatform" -v
+    finish_apk "$apkPath"
+elif [ "$buildType" == "profile" ]; then
+    apkPath="$projectPath/build/app/outputs/flutter-apk/app-profile.apk"
+    if [ -d "$projectPath/build/app/outputs" ]; then
+        rm -rf "$projectPath/build/app/outputs"
+    fi
+    flutter build apk --profile --build-number "$versionCode" --build-name "$versionName" --dart-define=DEBUG_MODE=true --dart-define=CI_NUM="$ciNum" --dart-define=ABI_FILTERS="$abis" --target-platform="$targetPlatform" -v
+    finish_apk "$apkPath"
+elif [ "$buildType" == "release" ]; then
     apkPath="$projectPath/build/app/outputs/flutter-apk/app-release.apk"
     if [ -d "$projectPath/build/app/outputs" ]; then
-        rm -rf $projectPath/build/app/outputs
+        rm -rf "$projectPath/build/app/outputs"
     fi
     if [[ "$debugModel" == "enable" ]]; then
-        cur_timestamp=$(date +%s)
-        flutter build apk --release --build-number $versionCode --build-name $versionName --dart-define=DEBUG_MODE=true --dart-define=CI_NUM="$ciNum" --dart-define=ABI_FILTERS=$abis --target-platform=$targetPlatform -v
+        flutter build apk --release --build-number "$versionCode" --build-name "$versionName" --dart-define=DEBUG_MODE=true --dart-define=CI_NUM="$ciNum" --dart-define=ABI_FILTERS="$abis" --target-platform="$targetPlatform" -v
     else
         flutter clean
-        flutter build apk --release --build-number $versionCode --build-name $versionName --dart-define=DEBUG_MODE=false --dart-define=ABI_FILTERS=$abis --target-platform=$targetPlatform -v
+        flutter build apk --release --build-number "$versionCode" --build-name "$versionName" --dart-define=DEBUG_MODE=false --dart-define=ABI_FILTERS="$abis" --target-platform="$targetPlatform" -v
     fi
-    mkdir -p "$projectPath/build/app/outputs/apk" "$projectPath/apks"
-    mv $apkPath $projectPath/build/app/outputs/apk/chimo_${buildType}_${ciNum}.apk
-    cp $projectPath/build/app/outputs/apk/chimo_${buildType}_${ciNum}.apk $projectPath/apks/chimo_${buildType}_${ciNum}.apk
-elif [ $buildType == "store" ]; then
+    finish_apk "$apkPath"
+elif [ "$buildType" == "store" ]; then
     echo 'store build'
+else
+    echo "ERROR: unknown buildType=$buildType" >&2
+    exit 1
 fi
