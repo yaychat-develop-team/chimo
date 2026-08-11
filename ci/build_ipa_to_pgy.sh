@@ -2,7 +2,7 @@
 versionName=$1
 ciNum=$2
 buildType=$3
-BRANCH="oumi_test"
+BRANCH="chimo_dev"
 export LANG=en_US.UTF-8
 projectPath="$(dirname "$(dirname "$0")")"
 echo "$projectPath"

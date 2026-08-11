@@ -7,13 +7,16 @@ parent_dir = os.path.dirname(current_file_path)  # 获取当前文件的父目�
 grandparent_dir = os.path.dirname(parent_dir)  # 获取当前文件的上级目录
 resource_dic = grandparent_dir + '/packages_local/resource/lib/arbs/'
 
-api_url = 'https://opadmin-api.oumiapp.com/content/translation/exportTranslation'
+api_url = os.environ.get(
+    'TRANSLATION_API_URL',
+    'https://opadmin-api.echimo.com/content/translation/exportTranslation',
+)
 headers = {"Accept-Language": "zh-CN,zh;q=0.9", "Content-Type": "application/json;charset=UTF-8"}
 
 
 def download_file_with_post(en):
     lan = "en" if en else "zh_cn"
-    post_data = {"lan": lan, "project": "yaychat-client"}
+    post_data = {"lan": lan, "project": os.environ.get('TRANSLATION_PROJECT', 'chimo-client')}
     output_file = 'intl_en.arb' if en else 'intl_zh.arb'
     output_path = resource_dic + output_file
 

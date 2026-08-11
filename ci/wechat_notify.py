@@ -165,7 +165,7 @@ else:
                             },
                             "type": "primary",
                             "multi_url": {
-                                "url": f"http://192.168.50.153:9992/yaychat_{buildType}_{ciNum}.apk",
+                                "url": f"http://192.168.50.153:9992/chimo_{buildType}_{ciNum}.apk",
                                 "pc_url": "",
                                 "android_url": "",
                                 "ios_url": ""
@@ -177,7 +177,7 @@ else:
             "header": {
                 "template": "yellow",
                 "title": {
-                    "content": f"🔥🔥🔥 Yaychat {ciNum} 号包",
+                    "content": f"🔥🔥🔥 Chimo {ciNum} 号包",
                     "tag": "plain_text"
                 }
             }

@@ -18,7 +18,7 @@ flutter pub get
 pod install
 chmod +x *.sh
 
-ipaPath="$projectPath/build/ios/ipa/oumi.ipa"
+ipaPath="$projectPath/build/ios/ipa/chimo.ipa"
 exportOptions="$projectPath/ios/ExportOptions.plist"
 if [ -f "$ipaPath" ]; then
   echo "Found ipa file at $ipaPath, deleting..."

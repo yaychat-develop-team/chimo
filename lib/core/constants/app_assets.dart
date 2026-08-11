@@ -5,8 +5,8 @@ abstract final class AppAssets {
   // ---------- 品牌 / 共用 ----------
   static const String logo = '$_forya/logo.webp';
   static const String iconLogo = '$_forya/logo_title.webp';
-  static const String oumiTitle = '$_forya/title_logo.webp';
-  static const String oumiIcon = logo;
+  static const String titleLogo = '$_forya/title_logo.webp';
+  static const String brandIcon = logo;
   static const String avatarPlace = '$_forya/man_img.webp';
   static const String emptyAvatar = '$_forya/woman_img.webp';
   static const String defaultAvatar = avatarPlace;
