@@ -14,6 +14,8 @@ releaseNotes=$5
 ciNum=$6
 
 projectPath=$(dirname "$PWD")
+adhocPlist="$projectPath/ios/export_adhoc.plist"
+storePlist="$projectPath/ios/ExportOptions.plist"
 
 apiKey="${APP_STORE_API_KEY:-}"
 apiIssuer="${APP_STORE_API_ISSUER:-}"
@@ -23,73 +25,128 @@ if [ -z "$apiKey" ] || [ -z "$apiIssuer" ]; then
     exit 1
 fi
 
+require_plist() {
+    local plist=$1
+    if [ ! -f "$plist" ]; then
+        echo "ERROR: export options plist missing: $plist" >&2
+        exit 1
+    fi
+}
+
+# flutter build ipa 已导出 IPA 时跳过二次 export；否则用 xcodebuild 补导出
+export_archive_if_needed() {
+    local exportPlist=$1
+    require_plist "$exportPlist"
+    local existing
+    existing=$(find "$projectPath/build/ios/ipa" -name "*.ipa" 2>/dev/null | head -n 1 || true)
+    if [ -n "$existing" ]; then
+        echo "IPA already present, skip xcodebuild export: $existing"
+        return 0
+    fi
+    local archivePath="$projectPath/build/ios/archive/Runner.xcarchive"
+    if [ ! -d "$archivePath" ]; then
+        echo "ERROR: archive not found: $archivePath" >&2
+        exit 1
+    fi
+    echo "[DEBUG] $(date '+%Y-%m-%d %H:%M:%S') 开始 export"
+    xcodebuild -exportArchive \
+        -archivePath "$archivePath" \
+        -exportPath "$projectPath/build/ios/ipa/" \
+        -exportOptionsPlist "$exportPlist" \
+        -allowProvisioningUpdates \
+        -authenticationKeyID "$apiKey" \
+        -authenticationKeyIssuerID "$apiIssuer"
+    echo "[DEBUG] $(date '+%Y-%m-%d %H:%M:%S') export 命令结束"
+}
+
 function buildStore() {
-    cd $projectPath
+    cd "$projectPath"
     flutter pub get
     cd ios
     arch -x86_64 pod install --repo-update
 
-    cd $projectPath
+    cd "$projectPath"
 
-    ipaPath=$projectPath/build/ios/ipa/Partying.ipa
-    archivePath=$projectPath/build/ios/archive/Runner.xcarchive
-    buildOutputPath=$projectPath/package_app
-    
-    flutter build ipa --release --build-number $versionCode --build-name $versionName
-    xcodebuild -exportArchive -archivePath $archivePath -exportPath build/ios/ipa/ -exportOptionsPlist ios/ExportOptions.plist -allowProvisioningUpdates -authenticationKeyID "$apiKey" -authenticationKeyIssuerID "$apiIssuer"
+    local ipaPath="$projectPath/build/ios/ipa/Partying.ipa"
+    local archivePath="$projectPath/build/ios/archive/Runner.xcarchive"
+    local buildOutputPath="$projectPath/package_app"
+
+    require_plist "$storePlist"
+    flutter build ipa --release \
+        --build-number "$versionCode" \
+        --build-name "$versionName" \
+        --export-options-plist="$storePlist"
+    export_archive_if_needed "$storePlist"
 
     if [ -f "$ipaPath" ]; then
-        targetPath="$buildOutputPath/$versionName-$buildType-$versionCode.ipa"
-        mv "$ipaPath" $targetPath
+        local targetPath="$buildOutputPath/$versionName-$buildType-$versionCode.ipa"
+        mkdir -p "$buildOutputPath"
+        mv "$ipaPath" "$targetPath"
     fi
 
-#     cd $projectPath/ci/upload_gp
-#     python3 translate_ios_releasenotes.py "$releaseNotes" $projectPath/ios/fastlane/metadata
-
-    if [ $versionCode == 1 ];then
-       cd $projectPath/ios
-       fastlane ios submit versionName:$versionName buildNum:$versionCode ipa:$ipaPath
+    if [ "$versionCode" == 1 ]; then
+       cd "$projectPath/ios"
+       fastlane ios submit versionName:"$versionName" buildNum:"$versionCode" ipa:"$ipaPath"
     fi
 
-    # 上传 dSYM
-    uploadymbolsPath=$projectPath/ios/Pods/FirebaseCrashlytics/upload-symbols
-    plistPath=$projectPath/ios/Runner/GoogleService-Info.plist
-    dsymPath=$projectPath/build/ios/archive/Runner.xcarchive/dSYMs/
-    if [ -d "$dsymPath" ];then
-      $uploadymbolsPath -gsp $plistPath -p ios $dsymPath
+    local uploadymbolsPath="$projectPath/ios/Pods/FirebaseCrashlytics/upload-symbols"
+    local plistPath="$projectPath/ios/Runner/GoogleService-Info.plist"
+    local dsymPath="$projectPath/build/ios/archive/Runner.xcarchive/dSYMs/"
+    if [ -d "$dsymPath" ] && [ -x "$uploadymbolsPath" ]; then
+      "$uploadymbolsPath" -gsp "$plistPath" -p ios "$dsymPath"
     fi
 }
 
-cd $projectPath
+cd "$projectPath"
+require_plist "$adhocPlist"
 
 if [ "$buildType" == "debug" ] || [ "$buildType" == "profile" ]; then
-    ipaPath=$(find "$projectPath/build/ios/ipa/" -name "*.ipa")
     if [ -d "$projectPath/build/ios" ]; then
-        rm -rf $projectPath/build/ios
+        rm -rf "$projectPath/build/ios"
     fi
     if [[ "$debugModel" == "enable" ]]; then
-        flutter build ipa --profile --build-number $versionCode --build-name $versionName --dart-define=DEBUG_MODE=true --dart-define=CI_NUM="$ciNum" -v
+        flutter build ipa --profile \
+            --build-number "$versionCode" \
+            --build-name "$versionName" \
+            --dart-define=DEBUG_MODE=true \
+            --dart-define=CI_NUM="$ciNum" \
+            --export-options-plist="$adhocPlist" \
+            -v
     else
-        flutter build ipa --profile --build-number $versionCode --build-name $versionName --dart-define=DEBUG_MODE=false -v
+        flutter build ipa --profile \
+            --build-number "$versionCode" \
+            --build-name "$versionName" \
+            --dart-define=DEBUG_MODE=false \
+            --export-options-plist="$adhocPlist" \
+            -v
     fi
-    archivePath=$projectPath/build/ios/archive/Runner.xcarchive
-    echo "[DEBUG] $(date '+%Y-%m-%d %H:%M:%S') 开始 export"
-    xcodebuild -exportArchive -archivePath $archivePath -exportPath build/ios/ipa/ -exportOptionsPlist ios/export_adhoc.plist -allowProvisioningUpdates -authenticationKeyID "$apiKey" -authenticationKeyIssuerID "$apiIssuer"
-    echo "[DEBUG] $(date '+%Y-%m-%d %H:%M:%S') export 命令结束"
+    export_archive_if_needed "$adhocPlist"
 
-elif [ $buildType == "release" ]; then
-    ipaPath=$(find "$projectPath/build/ios/ipa/" -name "*.ipa")
+elif [ "$buildType" == "release" ]; then
     if [ -d "$projectPath/build/ios" ]; then
-        rm -rf $projectPath/build/ios
+        rm -rf "$projectPath/build/ios"
     fi
 
     if [[ "$debugModel" == "enable" ]]; then
-        flutter build ipa --release --build-number $versionCode --build-name $versionName --dart-define=DEBUG_MODE=true --dart-define=CI_NUM="$ciNum" -v
+        flutter build ipa --release \
+            --build-number "$versionCode" \
+            --build-name "$versionName" \
+            --dart-define=DEBUG_MODE=true \
+            --dart-define=CI_NUM="$ciNum" \
+            --export-options-plist="$adhocPlist" \
+            -v
     else
-        flutter build ipa --release --build-number $versionCode --build-name $versionName --dart-define=DEBUG_MODE=false -v
+        flutter build ipa --release \
+            --build-number "$versionCode" \
+            --build-name "$versionName" \
+            --dart-define=DEBUG_MODE=false \
+            --export-options-plist="$adhocPlist" \
+            -v
     fi
-    archivePath=$projectPath/build/ios/archive/Runner.xcarchive
-    xcodebuild -exportArchive -archivePath $archivePath -exportPath build/ios/ipa/ -exportOptionsPlist ios/export_adhoc.plist -allowProvisioningUpdates -authenticationKeyID "$apiKey" -authenticationKeyIssuerID "$apiIssuer"
+    export_archive_if_needed "$adhocPlist"
+elif [ "$buildType" == "store" ]; then
+    buildStore
 else
-    echo "buildStore"
+    echo "ERROR: unknown buildType=$buildType" >&2
+    exit 1
 fi
