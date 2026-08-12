@@ -1,4 +1,5 @@
 import '../network/network_bootstrap.dart';
+import 'auth_session.dart';
 
 /// 判断登录后是否应跳过引导直接进入首页。
 ///
@@ -9,12 +10,16 @@ import '../network/network_bootstrap.dart';
 ///
 /// 邮箱注册常返回 `isRegister: true`，但昵称仍是邮箱地址——这类仍须走引导；
 /// 不要仅依赖 `isRegister`。
+/// 用户在引导中点 Skip 进入首页后，[AuthSession.isOnboardingCompleted] 为 true。
 abstract final class AuthOnboardingGate {
   /// `true` → 进入壳/首页；`false` → 资料设置引导。
   static Future<bool> shouldEnterHome(
     Map<String, dynamic> authData, {
     String? email,
   }) async {
+    // 已跳过 / 走完引导：直接进首页，无需资料齐全。
+    if (await AuthSession.isOnboardingCompleted()) return true;
+
     // AuthRsp 明确标记为新用户。
     if (_readBool(authData['newUser']) == true) return false;
 

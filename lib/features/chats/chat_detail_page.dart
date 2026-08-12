@@ -1070,9 +1070,14 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       case _DmMoreAction.block:
         await _toggleBlock();
       case _DmMoreAction.report:
-        Navigator.of(
-          context,
-        ).push(MaterialPageRoute<void>(builder: (_) => const ReportPage()));
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => ReportPage(
+              reportedId: _relationUid,
+              targetKind: ReportTargetKind.user,
+            ),
+          ),
+        );
       case _DmMoreAction.cancel:
         break;
     }

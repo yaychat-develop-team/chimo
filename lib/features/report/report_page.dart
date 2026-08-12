@@ -1,11 +1,46 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
+import 'dart:io';
 
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+
+import '../../core/network/app_apis.dart';
+import '../../core/network/media_upload.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_page_scaffold.dart';
+import '../../core/widgets/center_toast.dart';
+import '../profile/photo_pick_sheet.dart';
+
+/// 举报目标：用户或群聊（对齐 forya ReportType）。
+enum ReportTargetKind { user, group }
+
+class _ReportImage {
+  _ReportImage({
+    this.localPath,
+    this.remoteUrl,
+    this.uploading = false,
+  });
+
+  String? localPath;
+  String? remoteUrl;
+  bool uploading;
+
+  bool get ready =>
+      !uploading && (remoteUrl != null && remoteUrl!.trim().isNotEmpty);
+}
 
 /// 举报页：选择类型、上传凭证图、填写反馈。
 class ReportPage extends StatefulWidget {
-  const ReportPage({super.key});
+  const ReportPage({
+    super.key,
+    this.reportedId = '',
+    this.targetKind = ReportTargetKind.user,
+  });
+
+  /// 被举报用户 id 或群（环信）id。
+  final String reportedId;
+
+  final ReportTargetKind targetKind;
 
   @override
   State<ReportPage> createState() => _ReportPageState();
@@ -25,8 +60,10 @@ class _ReportPageState extends State<ReportPage> {
   static const _maxFeedbackLength = 500;
 
   String _selectedType = _types.first;
-  final List<Color> _images = [];
+  final List<_ReportImage> _images = [];
   final TextEditingController _feedbackController = TextEditingController();
+  bool _submitting = false;
+  bool _picking = false;
 
   @override
   void dispose() {
@@ -34,36 +71,130 @@ class _ReportPageState extends State<ReportPage> {
     super.dispose();
   }
 
-  void _addImage() {
+  Future<void> _addImage() async {
+    if (_picking || _submitting) return;
     if (_images.length >= _maxImages) return;
-    // UI 演示：色块占位；后续再接入相册选择。
-    const palette = [
-      Color(0xFF3A3A3C),
-      Color(0xFF2C3A34),
-      Color(0xFF3A2C34),
-      Color(0xFF2C2C3A),
-    ];
-    setState(() => _images.add(palette[_images.length % palette.length]));
+
+    final action = await showPhotoPickSheet(context);
+    if (!mounted || action == null) return;
+
+    final source = switch (action) {
+      PhotoPickAction.takePhoto => ImageSource.camera,
+      PhotoPickAction.gallery => ImageSource.gallery,
+    };
+
+    setState(() => _picking = true);
+    XFile? file;
+    try {
+      file = await ImagePicker().pickImage(
+        source: source,
+        imageQuality: 85,
+        maxWidth: 1920,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      showCenterToast(
+        context,
+        message: source == ImageSource.camera
+            ? 'Camera unavailable. Check app permissions.'
+            : 'Gallery unavailable. Check app permissions.',
+      );
+      setState(() => _picking = false);
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _picking = false);
+    if (file == null) return;
+
+    if (file.path.toLowerCase().endsWith('.gif')) {
+      showCenterToast(context, message: 'GIF uploads are not supported');
+      return;
+    }
+
+    final item = _ReportImage(localPath: file.path, uploading: true);
+    setState(() => _images.add(item));
+
+    final remote = await MediaUpload.uploadFile(file.path);
+    if (!mounted) return;
+
+    final index = _images.indexOf(item);
+    if (index < 0) return;
+
+    if (remote == null || remote.isEmpty) {
+      setState(() => _images.removeAt(index));
+      showCenterToast(context, message: 'Image upload failed. Try again.');
+      return;
+    }
+
+    setState(() {
+      _images[index] = _ReportImage(
+        localPath: file!.path,
+        remoteUrl: remote,
+        uploading: false,
+      );
+    });
   }
 
   void _removeImage(int index) {
+    if (_submitting) return;
     setState(() => _images.removeAt(index));
   }
 
-  void _submit() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Report submitted'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-    Navigator.of(context).pop();
+  Future<void> _submit() async {
+    if (_submitting) return;
+    final feedback = _feedbackController.text.trim();
+    if (feedback.isEmpty) {
+      showCenterToast(context, message: 'Please enter feedback');
+      return;
+    }
+    if (_images.any((e) => e.uploading)) {
+      showCenterToast(context, message: 'Images are still uploading…');
+      return;
+    }
+
+    final reportedId = widget.reportedId.trim();
+    final imageUrls = [
+      for (final img in _images)
+        if (img.ready) img.remoteUrl!.trim(),
+    ];
+
+    setState(() => _submitting = true);
+    try {
+      if (reportedId.isNotEmpty) {
+        final res = await AppApis.report.submit(
+          reportedId: reportedId,
+          type: widget.targetKind == ReportTargetKind.group
+              ? 'CHANNEL'
+              : 'USER',
+          reason: _selectedType,
+          description: feedback,
+          evidenceImages: imageUrls,
+        );
+        if (!mounted) return;
+        if (!res.ok) {
+          showCenterToast(
+            context,
+            message: res.message.isEmpty ? 'Submit failed' : res.message,
+          );
+          return;
+        }
+      }
+      if (!mounted) return;
+      showCenterToast(context, message: 'Report submitted');
+      Navigator.of(context).pop();
+    } catch (error) {
+      if (!mounted) return;
+      showCenterToast(context, message: 'Submit failed: $error');
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.paddingOf(context).bottom;
     final feedbackLen = _feedbackController.text.length;
+    final busy = _submitting || _picking;
 
     return AppPageScaffold(
       title: 'Report',
@@ -91,7 +222,9 @@ class _ReportPageState extends State<ReportPage> {
                       _TypeChip(
                         label: type,
                         selected: type == _selectedType,
-                        onTap: () => setState(() => _selectedType = type),
+                        onTap: busy
+                            ? null
+                            : () => setState(() => _selectedType = type),
                       ),
                   ],
                 ),
@@ -111,11 +244,14 @@ class _ReportPageState extends State<ReportPage> {
                   children: [
                     for (var i = 0; i < _images.length; i++)
                       _ImageThumb(
-                        color: _images[i],
+                        item: _images[i],
                         onRemove: () => _removeImage(i),
                       ),
                     if (_images.length < _maxImages)
-                      _AddImageButton(onTap: _addImage),
+                      _AddImageButton(
+                        onTap: busy ? null : () => unawaited(_addImage()),
+                        loading: _picking,
+                      ),
                   ],
                 ),
                 const SizedBox(height: 28),
@@ -132,6 +268,7 @@ class _ReportPageState extends State<ReportPage> {
                   controller: _feedbackController,
                   maxLength: _maxFeedbackLength,
                   length: feedbackLen,
+                  enabled: !_submitting,
                   onChanged: (_) => setState(() {}),
                 ),
               ],
@@ -145,12 +282,12 @@ class _ReportPageState extends State<ReportPage> {
                 color: AppColors.primaryBright,
                 borderRadius: BorderRadius.circular(26),
                 child: InkWell(
-                  onTap: _submit,
+                  onTap: busy ? null : () => unawaited(_submit()),
                   borderRadius: BorderRadius.circular(26),
-                  child: const Center(
+                  child: Center(
                     child: Text(
-                      'Submit',
-                      style: TextStyle(
+                      _submitting ? 'Submitting…' : 'Submit',
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 17,
                         fontWeight: FontWeight.w700,
@@ -171,12 +308,12 @@ class _TypeChip extends StatelessWidget {
   const _TypeChip({
     required this.label,
     required this.selected,
-    required this.onTap,
+    this.onTap,
   });
 
   final String label;
   final bool selected;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -202,9 +339,10 @@ class _TypeChip extends StatelessWidget {
 }
 
 class _AddImageButton extends StatelessWidget {
-  const _AddImageButton({required this.onTap});
+  const _AddImageButton({this.onTap, this.loading = false});
 
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
+  final bool loading;
 
   static const double size = 72;
 
@@ -219,39 +357,93 @@ class _AddImageButton extends StatelessWidget {
           color: const Color(0xFF2C2C2E),
           borderRadius: BorderRadius.circular(14),
         ),
-        child: const Icon(
-          Icons.add_rounded,
-          color: AppColors.textPrimary,
-          size: 32,
-        ),
+        child: loading
+            ? const Center(
+                child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              )
+            : const Icon(
+                Icons.add_rounded,
+                color: AppColors.textPrimary,
+                size: 32,
+              ),
       ),
     );
   }
 }
 
 class _ImageThumb extends StatelessWidget {
-  const _ImageThumb({required this.color, required this.onRemove});
+  const _ImageThumb({required this.item, required this.onRemove});
 
-  final Color color;
+  final _ReportImage item;
   final VoidCallback onRemove;
 
   @override
   Widget build(BuildContext context) {
+    final local = (item.localPath ?? '').trim();
+    final remote = (item.remoteUrl ?? '').trim();
+
+    Widget image;
+    if (local.isNotEmpty) {
+      image = Image.file(
+        File(local),
+        width: _AddImageButton.size,
+        height: _AddImageButton.size,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => const ColoredBox(
+          color: Color(0xFF3A3A3C),
+          child: Icon(Icons.broken_image_outlined, color: Colors.white54),
+        ),
+      );
+    } else if (remote.isNotEmpty) {
+      image = Image.network(
+        remote,
+        width: _AddImageButton.size,
+        height: _AddImageButton.size,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => const ColoredBox(
+          color: Color(0xFF3A3A3C),
+          child: Icon(Icons.broken_image_outlined, color: Colors.white54),
+        ),
+      );
+    } else {
+      image = const ColoredBox(color: Color(0xFF3A3A3C));
+    }
+
     return Stack(
       children: [
-        Container(
-          width: _AddImageButton.size,
-          height: _AddImageButton.size,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(14),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: SizedBox(
+            width: _AddImageButton.size,
+            height: _AddImageButton.size,
+            child: image,
           ),
         ),
+        if (item.uploading)
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Center(
+                child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            ),
+          ),
         Positioned(
           top: 4,
           right: 4,
           child: GestureDetector(
-            onTap: onRemove,
+            onTap: item.uploading ? null : onRemove,
             child: const DecoratedBox(
               decoration: BoxDecoration(
                 color: Colors.black54,
@@ -275,12 +467,14 @@ class _FeedbackField extends StatelessWidget {
     required this.maxLength,
     required this.length,
     required this.onChanged,
+    this.enabled = true,
   });
 
   final TextEditingController controller;
   final int maxLength;
   final int length;
   final ValueChanged<String> onChanged;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -296,6 +490,7 @@ class _FeedbackField extends StatelessWidget {
           TextField(
             controller: controller,
             onChanged: onChanged,
+            enabled: enabled,
             maxLength: maxLength,
             maxLines: null,
             expands: true,

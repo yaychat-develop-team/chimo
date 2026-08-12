@@ -270,6 +270,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _loadGroups({bool showError = false}) async {
     try {
+      await widget.chatsController.ensureBoundToCurrentUser();
       final popularFuture = AppApis.group.list(pageNum: 1, pageSize: 20);
       final mineFuture = AppApis.group.myGroups();
       final popularRes = await popularFuture;
@@ -286,20 +287,30 @@ class _HomePageState extends State<HomePage> {
       final popular = popularRes.data ?? const [];
       final mine = mineRes.data ?? const [];
 
-      final controllerIds = widget.chatsController.joinedGroupIds;
-      final mineIds = {for (final g in mine) g.id, ...controllerIds};
+      // My Groups 以 myGroups 为准；controller 只作本会话乐观加入。
+      final mineIds = {for (final g in mine) g.id};
+      final optimisticIds = widget.chatsController.joinedGroupIds;
+      final joinedFlagIds = {...mineIds, ...optimisticIds};
       final mergedPopular = [
         for (final g in popular)
-          g.copyWith(isJoined: g.isJoined || mineIds.contains(g.id)),
+          g.copyWith(isJoined: g.isJoined || joinedFlagIds.contains(g.id)),
       ];
 
       final joined = <PopularGroupItem>[
         for (final g in mine) g.copyWith(isJoined: true),
       ];
-      for (final g in mergedPopular) {
+      // Popular 上服务端已标 isJoined 的，补进 My Groups。
+      for (final g in popular) {
         if (!g.isJoined) continue;
         if (joined.any((j) => j.id == g.id)) continue;
-        joined.add(g);
+        joined.add(g.copyWith(isJoined: true));
+      }
+      // 本会话刚加入、mine 尚未回写时，从 Popular 卡片乐观补一条。
+      for (final id in optimisticIds) {
+        if (joined.any((j) => j.id == id)) continue;
+        final index = popular.indexWhere((g) => g.id == id);
+        if (index < 0) continue;
+        joined.add(popular[index].copyWith(isJoined: true));
       }
 
       setState(() {

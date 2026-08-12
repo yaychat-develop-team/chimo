@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../core/network/network_bootstrap.dart';
 import '../core/repositories/repositories.dart';
 import '../core/repositories/session_auth_repository.dart';
 import '../features/chats/data/chats_list_controller.dart';
@@ -17,7 +18,12 @@ class AppProviders extends StatelessWidget {
       providers: [
         Provider<AuthRepository>.value(value: SessionAuthRepository()),
         ChangeNotifierProvider<ChatsListController>(
-          create: (_) => ChatsListController(),
+          create: (_) {
+            final controller = ChatsListController();
+            NetworkBootstrap.onSessionCleared =
+                () => controller.clearLocalState();
+            return controller;
+          },
         ),
       ],
       child: child,

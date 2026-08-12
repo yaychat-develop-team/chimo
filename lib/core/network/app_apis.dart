@@ -4,6 +4,7 @@ import 'services/cash_api.dart';
 import 'services/emote_api.dart';
 import 'services/group_api.dart';
 import 'services/relation_api.dart';
+import 'services/report_api.dart';
 import 'services/user_api.dart';
 
 export 'api_result.dart';
@@ -18,6 +19,7 @@ export 'services/cash_api.dart';
 export 'services/emote_api.dart';
 export 'services/group_api.dart';
 export 'services/relation_api.dart';
+export 'services/report_api.dart';
 export 'services/user_api.dart';
 
 /// 各领域类型化 API 服务的静态门面。
@@ -31,4 +33,5 @@ abstract final class AppApis {
   static const cash = CashApi();
   static const app = AppSettingsApi();
   static const emote = EmoteApi();
+  static const report = ReportApi();
 }

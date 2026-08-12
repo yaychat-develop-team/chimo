@@ -17,6 +17,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_gradient_button.dart';
 import '../profile/photo_pick_sheet.dart';
 import 'onboarding_profile_draft.dart';
+import 'widgets/onboarding_skip_button.dart';
 
 /// 注册收尾：头像 + 昵称（Figma 完善资料 — You're almost in!）。
 class AlmostInPage extends StatefulWidget {
@@ -154,6 +155,13 @@ class _AlmostInPageState extends State<AlmostInPage> {
     });
   }
 
+  Future<void> _onSkip() async {
+    if (_submitting || _uploadingAvatar) return;
+    OnboardingProfileDraft.clear();
+    if (!mounted) return;
+    context.go(AppRoutes.welcomeBrand);
+  }
+
   Future<void> _onLetsGo() async {
     if (_submitting) return;
     final nick = _nickController.text.trim();
@@ -176,17 +184,6 @@ class _AlmostInPageState extends State<AlmostInPage> {
       return;
     }
 
-    if (!OnboardingProfileDraft.isReady) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select gender and birthday first'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      context.go(AppRoutes.profileSetup);
-      return;
-    }
-
     if (_uploadingAvatar) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -201,10 +198,12 @@ class _AlmostInPageState extends State<AlmostInPage> {
     try {
       final fields = <String, dynamic>{
         'nickname': nick,
-        'gender': OnboardingProfileDraft.gender,
-        'birthday': OnboardingProfileDraft.birthday,
         'register': true,
       };
+      final gender = OnboardingProfileDraft.gender.trim();
+      final birthday = OnboardingProfileDraft.birthday.trim();
+      if (gender.isNotEmpty) fields['gender'] = gender;
+      if (birthday.isNotEmpty) fields['birthday'] = birthday;
       final avatar = (_remoteAvatarUrl ?? '').trim();
       if (avatar.isNotEmpty) {
         fields['avatarUrl'] = avatar;
@@ -345,33 +344,39 @@ class _AlmostInPageState extends State<AlmostInPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Material(
-                          color: const Color(0xFF2A2A2A),
-                          borderRadius: BorderRadius.circular(12),
-                          child: InkWell(
-                            onTap: _submitting
-                                ? null
-                                : () => Navigator.of(context).pop(),
+                      Row(
+                        children: [
+                          Material(
+                            color: const Color(0xFF2A2A2A),
                             borderRadius: BorderRadius.circular(12),
-                            child: SizedBox(
-                              width: 36,
-                              height: 36,
-                              child: Center(
-                                child: SvgPicture.asset(
-                                  AppAssets.backArrow,
-                                  width: 7,
-                                  height: 12,
-                                  colorFilter: const ColorFilter.mode(
-                                    Colors.white,
-                                    BlendMode.srcIn,
+                            child: InkWell(
+                              onTap: _submitting
+                                  ? null
+                                  : () => Navigator.of(context).pop(),
+                              borderRadius: BorderRadius.circular(12),
+                              child: SizedBox(
+                                width: 36,
+                                height: 36,
+                                child: Center(
+                                  child: SvgPicture.asset(
+                                    AppAssets.backArrow,
+                                    width: 7,
+                                    height: 12,
+                                    colorFilter: const ColorFilter.mode(
+                                      Colors.white,
+                                      BlendMode.srcIn,
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
+                          const Spacer(),
+                          OnboardingSkipButton(
+                            enabled: !_submitting && !_uploadingAvatar,
+                            onPressed: () => unawaited(_onSkip()),
+                          ),
+                        ],
                       ),
                       SizedBox(height: keyboardOpen ? 16 : 28),
                       const Text(

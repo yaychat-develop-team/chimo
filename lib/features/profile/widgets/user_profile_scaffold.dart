@@ -253,6 +253,9 @@ class UserProfileScaffold extends StatelessWidget {
                                   children: [
                                     Text(
                                       nickname,
+                                      maxLines: 1,
+                                      softWrap: false,
+                                      overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 18,

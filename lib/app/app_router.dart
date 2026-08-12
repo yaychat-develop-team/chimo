@@ -54,6 +54,12 @@ abstract final class AppRoutes {
   static String profilePath(String id) => '/app/profile/$id';
   static String verifyPath(String phone) =>
       '/login/verify?phone=${Uri.encodeQueryComponent(phone)}';
+  /// 推荐部落；[typeList] 为所选行业（逗号分隔，空=全部）。
+  static String tribesPath({String typeList = ''}) {
+    final trimmed = typeList.trim();
+    if (trimmed.isEmpty) return tribes;
+    return '$tribes?types=${Uri.encodeQueryComponent(trimmed)}';
+  }
   static const bindEmailLogin = '/bind-email?login=1';
 }
 
@@ -114,7 +120,10 @@ GoRouter createAppRouter({required ChatsListController chatsController}) {
       ),
       GoRoute(
         path: AppRoutes.tribes,
-        builder: (_, _) => const PopularTribesPage(),
+        builder: (_, state) {
+          final types = state.uri.queryParameters['types'] ?? '';
+          return PopularTribesPage(typeList: types);
+        },
       ),
       GoRoute(
         path: AppRoutes.shell,

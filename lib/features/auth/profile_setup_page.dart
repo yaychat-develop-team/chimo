@@ -10,6 +10,7 @@ import '../../core/network/app_apis.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_gradient_button.dart';
 import 'onboarding_profile_draft.dart';
+import 'widgets/onboarding_skip_button.dart';
 
 enum _Gender { male, female }
 
@@ -110,6 +111,11 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
     }
   }
 
+  Future<void> _onSkip() async {
+    if (_saving) return;
+    context.push(AppRoutes.almostIn);
+  }
+
   Future<void> _onNext() async {
     if (!_canNext) return;
     final d = _birthday!;
@@ -171,11 +177,17 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: _BackButton(
-                    onTap: () => Navigator.of(context).maybePop(),
-                  ),
+                Row(
+                  children: [
+                    _BackButton(
+                      onTap: () => Navigator.of(context).maybePop(),
+                    ),
+                    const Spacer(),
+                    OnboardingSkipButton(
+                      enabled: !_saving,
+                      onPressed: () => _onSkip(),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 28),
                 const Text(

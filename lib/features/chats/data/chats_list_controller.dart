@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:im_flutter_sdk/im_flutter_sdk.dart';
 
+import '../../../core/auth/auth_session.dart';
 import '../../../core/constants/app_assets.dart';
 import '../../../core/im/im_service.dart';
 import '../../../core/im/im_system_accounts.dart';
@@ -32,6 +33,8 @@ class ChatsListController extends ChangeNotifier {
   final Set<String> _hiddenIds = {};
   /// 当前打开的聊天/群详情 key（列表 id 或环信 id）— 查看中不增加未读。
   String? _activeConversationKey;
+  /// 当前列表绑定的业务 uid；换号时整表清空，避免沿用上一账号群聊。
+  String? _sessionUserId;
   StreamSubscription<ImChatMessage>? _imSub;
   bool _loading = false;
   String? _loadError;
@@ -69,12 +72,36 @@ class ChatsListController extends ChangeNotifier {
     return [...pinned, ...unpinned];
   }
 
+  /// 登出 / 换号时清空内存会话，避免新账号看到上一账号群聊。
+  void clearLocalState({bool notify = true}) {
+    _conversations.clear();
+    _pinnedIds.clear();
+    _joinedGroupIds.clear();
+    _hiddenIds.clear();
+    _activeConversationKey = null;
+    _sessionUserId = null;
+    _loading = false;
+    _loadError = null;
+    if (notify) notifyListeners();
+  }
+
+  /// 绑定当前登录用户；uid 变化时清空上一账号残留。
+  Future<void> ensureBoundToCurrentUser() async {
+    final uid = (await AuthSession.userId())?.trim() ?? '';
+    if (uid == _sessionUserId) return;
+    clearLocalState(notify: true);
+    _sessionUserId = uid.isEmpty ? null : uid;
+  }
+
   /// 从 API 加载我的群组并重建列表（保留置顶/未读/本地预览）。
   Future<void> refreshFromApi() async {
     _loading = true;
     _loadError = null;
     notifyListeners();
     try {
+      await ensureBoundToCurrentUser();
+      _loading = true;
+
       final groupsRes = await AppApis.group.myGroups();
       final groups = groupsRes.data ?? const [];
 
@@ -97,8 +124,8 @@ class ChatsListController extends ChangeNotifier {
         next.add(c);
       }
 
-      // 若 API myGroups 为空但本地已加入，保留这些行并
-      // 重新拉取详情，使列表仍反映服务端群组卡片。
+      // 仅当本账号会话内乐观加入、且 API 尚未回写时保留本地群行。
+      // 换号后 _joinedGroupIds 已空，不会把上一账号群补回来。
       for (final id in _joinedGroupIds) {
         if (nextJoined.contains(id)) continue;
         if (_isHidden(id)) continue;

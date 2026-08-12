@@ -202,6 +202,19 @@ abstract final class AuthSession {
     await _write(data);
   }
 
+  /// 用户完成或跳过注册引导后标记，避免下次冷启动再次强制完善资料。
+  static Future<void> markOnboardingCompleted() async {
+    final data = await _read();
+    data['loggedIn'] = true;
+    data['onboardingCompleted'] = true;
+    await _write(data);
+  }
+
+  static Future<bool> isOnboardingCompleted() async {
+    final data = await _read();
+    return data['onboardingCompleted'] == true;
+  }
+
   static Future<void> clear() async {
     try {
       final file = await _sessionFile();

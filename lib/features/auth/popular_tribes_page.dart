@@ -3,16 +3,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:go_router/go_router.dart';
 
-import '../../app/app_router.dart';
-import '../../core/auth/auth_session.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/network/app_apis.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_gradient_button.dart';
 import '../../core/widgets/center_toast.dart';
 import '../../core/widgets/network_or_asset_avatar.dart';
+import 'onboarding_exit.dart';
+import 'widgets/onboarding_skip_button.dart';
 
 class _TribeOption {
   const _TribeOption({
@@ -30,10 +29,13 @@ class _TribeOption {
   final String? avatarUrl;
 }
 
-/// 注册流程：从 `/chat/group/listByType`（forya）选取部落 /
-/// 回退 `/chat/group/list`，在 Next Step 时加入所选。
+/// 注册流程：按所选行业调用 `/chat/group/listByType`（forya），
+/// 未选行业时 typeList 为空表示全部；失败时回退 `/chat/group/list`。
 class PopularTribesPage extends StatefulWidget {
-  const PopularTribesPage({super.key});
+  const PopularTribesPage({super.key, this.typeList = ''});
+
+  /// 逗号分隔的行业 type（来自上一页勾选）。
+  final String typeList;
 
   @override
   State<PopularTribesPage> createState() => _PopularTribesPageState();
@@ -60,9 +62,12 @@ class _PopularTribesPageState extends State<PopularTribesPage> {
       _error = null;
     });
     try {
-      // 对齐 forya SelectTribesPage：listByType（空 typeList = 全部）。
-      var res = await AppApis.group.listByType('');
-      if ((!res.ok || (res.data?.isEmpty ?? true))) {
+      // 对齐 forya SelectTribesPage：listByType(所选行业)；空 = 全部。
+      final typeList = widget.typeList.trim();
+      var res = await AppApis.group.listByType(typeList);
+      // 仅「未按行业筛选」时，空结果才回退到全量 list。
+      if (typeList.isEmpty &&
+          (!res.ok || (res.data?.isEmpty ?? true))) {
         res = await AppApis.group.list(pageNum: 1, pageSize: 50);
       }
       if (!mounted) return;
@@ -128,9 +133,8 @@ class _PopularTribesPageState extends State<PopularTribesPage> {
           return;
         }
       }
-      await AuthSession.markLoggedIn(method: 'phone');
       if (!mounted) return;
-      context.go(AppRoutes.shell);
+      await OnboardingExit.finishToHome(context);
     } catch (error) {
       if (!mounted) return;
       showCenterToast(context, message: 'Failed: $error');
@@ -181,18 +185,9 @@ class _PopularTribesPageState extends State<PopularTribesPage> {
                       ),
                     ),
                     const Spacer(),
-                    TextButton(
-                      onPressed: _submitting
-                          ? null
-                          : () => unawaited(_goMain()),
-                      style: TextButton.styleFrom(
-                        foregroundColor: AppColors.textSecondary,
-                        textStyle: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      child: const Text('Skip'),
+                    OnboardingSkipButton(
+                      enabled: !_submitting,
+                      onPressed: () => unawaited(_goMain()),
                     ),
                   ],
                 ),

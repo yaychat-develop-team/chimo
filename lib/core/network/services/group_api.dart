@@ -24,6 +24,14 @@ class GroupApi {
     );
   }
 
+  /// 引导页行业列表（`/chat/group/getTypeList`）。
+  Future<ApiResult<List<String>>> typeList() {
+    return ApiGateway.request(
+      () => NetworkBootstrap.api.groupTypeList(),
+      map: GroupDto.parseTypeList,
+    );
+  }
+
   /// 引导页 / 按部落类型筛选（`typeList`，逗号分隔；空表示全部）。
   Future<ApiResult<List<PopularGroupItem>>> listByType(String typeList) {
     return ApiGateway.request(

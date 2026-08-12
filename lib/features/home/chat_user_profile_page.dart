@@ -218,9 +218,16 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
   }
 
   void _openReport() {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const ReportPage()));
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ReportPage(
+          reportedId: _profile.userId.isNotEmpty
+              ? _profile.userId
+              : _profile.id,
+          targetKind: ReportTargetKind.user,
+        ),
+      ),
+    );
   }
 
   void _openChat() {

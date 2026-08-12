@@ -17,6 +17,9 @@ abstract final class NetworkBootstrap {
   static Timer? _heartbeat;
   static String? authToken;
 
+  /// 登出 / token 失效时清空内存态（如会话列表），由 [AppProviders] 注册。
+  static void Function()? onSessionCleared;
+
   static ApiClient get client => _client ??= ApiClient(
         tokenProvider: () => authToken,
       );
@@ -157,6 +160,11 @@ abstract final class NetworkBootstrap {
     try {
       await ImService.logout().timeout(const Duration(seconds: 3));
     } catch (_) {}
+    try {
+      onSessionCleared?.call();
+    } catch (error) {
+      debugPrint('NetworkBootstrap onSessionCleared: $error');
+    }
   }
 
   static void dispose() {

@@ -32,17 +32,25 @@ abstract final class UserDto {
 
   static MeProfile fromUserMap(Map<String, dynamic> json) {
     final avatar = '${json['avatar'] ?? ''}';
-    final genderRaw = '${json['gender'] ?? ''}'.toLowerCase();
+    final genderRaw = '${json['gender'] ?? ''}'.trim().toLowerCase();
+    // 未设置 / 未知不要默认成 Male（跳过引导后会误显示假资料）。
     final gender = switch (genderRaw) {
       'female' || 'f' || '2' => 'Female',
       'male' || 'm' || '1' => 'Male',
-      _ => genderRaw.isEmpty ? 'Male' : genderRaw,
+      '0' || 'unknown' || 'null' || '' => '',
+      _ => '',
     };
 
     final signature =
         '${json['personalSignature'] ?? json['signature'] ?? json['desc'] ?? ''}';
 
     final email = '${json['email'] ?? ''}'.trim();
+    final birthdayRaw = '${json['birthday'] ?? ''}'.trim();
+    final birthday = (birthdayRaw.isEmpty ||
+            birthdayRaw == 'null' ||
+            birthdayRaw == '0')
+        ? ''
+        : birthdayRaw;
 
     return MeProfile(
       displayName: '${json['nickname'] ?? json['nickName'] ?? ''}',
@@ -55,7 +63,7 @@ abstract final class UserDto {
       follows: _asInt(json['followNum']),
       visitors: _asInt(json['viewNum']),
       gender: gender,
-      birthday: '${json['birthday'] ?? '1995-01-01'}',
+      birthday: birthday,
       signature: signature,
       height: _asIntOrNull(json['height']),
       weight: _asIntOrNull(json['weight']),

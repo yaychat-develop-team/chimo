@@ -456,7 +456,12 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
     switch (action) {
       case _GroupMoreAction.report:
         Navigator.of(context).push(
-          MaterialPageRoute<void>(builder: (_) => const ReportPage()),
+          MaterialPageRoute<void>(
+            builder: (_) => ReportPage(
+              reportedId: _group.id,
+              targetKind: ReportTargetKind.group,
+            ),
+          ),
         );
       case _GroupMoreAction.leave:
         _leave();

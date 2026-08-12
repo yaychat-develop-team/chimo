@@ -5,10 +5,8 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../../app/app_router.dart';
 import '../../core/audio/app_audio_playback.dart';
 import '../../core/auth/auth_session.dart';
 import '../../core/constants/app_assets.dart';
@@ -18,6 +16,8 @@ import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_gradient_button.dart';
 import '../../core/widgets/app_top_loading_bar.dart';
 import '../../core/widgets/network_or_asset_avatar.dart';
+import '../auth/onboarding_exit.dart';
+import '../auth/widgets/onboarding_skip_button.dart';
 import '../me/models/me_models.dart';
 import 'body_metric_page.dart';
 import 'album_photo_viewer_page.dart';
@@ -51,8 +51,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
   late MeProfile _profile;
   String _signature = '';
   String _nickname = '';
-  String _gender = 'Male';
-  String _birthday = '1995-01-01';
+  String _gender = '';
+  String _birthday = '';
   int? _height;
   int? _weight;
   int? _voiceSeconds;
@@ -146,7 +146,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
   void _leave() {
     if (widget.fromOnboarding) {
-      context.go(AppRoutes.shell);
+      unawaited(OnboardingExit.finishToHome(context));
       return;
     }
     Navigator.of(context).pop(_buildResult());
@@ -158,7 +158,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
     if (_saving) return;
     final nick = _nickname.trim();
     if (widget.fromOnboarding) {
-      if (nick.isEmpty || nick.contains('@')) {
+      // 引导态允许资料不完整；仅当填了昵称时校验邮箱占位。
+      if (nick.contains('@')) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Please set a nickname (not your email)'),
@@ -170,13 +171,20 @@ class _EditProfilePageState extends State<EditProfilePage> {
     }
     setState(() => _saving = true);
     try {
-      final genderApi = _gender.toLowerCase() == 'female' ? 'female' : 'male';
       final fields = <String, dynamic>{
         'nickname': nick,
-        'birthday': _birthday,
-        'gender': genderApi,
         'personalSignature': _signature.trim(),
       };
+      // 未选过的性别/生日不要用 Male / 1995 假数据写回服务端。
+      final genderTrim = _gender.trim();
+      if (genderTrim.isNotEmpty) {
+        fields['gender'] =
+            genderTrim.toLowerCase() == 'female' ? 'female' : 'male';
+      }
+      final birthdayTrim = _birthday.trim();
+      if (birthdayTrim.isNotEmpty) {
+        fields['birthday'] = birthdayTrim;
+      }
       if (widget.fromOnboarding) {
         fields['register'] = true;
       }
@@ -232,11 +240,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
       }
       if (widget.fromOnboarding) {
         await AuthSession.markLoggedIn(
-          nickname: nick,
+          nickname: nick.isEmpty ? null : nick,
           avatarUrl: _profile.avatarUrl,
         );
         if (!mounted) return;
-        context.go(AppRoutes.shell);
+        await OnboardingExit.finishToHome(context);
         return;
       }
       _leave();
@@ -629,6 +637,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
               _EditProfileAppBar(
                 onBack: _popWithResult,
                 completionPercent: _completionPercent,
+                onSkip: widget.fromOnboarding
+                    ? () => unawaited(OnboardingExit.finishToHome(context))
+                    : null,
               ),
               if (_loading) const AppTopLoadingBar(),
               Expanded(
@@ -720,10 +731,12 @@ class _EditProfileAppBar extends StatelessWidget {
   const _EditProfileAppBar({
     required this.onBack,
     required this.completionPercent,
+    this.onSkip,
   });
 
   final VoidCallback onBack;
   final int completionPercent;
+  final VoidCallback? onSkip;
 
   @override
   Widget build(BuildContext context) {
@@ -777,6 +790,11 @@ class _EditProfileAppBar extends StatelessWidget {
               ),
             ],
           ),
+          if (onSkip != null)
+            Align(
+              alignment: Alignment.centerRight,
+              child: OnboardingSkipButton(onPressed: onSkip),
+            ),
         ],
       ),
     );
@@ -1419,8 +1437,10 @@ class _BasicInfoCard extends StatelessWidget {
   final VoidCallback? onWeightTap;
 
   String get _birthdayDisplay {
-    final parsed = DateTime.tryParse(birthday);
-    if (parsed == null) return birthday;
+    final raw = birthday.trim();
+    if (raw.isEmpty) return '';
+    final parsed = DateTime.tryParse(raw);
+    if (parsed == null) return raw;
     final m = parsed.month.toString().padLeft(2, '0');
     final d = parsed.day.toString().padLeft(2, '0');
     final y = parsed.year.toString().padLeft(4, '0');

@@ -9,6 +9,25 @@ abstract final class GroupDto {
     return parseData(response.data);
   }
 
+  /// `/chat/group/getTypeList` → 行业 / 兴趣标签。
+  static List<String> parseTypeList(ApiResponse response) {
+    if (!response.success) return const [];
+    final data = response.data;
+    if (data is List) {
+      return [
+        for (final item in data)
+          if ('$item'.trim().isNotEmpty) '$item'.trim(),
+      ];
+    }
+    if (data is! Map) return const [];
+    final list = data['typeList'] ?? data['list'] ?? data['types'];
+    if (list is! List) return const [];
+    return [
+      for (final item in list)
+        if ('$item'.trim().isNotEmpty) '$item'.trim(),
+    ];
+  }
+
   static List<PopularGroupItem> parseData(Object? data) {
     if (data is List) {
       return [

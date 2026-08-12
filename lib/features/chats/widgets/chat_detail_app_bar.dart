@@ -73,10 +73,12 @@ class _DmAppBar extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            Flexible(
+                            // Expanded(tight)：长昵称强制截断，避免盖住 Follow。
+                            Expanded(
                               child: Text(
                                 conversation.title,
                                 maxLines: 1,
+                                softWrap: false,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   color: Colors.white,

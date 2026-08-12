@@ -12,8 +12,8 @@ class MeProfile {
     required this.visitors,
     this.avatarUrl,
     this.email = '',
-    this.gender = 'Male',
-    this.birthday = '1995-01-01',
+    this.gender = '',
+    this.birthday = '',
     this.height,
     this.weight,
     this.signature = '',
@@ -94,7 +94,14 @@ class MeProfile {
   /// 打开个人主页时的 PAG 特效 URL。
   final String cardDynamicResource;
 
-  bool get isMale => gender == 'Male';
+  bool get isMale => gender.toLowerCase() == 'male';
+
+  bool get hasGender =>
+      gender.trim().isNotEmpty &&
+      gender.toLowerCase() != 'unknown' &&
+      gender != '0';
+
+  bool get hasBirthday => birthday.trim().isNotEmpty;
 
   /// Forya `User.levelIndex` — 选择卡片/徽章色阶。
   int get levelIndex {

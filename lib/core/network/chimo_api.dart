@@ -353,6 +353,29 @@ class ChimoApi {
     );
   }
 
+  // ---- 举报 ----
+  /// 对齐 forya `POST /report`（ReportReq）。
+  Future<ApiResponse> report({
+    required String reportedId,
+    required String type,
+    required String reason,
+    required String description,
+    List<String> evidenceImages = const [],
+    List<String> evidenceVideos = const [],
+  }) {
+    return _client.post(
+      '/report',
+      bizParam: {
+        'reportedId': reportedId,
+        'type': type,
+        'reason': reason,
+        'description': description,
+        'evidenceImages': evidenceImages,
+        'evidenceVideos': evidenceVideos,
+      },
+    );
+  }
+
   // ---- 媒体上传 ----
   Future<ApiResponse> uploadUrl({
     required int sceneCode,
