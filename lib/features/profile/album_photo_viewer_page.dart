@@ -13,16 +13,21 @@ class AlbumPhotoViewerPage extends StatefulWidget {
     super.key,
     required this.paths,
     this.initialIndex = 0,
+    this.showPageIndicator = true,
   });
 
   final List<String> paths;
   final int initialIndex;
+
+  /// 为 false 时不显示顶部「1/5」页码（聊天图片预览用）。
+  final bool showPageIndicator;
 
   /// 打开全屏查看器；[paths] 无可用项时为 no-op。
   static Future<void> open(
     BuildContext context, {
     required List<String> paths,
     int initialIndex = 0,
+    bool showPageIndicator = true,
   }) {
     final clean = [
       for (final p in paths)
@@ -35,6 +40,7 @@ class AlbumPhotoViewerPage extends StatefulWidget {
         builder: (_) => AlbumPhotoViewerPage(
           paths: clean,
           initialIndex: index,
+          showPageIndicator: showPageIndicator,
         ),
       ),
     );
@@ -126,14 +132,15 @@ class _AlbumPhotoViewerPageState extends State<AlbumPhotoViewerPage> {
                         ),
                       ),
                     ),
-                    Text(
-                      total > 1 ? '${_currentIndex + 1}/$total' : 'Photo',
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w600,
+                    if (widget.showPageIndicator)
+                      Text(
+                        total > 1 ? '${_currentIndex + 1}/$total' : 'Photo',
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),

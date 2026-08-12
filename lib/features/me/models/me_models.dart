@@ -27,6 +27,7 @@ class MeProfile {
     this.moreExpForNextLevel = 0,
     this.totalExperience = 0,
     this.momentUrls = const [],
+    this.cardDynamicResource = '',
   });
 
   /// `/user/info` 返回前的空壳。
@@ -90,6 +91,9 @@ class MeProfile {
   final int totalExperience;
   final List<String> momentUrls;
 
+  /// 打开个人主页时的 PAG 特效 URL。
+  final String cardDynamicResource;
+
   bool get isMale => gender == 'Male';
 
   /// Forya `User.levelIndex` — 选择卡片/徽章色阶。
@@ -139,6 +143,7 @@ class MeProfile {
     int? moreExpForNextLevel,
     int? totalExperience,
     List<String>? momentUrls,
+    String? cardDynamicResource,
   }) {
     return MeProfile(
       displayName: displayName ?? this.displayName,
@@ -165,6 +170,8 @@ class MeProfile {
       moreExpForNextLevel: moreExpForNextLevel ?? this.moreExpForNextLevel,
       totalExperience: totalExperience ?? this.totalExperience,
       momentUrls: momentUrls ?? this.momentUrls,
+      cardDynamicResource:
+          cardDynamicResource ?? this.cardDynamicResource,
     );
   }
 }

@@ -9,6 +9,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
+import '../../core/audio/app_audio_playback.dart';
 import '../../core/constants/app_assets.dart';
 
 /// 用户确认录音后返回的结果。
@@ -210,8 +211,7 @@ class _VoiceNotePageState extends State<VoiceNotePage> {
         setState(() => _previewPlaying = false);
         return;
       }
-      await _player.stop();
-      await _player.play(DeviceFileSource(path));
+      await AppAudioPlayback.play(_player, path);
       if (!mounted) return;
       setState(() => _previewPlaying = true);
     } catch (error) {

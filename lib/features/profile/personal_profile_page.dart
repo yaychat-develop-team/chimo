@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/network/app_apis.dart';
+import '../../core/utils/personal_effect_card_cache.dart';
 import '../../core/utils/zodiac.dart';
+import '../../core/widgets/pag_network_overlay.dart';
 import '../me/models/me_models.dart';
 import 'edit_profile_page.dart';
 import 'widgets/user_profile_scaffold.dart';
@@ -26,6 +28,7 @@ class PersonalProfilePage extends StatefulWidget {
 class _PersonalProfilePageState extends State<PersonalProfilePage> {
   late MeProfile _profile;
   bool _loading = true;
+  bool _showCardEffect = false;
 
   @override
   void initState() {
@@ -85,6 +88,17 @@ class _PersonalProfilePageState extends State<PersonalProfilePage> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+    if (!mounted) return;
+    await _maybeShowCardEffect();
+  }
+
+  Future<void> _maybeShowCardEffect() async {
+    final url = _profile.cardDynamicResource.trim();
+    final uid = _profile.userId.trim();
+    if (url.isEmpty || uid.isEmpty) return;
+    if (!PersonalEffectCardCache.shouldShow(uid)) return;
+    if (!mounted) return;
+    setState(() => _showCardEffect = true);
   }
 
   Future<void> _openEditProfile() async {
@@ -135,6 +149,17 @@ class _PersonalProfilePageState extends State<PersonalProfilePage> {
               onTap: _openEditProfile,
             ),
           ),
+          if (_showCardEffect && _profile.cardDynamicResource.trim().isNotEmpty)
+            PagNetworkOverlay(
+              url: _profile.cardDynamicResource,
+              onAnimationStart: () {
+                PersonalEffectCardCache.markShown(_profile.userId);
+              },
+              onAnimationEnd: () {
+                if (!mounted) return;
+                setState(() => _showCardEffect = false);
+              },
+            ),
           if (_loading)
             const Positioned(
               top: 0,

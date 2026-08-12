@@ -167,7 +167,7 @@ abstract final class AuthSession {
     return value is String && value.isNotEmpty ? value : null;
   }
 
-  /// [method]：`phone` / `email`。省略则保留先前存储的方式。
+  /// [method]：`phone` / `email` / `apple`。省略则保留先前存储的方式。
   static Future<void> markLoggedIn({
     String? method,
     String? phone,

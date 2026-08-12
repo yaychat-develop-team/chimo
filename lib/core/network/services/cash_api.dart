@@ -2,6 +2,7 @@ import '../../../features/chats/data/cash_gift_dto.dart';
 import '../api_gateway.dart';
 import '../api_result.dart';
 import '../cash_charge_dto.dart';
+import '../cash_op_history_dto.dart';
 import '../network_bootstrap.dart';
 
 /// 钱包 / 礼物现金相关接口。
@@ -60,6 +61,20 @@ class CashApi {
         count: count,
         channelId: channelId,
       ),
+    );
+  }
+
+  /// 金币消费 / 充值明细。
+  Future<ApiResult<List<CashOpHistoryItem>>> opHistory({
+    required int pageNum,
+    int pageSize = 20,
+  }) {
+    return ApiGateway.request(
+      () => NetworkBootstrap.api.cashOpHistory(
+        pageNum: pageNum,
+        pageSize: pageSize,
+      ),
+      map: CashOpHistoryDto.parseItems,
     );
   }
 }

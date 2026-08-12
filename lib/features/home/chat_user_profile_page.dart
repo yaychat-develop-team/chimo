@@ -4,9 +4,12 @@ import 'package:flutter/material.dart';
 
 import '../../core/auth/auth_session.dart';
 import '../../core/network/app_apis.dart';
+import '../../core/utils/personal_effect_card_cache.dart';
 import '../../core/utils/zodiac.dart';
+import '../../core/widgets/app_action_bottom_sheet.dart';
 import '../../core/widgets/app_tip_dialog.dart';
 import '../../core/widgets/center_toast.dart';
+import '../../core/widgets/pag_network_overlay.dart';
 import '../chats/chat_detail_page.dart';
 import '../chats/data/chats_list_controller.dart';
 import '../chats/models/chat_conversation.dart';
@@ -37,6 +40,7 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
   bool _blocked = false;
   bool _loading = true;
   bool _isSelf = false;
+  bool _showCardEffect = false;
 
   @override
   void initState() {
@@ -88,6 +92,20 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
     if (!mounted) return;
     setState(() => _isSelf = self);
     await _loadProfile();
+    if (!mounted) return;
+    await _maybeShowCardEffect();
+  }
+
+  /// 对齐 forya `showEffectIfNeed`：有 `cardDynamicResource` 且未在冷却内则播放。
+  Future<void> _maybeShowCardEffect() async {
+    final url = _profile.cardDynamicResource.trim();
+    final uid = _profile.userId.trim().isNotEmpty
+        ? _profile.userId.trim()
+        : _targetUid;
+    if (url.isEmpty || uid.isEmpty) return;
+    if (!PersonalEffectCardCache.shouldShow(uid)) return;
+    if (!mounted) return;
+    setState(() => _showCardEffect = true);
   }
 
   /// 优先数字应用 uid；EaseMob 用户名经 `/user/msg-user` 解析。
@@ -140,6 +158,7 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
               tags: me.tags,
               isFollowing: false,
               emUsername: _profile.emUsername,
+              cardDynamicResource: me.cardDynamicResource,
             );
           });
         }
@@ -149,6 +168,17 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
         final infoRes = await AppApis.user.profileByUidOrNull(appUid);
         if (!mounted) return;
         final parsed = infoRes.data;
+        var blocked = false;
+        final blockUid = (parsed?.userId.isNotEmpty == true)
+            ? parsed!.userId
+            : appUid;
+        if (blockUid.isNotEmpty && RegExp(r'^\d+$').hasMatch(blockUid)) {
+          try {
+            final blackRes = await AppApis.relation.isBlocked(blockUid);
+            blocked = blackRes.data ?? false;
+          } catch (_) {}
+        }
+        if (!mounted) return;
         if (parsed != null) {
           final self = await AuthSession.isCurrentUser(parsed.userId) ||
               await AuthSession.isCurrentUser(parsed.id);
@@ -161,8 +191,11 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
               // 仅当 API 未返回时保留种子 Moments/标签（少见）。
             );
             _following = parsed.isFollowing;
+            _blocked = blocked;
             _isSelf = self;
           });
+        } else {
+          setState(() => _blocked = blocked);
         }
       }
     } catch (_) {
@@ -309,12 +342,26 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
 
   Future<void> _openMoreMenu() async {
     if (_isSelf) return;
-    final action = await showModalBottomSheet<_ProfileMoreAction>(
+    final action = await AppActionBottomSheet.show<_ProfileMoreAction>(
       context: context,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.55),
-      builder: (context) =>
-          _ProfileMoreSheet(following: _following, blocked: _blocked),
+      buildItems: (sheetContext) => [
+        AppActionSheetItem(
+          label: _following ? 'Unfollow' : 'Follow',
+          onTap: () =>
+              Navigator.pop(sheetContext, _ProfileMoreAction.follow),
+        ),
+        AppActionSheetItem(
+          label: 'Report',
+          destructive: true,
+          onTap: () =>
+              Navigator.pop(sheetContext, _ProfileMoreAction.report),
+        ),
+        AppActionSheetItem(
+          label: _blocked ? 'Unblock' : 'Block',
+          destructive: !_blocked,
+          onTap: () => Navigator.pop(sheetContext, _ProfileMoreAction.block),
+        ),
+      ],
     );
     if (!mounted || action == null) return;
     switch (action) {
@@ -330,23 +377,65 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
   }
 
   Future<void> _toggleBlock() async {
-    if (_blocked) {
-      setState(() => _blocked = false);
-      if (!mounted) return;
+    final uid = _targetUid;
+    if (uid.isEmpty || !RegExp(r'^\d+$').hasMatch(uid)) {
       showCenterToast(
         context,
-        message: 'The user is removed from the block list.',
+        message: 'Block failed: user id not ready',
       );
+      return;
+    }
+
+    if (_blocked) {
+      try {
+        final res = await AppApis.relation.setBlackList(
+          userId: uid,
+          isCancel: true,
+        );
+        if (!mounted) return;
+        if (!res.ok) {
+          showCenterToast(
+            context,
+            message: res.message.isEmpty ? 'Unblock failed' : res.message,
+          );
+          return;
+        }
+        setState(() => _blocked = false);
+        showCenterToast(
+          context,
+          message: 'The user is removed from the block list.',
+        );
+      } catch (error) {
+        if (!mounted) return;
+        showCenterToast(context, message: 'Unblock failed: $error');
+      }
       return;
     }
 
     final confirmed = await AppTipDialog.confirmBlockUser(context);
     if (!mounted || !confirmed) return;
-    setState(() {
-      _blocked = true;
-      _following = false;
-    });
-    showCenterToast(context, message: 'The other user has been blocked.');
+    try {
+      final res = await AppApis.relation.setBlackList(
+        userId: uid,
+        isCancel: false,
+      );
+      if (!mounted) return;
+      if (!res.ok) {
+        showCenterToast(
+          context,
+          message: res.message.isEmpty ? 'Block failed' : res.message,
+        );
+        return;
+      }
+      setState(() {
+        _blocked = true;
+        _following = false;
+      });
+      showCenterToast(context, message: 'The other user has been blocked.');
+    } catch (error) {
+      if (!mounted) return;
+      showCenterToast(context, message: 'Block failed: $error');
+    }
   }
 
   Widget _buildBottomBar() {
@@ -420,6 +509,20 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
           onMore: _isSelf ? null : _openMoreMenu,
           bottomBar: _buildBottomBar(),
         ),
+        if (_showCardEffect && _profile.cardDynamicResource.trim().isNotEmpty)
+          PagNetworkOverlay(
+            url: _profile.cardDynamicResource,
+            onAnimationStart: () {
+              final uid = _profile.userId.trim().isNotEmpty
+                  ? _profile.userId.trim()
+                  : _targetUid;
+              PersonalEffectCardCache.markShown(uid);
+            },
+            onAnimationEnd: () {
+              if (!mounted) return;
+              setState(() => _showCardEffect = false);
+            },
+          ),
         if (_loading)
           const Positioned(
             top: 0,
@@ -438,107 +541,3 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
 
 enum _ProfileMoreAction { follow, report, block, cancel }
 
-class _ProfileMoreSheet extends StatelessWidget {
-  const _ProfileMoreSheet({required this.following, required this.blocked});
-
-  final bool following;
-  final bool blocked;
-
-  @override
-  Widget build(BuildContext context) {
-    final bottom = MediaQuery.paddingOf(context).bottom;
-
-    return Padding(
-      padding: EdgeInsets.fromLTRB(12, 0, 12, 12 + bottom),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              color: const Color(0xFF2A2A2A),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Column(
-              children: [
-                _MoreItem(
-                  label: following ? 'Unfollow' : 'Follow',
-                  onTap: () =>
-                      Navigator.pop(context, _ProfileMoreAction.follow),
-                ),
-                const Divider(height: 1, color: Color(0xFF3A3A3A)),
-                _MoreItem(
-                  label: 'Report',
-                  onTap: () =>
-                      Navigator.pop(context, _ProfileMoreAction.report),
-                ),
-                const Divider(height: 1, color: Color(0xFF3A3A3A)),
-                _MoreItem(
-                  label: blocked ? 'Unblock' : 'Block',
-                  destructive: !blocked,
-                  onTap: () =>
-                      Navigator.pop(context, _ProfileMoreAction.block),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Material(
-            color: const Color(0xFF2A2A2A),
-            borderRadius: BorderRadius.circular(14),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(14),
-              onTap: () => Navigator.pop(context, _ProfileMoreAction.cancel),
-              child: const SizedBox(
-                height: 52,
-                width: double.infinity,
-                child: Center(
-                  child: Text(
-                    'Cancel',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MoreItem extends StatelessWidget {
-  const _MoreItem({
-    required this.label,
-    required this.onTap,
-    this.destructive = false,
-  });
-
-  final String label;
-  final VoidCallback onTap;
-  final bool destructive;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: SizedBox(
-        height: 52,
-        width: double.infinity,
-        child: Center(
-          child: Text(
-            label,
-            style: TextStyle(
-              color: destructive ? const Color(0xFFFF5A5A) : Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}

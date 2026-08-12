@@ -37,6 +37,7 @@ class ChatsPage extends StatefulWidget {
 
 class _ChatsPageState extends State<ChatsPage> {
   bool _showPromo = true;
+  bool _promoOpening = false;
   final ValueNotifier<String?> _openSwipeId = ValueNotifier<String?>(null);
 
   ChatsListController get _controller => widget.controller;
@@ -181,17 +182,23 @@ class _ChatsPageState extends State<ChatsPage> {
   }
 
   Future<void> _openPromoCompleteProfile() async {
-    MeProfile profile = MeProfile.empty;
+    if (_promoOpening) return;
+    _promoOpening = true;
     try {
-      final res = await AppApis.user.profileOrNull();
-      profile = res.data ?? profile;
-    } catch (_) {}
-    if (!mounted) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => EditProfilePage(profile: profile),
-      ),
-    );
+      MeProfile profile = MeProfile.empty;
+      try {
+        final res = await AppApis.user.profileOrNull();
+        profile = res.data ?? profile;
+      } catch (_) {}
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => EditProfilePage(profile: profile),
+        ),
+      );
+    } finally {
+      _promoOpening = false;
+    }
   }
 
   @override

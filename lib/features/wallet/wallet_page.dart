@@ -8,6 +8,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_nav_bar.dart';
 import '../../core/widgets/app_primary_button.dart';
 import '../../core/widgets/app_top_loading_bar.dart';
+import 'coins_details_page.dart';
 
 /// 我的钱包：余额 + 来自 cash 接口的充值套餐。
 class WalletPage extends StatefulWidget {
@@ -80,10 +81,9 @@ class _WalletPageState extends State<WalletPage> {
   }
 
   void _onDetails() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Balance: $_balance coins'),
-        behavior: SnackBarBehavior.floating,
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const CoinsDetailsPage(),
       ),
     );
   }

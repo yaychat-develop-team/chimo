@@ -47,6 +47,8 @@ class MyGroupsSection extends StatelessWidget {
             },
           ),
         ),
+        // 对齐 forya [_myGroupList] bottom 24，与 Popular Groups 拉开间距。
+        const SizedBox(height: 24),
       ],
     );
   }

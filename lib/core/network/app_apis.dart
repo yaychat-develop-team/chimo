@@ -10,6 +10,7 @@ export 'api_result.dart';
 export 'app_meta_dto.dart';
 export 'blacklist_dto.dart';
 export 'cash_charge_dto.dart';
+export 'cash_op_history_dto.dart';
 export 'group_photo_dto.dart';
 export 'services/app_settings_api.dart';
 export 'services/auth_api.dart';

@@ -163,7 +163,8 @@ class _HomeHeroBannerState extends State<HomeHeroBanner> {
     final pages = _loopPages;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      // 对齐 forya [FyHomeRoomPage._bannerWidget]：bottom 24。
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
       child: SizedBox(
         height: 100,
         child: ClipRRect(
@@ -176,7 +177,8 @@ class _HomeHeroBannerState extends State<HomeHeroBanner> {
               } else if (notification is ScrollEndNotification) {
                 _onUserScrollEnd();
               }
-              return notification.metrics.axis == Axis.vertical;
+              // 吞掉 Banner 纵向滑动，避免带动下方列表。
+              return true;
             },
             child: PageView.builder(
               controller: controller,

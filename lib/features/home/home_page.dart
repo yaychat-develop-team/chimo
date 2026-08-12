@@ -65,7 +65,9 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     widget.chatsController.addListener(_syncMembershipFromController);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      unawaited(_loadFromApi(showError: true));
+      // Banner 与小组列表独立加载，互不阻塞。
+      unawaited(_loadBanners());
+      unawaited(_loadGroups(showError: true));
     });
   }
 
@@ -253,14 +255,25 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Future<void> _loadFromApi({bool showError = false}) async {
+  Future<void> _loadBanners() async {
+    try {
+      final homeRes = await AppApis.app.homeBanners();
+      if (!mounted) return;
+      if (!homeRes.ok) return;
+      setState(() {
+        _banners = homeRes.data ?? const [];
+      });
+    } catch (_) {
+      // Banner 失败不影响下方小组列表。
+    }
+  }
+
+  Future<void> _loadGroups({bool showError = false}) async {
     try {
       final popularFuture = AppApis.group.list(pageNum: 1, pageSize: 20);
       final mineFuture = AppApis.group.myGroups();
-      final homeFuture = AppApis.app.homeBanners();
       final popularRes = await popularFuture;
       final mineRes = await mineFuture;
-      final homeRes = await homeFuture;
 
       if (!mounted) return;
 
@@ -272,7 +285,6 @@ class _HomePageState extends State<HomePage> {
 
       final popular = popularRes.data ?? const [];
       final mine = mineRes.data ?? const [];
-      final banners = homeRes.ok ? (homeRes.data ?? const []) : const <HomeBannerItem>[];
 
       final controllerIds = widget.chatsController.joinedGroupIds;
       final mineIds = {for (final g in mine) g.id, ...controllerIds};
@@ -293,7 +305,6 @@ class _HomePageState extends State<HomePage> {
       setState(() {
         _popularGroups = mergedPopular;
         _joinedGroups = joined;
-        _banners = banners;
         _initialLoading = false;
         _loadError = popularRes.ok
             ? null
@@ -324,7 +335,8 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _reloadData() => _loadFromApi();
+  /// 下拉刷新只刷新小组列表，不碰上方 Banner。
+  Future<void> _reloadData() => _loadGroups();
 
   void _updatePull(double extent) {
     final next = extent.clamp(0.0, _maxPullExtent);
@@ -401,6 +413,7 @@ class _HomePageState extends State<HomePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // 上方：Logo + Banner（固定，不随列表滚动）
             DecoratedBox(
               decoration: const BoxDecoration(
                 image: DecorationImage(
@@ -439,6 +452,7 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
             ),
+            // 下方：My Groups / Popular Groups（独立滚动 + 下拉刷新）
             AnimatedContainer(
               duration: Duration(
                 milliseconds: _phase == _HomeRefreshPhase.pull ||
@@ -503,7 +517,7 @@ class _HomePageState extends State<HomePage> {
                                             _loadError = null;
                                           });
                                           unawaited(
-                                            _loadFromApi(showError: true),
+                                            _loadGroups(showError: true),
                                           );
                                         },
                                         child: const Text('Retry'),

@@ -22,6 +22,7 @@ class _ChatLine {
     this.emoteName = '',
     this.serverTimeMs = 0,
     this.msgId = '',
+    this.failed = false,
   });
 
   final _ChatSide side;
@@ -41,6 +42,30 @@ class _ChatLine {
 
   /// EaseMob 消息 id（历史分页游标）。
   final String msgId;
+
+  /// 发送失败（如被对方拉黑），气泡旁显示红色感叹号。
+  final bool failed;
+
+  _ChatLine copyWith({bool? failed, String? msgId}) {
+    return _ChatLine(
+      side: side,
+      kind: kind,
+      text: text,
+      voiceSeconds: voiceSeconds,
+      mediaSource: mediaSource,
+      imageAssets: imageAssets,
+      giftId: giftId,
+      giftQty: giftQty,
+      giftEmoji: giftEmoji,
+      giftName: giftName,
+      giftIconUrl: giftIconUrl,
+      emoteUrl: emoteUrl,
+      emoteName: emoteName,
+      serverTimeMs: serverTimeMs,
+      msgId: msgId ?? this.msgId,
+      failed: failed ?? this.failed,
+    );
+  }
 
   String get displayMedia {
     if (mediaSource.trim().isNotEmpty) return mediaSource.trim();

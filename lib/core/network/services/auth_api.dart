@@ -60,6 +60,26 @@ class AuthApi {
     );
   }
 
+  Future<ApiResult<AuthTokenPayload>> appleAuth({
+    required String idToken,
+    String nickname = '',
+  }) {
+    return ApiGateway.request(
+      () => NetworkBootstrap.api.appleAuth(
+        idToken: idToken,
+        nickname: nickname,
+      ),
+      map: (res) {
+        final payload = AuthTokenPayload.fromResponse(res);
+        if (payload == null) {
+          throw StateError('Login succeeded but token missing');
+        }
+        return payload;
+      },
+      clearSessionOnNotLogin: false,
+    );
+  }
+
   Future<ApiResult<void>> bindEmail({
     required String email,
     required String code,

@@ -28,6 +28,7 @@ class ChatUserProfile {
     this.inPartyName,
     this.isOnline = false,
     this.emUsername = '',
+    this.cardDynamicResource = '',
   });
 
   final String id;
@@ -68,6 +69,9 @@ class ChatUserProfile {
 
   /// EaseMob 聊天 id（优先的私聊会话目标）。
   final String emUsername;
+
+  /// 打开个人主页时的 PAG 特效 URL（`cardDynamicResource`）。
+  final String cardDynamicResource;
 
   static ChatUserProfile placeholder({
     String id = '',
@@ -130,6 +134,7 @@ class ChatUserProfile {
     bool clearInParty = false,
     bool? isOnline,
     String? emUsername,
+    String? cardDynamicResource,
   }) {
     return ChatUserProfile(
       id: id ?? this.id,
@@ -156,6 +161,8 @@ class ChatUserProfile {
       inPartyName: clearInParty ? null : (inPartyName ?? this.inPartyName),
       isOnline: isOnline ?? this.isOnline,
       emUsername: emUsername ?? this.emUsername,
+      cardDynamicResource:
+          cardDynamicResource ?? this.cardDynamicResource,
     );
   }
 }

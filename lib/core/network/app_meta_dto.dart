@@ -157,6 +157,7 @@ class MsgUserBrief {
     this.nickname = '',
     this.avatarUrl = '',
     this.emUsername = '',
+    this.isYourInBlackList = false,
     this.raw = const {},
   });
 
@@ -164,7 +165,13 @@ class MsgUserBrief {
   final String nickname;
   final String avatarUrl;
   final String emUsername;
+
+  /// 对方是否已将你拉黑（发消息会失败）。
+  final bool isYourInBlackList;
   final Map<String, dynamic> raw;
+
+  static bool _truthy(Object? v) =>
+      v == true || v == 1 || '$v'.toLowerCase() == 'true';
 
   static MsgUserBrief? fromResponse(ApiResponse response) {
     if (!response.success || response.data is! Map) return null;
@@ -179,6 +186,11 @@ class MsgUserBrief {
       nickname: '${map['nickname'] ?? map['nickName'] ?? ''}'.trim(),
       avatarUrl: '${map['avatar'] ?? ''}'.trim(),
       emUsername: '${map['emUsername'] ?? map['emUserName'] ?? ''}'.trim(),
+      isYourInBlackList: _truthy(
+        map['isYourInBlackList'] ??
+            map['is_your_in_black_list'] ??
+            data['isYourInBlackList'],
+      ),
       raw: map,
     );
   }

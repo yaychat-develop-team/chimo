@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../core/audio/app_audio_playback.dart';
 import '../../../core/constants/app_assets.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/center_toast.dart';
@@ -355,7 +356,9 @@ class UserProfileScaffold extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            if (voiceSeconds != null && voiceSeconds! > 0)
+                            if (voiceSeconds != null &&
+                                voiceSeconds! > 0 &&
+                                (voiceUrl ?? '').trim().isNotEmpty)
                               _VoiceCard(
                                 seconds: voiceSeconds!,
                                 source: voiceUrl,
@@ -793,37 +796,11 @@ class _VoiceCardState extends State<_VoiceCard> {
     }
     final source = (widget.source ?? '').trim();
     if (source.isEmpty) {
-      // 尚无文件 — 仅保留视觉倒计时。
-      setState(() {
-        _playing = true;
-        _remaining = widget.seconds;
-      });
-      _playTimer?.cancel();
-      _playTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-        if (!mounted) {
-          timer.cancel();
-          return;
-        }
-        if (_remaining <= 1) {
-          timer.cancel();
-          _playTimer = null;
-          setState(() {
-            _playing = false;
-            _remaining = 0;
-          });
-          return;
-        }
-        setState(() => _remaining -= 1);
-      });
+      showCenterToast(context, message: 'Voice file unavailable');
       return;
     }
     try {
-      await _player.stop();
-      final isRemote =
-          source.startsWith('http://') || source.startsWith('https://');
-      await _player.play(
-        isRemote ? UrlSource(source) : DeviceFileSource(source),
-      );
+      await AppAudioPlayback.play(_player, source);
       if (!mounted) return;
       setState(() {
         _playing = true;
@@ -838,16 +815,15 @@ class _VoiceCardState extends State<_VoiceCard> {
         if (_remaining <= 1) {
           timer.cancel();
           _playTimer = null;
-          setState(() {
-            _playing = false;
-            _remaining = 0;
-          });
+          unawaited(_stopPlay());
           return;
         }
         setState(() => _remaining -= 1);
       });
     } catch (error) {
       debugPrint('Profile voice play failed: $error');
+      if (!mounted) return;
+      showCenterToast(context, message: 'Playback failed');
     }
   }
 

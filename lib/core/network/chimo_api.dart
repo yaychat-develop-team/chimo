@@ -48,6 +48,20 @@ class ChimoApi {
     );
   }
 
+  /// Apple ID 登录，对齐 forya `POST /auth/apple-auth`（AppleAuthReq）。
+  Future<ApiResponse> appleAuth({
+    required String idToken,
+    String nickname = '',
+  }) {
+    return _client.post(
+      '/auth/apple-auth',
+      bizParam: {
+        'idToken': idToken,
+        if (nickname.isNotEmpty) 'nickname': nickname,
+      },
+    );
+  }
+
   Future<ApiResponse> bindEmail({
     required String email,
     required String code,
@@ -205,6 +219,24 @@ class ChimoApi {
         'itemId': itemId,
         'count': count,
         if (channelId != null && channelId.isNotEmpty) 'channel': channelId,
+      },
+    );
+  }
+
+  /// 金币流水（近 [days] 天，分页）。对齐 forya `CashApi.getOpHistory`。
+  Future<ApiResponse> cashOpHistory({
+    required int pageNum,
+    required int pageSize,
+    int days = 30,
+  }) {
+    final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    return _client.post(
+      '/cash/op-history',
+      bizParam: {
+        'beginTimestamp': nowSec - 60 * 60 * 24 * days,
+        'endTimestamp': nowSec,
+        'pageNum': pageNum,
+        'pageSize': pageSize,
       },
     );
   }

@@ -5,12 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/app_router.dart';
+import '../../core/auth/apple_sign_in.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_webview_page.dart';
 import '../debug/debug_page.dart';
 
-/// 登录页（按设计）：邮箱主按钮、协议、Debug、手机入口。
+/// 登录页：iOS 上 Apple + Email 主按钮（对齐 forya）；Android 为 Email + Phone。
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -25,6 +26,9 @@ class _LoginPageState extends State<LoginPage> {
       'https://www.chimoapp.com/agreements/yinsi.html';
 
   bool _agreed = false;
+  bool _appleSigningIn = false;
+
+  bool get _showAppleLogin => AppleSignInAuth.isSupportedPlatform;
 
   Future<void> _openAgreement(String title) {
     final url = title.contains('Privacy')
@@ -43,44 +47,46 @@ class _LoginPageState extends State<LoginPage> {
     return AppWebViewPage.open(sheetContext, url: url, title: title);
   }
 
+  Future<bool> _ensureAgreed() async {
+    if (_agreed) return true;
+    final accepted = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      barrierColor: Colors.black.withValues(alpha: 0.55),
+      builder: (sheetContext) => _WelcomeAgreementSheet(
+        onOpenAgreement: (title) {
+          unawaited(_openAgreementFromSheet(sheetContext, title));
+        },
+      ),
+    );
+    if (!mounted || accepted != true) return false;
+    setState(() => _agreed = true);
+    return true;
+  }
+
   Future<void> _openEmailLogin() async {
-    if (!_agreed) {
-      final accepted = await showModalBottomSheet<bool>(
-        context: context,
-        backgroundColor: Colors.transparent,
-        isScrollControlled: true,
-        barrierColor: Colors.black.withValues(alpha: 0.55),
-        builder: (sheetContext) => _WelcomeAgreementSheet(
-          onOpenAgreement: (title) {
-            unawaited(_openAgreementFromSheet(sheetContext, title));
-          },
-        ),
-      );
-      if (!mounted || accepted != true) return;
-      setState(() => _agreed = true);
-    }
+    if (!await _ensureAgreed()) return;
     if (!mounted) return;
     context.push(AppRoutes.bindEmailLogin);
   }
 
   Future<void> _openPhoneLogin() async {
-    if (!_agreed) {
-      final accepted = await showModalBottomSheet<bool>(
-        context: context,
-        backgroundColor: Colors.transparent,
-        isScrollControlled: true,
-        barrierColor: Colors.black.withValues(alpha: 0.55),
-        builder: (sheetContext) => _WelcomeAgreementSheet(
-          onOpenAgreement: (title) {
-            unawaited(_openAgreementFromSheet(sheetContext, title));
-          },
-        ),
-      );
-      if (!mounted || accepted != true) return;
-      setState(() => _agreed = true);
-    }
+    if (!await _ensureAgreed()) return;
     if (!mounted) return;
     context.push(AppRoutes.phoneLogin);
+  }
+
+  Future<void> _openAppleLogin() async {
+    if (_appleSigningIn) return;
+    if (!await _ensureAgreed()) return;
+    if (!mounted) return;
+    setState(() => _appleSigningIn = true);
+    try {
+      await AppleSignInAuth.signIn(context);
+    } finally {
+      if (mounted) setState(() => _appleSigningIn = false);
+    }
   }
 
   @override
@@ -141,6 +147,14 @@ class _LoginPageState extends State<LoginPage> {
                     fit: BoxFit.contain,
                   ),
                   const Spacer(flex: 3),
+                  // iOS：Apple（白底）在上，Email（深色）在下 — 对齐 forya _defaultMainPlatforms。
+                  if (_showAppleLogin) ...[
+                    _AppleLoginButton(
+                      onTap: _openAppleLogin,
+                      loading: _appleSigningIn,
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                   _EmailLoginButton(onTap: _openEmailLogin),
                   const SizedBox(height: 18),
                   _AgreementRow(
@@ -179,6 +193,60 @@ class _LoginPageState extends State<LoginPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// forya Apple 主按钮：白底 Stadium + 深色文案。
+class _AppleLoginButton extends StatelessWidget {
+  const _AppleLoginButton({required this.onTap, this.loading = false});
+
+  final VoidCallback onTap;
+  final bool loading;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(28),
+      child: InkWell(
+        onTap: loading ? null : onTap,
+        borderRadius: BorderRadius.circular(28),
+        child: SizedBox(
+          height: 54,
+          width: double.infinity,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (loading)
+                const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Color(0xFF333333),
+                  ),
+                )
+              else
+                Image.asset(
+                  AppAssets.appleIcon,
+                  width: 28,
+                  height: 28,
+                  fit: BoxFit.contain,
+                ),
+              const SizedBox(width: 12),
+              const Text(
+                'Sign in with Apple',
+                style: TextStyle(
+                  color: Color(0xFF333333),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

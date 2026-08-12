@@ -7,16 +7,19 @@ import 'dart:ui';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:im_flutter_sdk/im_flutter_sdk.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:record/record.dart';
 
+import '../../core/audio/app_audio_playback.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/im/im_service.dart';
 import '../../core/network/app_apis.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/zodiac.dart';
+import '../../core/widgets/app_action_bottom_sheet.dart';
 import '../../core/widgets/app_asset_image.dart';
 import '../../core/widgets/app_tip_dialog.dart';
 import '../../core/widgets/center_toast.dart';
@@ -82,6 +85,8 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   String? _selfAvatarUrl;
   bool _following = false;
   bool _blocked = false;
+  /// 对方是否已将你拉黑。
+  bool _blockedByPeer = false;
   bool _loadingPeer = true;
   String _peerEmUser = '';
   /// 后端数字用户 id（关注 / 拉黑 / 礼物）。与环信 id 不同。
@@ -146,13 +151,15 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     }
 
     try {
-      // 会话 key 为环信用户名时解析数字应用 uid。
+      // 会话 key 为环信用户名时解析数字应用 uid，并检测对方是否拉黑你。
       var appUid = RegExp(r'^\d+$').hasMatch(rawId) ? rawId : '';
-      if (appUid.isEmpty && emHint.isNotEmpty) {
+      var blockedByPeer = false;
+      if (emHint.isNotEmpty) {
         try {
           final msgRes = await AppApis.relation.msgUser(emHint);
           final id = msgRes.data?.id.trim() ?? '';
           if (id.isNotEmpty) appUid = id;
+          blockedByPeer = msgRes.data?.isYourInBlackList ?? false;
         } catch (_) {}
       }
       if (appUid.isEmpty && RegExp(r'^\d+$').hasMatch(rawId)) {
@@ -209,6 +216,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           _conversation = updated;
           _following = peer.isFollowing;
           _blocked = blocked;
+          _blockedByPeer = blockedByPeer;
           _selfAvatarUrl = self?.avatarUrl;
           _peerEmUser = em;
           _peerAppUid = appUid;
@@ -221,6 +229,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         setState(() {
           _peerAppUid = appUid;
           _blocked = blocked;
+          _blockedByPeer = blockedByPeer;
           _selfAvatarUrl = self?.avatarUrl;
           _loadingPeer = false;
         });
@@ -346,6 +355,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           text: m.text,
           serverTimeMs: m.serverTimeMs,
           msgId: m.id,
+          failed: m.failed,
         );
       case 'voice':
         return _ChatLine(
@@ -356,6 +366,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           text: m.text,
           serverTimeMs: m.serverTimeMs,
           msgId: m.id,
+          failed: m.failed,
         );
       case 'gift':
         return _ChatLine(
@@ -368,6 +379,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           text: m.text,
           serverTimeMs: m.serverTimeMs,
           msgId: m.id,
+          failed: m.failed,
         );
       case 'emote':
         return _ChatLine(
@@ -379,6 +391,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           text: m.text,
           serverTimeMs: m.serverTimeMs,
           msgId: m.id,
+          failed: m.failed,
         );
       default:
         return _ChatLine(
@@ -386,6 +399,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           text: m.text,
           serverTimeMs: m.serverTimeMs,
           msgId: m.id,
+          failed: m.failed,
         );
     }
   }
@@ -421,11 +435,267 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     }
   }
 
+  /// 环信拉黑错误码 210，或描述含 block/blacklist。
+  bool _isPeerBlockSendError(Object error) {
+    if (error is EMError && error.code == 210) return true;
+    final s = '$error'.toLowerCase();
+    return s.contains('blacklist') ||
+        s.contains('in block') ||
+        s.contains('been blocked') ||
+        s.contains('code: 210') ||
+        s.contains('code=210');
+  }
+
+  void _toastBlockedByPeer() {
+    showCenterToast(context, message: 'You have been blocked.');
+  }
+
+  void _toastYouBlockedPeer() {
+    showCenterToast(context, message: 'The user has been blocked by you.');
+  }
+
+  /// 发送前关系检查。返回 false 表示不应继续发 IM。
+  /// 被对方拉黑时会插入一条失败气泡、写入本地环信库并 toast。
+  bool _guardRelationBeforeSend({_ChatLine? failedLine}) {
+    if (_blocked) {
+      _toastYouBlockedPeer();
+      return false;
+    }
+    if (_blockedByPeer) {
+      _toastBlockedByPeer();
+      if (failedLine != null) {
+        setState(() {
+          _messages.add(failedLine.copyWith(failed: true));
+        });
+        _afterSend(failedLine.listPreview);
+        unawaited(_persistFailedLine(failedLine));
+      }
+      return false;
+    }
+    return true;
+  }
+
+  Future<void> _persistFailedLine(_ChatLine line) async {
+    final peer = _imConversationId;
+    if (peer.isEmpty) return;
+    try {
+      ImChatMessage? saved;
+      switch (line.kind) {
+        case _ChatLineKind.image:
+          saved = await ImService.appendFailedImage(
+            peerEmUsername: peer,
+            filePath: line.displayMedia,
+          );
+        case _ChatLineKind.voice:
+          saved = await ImService.appendFailedVoice(
+            peerEmUsername: peer,
+            filePath: line.mediaSource,
+            durationSecs: line.voiceSeconds,
+          );
+        case _ChatLineKind.emote:
+          saved = await ImService.appendFailedText(
+            peerEmUsername: peer,
+            content: line.text.isEmpty ? '[Sticker]' : line.text,
+            extra: {
+              'type': 'emote',
+              'emote': {
+                'desc': line.emoteName,
+                'url': line.emoteUrl.isNotEmpty ? line.emoteUrl : line.mediaSource,
+              },
+            },
+          );
+        case _ChatLineKind.text:
+        case _ChatLineKind.gift:
+        case _ChatLineKind.tip:
+          saved = await ImService.appendFailedText(
+            peerEmUsername: peer,
+            content: line.text,
+          );
+      }
+      final id = saved?.id ?? '';
+      if (id.isEmpty || !mounted) return;
+      _seenMsgIds.add(id);
+      setState(() {
+        for (var i = _messages.length - 1; i >= 0; i--) {
+          final m = _messages[i];
+          if (m.side != _ChatSide.self || !m.failed || m.msgId.isNotEmpty) {
+            continue;
+          }
+          if (m.kind == line.kind && m.listPreview == line.listPreview) {
+            _messages[i] = m.copyWith(msgId: id);
+            break;
+          }
+        }
+      });
+    } catch (error) {
+      debugPrint('persist failed line: $error');
+    }
+  }
+
+  Future<bool> _refreshBlockedByPeer() async {
+    final em = _imConversationId;
+    if (em.isEmpty) return _blockedByPeer;
+    try {
+      final msgRes = await AppApis.relation.msgUser(em);
+      final blocked = msgRes.data?.isYourInBlackList ?? _blockedByPeer;
+      if (mounted) setState(() => _blockedByPeer = blocked);
+      return blocked;
+    } catch (_) {
+      return _blockedByPeer;
+    }
+  }
+
+  Future<void> _onFailedTap(int index) async {
+    if (index < 0 || index >= _messages.length) return;
+    final line = _messages[index];
+    if (!line.failed || line.side != _ChatSide.self) return;
+
+    if (_blocked) {
+      if (!mounted) return;
+      await AppTipDialog.alert(
+        context,
+        message: 'The user has been blocked by you.',
+      );
+      return;
+    }
+
+    final stillBlocked = await _refreshBlockedByPeer();
+    if (!mounted) return;
+    if (stillBlocked) {
+      await AppTipDialog.alert(
+        context,
+        message: 'You have been blocked.',
+      );
+      return;
+    }
+
+    await _resendFailedAt(index);
+  }
+
+  Future<void> _resendFailedAt(int index) async {
+    if (index < 0 || index >= _messages.length) return;
+    final line = _messages[index];
+    final peer = _imConversationId;
+    if (peer.isEmpty) {
+      showCenterToast(context, message: 'Cannot resend: peer IM account missing');
+      return;
+    }
+
+    // 先清失败态，避免连点。
+    setState(() {
+      _messages[index] = line.copyWith(failed: false);
+    });
+
+    try {
+      ImChatMessage? sent;
+      if (line.msgId.isNotEmpty) {
+        try {
+          sent = await ImService.resendFailed(
+            peerEmUsername: peer,
+            msgId: line.msgId,
+          );
+        } catch (_) {
+          sent = null;
+        }
+      }
+      sent ??= switch (line.kind) {
+        _ChatLineKind.image => await ImService.sendImage(
+            peerEmUsername: peer,
+            filePath: line.displayMedia,
+            sendOriginalImage: true,
+          ),
+        _ChatLineKind.voice => await ImService.sendVoice(
+            peerEmUsername: peer,
+            filePath: line.mediaSource,
+            durationSecs: line.voiceSeconds > 0 ? line.voiceSeconds : 1,
+          ),
+        _ChatLineKind.emote => await ImService.sendText(
+            peerEmUsername: peer,
+            content: line.text.isEmpty ? '[Sticker]' : line.text,
+            extra: {
+              'type': 'emote',
+              'emote': {
+                'desc': line.emoteName,
+                'url':
+                    line.emoteUrl.isNotEmpty ? line.emoteUrl : line.mediaSource,
+              },
+            },
+          ),
+        _ChatLineKind.text ||
+        _ChatLineKind.gift ||
+        _ChatLineKind.tip =>
+          await ImService.sendText(
+            peerEmUsername: peer,
+            content: line.text,
+          ),
+      };
+
+      if (!mounted) return;
+      if (sent != null && sent.id.isNotEmpty) {
+        _seenMsgIds.add(sent.id);
+        setState(() {
+          _messages[index] = _lineFromIm(sent!).copyWith(failed: false);
+        });
+        _afterSend(line.listPreview);
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _messages[index] = line.copyWith(failed: true);
+      });
+      if (_isPeerBlockSendError(error)) {
+        _blockedByPeer = true;
+        await AppTipDialog.alert(
+          context,
+          message: 'You have been blocked.',
+        );
+      } else {
+        showCenterToast(
+          context,
+          message: 'Message failed to send',
+        );
+      }
+    }
+  }
+
+  void _markLastSelfFailed({int count = 1}) {
+    var left = count;
+    setState(() {
+      for (var i = _messages.length - 1; i >= 0 && left > 0; i--) {
+        if (_messages[i].side != _ChatSide.self) continue;
+        _messages[i] = _messages[i].copyWith(failed: true);
+        left--;
+      }
+    });
+  }
+
+  void _onSendError(Object error, {int failedCount = 1}) {
+    if (!mounted) return;
+    if (_isPeerBlockSendError(error)) {
+      _blockedByPeer = true;
+      _toastBlockedByPeer();
+      _markLastSelfFailed(count: failedCount);
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Send failed: $error'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   Future<void> _sendMessage([String? raw]) async {
     final text = (raw ?? _inputController.text).trim();
     if (text.isEmpty) {
       if (!mounted) return;
       showCenterToast(context, message: 'The message cannot be empty!');
+      return;
+    }
+
+    final failedLine = _ChatLine(side: _ChatSide.self, text: text);
+    if (!_guardRelationBeforeSend(failedLine: failedLine)) {
+      _inputController.clear();
       return;
     }
     _inputController.clear();
@@ -449,12 +719,23 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         return;
       } catch (error) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Send failed: $error'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        setState(() {
+          _messages.add(
+            _ChatLine(side: _ChatSide.self, text: text, failed: true),
+          );
+        });
+        _afterSend(text);
+        if (_isPeerBlockSendError(error)) {
+          _blockedByPeer = true;
+          _toastBlockedByPeer();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Send failed: $error'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
         return;
       }
     }
@@ -473,18 +754,18 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     if (url.isEmpty) return;
     final name = sticker.name.trim();
     final preview = name.isEmpty ? '[Sticker]' : '[$name]';
+    final line = _ChatLine(
+      side: _ChatSide.self,
+      kind: _ChatLineKind.emote,
+      emoteUrl: url,
+      emoteName: name,
+      mediaSource: url,
+      text: preview,
+    );
+    if (!_guardRelationBeforeSend(failedLine: line)) return;
 
     setState(() {
-      _messages.add(
-        _ChatLine(
-          side: _ChatSide.self,
-          kind: _ChatLineKind.emote,
-          emoteUrl: url,
-          emoteName: name,
-          mediaSource: url,
-          text: preview,
-        ),
-      );
+      _messages.add(line);
     });
     _afterSend(preview);
 
@@ -512,13 +793,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         _seenMsgIds.add(sent.id);
       }
     } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Sticker send failed: $error'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      _onSendError(error);
     }
   }
 
@@ -526,17 +801,17 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     if (seconds <= 0) return;
     final peerEm = _imConversationId;
     final localPath = path.trim();
+    final line = _ChatLine(
+      side: _ChatSide.self,
+      kind: _ChatLineKind.voice,
+      voiceSeconds: seconds,
+      mediaSource: localPath,
+    );
+    if (!_guardRelationBeforeSend(failedLine: line)) return;
 
     // 立即乐观更新 UI。
     setState(() {
-      _messages.add(
-        _ChatLine(
-          side: _ChatSide.self,
-          kind: _ChatLineKind.voice,
-          voiceSeconds: seconds,
-          mediaSource: localPath,
-        ),
-      );
+      _messages.add(line);
     });
     _afterSend('[Voice] $seconds"');
 
@@ -565,13 +840,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         _seenMsgIds.add(sent.id);
       }
     } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Voice send failed: $error'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      _onSendError(error);
     }
   }
 
@@ -581,18 +850,30 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     final files = paths.map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
     if (files.isEmpty) return;
 
+    final lines = [
+      for (final path in files)
+        _ChatLine(
+          side: _ChatSide.self,
+          kind: _ChatLineKind.image,
+          mediaSource: path,
+          imageAssets: [path],
+        ),
+    ];
+    if (!_guardRelationBeforeSend(failedLine: lines.first)) {
+      // 多图时把其余也标为失败气泡。
+      if (_blockedByPeer && lines.length > 1) {
+        setState(() {
+          for (var i = 1; i < lines.length; i++) {
+            _messages.add(lines[i].copyWith(failed: true));
+          }
+        });
+      }
+      return;
+    }
+
     // 对每个路径做乐观 UI（文件或临时资源导出）。
     setState(() {
-      for (final path in files) {
-        _messages.add(
-          _ChatLine(
-            side: _ChatSide.self,
-            kind: _ChatLineKind.image,
-            mediaSource: path,
-            imageAssets: [path],
-          ),
-        );
-      }
+      _messages.addAll(lines);
     });
     final n = files.length;
     _afterSend(n <= 1 ? '[Image]' : '[Image ×$n]');
@@ -608,6 +889,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       return;
     }
 
+    var failIndex = 0;
     for (final path in files) {
       try {
         final sent = await ImService.sendImage(
@@ -618,14 +900,13 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         if (sent != null && sent.id.isNotEmpty) {
           _seenMsgIds.add(sent.id);
         }
+        failIndex++;
       } catch (error) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Image send failed: $error'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        // 从当前失败图起，把剩余乐观气泡标失败。
+        final remaining = files.length - failIndex;
+        _onSendError(error, failedCount: remaining);
+        return;
       }
     }
   }
@@ -752,12 +1033,28 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   }
 
   Future<void> _openMoreMenu() async {
-    final action = await showModalBottomSheet<_DmMoreAction>(
+    final action = await AppActionBottomSheet.show<_DmMoreAction>(
       context: context,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.55),
-      builder: (context) =>
-          _DmMoreSheet(following: _following, blocked: _blocked),
+      buildItems: (sheetContext) => [
+        AppActionSheetItem(
+          label: 'Search',
+          onTap: () => Navigator.of(sheetContext).pop(_DmMoreAction.search),
+        ),
+        AppActionSheetItem(
+          label: _following ? 'Unfollow' : 'Follow',
+          onTap: () => Navigator.of(sheetContext).pop(_DmMoreAction.follow),
+        ),
+        AppActionSheetItem(
+          label: _blocked ? 'Unblock' : 'Block',
+          destructive: !_blocked,
+          onTap: () => Navigator.of(sheetContext).pop(_DmMoreAction.block),
+        ),
+        AppActionSheetItem(
+          label: 'Report',
+          destructive: true,
+          onTap: () => Navigator.of(sheetContext).pop(_DmMoreAction.report),
+        ),
+      ],
     );
     if (!mounted || action == null) return;
     switch (action) {
@@ -870,14 +1167,24 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                   ? _conversation.emUserName
                   : null),
         );
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => ChatUserProfilePage(
-          profile: profile,
-          chatsController: widget.chatsController,
+    unawaited(() async {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => ChatUserProfilePage(
+            profile: profile,
+            chatsController: widget.chatsController,
+          ),
         ),
-      ),
-    );
+      );
+      if (!mounted) return;
+      final appUid = _relationUid;
+      if (appUid.isEmpty || !RegExp(r'^\d+$').hasMatch(appUid)) return;
+      try {
+        final blackRes = await AppApis.relation.isBlocked(appUid);
+        if (!mounted) return;
+        setState(() => _blocked = blackRes.data ?? _blocked);
+      } catch (_) {}
+    }());
   }
 
   @override
@@ -917,6 +1224,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
               onHandleDragUpdate: _onIntroDragUpdate,
               onHandleDragEnd: _onIntroDragEnd,
               onBlankTap: () => _inputBarKey.currentState?.dismissComposer(),
+              onFailedTap: (index) => unawaited(_onFailedTap(index)),
             ),
           ),
           _DmInputBar(

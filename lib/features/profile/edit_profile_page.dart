@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../app/app_router.dart';
+import '../../core/audio/app_audio_playback.dart';
 import '../../core/auth/auth_session.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/network/app_apis.dart';
@@ -1160,12 +1161,7 @@ class _VoiceNoteCardState extends State<_VoiceNoteCard> {
       return;
     }
     try {
-      await _player.stop();
-      final isRemote =
-          source.startsWith('http://') || source.startsWith('https://');
-      await _player.play(
-        isRemote ? UrlSource(source) : DeviceFileSource(source),
-      );
+      await AppAudioPlayback.play(_player, source);
       if (!mounted) return;
       setState(() {
         _playing = true;
@@ -1180,10 +1176,7 @@ class _VoiceNoteCardState extends State<_VoiceNoteCard> {
         if (_remaining <= 1) {
           timer.cancel();
           _playTimer = null;
-          setState(() {
-            _playing = false;
-            _remaining = 0;
-          });
+          unawaited(_stopPlay());
           return;
         }
         setState(() => _remaining -= 1);

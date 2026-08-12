@@ -25,6 +25,13 @@ dependencies:
   im_flutter_sdk: 4.19.3
   package_info_plus: ^10.2.1
   device_info_plus: ^13.2.0
+  # 个人主页打开特效（对齐 forya PAGView.network(cardDynamicResource)）
+  forya_pag:
+    path: third_party/pag-flutter
+  visibility_detector: ^0.4.0+2
+  # iOS Sign in with Apple（对齐 forya apple_login_platform）
+  sign_in_with_apple: ^7.0.1
+  crypto: ^3.0.6
 
 dev_dependencies:
   flutter_test:

@@ -23,7 +23,8 @@ class SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
+      // Top 0：与 forya 一致，间距由 Banner bottom 24 / 上一区块 bottom 承担。
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: Row(
         children: [
           Expanded(

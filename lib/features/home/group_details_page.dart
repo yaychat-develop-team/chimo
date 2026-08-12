@@ -10,6 +10,7 @@ import '../../core/constants/app_assets.dart';
 import '../../core/im/im_service.dart';
 import '../../core/network/app_apis.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/app_action_bottom_sheet.dart';
 import '../../core/widgets/app_tip_dialog.dart';
 import '../../core/widgets/center_toast.dart';
 import '../../core/widgets/network_or_asset_avatar.dart';
@@ -426,11 +427,29 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
   }
 
   Future<void> _openMoreMenu() async {
-    final action = await showModalBottomSheet<_GroupMoreAction>(
+    final action = await AppActionBottomSheet.show<_GroupMoreAction>(
       context: context,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.55),
-      builder: (context) => _GroupMoreSheet(showLeave: _isJoined),
+      buildItems: (sheetContext) => [
+        AppActionSheetItem(
+          label: 'Report',
+          destructive: true,
+          onTap: () =>
+              Navigator.of(sheetContext).pop(_GroupMoreAction.report),
+        ),
+        if (_isJoined)
+          AppActionSheetItem(
+            label: 'Leave Group',
+            onTap: () async {
+              final confirmed = await AppTipDialog.confirmLeaveGroup(
+                sheetContext,
+              );
+              if (!sheetContext.mounted) return;
+              if (confirmed) {
+                Navigator.of(sheetContext).pop(_GroupMoreAction.leave);
+              }
+            },
+          ),
+      ],
     );
     if (!mounted || action == null) return;
 
@@ -734,87 +753,6 @@ class _DescToggleChip extends StatelessWidget {
               size: 20,
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-/// 已加入群组：右上角更多面板（举报 / 退出群组）。
-class _GroupMoreSheet extends StatelessWidget {
-  const _GroupMoreSheet({required this.showLeave});
-
-  final bool showLeave;
-
-  Future<void> _onLeaveTap(BuildContext context) async {
-    final confirmed = await AppTipDialog.confirmLeaveGroup(context);
-    if (!context.mounted) return;
-    if (confirmed) {
-      Navigator.of(context).pop(_GroupMoreAction.leave);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final bottom = MediaQuery.paddingOf(context).bottom;
-
-    return DecoratedBox(
-      decoration: const BoxDecoration(
-        color: Color(0xFF1C1C1E),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      child: Padding(
-        padding: EdgeInsets.only(top: 28, bottom: 28 + bottom),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _MoreActionTile(
-              label: 'Report',
-              color: AppColors.badge,
-              onTap: () => Navigator.of(context).pop(_GroupMoreAction.report),
-            ),
-            if (showLeave) ...[
-              const SizedBox(height: 8),
-              _MoreActionTile(
-                label: 'Leave Group',
-                color: AppColors.textPrimary,
-                onTap: () => _onLeaveTap(context),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MoreActionTile extends StatelessWidget {
-  const _MoreActionTile({
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: SizedBox(
-        height: 48,
-        width: double.infinity,
-        child: Center(
-          child: Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontSize: 17,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
         ),
       ),
     );
@@ -1161,6 +1099,7 @@ class _MessagesFeed extends StatelessWidget {
                           context,
                           paths: paths,
                           initialIndex: initial < 0 ? 0 : initial,
+                          showPageIndicator: false,
                         );
                       }
                     : null,

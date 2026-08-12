@@ -12,6 +12,7 @@ class _DmChatBody extends StatelessWidget {
     this.historyLoading = false,
     this.historyHasMore = false,
     this.onBlankTap,
+    this.onFailedTap,
   });
 
   final List<_ChatLine> messages;
@@ -24,6 +25,7 @@ class _DmChatBody extends StatelessWidget {
   final bool historyLoading;
   final bool historyHasMore;
   final VoidCallback? onBlankTap;
+  final ValueChanged<int>? onFailedTap;
 
   @override
   Widget build(BuildContext context) {
@@ -67,6 +69,7 @@ class _DmChatBody extends StatelessWidget {
               historyLoading: historyLoading,
               historyHasMore: historyHasMore,
               onBlankTap: onBlankTap,
+              onFailedTap: onFailedTap,
             ),
           ),
         ],
@@ -85,6 +88,7 @@ class _DmMessagesFeed extends StatelessWidget {
     this.historyLoading = false,
     this.historyHasMore = false,
     this.onBlankTap,
+    this.onFailedTap,
   });
 
   final List<_ChatLine> messages;
@@ -95,6 +99,7 @@ class _DmMessagesFeed extends StatelessWidget {
   final bool historyLoading;
   final bool historyHasMore;
   final VoidCallback? onBlankTap;
+  final ValueChanged<int>? onFailedTap;
 
   bool _showAvatar(int index) {
     if (messages[index].kind == _ChatLineKind.tip) return false;
@@ -233,6 +238,8 @@ class _DmMessagesFeed extends StatelessWidget {
             peerAvatarUrl: peerAvatarUrl,
             selfAvatarUrl: selfAvatarUrl,
             showAvatar: showAvatar,
+            failed: line.failed,
+            onFailedTap: line.failed ? () => onFailedTap?.call(msgIndex) : null,
           ),
           _ChatLineKind.image => _ImageBubble(
             side: line.side,
@@ -242,6 +249,8 @@ class _DmMessagesFeed extends StatelessWidget {
             peerAvatarUrl: peerAvatarUrl,
             selfAvatarUrl: selfAvatarUrl,
             showAvatar: showAvatar,
+            failed: line.failed,
+            onFailedTap: line.failed ? () => onFailedTap?.call(msgIndex) : null,
             onTap: () {
               final paths = [
                 for (final m in messages)
@@ -255,6 +264,7 @@ class _DmMessagesFeed extends StatelessWidget {
                 context,
                 paths: paths,
                 initialIndex: initial < 0 ? 0 : initial,
+                showPageIndicator: false,
               );
             },
           ),
@@ -277,6 +287,8 @@ class _DmMessagesFeed extends StatelessWidget {
             peerAvatarUrl: peerAvatarUrl,
             selfAvatarUrl: selfAvatarUrl,
             showAvatar: showAvatar,
+            failed: line.failed,
+            onFailedTap: line.failed ? () => onFailedTap?.call(msgIndex) : null,
           ),
           _ChatLineKind.tip => Center(
               child: Padding(
@@ -298,6 +310,9 @@ class _DmMessagesFeed extends StatelessWidget {
                   text: line.text,
                   showAvatar: showAvatar,
                   avatarUrl: selfAvatarUrl,
+                  failed: line.failed,
+                  onFailedTap:
+                      line.failed ? () => onFailedTap?.call(msgIndex) : null,
                 )
               : _PeerBubble(
                   text: line.text,
@@ -361,6 +376,8 @@ class _ChatRow extends StatelessWidget {
     required this.peerAvatar,
     this.peerAvatarUrl,
     this.selfAvatarUrl,
+    this.failed = false,
+    this.onFailedTap,
   });
 
   final bool isSelf;
@@ -369,6 +386,8 @@ class _ChatRow extends StatelessWidget {
   final String peerAvatar;
   final String? peerAvatarUrl;
   final String? selfAvatarUrl;
+  final bool failed;
+  final VoidCallback? onFailedTap;
 
   @override
   Widget build(BuildContext context) {
@@ -387,7 +406,29 @@ class _ChatRow extends StatelessWidget {
           Flexible(
             child: Align(
               alignment: Alignment.centerRight,
-              child: child,
+              // 失败感叹号紧贴气泡左侧，勿与 Flexible 并列否则会被撑到最左。
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  if (failed) ...[
+                    GestureDetector(
+                      onTap: onFailedTap,
+                      behavior: HitTestBehavior.opaque,
+                      child: const Padding(
+                        padding: EdgeInsets.all(4),
+                        child: Icon(
+                          Icons.error,
+                          color: Color(0xFFFF3B30),
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                  ],
+                  child,
+                ],
+              ),
             ),
           ),
           const SizedBox(width: _BubbleLayout.avatarGap),
@@ -460,11 +501,15 @@ class _SelfBubble extends StatelessWidget {
     required this.text,
     required this.showAvatar,
     this.avatarUrl,
+    this.failed = false,
+    this.onFailedTap,
   });
 
   final String text;
   final bool showAvatar;
   final String? avatarUrl;
+  final bool failed;
+  final VoidCallback? onFailedTap;
 
   @override
   Widget build(BuildContext context) {
@@ -473,6 +518,8 @@ class _SelfBubble extends StatelessWidget {
       showAvatar: showAvatar,
       peerAvatar: AppAssets.avatarPlace,
       selfAvatarUrl: avatarUrl,
+      failed: failed,
+      onFailedTap: onFailedTap,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: _BubbleLayout.selfMax),
         child: Container(
@@ -505,6 +552,8 @@ class _VoiceBubble extends StatefulWidget {
     this.mediaSource = '',
     this.peerAvatarUrl,
     this.selfAvatarUrl,
+    this.failed = false,
+    this.onFailedTap,
   });
 
   final _ChatSide side;
@@ -514,6 +563,8 @@ class _VoiceBubble extends StatefulWidget {
   final String? peerAvatarUrl;
   final String? selfAvatarUrl;
   final bool showAvatar;
+  final bool failed;
+  final VoidCallback? onFailedTap;
 
   @override
   State<_VoiceBubble> createState() => _VoiceBubbleState();
@@ -595,13 +646,7 @@ class _VoiceBubbleState extends State<_VoiceBubble>
     final src = _source;
     if (src.isNotEmpty) {
       try {
-        if (src.startsWith('http://') || src.startsWith('https://')) {
-          await _player.play(UrlSource(src));
-        } else if (File(src).existsSync()) {
-          await _player.play(DeviceFileSource(src));
-        } else {
-          // 未知路径 — 仅走倒计时计时器。
-        }
+        await AppAudioPlayback.play(_player, src);
         await _completeSub?.cancel();
         _completeSub = _player.onPlayerComplete.listen((_) {
           if (mounted) _stopPlay();
@@ -694,6 +739,8 @@ class _VoiceBubbleState extends State<_VoiceBubble>
       peerAvatar: widget.peerAvatar,
       peerAvatarUrl: widget.peerAvatarUrl,
       selfAvatarUrl: widget.selfAvatarUrl,
+      failed: widget.failed,
+      onFailedTap: widget.onFailedTap,
       child: bubble,
     );
   }
@@ -787,6 +834,8 @@ class _ImageBubble extends StatelessWidget {
     this.peerAvatarUrl,
     this.selfAvatarUrl,
     this.onTap,
+    this.failed = false,
+    this.onFailedTap,
   });
 
   final _ChatSide side;
@@ -797,6 +846,8 @@ class _ImageBubble extends StatelessWidget {
   final String? selfAvatarUrl;
   final bool showAvatar;
   final VoidCallback? onTap;
+  final bool failed;
+  final VoidCallback? onFailedTap;
 
   bool get _isSelf => side == _ChatSide.self;
 
@@ -949,6 +1000,8 @@ class _ImageBubble extends StatelessWidget {
       peerAvatar: peerAvatar,
       peerAvatarUrl: peerAvatarUrl,
       selfAvatarUrl: selfAvatarUrl,
+      failed: failed,
+      onFailedTap: onFailedTap,
       child: locked || onTap == null
           ? bubble
           : GestureDetector(
@@ -969,6 +1022,8 @@ class _EmoteBubble extends StatelessWidget {
     required this.showAvatar,
     this.peerAvatarUrl,
     this.selfAvatarUrl,
+    this.failed = false,
+    this.onFailedTap,
   });
 
   final _ChatSide side;
@@ -977,6 +1032,8 @@ class _EmoteBubble extends StatelessWidget {
   final String? peerAvatarUrl;
   final String? selfAvatarUrl;
   final bool showAvatar;
+  final bool failed;
+  final VoidCallback? onFailedTap;
 
   bool get _isSelf => side == _ChatSide.self;
 
@@ -1059,6 +1116,8 @@ class _EmoteBubble extends StatelessWidget {
       peerAvatar: peerAvatar,
       peerAvatarUrl: peerAvatarUrl,
       selfAvatarUrl: selfAvatarUrl,
+      failed: failed,
+      onFailedTap: onFailedTap,
       child: _sticker(),
     );
   }

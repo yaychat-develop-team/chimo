@@ -75,6 +75,9 @@ abstract final class UserDto {
         return v.isEmpty ? null : v;
       }(),
       vipIconUrl: _parseVipSmallIcon(json),
+      cardDynamicResource:
+          '${json['cardDynamicResource'] ?? json['card_dynamic_resource'] ?? ''}'
+              .trim(),
     );
   }
 
@@ -133,6 +136,9 @@ abstract final class UserDto {
       inPartyName: inParty,
       isOnline: onlineStatus == 1 && !isHidden,
       emUsername: '${json['emUsername'] ?? json['emUserName'] ?? ''}'.trim(),
+      cardDynamicResource:
+          '${json['cardDynamicResource'] ?? json['card_dynamic_resource'] ?? ''}'
+              .trim(),
     );
   }
 

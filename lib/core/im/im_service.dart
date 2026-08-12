@@ -34,6 +34,7 @@ class ImChatMessage {
     this.joinName = '',
     this.joinUid = '',
     this.isGroup = false,
+    this.failed = false,
   });
 
   final String id;
@@ -43,6 +44,9 @@ class ImChatMessage {
   final String text;
   final bool isSelf;
   final int serverTimeMs;
+
+  /// 本地发送失败（如被拉黑），对应环信 [MessageStatus.FAIL]。
+  final bool failed;
 
   /// 消息类型：`txt` | `image` | `voice` | `gift` | `follow` | `emote` | `join` | `custom`
   final String msgType;
@@ -300,12 +304,12 @@ abstract final class ImService {
     final text = content.trim();
     if (text.isEmpty || peerEmUsername.isEmpty) return null;
     if (!_sdkInited) await connectFromServer();
+    final msg = EMMessage.createTxtSendMessage(
+      targetId: peerEmUsername,
+      content: text,
+    );
+    msg.chatType = isGroup ? ChatType.GroupChat : ChatType.Chat;
     try {
-      final msg = EMMessage.createTxtSendMessage(
-        targetId: peerEmUsername,
-        content: text,
-      );
-      msg.chatType = isGroup ? ChatType.GroupChat : ChatType.Chat;
       await _applySenderAttrs(msg);
       if (extra != null && extra.isNotEmpty) {
         final attrs = Map<String, dynamic>.from(msg.attributes ?? const {});
@@ -316,6 +320,7 @@ abstract final class ImService {
       return _emitAndReturn(sent, forceSelf: true);
     } on EMError catch (e) {
       debugPrint('ImService sendText failed ${e.code} ${e.description}');
+      await _persistFailed(msg, peerEmUsername, isGroup: isGroup);
       rethrow;
     }
   }
@@ -343,6 +348,138 @@ abstract final class ImService {
         },
       },
     );
+  }
+
+  /// 未真正发出（如发送前已知被拉黑）时，写入本地失败消息，便于重进会话仍可见。
+  static Future<ImChatMessage?> appendFailedText({
+    required String peerEmUsername,
+    required String content,
+    Map<String, dynamic>? extra,
+    bool isGroup = false,
+  }) async {
+    final text = content.trim();
+    if (text.isEmpty || peerEmUsername.isEmpty) return null;
+    if (!_sdkInited) await connectFromServer();
+    final msg = EMMessage.createTxtSendMessage(
+      targetId: peerEmUsername,
+      content: text,
+    );
+    msg.chatType = isGroup ? ChatType.GroupChat : ChatType.Chat;
+    await _applySenderAttrs(msg);
+    if (extra != null && extra.isNotEmpty) {
+      final attrs = Map<String, dynamic>.from(msg.attributes ?? const {});
+      attrs['extra'] = extra;
+      msg.attributes = attrs;
+    }
+    await _persistFailed(msg, peerEmUsername, isGroup: isGroup);
+    return _fromEm(msg, forceSelf: true);
+  }
+
+  static Future<ImChatMessage?> appendFailedImage({
+    required String peerEmUsername,
+    required String filePath,
+    bool isGroup = false,
+  }) async {
+    final path = filePath.trim();
+    if (path.isEmpty || peerEmUsername.isEmpty) return null;
+    if (!_sdkInited) await connectFromServer();
+    var local = path;
+    if (local.startsWith('file://')) local = local.substring(7);
+    final file = File(local);
+    if (!file.existsSync()) return null;
+    final msg = EMMessage.createImageSendMessage(
+      targetId: peerEmUsername,
+      filePath: local,
+      sendOriginalImage: true,
+      fileSize: file.lengthSync(),
+      displayName: local.split(RegExp(r'[/\\]')).last,
+    );
+    msg.chatType = isGroup ? ChatType.GroupChat : ChatType.Chat;
+    await _applySenderAttrs(msg);
+    await _persistFailed(msg, peerEmUsername, isGroup: isGroup);
+    return _fromEm(msg, forceSelf: true);
+  }
+
+  static Future<ImChatMessage?> appendFailedVoice({
+    required String peerEmUsername,
+    required String filePath,
+    required int durationSecs,
+    bool isGroup = false,
+  }) async {
+    final path = filePath.trim();
+    if (path.isEmpty || peerEmUsername.isEmpty) return null;
+    if (!_sdkInited) await connectFromServer();
+    var local = path;
+    if (local.startsWith('file://')) local = local.substring(7);
+    final file = File(local);
+    if (!file.existsSync()) return null;
+    final msg = EMMessage.createVoiceSendMessage(
+      targetId: peerEmUsername,
+      filePath: local,
+      duration: durationSecs < 1 ? 1 : durationSecs,
+      fileSize: file.lengthSync(),
+      displayName: local.split(RegExp(r'[/\\]')).last,
+    );
+    msg.chatType = isGroup ? ChatType.GroupChat : ChatType.Chat;
+    await _applySenderAttrs(msg);
+    await _persistFailed(msg, peerEmUsername, isGroup: isGroup);
+    return _fromEm(msg, forceSelf: true);
+  }
+
+  static Future<void> _persistFailed(
+    EMMessage msg,
+    String peerEmUsername, {
+    bool isGroup = false,
+  }) async {
+    msg.status = MessageStatus.FAIL;
+    final convType =
+        isGroup ? EMConversationType.GroupChat : EMConversationType.Chat;
+    try {
+      final conv = await EMClient.getInstance.chatManager.getConversation(
+        peerEmUsername,
+        type: convType,
+        createIfNeed: true,
+      );
+      if (conv == null) return;
+      try {
+        await conv.updateMessage(msg);
+      } catch (_) {
+        try {
+          await conv.insertMessage(msg);
+        } catch (error) {
+          debugPrint('ImService persist failed msg: $error');
+        }
+      }
+    } catch (error) {
+      debugPrint('ImService _persistFailed: $error');
+    }
+  }
+
+  /// 重发本地失败消息（按 msgId 从会话库取出后 resend）。
+  static Future<ImChatMessage?> resendFailed({
+    required String peerEmUsername,
+    required String msgId,
+    bool isGroup = false,
+  }) async {
+    final id = msgId.trim();
+    if (peerEmUsername.isEmpty || id.isEmpty) return null;
+    if (!_sdkInited) await connectFromServer();
+    final convType =
+        isGroup ? EMConversationType.GroupChat : EMConversationType.Chat;
+    try {
+      final conv = await EMClient.getInstance.chatManager.getConversation(
+        peerEmUsername,
+        type: convType,
+        createIfNeed: true,
+      );
+      final local = await conv?.loadMessage(id);
+      if (local == null) return null;
+      final sent = await EMClient.getInstance.chatManager.resendMessage(local);
+      return _emitAndReturn(sent, forceSelf: true);
+    } on EMError catch (e) {
+      debugPrint('ImService resendFailed ${e.code} ${e.description}');
+      rethrow;
+    }
   }
 
   /// 关注 / 取消关注后的 forya `im_follow_message` 提示。
@@ -381,28 +518,29 @@ abstract final class ImService {
       throw StateError('Voice too short');
     }
     if (!_sdkInited) await connectFromServer();
+    var local = path;
+    if (local.startsWith('file://')) {
+      local = local.substring(7);
+    }
+    final file = File(local);
+    if (!file.existsSync()) {
+      throw StateError('Voice file missing: $local');
+    }
+    final msg = EMMessage.createVoiceSendMessage(
+      targetId: peerEmUsername,
+      filePath: local,
+      duration: durationSecs,
+      fileSize: file.lengthSync(),
+      displayName: local.split(RegExp(r'[/\\]')).last,
+    );
+    msg.chatType = isGroup ? ChatType.GroupChat : ChatType.Chat;
     try {
-      var local = path;
-      if (local.startsWith('file://')) {
-        local = local.substring(7);
-      }
-      final file = File(local);
-      if (!file.existsSync()) {
-        throw StateError('Voice file missing: $local');
-      }
-      final msg = EMMessage.createVoiceSendMessage(
-        targetId: peerEmUsername,
-        filePath: local,
-        duration: durationSecs,
-        fileSize: file.lengthSync(),
-        displayName: local.split(RegExp(r'[/\\]')).last,
-      );
-      msg.chatType = isGroup ? ChatType.GroupChat : ChatType.Chat;
       await _applySenderAttrs(msg);
       final sent = await EMClient.getInstance.chatManager.sendMessage(msg);
       return _emitAndReturn(sent, forceSelf: true);
     } on EMError catch (e) {
       debugPrint('ImService sendVoice failed ${e.code} ${e.description}');
+      await _persistFailed(msg, peerEmUsername, isGroup: isGroup);
       rethrow;
     }
   }
@@ -417,28 +555,29 @@ abstract final class ImService {
     final path = filePath.trim();
     if (path.isEmpty || peerEmUsername.isEmpty) return null;
     if (!_sdkInited) await connectFromServer();
+    var local = path;
+    if (local.startsWith('file://')) {
+      local = local.substring(7);
+    }
+    final file = File(local);
+    if (!file.existsSync()) {
+      throw StateError('Image file missing: $local');
+    }
+    final msg = EMMessage.createImageSendMessage(
+      targetId: peerEmUsername,
+      filePath: local,
+      sendOriginalImage: sendOriginalImage,
+      fileSize: file.lengthSync(),
+      displayName: local.split(RegExp(r'[/\\]')).last,
+    );
+    msg.chatType = isGroup ? ChatType.GroupChat : ChatType.Chat;
     try {
-      var local = path;
-      if (local.startsWith('file://')) {
-        local = local.substring(7);
-      }
-      final file = File(local);
-      if (!file.existsSync()) {
-        throw StateError('Image file missing: $local');
-      }
-      final msg = EMMessage.createImageSendMessage(
-        targetId: peerEmUsername,
-        filePath: local,
-        sendOriginalImage: sendOriginalImage,
-        fileSize: file.lengthSync(),
-        displayName: local.split(RegExp(r'[/\\]')).last,
-      );
-      msg.chatType = isGroup ? ChatType.GroupChat : ChatType.Chat;
       await _applySenderAttrs(msg);
       final sent = await EMClient.getInstance.chatManager.sendMessage(msg);
       return _emitAndReturn(sent, forceSelf: true);
     } on EMError catch (e) {
       debugPrint('ImService sendImage failed ${e.code} ${e.description}');
+      await _persistFailed(msg, peerEmUsername, isGroup: isGroup);
       rethrow;
     }
   }
@@ -496,7 +635,7 @@ abstract final class ImService {
         direction: EMSearchDirection.Up,
       );
 
-      // 打开更早分页或本地页不足时，从服务端拉取。
+      // 本地不足时从服务端补齐，但必须与本地合并，避免冲掉 FAIL 失败消息。
       if (startMsgId.isNotEmpty || list.length < count) {
         try {
           final cursorResult =
@@ -510,8 +649,31 @@ abstract final class ImService {
             cursor: startMsgId.isEmpty ? null : startMsgId,
             pageSize: count,
           );
-          // 服务端 Up 为最新在前；翻转为最旧在前。
-          list = cursorResult.data.reversed.toList();
+          final remote = cursorResult.data.reversed.toList();
+          final byId = <String, EMMessage>{
+            for (final m in list)
+              if (m.msgId.isNotEmpty) m.msgId: m,
+          };
+          for (final m in remote) {
+            final id = m.msgId;
+            if (id.isEmpty) {
+              list = [...list, m];
+              continue;
+            }
+            final existing = byId[id];
+            // 本地 FAIL 优先保留，不被服务端成功态覆盖。
+            if (existing != null && existing.status == MessageStatus.FAIL) {
+              continue;
+            }
+            byId[id] = m;
+          }
+          // 保留本地独有（含失败）+ 合并后的 id 集合。
+          final merged = <EMMessage>[
+            ...byId.values,
+            for (final m in list)
+              if (m.msgId.isEmpty) m,
+          ];
+          list = merged;
         } catch (error) {
           debugPrint('ImService fetchHistory: $error');
         }
@@ -843,6 +1005,7 @@ abstract final class ImService {
       emoteUrl: emoteUrl,
       emoteName: emoteName,
       isGroup: message.chatType == ChatType.GroupChat,
+      failed: message.status == MessageStatus.FAIL,
     );
   }
 
@@ -913,6 +1076,7 @@ abstract final class ImService {
         giftName: name,
         giftIconUrl: gift.iconUrl,
         isGroup: isGroup,
+        failed: message.status == MessageStatus.FAIL,
       );
     }
 
@@ -936,6 +1100,7 @@ abstract final class ImService {
         msgType: 'follow',
         customEvent: event,
         isGroup: isGroup,
+        failed: message.status == MessageStatus.FAIL,
       );
     }
 
@@ -955,6 +1120,7 @@ abstract final class ImService {
         joinName: name,
         joinUid: join.uid,
         isGroup: isGroup,
+        failed: message.status == MessageStatus.FAIL,
       );
     }
 
@@ -978,6 +1144,7 @@ abstract final class ImService {
         msgType: 'txt',
         customEvent: event,
         isGroup: isGroup,
+        failed: message.status == MessageStatus.FAIL,
       );
     }
 
@@ -993,6 +1160,7 @@ abstract final class ImService {
       msgType: 'custom',
       customEvent: event,
       isGroup: isGroup,
+      failed: message.status == MessageStatus.FAIL,
     );
   }
 

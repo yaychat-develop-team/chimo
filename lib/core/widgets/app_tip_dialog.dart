@@ -10,12 +10,14 @@ class AppTipDialog extends StatelessWidget {
     this.title = 'Tip',
     this.cancelLabel = 'Cancel',
     this.confirmLabel = 'Confirm',
+    this.alertOnly = false,
   });
 
   final String title;
   final String message;
   final String cancelLabel;
   final String confirmLabel;
+  final bool alertOnly;
 
   /// 显示确认弹窗；用户点 Confirm 时返回 `true`。
   static Future<bool> show(
@@ -36,6 +38,25 @@ class AppTipDialog extends StatelessWidget {
       ),
     );
     return result ?? false;
+  }
+
+  /// 仅提示（单 OK），用于仍被屏蔽等场景。
+  static Future<void> alert(
+    BuildContext context, {
+    required String message,
+    String title = 'Tip',
+    String confirmLabel = 'OK',
+  }) {
+    return showDialog<void>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.55),
+      builder: (context) => AppTipDialog(
+        title: title,
+        message: message,
+        confirmLabel: confirmLabel,
+        alertOnly: true,
+      ),
+    );
   }
 
   /// 会话列表：滑动删除会话。
@@ -104,29 +125,41 @@ class AppTipDialog extends StatelessWidget {
               ),
             ],
             const SizedBox(height: 22),
-            Row(
-              children: [
-                Expanded(
-                  child: _DialogButton(
-                    label: cancelLabel,
-                    background: const Color(0xFFF0F0F0),
-                    foreground: const Color(0xFF666666),
-                    onTap: () =>
-                        Navigator.of(context, rootNavigator: true).pop(false),
-                  ),
+            if (alertOnly)
+              SizedBox(
+                width: double.infinity,
+                child: _DialogButton(
+                  label: confirmLabel,
+                  background: Colors.black,
+                  foreground: Colors.white,
+                  onTap: () =>
+                      Navigator.of(context, rootNavigator: true).pop(),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _DialogButton(
-                    label: confirmLabel,
-                    background: Colors.black,
-                    foreground: Colors.white,
-                    onTap: () =>
-                        Navigator.of(context, rootNavigator: true).pop(true),
+              )
+            else
+              Row(
+                children: [
+                  Expanded(
+                    child: _DialogButton(
+                      label: cancelLabel,
+                      background: const Color(0xFFF0F0F0),
+                      foreground: const Color(0xFF666666),
+                      onTap: () =>
+                          Navigator.of(context, rootNavigator: true).pop(false),
+                    ),
                   ),
-                ),
-              ],
-            ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _DialogButton(
+                      label: confirmLabel,
+                      background: Colors.black,
+                      foreground: Colors.white,
+                      onTap: () =>
+                          Navigator.of(context, rootNavigator: true).pop(true),
+                    ),
+                  ),
+                ],
+              ),
           ],
         ),
       ),
