@@ -14,7 +14,7 @@ import '../home/group_details_page.dart';
 import '../home/models/chat_user_profile.dart';
 import '../home/models/group_item.dart';
 import '../me/models/me_models.dart';
-import '../profile/edit_profile_page.dart';
+import '../profile/edit/edit_profile_page.dart';
 import 'chat_detail_page.dart';
 import 'data/chats_list_controller.dart';
 import 'im_search_page.dart';

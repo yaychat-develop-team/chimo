@@ -9,7 +9,7 @@ import '../../core/network/media_upload.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_page_scaffold.dart';
 import '../../core/widgets/center_toast.dart';
-import '../profile/photo_pick_sheet.dart';
+import '../profile/edit/photo_pick_sheet.dart';
 
 /// 举报目标：用户或群聊（对齐 forya ReportType）。
 enum ReportTargetKind { user, group }

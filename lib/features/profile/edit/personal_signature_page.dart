@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../core/theme/app_colors.dart';
-import '../../core/widgets/app_page_scaffold.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_page_scaffold.dart';
 
 /// 编辑个性签名页。
 class PersonalSignaturePage extends StatefulWidget {

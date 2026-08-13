@@ -15,7 +15,7 @@ import '../chats/data/chats_list_controller.dart';
 import '../chats/models/chat_conversation.dart';
 import '../chats/widgets/gift_bottom_sheet.dart';
 import '../me/models/me_models.dart';
-import '../profile/edit_profile_page.dart';
+import '../profile/edit/edit_profile_page.dart';
 import '../profile/widgets/user_profile_scaffold.dart';
 import '../report/report_page.dart';
 import 'models/chat_user_profile.dart';

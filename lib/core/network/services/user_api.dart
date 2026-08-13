@@ -6,6 +6,14 @@ import '../api_result.dart';
 import '../app_meta_dto.dart';
 import '../network_bootstrap.dart';
 
+/// 交友标签目录项。
+class MakeFriendLabelItem {
+  const MakeFriendLabelItem({required this.id, required this.name});
+
+  final int id;
+  final String name;
+}
+
 /// 当前用户 / 资料相关接口。
 class UserApi {
   const UserApi();
@@ -67,6 +75,39 @@ class UserApi {
   Future<ApiResult<void>> update(Map<String, dynamic> fields) {
     return ApiGateway.action(
       () => NetworkBootstrap.api.updateUserInfo(fields),
+    );
+  }
+
+  /// 交友标签目录（`GET /user/make-friend-label-list`）。
+  Future<ApiResult<List<MakeFriendLabelItem>>> makeFriendLabelList() {
+    return ApiGateway.request(
+      () => NetworkBootstrap.api.makeFriendLabelList(),
+      map: (res) {
+        final data = res.data;
+        Object? list;
+        if (data is Map) {
+          list = data['list'] ?? data['labels'] ?? data['data'];
+        } else if (data is List) {
+          list = data;
+        }
+        if (list is! List) return const <MakeFriendLabelItem>[];
+        final out = <MakeFriendLabelItem>[];
+        for (final item in list) {
+          if (item is! Map) continue;
+          final map = Map<String, dynamic>.from(item);
+          final id = int.tryParse('${map['id'] ?? ''}');
+          final name = '${map['name'] ?? map['label'] ?? ''}'.trim();
+          if (id == null || name.isEmpty) continue;
+          out.add(MakeFriendLabelItem(id: id, name: name));
+        }
+        return out;
+      },
+    );
+  }
+
+  Future<ApiResult<void>> saveMakeFriendLabels(List<int> ids) {
+    return ApiGateway.action(
+      () => NetworkBootstrap.api.saveMakeFriendLabels(ids),
     );
   }
 

@@ -13,7 +13,7 @@ import '../../core/widgets/app_top_loading_bar.dart';
 import '../debug/debug_page.dart';
 import '../friends/friends_page.dart';
 import '../level/level_page.dart';
-import '../profile/edit_profile_page.dart';
+import '../profile/edit/edit_profile_page.dart';
 import '../profile/personal_profile_page.dart';
 import '../wallet/wallet_page.dart';
 import 'about_us_page.dart';

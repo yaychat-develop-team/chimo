@@ -15,7 +15,7 @@ import '../../core/network/app_apis.dart';
 import '../../core/network/media_upload.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_gradient_button.dart';
-import '../profile/photo_pick_sheet.dart';
+import '../profile/edit/photo_pick_sheet.dart';
 import 'onboarding_profile_draft.dart';
 import 'widgets/onboarding_skip_button.dart';
 

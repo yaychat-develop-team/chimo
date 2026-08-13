@@ -18,7 +18,7 @@ import '../features/home/group_details_page.dart';
 import '../features/me/bind_email_page.dart';
 import '../features/me/models/me_models.dart';
 import '../features/me/settings_page.dart';
-import '../features/profile/edit_profile_page.dart';
+import '../features/profile/edit/edit_profile_page.dart';
 import '../core/constants/app_assets.dart';
 import '../features/shell/main_tab_shell.dart';
 import '../features/splash/splash_page.dart';

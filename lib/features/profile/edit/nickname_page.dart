@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-import '../../core/constants/app_assets.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/widgets/app_page_scaffold.dart';
+import '../../../core/constants/app_assets.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_page_scaffold.dart';
 
 /// 编辑昵称页。
 class NicknamePage extends StatefulWidget {

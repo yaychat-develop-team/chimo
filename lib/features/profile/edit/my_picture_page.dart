@@ -4,10 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../../core/auth/auth_session.dart';
-import '../../core/network/app_apis.dart';
-import '../../core/network/media_upload.dart';
-import '../../core/widgets/app_page_scaffold.dart';
+import '../../../core/auth/auth_session.dart';
+import '../../../core/network/app_apis.dart';
+import '../../../core/network/media_upload.dart';
+import '../../../core/widgets/app_page_scaffold.dart';
 import 'photo_pick_sheet.dart';
 
 /// 全尺寸头像预览 / 更换页。

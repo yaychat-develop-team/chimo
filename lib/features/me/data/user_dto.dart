@@ -210,8 +210,10 @@ abstract final class UserDto {
 
   static int? _asIntOrNull(Object? value) {
     if (value == null) return null;
-    if (value is int) return value;
-    return int.tryParse('$value');
+    final n = value is int ? value : int.tryParse('$value');
+    // 服务端 0 表示未设置（对齐 forya height/weight 空态）。
+    if (n == null || n == 0) return null;
+    return n;
   }
 
   static int _ageFromBirthday(String birthday) {

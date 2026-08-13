@@ -7,20 +7,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../../core/audio/app_audio_playback.dart';
-import '../../core/auth/auth_session.dart';
-import '../../core/constants/app_assets.dart';
-import '../../core/network/app_apis.dart';
-import '../../core/network/media_upload.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/widgets/app_gradient_button.dart';
-import '../../core/widgets/app_top_loading_bar.dart';
-import '../../core/widgets/network_or_asset_avatar.dart';
-import '../auth/onboarding_exit.dart';
-import '../auth/widgets/onboarding_skip_button.dart';
-import '../me/models/me_models.dart';
+import '../../../core/audio/app_audio_playback.dart';
+import '../../../core/auth/auth_session.dart';
+import '../../../core/constants/app_assets.dart';
+import '../../../core/network/app_apis.dart';
+import '../../../core/network/media_upload.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_gradient_button.dart';
+import '../../../core/widgets/app_top_loading_bar.dart';
+import '../../../core/widgets/network_or_asset_avatar.dart';
+import '../../auth/onboarding_exit.dart';
+import '../../auth/widgets/onboarding_skip_button.dart';
+import '../../me/models/me_models.dart';
 import 'body_metric_page.dart';
-import 'album_photo_viewer_page.dart';
+import '../album_photo_viewer_page.dart';
 import 'my_picture_page.dart';
 import 'my_tags_page.dart';
 import 'nickname_page.dart';
@@ -28,7 +28,7 @@ import 'personal_signature_page.dart';
 import 'photo_pick_sheet.dart';
 import 'voice_note_page.dart';
 
-/// 编辑资料页。
+/// Edit profile page (forya MineDataEditPage).
 class EditProfilePage extends StatefulWidget {
   const EditProfilePage({
     super.key,
@@ -38,7 +38,7 @@ class EditProfilePage extends StatefulWidget {
 
   final MeProfile profile;
 
-  /// 邮箱注册：保存后进入首页，而不是 pop。
+  /// Email onboarding: Save goes home instead of pop.
   final bool fromOnboarding;
 
   static const int maxPhotos = 9;
@@ -57,14 +57,17 @@ class _EditProfilePageState extends State<EditProfilePage> {
   int? _weight;
   int? _voiceSeconds;
   String? _voiceUrl;
-  /// 本地待上传录音路径（Save 时上传）。
+  /// Local pending voice path (upload on persist).
   String? _pendingVoicePath;
   List<String> _tags = const [];
   bool _nicknameChangedOnce = false;
   final List<String> _photoPaths = [];
   bool _loading = true;
   bool _saving = false;
-  Object? _photoUploadToken;
+  /// Values loaded from API; used to decide whether delete* should be sent.
+  int? _loadedHeight;
+  int? _loadedWeight;
+  int? _loadedVoiceSeconds;
 
   int get _photoCount => _photoPaths.length;
 
@@ -89,13 +92,16 @@ class _EditProfilePageState extends State<EditProfilePage> {
     _voiceSeconds = p.voiceSeconds;
     _voiceUrl = p.voiceUrl;
     _pendingVoicePath = null;
+    _loadedHeight = p.height;
+    _loadedWeight = p.weight;
+    _loadedVoiceSeconds = p.voiceSeconds;
     _tags = List<String>.from(p.tags);
     _nicknameChangedOnce = p.nicknameChangedOnce;
     _photoPaths
       ..clear()
       ..addAll(p.momentUrls);
-    // 避免在 user/info 仍在加载时清空用户刚添加的图片，
-    // 或后端解析时省略待审核项的情况。
+    // Keep local previews while /user/info is still loading,
+    // or when pending audit items are omitted by the backend.
     if (keepLocalPhotosIfRemoteEmpty &&
         _photoPaths.isEmpty &&
         previousPhotos.isNotEmpty) {
@@ -118,7 +124,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         );
       }
     } catch (_) {
-      // 刷新失败时保留种子资料。
+      // Keep seeded profile if refresh fails.
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -158,7 +164,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     if (_saving) return;
     final nick = _nickname.trim();
     if (widget.fromOnboarding) {
-      // 引导态允许资料不完整；仅当填了昵称时校验邮箱占位。
+      // Onboarding allows incomplete profile; only validate nickname placeholder.
       if (nick.contains('@')) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -175,7 +181,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         'nickname': nick,
         'personalSignature': _signature.trim(),
       };
-      // 未选过的性别/生日不要用 Male / 1995 假数据写回服务端。
+      // Do not write default Male / 1995 when gender/birthday unset.
       final genderTrim = _gender.trim();
       if (genderTrim.isNotEmpty) {
         fields['gender'] =
@@ -188,19 +194,23 @@ class _EditProfilePageState extends State<EditProfilePage> {
       if (widget.fromOnboarding) {
         fields['register'] = true;
       }
+      // Only delete* when a previously loaded value was cleared.
       if (_height != null) {
         fields['height'] = _height;
-      } else {
+      } else if (_loadedHeight != null) {
         fields['deleteHeight'] = true;
       }
       if (_weight != null) {
         fields['weight'] = _weight;
-      } else {
+      } else if (_loadedWeight != null) {
         fields['deleteWeight'] = true;
       }
-      if (_voiceSeconds == null) {
+      if (_voiceSeconds != null) {
+        // continue below for voice upload
+      } else if (_loadedVoiceSeconds != null) {
         fields['deleteVoice'] = true;
-      } else {
+      }
+      if (_voiceSeconds != null) {
         var voice = (_voiceUrl ?? '').trim();
         final pending = (_pendingVoicePath ?? '').trim();
         if (pending.isNotEmpty &&
@@ -267,7 +277,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     }
   }
 
-  /// 资料完善进度（应用栏用，0–100）。
+  /// Profile completion percent for app bar (0-100).
   int get _completionPercent {
     var filled = 0;
     const total = 10;
@@ -330,20 +340,18 @@ class _EditProfilePageState extends State<EditProfilePage> {
     }
 
     if (!forAlbum) {
-      // 头像路径（个人头像）暂由独立页面处理。
+      // Avatar is handled by a dedicated page.
       return;
     }
     if (_photoCount >= EditProfilePage.maxPhotos) return;
 
-    // 上传进行中先做本地乐观预览。
+    // Optimistic local preview; each photo posts newPic independently.
     final localPath = file.path;
-    final token = Object();
-    _photoUploadToken = token;
     setState(() => _photoPaths.add(localPath));
 
     try {
       final remote = await MediaUpload.uploadFile(localPath);
-      if (!mounted || !identical(_photoUploadToken, token)) return;
+      if (!mounted) return;
       if (remote == null) {
         setState(() => _photoPaths.remove(localPath));
         ScaffoldMessenger.of(context).showSnackBar(
@@ -358,7 +366,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       final res = await AppApis.user.update({
         'newPic': [remote],
       });
-      if (!mounted || !identical(_photoUploadToken, token)) return;
+      if (!mounted) return;
       if (!res.ok) {
         setState(() => _photoPaths.remove(localPath));
         ScaffoldMessenger.of(context).showSnackBar(
@@ -378,6 +386,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
           _photoPaths.add(remote);
         }
       });
+      unawaited(_loadFromApi());
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Photo saved'),
@@ -386,7 +395,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         ),
       );
     } catch (error) {
-      if (!mounted || !identical(_photoUploadToken, token)) return;
+      if (!mounted) return;
       setState(() => _photoPaths.remove(localPath));
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -438,6 +447,45 @@ class _EditProfilePageState extends State<EditProfilePage> {
     }
   }
 
+  /// Forya-style: nested pages persist `/user/info` immediately, then refresh.
+  Future<bool> _persistFields(
+    Map<String, dynamic> fields, {
+    String successMessage = 'Update successful.',
+  }) async {
+    try {
+      final res = await AppApis.user.update(fields);
+      if (!mounted) return false;
+      if (!res.ok) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(res.message.isEmpty ? 'Update failed' : res.message),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return false;
+      }
+      await _loadFromApi();
+      if (!mounted) return true;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(successMessage),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 1),
+        ),
+      );
+      return true;
+    } catch (error) {
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Update failed: $error'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return false;
+    }
+  }
+
   Future<void> _openSignature() async {
     final result = await Navigator.of(context).push<String>(
       MaterialPageRoute(
@@ -445,7 +493,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       ),
     );
     if (!mounted || result == null) return;
-    setState(() => _signature = result);
+    await _persistFields({'personalSignature': result.trim()});
   }
 
   Future<void> _openNickname() async {
@@ -458,12 +506,13 @@ class _EditProfilePageState extends State<EditProfilePage> {
       ),
     );
     if (!mounted || result == null) return;
-    setState(() {
-      if (result != _nickname) {
-        _nicknameChangedOnce = true;
-      }
-      _nickname = result;
-    });
+    final nick = result.trim();
+    if (nick.isEmpty) return;
+    final ok = await _persistFields({'nickname': nick});
+    if (!ok || !mounted) return;
+    if (nick != _nickname) {
+      setState(() => _nicknameChangedOnce = true);
+    }
   }
 
   Future<void> _openVoiceNote() async {
@@ -471,29 +520,39 @@ class _EditProfilePageState extends State<EditProfilePage> {
       MaterialPageRoute(builder: (_) => const VoiceNotePage()),
     );
     if (!mounted || result == null || result.seconds <= 0) return;
-    setState(() {
-      _voiceSeconds = result.seconds;
-      _pendingVoicePath = result.path;
-      _voiceUrl = result.path;
+    final local = result.path.trim();
+    if (local.isEmpty) return;
+    final uploaded = await MediaUpload.uploadFile(local, sceneCode: 102);
+    if (!mounted) return;
+    if (uploaded == null || uploaded.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Voice upload failed'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    await _persistFields({
+      'voice': uploaded,
+      'voiceDuration': result.seconds,
     });
   }
 
-  void _deleteVoiceNote() {
-    setState(() {
-      _voiceSeconds = null;
-      _voiceUrl = null;
-      _pendingVoicePath = null;
-    });
+  Future<void> _deleteVoiceNote() async {
+    if (_voiceSeconds == null && (_voiceUrl ?? '').trim().isEmpty) return;
+    await _persistFields({'deleteVoice': true}, successMessage: 'Deleted');
   }
 
   Future<void> _openTags() async {
-    final result = await Navigator.of(context).push<List<String>>(
+    // Forya FriendWishPage: child posts labels, parent refreshes on return.
+    await Navigator.of(context).push<List<String>>(
       MaterialPageRoute(
         builder: (_) => MyTagsPage(initialSelected: _tags),
       ),
     );
-    if (!mounted || result == null) return;
-    setState(() => _tags = result);
+    if (!mounted) return;
+    await _loadFromApi();
   }
 
   Future<void> _openGender() async {
@@ -504,7 +563,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
       builder: (_) => _GenderPickerSheet(initialGender: _gender),
     );
     if (!mounted || result == null) return;
-    setState(() => _gender = result);
+    final gender =
+        result.trim().toLowerCase() == 'female' ? 'female' : 'male';
+    await _persistFields({'gender': gender});
   }
 
   Future<void> _openBirthday() async {
@@ -584,7 +645,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     final y = picked.year.toString().padLeft(4, '0');
     final m = picked.month.toString().padLeft(2, '0');
     final d = picked.day.toString().padLeft(2, '0');
-    setState(() => _birthday = '$y-$m-$d');
+    await _persistFields({'birthday': '$y-$m-$d'});
   }
 
   Future<void> _openHeight() async {
@@ -601,7 +662,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       ),
     );
     if (!mounted || result == null) return;
-    setState(() => _height = result);
+    await _persistFields({'height': result});
   }
 
   Future<void> _openWeight() async {
@@ -618,7 +679,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       ),
     );
     if (!mounted || result == null) return;
-    setState(() => _weight = result);
+    await _persistFields({'weight': result});
   }
 
   @override
@@ -695,7 +756,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                       seconds: _voiceSeconds,
                       source: _voiceUrl,
                       onTap: _openVoiceNote,
-                      onDelete: _deleteVoiceNote,
+                      onDelete: () => unawaited(_deleteVoiceNote()),
                     ),
                     const SizedBox(height: 16),
                     _TagsCard(tags: _tags, onTap: _openTags),
@@ -718,8 +779,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
               Padding(
                 padding: EdgeInsets.fromLTRB(16, 8, 16, 12 + bottom),
                 child: AppGradientButton(
-                  label: 'Save',
-                  onTap: _save,
+                  label: widget.fromOnboarding ? 'Save' : 'Done',
+                  onTap: widget.fromOnboarding ? _save : _leave,
                   height: 48,
                   borderRadius: 24,
                   loading: _saving,
@@ -933,7 +994,7 @@ class _PhotoCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'My Photos（$count/${EditProfilePage.maxPhotos}）',
+            'My Photos ($count/${EditProfilePage.maxPhotos})',
             style: const TextStyle(
               color: Colors.white,
               fontSize: 14,
@@ -1116,7 +1177,7 @@ class _VoiceNoteCard extends StatefulWidget {
   });
 
   final int? seconds;
-  /// 远程 URL 或本地文件路径，用于播放。
+  /// Remote URL or local file path for playback.
   final String? source;
   final VoidCallback onTap;
   final VoidCallback onDelete;

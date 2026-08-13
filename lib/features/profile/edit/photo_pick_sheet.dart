@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../core/widgets/app_action_bottom_sheet.dart';
+import '../../../core/widgets/app_action_bottom_sheet.dart';
 
 /// 相机 / 相册选择器。
 enum PhotoPickAction { takePhoto, gallery }

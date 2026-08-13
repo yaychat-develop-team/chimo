@@ -98,6 +98,16 @@ class ChimoApi {
 
   Future<ApiResponse> userConf() => _client.get('/user/conf');
 
+  /// 交友标签目录（对齐 forya `GET /user/make-friend-label-list`）。
+  Future<ApiResponse> makeFriendLabelList() {
+    return _client.get('/user/make-friend-label-list');
+  }
+
+  /// 保存交友标签（对齐 forya `POST /user/make-friend-label`，body.id 为标签 id 列表）。
+  Future<ApiResponse> saveMakeFriendLabels(List<int> ids) {
+    return _client.post('/user/make-friend-label', bizParam: {'id': ids});
+  }
+
   Future<ApiResponse> searchUsers(String key) {
     return _client.get('/user-relation/searchUser', query: {'key': key});
   }

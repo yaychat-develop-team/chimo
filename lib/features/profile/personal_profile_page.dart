@@ -7,7 +7,7 @@ import '../../core/utils/personal_effect_card_cache.dart';
 import '../../core/utils/zodiac.dart';
 import '../../core/widgets/pag_network_overlay.dart';
 import '../me/models/me_models.dart';
-import 'edit_profile_page.dart';
+import 'edit/edit_profile_page.dart';
 import 'widgets/user_profile_scaffold.dart';
 
 /// 自己的资料页：布局与他人一致；底栏为编辑资料。
