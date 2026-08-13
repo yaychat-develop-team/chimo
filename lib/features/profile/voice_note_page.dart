@@ -49,6 +49,7 @@ class _VoiceNotePageState extends State<VoiceNotePage> {
   void initState() {
     super.initState();
     _playerCompleteSub = _player.onPlayerComplete.listen((_) {
+      AppVoiceExclusive.release(_exclusiveStop);
       if (!mounted) return;
       setState(() => _previewPlaying = false);
     });
@@ -56,11 +57,21 @@ class _VoiceNotePageState extends State<VoiceNotePage> {
 
   @override
   void dispose() {
+    AppVoiceExclusive.release(_exclusiveStop);
     _timer?.cancel();
     _playerCompleteSub?.cancel();
     unawaited(_player.dispose());
     unawaited(_recorder.dispose());
     super.dispose();
+  }
+
+  void _exclusiveStop() {
+    unawaited(_player.stop());
+    if (!mounted) {
+      _previewPlaying = false;
+      return;
+    }
+    setState(() => _previewPlaying = false);
   }
 
   String get _timeLabel {
@@ -93,6 +104,7 @@ class _VoiceNotePageState extends State<VoiceNotePage> {
 
   Future<void> _start() async {
     try {
+      AppVoiceExclusive.stopActive();
       final ok = await _recorder.hasPermission();
       if (!ok) {
         if (!mounted) return;
@@ -206,16 +218,19 @@ class _VoiceNotePageState extends State<VoiceNotePage> {
     if (path == null || path.isEmpty) return;
     try {
       if (_previewPlaying) {
+        AppVoiceExclusive.release(_exclusiveStop);
         await _player.stop();
         if (!mounted) return;
         setState(() => _previewPlaying = false);
         return;
       }
+      AppVoiceExclusive.claim(_exclusiveStop);
       await AppAudioPlayback.play(_player, path);
       if (!mounted) return;
       setState(() => _previewPlaying = true);
     } catch (error) {
       debugPrint('Preview profile voice failed: $error');
+      AppVoiceExclusive.release(_exclusiveStop);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -227,6 +242,7 @@ class _VoiceNotePageState extends State<VoiceNotePage> {
   }
 
   Future<void> _reset() async {
+    AppVoiceExclusive.release(_exclusiveStop);
     await _player.stop();
     await _stopRecorderIfNeeded(deleteFile: true);
     _timer?.cancel();

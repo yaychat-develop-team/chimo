@@ -242,11 +242,17 @@ class _EditProfilePageState extends State<EditProfilePage> {
         await AuthSession.markLoggedIn(
           nickname: nick.isEmpty ? null : nick,
           avatarUrl: _profile.avatarUrl,
+          gender: _gender,
         );
         if (!mounted) return;
         await OnboardingExit.finishToHome(context);
         return;
       }
+      await AuthSession.markLoggedIn(
+        nickname: nick.isEmpty ? null : nick,
+        avatarUrl: _profile.avatarUrl,
+        gender: _gender,
+      );
       _leave();
     } catch (error) {
       if (!mounted) return;
@@ -1145,15 +1151,21 @@ class _VoiceNoteCardState extends State<_VoiceNoteCard> {
 
   @override
   void dispose() {
+    AppVoiceExclusive.release(_exclusiveStop);
     _playTimer?.cancel();
     _completeSub?.cancel();
     unawaited(_player.dispose());
     super.dispose();
   }
 
+  void _exclusiveStop() {
+    unawaited(_stopPlay());
+  }
+
   Future<void> _stopPlay({bool resetOnly = false}) async {
     _playTimer?.cancel();
     _playTimer = null;
+    AppVoiceExclusive.release(_exclusiveStop);
     if (!resetOnly) {
       try {
         await _player.stop();
@@ -1179,6 +1191,7 @@ class _VoiceNoteCardState extends State<_VoiceNoteCard> {
       return;
     }
     try {
+      AppVoiceExclusive.claim(_exclusiveStop);
       await AppAudioPlayback.play(_player, source);
       if (!mounted) return;
       setState(() {
@@ -1201,6 +1214,7 @@ class _VoiceNoteCardState extends State<_VoiceNoteCard> {
       });
     } catch (error) {
       debugPrint('Edit voice play failed: $error');
+      AppVoiceExclusive.release(_exclusiveStop);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

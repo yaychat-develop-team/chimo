@@ -468,6 +468,34 @@ class _PeerBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final pureEmoji = AppEmoji.isCustomEmojiOnly(text);
+    final style = (pureEmoji
+            ? _BubbleLayout.peerTextStyle.copyWith(
+                fontSize: 28,
+                height: 1.2,
+                letterSpacing: 1.5,
+                fontWeight: FontWeight.w500,
+              )
+            : _BubbleLayout.peerTextStyle)
+        .withAppEmoji;
+    final child = pureEmoji
+        ? Text(text, style: style)
+        : Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: _BubbleLayout.padH,
+              vertical: _BubbleLayout.padV,
+            ),
+            decoration: const BoxDecoration(
+              color: _BubbleLayout.peerColor,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(4),
+                topRight: Radius.circular(18),
+                bottomLeft: Radius.circular(18),
+                bottomRight: Radius.circular(18),
+              ),
+            ),
+            child: Text(text, style: style),
+          );
     return _ChatRow(
       isSelf: false,
       showAvatar: showAvatar,
@@ -475,22 +503,7 @@ class _PeerBubble extends StatelessWidget {
       peerAvatarUrl: avatarUrl,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: _BubbleLayout.peerMax),
-        child: Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: _BubbleLayout.padH,
-            vertical: _BubbleLayout.padV,
-          ),
-          decoration: const BoxDecoration(
-            color: _BubbleLayout.peerColor,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(4),
-              topRight: Radius.circular(18),
-              bottomLeft: Radius.circular(18),
-              bottomRight: Radius.circular(18),
-            ),
-          ),
-          child: Text(text, style: _BubbleLayout.peerTextStyle),
-        ),
+        child: child,
       ),
     );
   }
@@ -513,6 +526,34 @@ class _SelfBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final pureEmoji = AppEmoji.isCustomEmojiOnly(text);
+    final style = (pureEmoji
+            ? _BubbleLayout.textStyle.copyWith(
+                fontSize: 28,
+                height: 1.2,
+                letterSpacing: 1.5,
+                fontWeight: FontWeight.w500,
+              )
+            : _BubbleLayout.textStyle)
+        .withAppEmoji;
+    final child = pureEmoji
+        ? Text(text, style: style)
+        : Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: _BubbleLayout.padH,
+              vertical: _BubbleLayout.padV,
+            ),
+            decoration: const BoxDecoration(
+              color: _BubbleLayout.selfColor,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(18),
+                topRight: Radius.circular(4),
+                bottomLeft: Radius.circular(18),
+                bottomRight: Radius.circular(18),
+              ),
+            ),
+            child: Text(text, style: style),
+          );
     return _ChatRow(
       isSelf: true,
       showAvatar: showAvatar,
@@ -522,22 +563,7 @@ class _SelfBubble extends StatelessWidget {
       onFailedTap: onFailedTap,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: _BubbleLayout.selfMax),
-        child: Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: _BubbleLayout.padH,
-            vertical: _BubbleLayout.padV,
-          ),
-          decoration: const BoxDecoration(
-            color: _BubbleLayout.selfColor,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(18),
-              topRight: Radius.circular(4),
-              bottomLeft: Radius.circular(18),
-              bottomRight: Radius.circular(18),
-            ),
-          ),
-          child: Text(text, style: _BubbleLayout.textStyle),
-        ),
+        child: child,
       ),
     );
   }
@@ -572,8 +598,6 @@ class _VoiceBubble extends StatefulWidget {
 
 class _VoiceBubbleState extends State<_VoiceBubble>
     with SingleTickerProviderStateMixin {
-  /// 同一时间只能播放一条语音。
-  static VoidCallback? _activeStop;
   static final AudioPlayer _player = AudioPlayer();
 
   bool _playing = false;
@@ -597,8 +621,8 @@ class _VoiceBubbleState extends State<_VoiceBubble>
 
   @override
   void dispose() {
-    if (_activeStop == _stopPlay) {
-      _activeStop = null;
+    AppVoiceExclusive.release(_stopPlay);
+    if (_playing) {
       unawaited(_player.stop());
     }
     _completeSub?.cancel();
@@ -615,9 +639,7 @@ class _VoiceBubbleState extends State<_VoiceBubble>
     unawaited(_player.stop());
     _waveController.stop();
     _waveController.reset();
-    if (_activeStop == _stopPlay) {
-      _activeStop = null;
-    }
+    AppVoiceExclusive.release(_stopPlay);
     if (!mounted) {
       _playing = false;
       _remaining = 0;
@@ -635,8 +657,7 @@ class _VoiceBubbleState extends State<_VoiceBubble>
       _stopPlay();
       return;
     }
-    _activeStop?.call();
-    _activeStop = _stopPlay;
+    AppVoiceExclusive.claim(_stopPlay);
     setState(() {
       _playing = true;
       _remaining = widget.seconds > 0 ? widget.seconds : 1;

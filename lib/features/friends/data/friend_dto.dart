@@ -21,23 +21,67 @@ abstract final class FriendDto {
     ];
   }
 
+  /// `GET /search?no=` → `data.users`（兼兼容 `userList`）。
+  static List<FriendUser> parseHomeSearch(ApiResponse response) {
+    if (!response.success) return const [];
+    final data = response.data;
+    if (data is! Map) return const [];
+    final map = Map<String, dynamic>.from(data);
+    final list = map['users'] ?? map['userList'] ?? map['list'];
+    if (list is! List) return const [];
+    return [
+      for (final item in list)
+        if (item is Map)
+          fromUserMap(
+            Map<String, dynamic>.from(item),
+            relation: FriendRelation.follower,
+          ),
+    ];
+  }
+
   static FriendUser fromUserMap(
     Map<String, dynamic> json, {
     required FriendRelation relation,
   }) {
     final id = '${json['id'] ?? ''}';
-    final avatar = '${json['avatar'] ?? ''}';
-    final genderRaw = '${json['gender'] ?? ''}'.toLowerCase();
+    var avatar = '${json['avatar'] ?? ''}'.trim();
+    if (avatar.isEmpty) {
+      final picList = json['picList'];
+      if (picList is List && picList.isNotEmpty) {
+        final first = picList.first;
+        if (first is Map) {
+          avatar = '${first['content'] ?? first['url'] ?? ''}'.trim();
+        } else if (first is String) {
+          avatar = first.trim();
+        }
+      }
+    }
+    final genderRaw = '${json['gender'] ?? ''}'.trim().toLowerCase();
     final isMale = switch (genderRaw) {
       'female' || 'f' || '2' => false,
+      'male' || 'm' || '1' => true,
       _ => true,
     };
-    final birthday = '${json['birthday'] ?? ''}';
+    final hasGender = switch (genderRaw) {
+      'female' || 'f' || '2' || 'male' || 'm' || '1' => true,
+      _ => false,
+    };
+    final birthdayRaw = '${json['birthday'] ?? ''}'.trim();
+    final birthday = (birthdayRaw.isEmpty ||
+            birthdayRaw == 'null' ||
+            birthdayRaw == '0')
+        ? ''
+        : birthdayRaw;
     final ageFromField = int.tryParse('${json['age'] ?? ''}');
-    final age = ageFromField ?? _ageFromBirthday(birthday);
+    final age = hasGender
+        ? (ageFromField ?? _ageFromBirthday(birthday))
+        : 0;
 
     final relationRaw = '${json['relationType'] ?? ''}'.toUpperCase();
-    final isFollow = json['isFollow'] == true ||
+    final followFlag = json['isFollow'] ?? json['follow'] ?? json['followed'];
+    final isFollow = followFlag == true ||
+        followFlag == 1 ||
+        '$followFlag'.toLowerCase() == 'true' ||
         relationRaw.contains('FOLLOW') ||
         relationRaw.contains('FRIEND') ||
         relationRaw.contains('MUTUAL');
@@ -57,8 +101,11 @@ abstract final class FriendDto {
       isMale: isMale,
       age: age,
       relation: resolved,
-      zodiac: zodiacFromBirthday(birthday.isEmpty ? '1995-01-01' : birthday),
+      zodiac: birthday.isEmpty ? '' : zodiacFromBirthday(birthday),
       bio: '${json['personalSignature'] ?? json['signature'] ?? ''}',
+      emUsername:
+          '${json['emUsername'] ?? json['emUserName'] ?? ''}'.trim(),
+      hasGender: hasGender,
     );
   }
 

@@ -1,7 +1,7 @@
-/// 由 `yyyy-MM-dd` 生日得到西方星座名。
+/// 由 `yyyy-MM-dd` 生日得到西方星座名；无效 / 空生日返回空串（不展示假星座）。
 String zodiacFromBirthday(String birthday) {
-  final date = DateTime.tryParse(birthday);
-  if (date == null) return 'Capricorn';
+  final date = DateTime.tryParse(birthday.trim());
+  if (date == null) return '';
   final m = date.month;
   final d = date.day;
   if ((m == 3 && d >= 21) || (m == 4 && d <= 19)) return 'Aries';

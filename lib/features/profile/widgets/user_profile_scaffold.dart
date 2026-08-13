@@ -61,6 +61,8 @@ class UserProfileScaffold extends StatelessWidget {
     this.flavors,
     this.inPartyName,
     this.showMore = false,
+    this.showZodiac = true,
+    this.showGenderAge = true,
     this.onBack,
     this.onMore,
     this.onInPartyTap,
@@ -92,6 +94,12 @@ class UserProfileScaffold extends StatelessWidget {
   /// 非 null 时在头像旁显示 “In Party: …” 胶囊。
   final String? inPartyName;
   final bool showMore;
+
+  /// 未设置生日时隐藏星座芯片。
+  final bool showZodiac;
+
+  /// 未设置性别时隐藏性别 / 年龄芯片。
+  final bool showGenderAge;
   final VoidCallback? onBack;
   final VoidCallback? onMore;
   final VoidCallback? onInPartyTap;
@@ -299,56 +307,59 @@ class UserProfileScaffold extends StatelessWidget {
                                       crossAxisAlignment:
                                           WrapCrossAlignment.center,
                                       children: [
-                                        _ProfileChip(
-                                          height: 20,
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 10,
-                                          ),
-                                          background: Colors.white12,
-                                          child: Text(
-                                            '${_zodiacEmoji(zodiac)} $zodiac',
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.w500,
-                                              height: 1,
+                                        if (showZodiac &&
+                                            zodiac.trim().isNotEmpty)
+                                          _ProfileChip(
+                                            height: 20,
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                            ),
+                                            background: Colors.white12,
+                                            child: Text(
+                                              '${_zodiacEmoji(zodiac)} $zodiac',
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w500,
+                                                height: 1,
+                                              ),
                                             ),
                                           ),
-                                        ),
-                                        _ProfileChip(
-                                          height: 16,
-                                          padding: const EdgeInsets.fromLTRB(
-                                            0,
-                                            0,
-                                            4,
-                                            0,
-                                          ),
-                                          background: isMale
-                                              ? const Color(0xFF0091FF)
-                                              : const Color(0xFFFF4D94),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Image.asset(
-                                                isMale
-                                                    ? AppAssets.genderMan
-                                                    : AppAssets.genderWoman,
-                                                width: 16,
-                                                height: 16,
-                                              ),
-                                              const SizedBox(width: 2),
-                                              Text(
-                                                '$age',
-                                                style: const TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.w600,
-                                                  height: 1,
+                                        if (showGenderAge)
+                                          _ProfileChip(
+                                            height: 16,
+                                            padding: const EdgeInsets.fromLTRB(
+                                              0,
+                                              0,
+                                              4,
+                                              0,
+                                            ),
+                                            background: isMale
+                                                ? const Color(0xFF0091FF)
+                                                : const Color(0xFFFF4D94),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Image.asset(
+                                                  isMale
+                                                      ? AppAssets.genderMan
+                                                      : AppAssets.genderWoman,
+                                                  width: 16,
+                                                  height: 16,
                                                 ),
-                                              ),
-                                            ],
+                                                const SizedBox(width: 2),
+                                                Text(
+                                                  '$age',
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w600,
+                                                    height: 1,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
                                           ),
-                                        ),
                                         if ((vipIconUrl ?? '')
                                             .trim()
                                             .isNotEmpty)
@@ -766,15 +777,21 @@ class _VoiceCardState extends State<_VoiceCard> {
 
   @override
   void dispose() {
+    AppVoiceExclusive.release(_exclusiveStop);
     _playTimer?.cancel();
     _completeSub?.cancel();
     unawaited(_player.dispose());
     super.dispose();
   }
 
+  void _exclusiveStop() {
+    unawaited(_stopPlay());
+  }
+
   Future<void> _stopPlay({bool resetOnly = false}) async {
     _playTimer?.cancel();
     _playTimer = null;
+    AppVoiceExclusive.release(_exclusiveStop);
     if (!resetOnly) {
       try {
         await _player.stop();
@@ -803,6 +820,7 @@ class _VoiceCardState extends State<_VoiceCard> {
       return;
     }
     try {
+      AppVoiceExclusive.claim(_exclusiveStop);
       await AppAudioPlayback.play(_player, source);
       if (!mounted) return;
       setState(() {
@@ -825,6 +843,7 @@ class _VoiceCardState extends State<_VoiceCard> {
       });
     } catch (error) {
       debugPrint('Profile voice play failed: $error');
+      AppVoiceExclusive.release(_exclusiveStop);
       if (!mounted) return;
       showCenterToast(context, message: 'Playback failed');
     }

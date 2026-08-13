@@ -20,9 +20,11 @@ class FriendUser {
     required this.age,
     required this.relation,
     this.avatarUrl,
-    this.zodiac = 'Capricornus',
-    this.bio = 'I love listening to songs and playing games.',
+    this.zodiac = '',
+    this.bio = '',
     this.momentAssets = const [],
+    this.emUsername = '',
+    this.hasGender = true,
   });
 
   final String id;
@@ -37,6 +39,12 @@ class FriendUser {
   final String bio;
   final List<String> momentAssets;
 
+  /// 环信私聊 id；搜索进 Chat 时优先使用。
+  final String emUsername;
+
+  /// 是否已设置性别；未设置时搜索结果不展示性别 / 年龄芯片。
+  final bool hasGender;
+
   FriendUser copyWith({
     String? id,
     String? nickname,
@@ -49,6 +57,8 @@ class FriendUser {
     String? zodiac,
     String? bio,
     List<String>? momentAssets,
+    String? emUsername,
+    bool? hasGender,
   }) {
     return FriendUser(
       id: id ?? this.id,
@@ -62,6 +72,8 @@ class FriendUser {
       zodiac: zodiac ?? this.zodiac,
       bio: bio ?? this.bio,
       momentAssets: momentAssets ?? this.momentAssets,
+      emUsername: emUsername ?? this.emUsername,
+      hasGender: hasGender ?? this.hasGender,
     );
   }
 }

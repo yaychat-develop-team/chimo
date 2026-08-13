@@ -44,3 +44,7 @@ flutter:
     - assets/images/
     - assets/images/forya/
     - assets/json/
+  fonts:
+    - family: Emoji
+      fonts:
+        - asset: assets/fonts/EmojiFont.ttf

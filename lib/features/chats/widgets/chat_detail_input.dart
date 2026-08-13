@@ -69,6 +69,7 @@ class _DmInputBarState extends State<_DmInputBar> {
 
   @override
   void dispose() {
+    AppVoiceExclusive.release(_stopPreviewExclusive);
     _voiceTimer?.cancel();
     unawaited(_recorder.dispose());
     unawaited(_previewPlayer.dispose());
@@ -95,6 +96,7 @@ class _DmInputBarState extends State<_DmInputBar> {
   /// 输入框获焦时关闭语音/相册面板。
   void _closeFunctionPanel() {
     if (_panel == _DmPanel.none) return;
+    AppVoiceExclusive.release(_stopPreviewExclusive);
     unawaited(_stopRecorderIfNeeded(deleteFile: true));
     _voiceTimer?.cancel();
     _voiceTimer = null;
@@ -291,6 +293,7 @@ class _DmInputBarState extends State<_DmInputBar> {
   }
 
   Future<void> _closeVoicePanel({bool deleteFile = true}) async {
+    AppVoiceExclusive.release(_stopPreviewExclusive);
     await _stopRecorderIfNeeded(deleteFile: deleteFile);
     _voiceTimer?.cancel();
     _voiceTimer = null;
@@ -332,6 +335,7 @@ class _DmInputBarState extends State<_DmInputBar> {
 
   Future<void> _startRecording() async {
     try {
+      AppVoiceExclusive.stopActive();
       final ok = await _recorder.hasPermission();
       if (!ok) {
         if (!mounted) return;
@@ -440,15 +444,22 @@ class _DmInputBarState extends State<_DmInputBar> {
         final path = _voicePath;
         if (path == null || path.isEmpty) return;
         try {
+          AppVoiceExclusive.claim(_stopPreviewExclusive);
           await _previewPlayer.stop();
-          await _previewPlayer.play(DeviceFileSource(path));
+          await AppAudioPlayback.play(_previewPlayer, path);
         } catch (error) {
           debugPrint('Preview voice failed: $error');
+          AppVoiceExclusive.release(_stopPreviewExclusive);
         }
     }
   }
 
+  void _stopPreviewExclusive() {
+    unawaited(_previewPlayer.stop());
+  }
+
   Future<void> _resetVoice() async {
+    AppVoiceExclusive.release(_stopPreviewExclusive);
     await _stopRecorderIfNeeded(deleteFile: true);
     _voiceTimer?.cancel();
     _voiceTimer = null;
@@ -677,7 +688,7 @@ class _DmInputBarState extends State<_DmInputBar> {
                             color: Color(0xFF111111),
                             fontSize: 14,
                             fontWeight: FontWeight.w400,
-                          ),
+                          ).withAppEmoji,
                           decoration: const InputDecoration(
                             isDense: true,
                             hintText: 'Send message...',
@@ -831,30 +842,10 @@ class _ChatEmojiPanel extends StatefulWidget {
 }
 
 class _ChatEmojiPanelState extends State<_ChatEmojiPanel> {
-  /// 对齐 forya EmojiSubPanel 集合（常用聊天表情）。
-  static const List<String> _emojis = [
-    '😀', '😁', '😂', '🤣', '😃', '😄',
-    '😅', '😆', '😉', '😊', '😋', '😎',
-    '😍', '😘', '🥰', '😗', '😙', '😚',
-    '🙂', '🤗', '🤩', '🤔', '🤨', '😐',
-    '😑', '😶', '🙄', '😏', '😣', '😥',
-    '😮', '🤐', '😯', '😪', '😫', '🥱',
-    '😴', '😌', '😛', '😜', '😝', '🤤',
-    '😒', '😓', '😔', '😕', '🙃', '🤑',
-    '😲', '🙁', '😖', '😞', '😟', '😤',
-    '😢', '😭', '😦', '😧', '😨', '😩',
-    '🤯', '😬', '😰', '😱', '🥵', '🥶',
-    '😳', '🤪', '😵', '😡', '😠', '🤬',
-    '😷', '🤒', '🤕', '🤢', '🤮', '🤧',
-    '😇', '🥳', '🥺', '🤠', '🤡', '🤥',
-    '👍', '👎', '👏', '🙏', '💪', '❤️',
-    '🧡', '💛', '💚', '💙', '💜', '💔',
-    '💕', '💞', '💓', '💗', '💖', '✨',
-  ];
-
-  /// Tab 0 = 系统 emoji；1..n = 贴纸包。
+  /// Tab 0 = 系统 / 自定义 emoji；1..n = 贴纸包。
   int _tab = 0;
   List<EmotePack> _packs = const [];
+  List<String> _emojis = const [];
   final Map<String, List<EmoteSticker>> _stickersByPack = {};
   final Set<String> _loadingPacks = {};
   bool _packsLoading = true;
@@ -863,7 +854,14 @@ class _ChatEmojiPanelState extends State<_ChatEmojiPanel> {
   @override
   void initState() {
     super.initState();
+    unawaited(_loadEmojis());
     unawaited(_loadPacks());
+  }
+
+  Future<void> _loadEmojis() async {
+    final glyphs = await AppEmoji.loadGlyphs();
+    if (!mounted) return;
+    setState(() => _emojis = glyphs);
   }
 
   Future<void> _loadPacks() async {
@@ -969,6 +967,15 @@ class _ChatEmojiPanelState extends State<_ChatEmojiPanel> {
   }
 
   Widget _emojiGrid() {
+    if (_emojis.isEmpty) {
+      return const Center(
+        child: SizedBox(
+          width: 22,
+          height: 22,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+    }
     return Stack(
       children: [
         GridView.builder(
@@ -986,7 +993,10 @@ class _ChatEmojiPanelState extends State<_ChatEmojiPanel> {
               onTap: () => widget.onEmojiTap(emoji),
               behavior: HitTestBehavior.opaque,
               child: Center(
-                child: Text(emoji, style: const TextStyle(fontSize: 24)),
+                child: Text(
+                  emoji,
+                  style: const TextStyle(fontSize: 24).withAppEmoji,
+                ),
               ),
             );
           },

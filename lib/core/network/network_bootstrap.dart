@@ -9,6 +9,7 @@ import 'auth_request_headers.dart';
 import 'api_config.dart';
 import 'api_config_store.dart';
 import 'chimo_api.dart';
+import 'proxy_config_store.dart';
 
 /// 应用级网络启动：加载环境与可选心跳。
 abstract final class NetworkBootstrap {
@@ -20,18 +21,38 @@ abstract final class NetworkBootstrap {
   /// 登出 / token 失效时清空内存态（如会话列表），由 [AppProviders] 注册。
   static void Function()? onSessionCleared;
 
-  static ApiClient get client => _client ??= ApiClient(
-        tokenProvider: () => authToken,
-      );
+  static ApiClient get client => _client ??= _createClient();
 
   static ChimoApi get api => _api ??= ChimoApi(client);
 
+  static ApiClient _createClient() {
+    return ApiClient(
+      httpClient: ProxyConfigStore.buildIoClient(),
+      tokenProvider: () => authToken,
+    );
+  }
+
+  /// 代理变更后重建 HTTP 客户端（对齐 forya `JRNetwork.updateProxy`）。
+  static Future<void> rebuildHttpClient() async {
+    await ProxyConfigStore.load();
+    final old = _client;
+    _client = _createClient();
+    _api = ChimoApi(client);
+    try {
+      old?.close();
+    } catch (_) {}
+  }
+
   static Future<ApiResponse> initialize({bool startHeartbeat = true}) async {
     await ApiConfigStore.load();
+    await ProxyConfigStore.load();
     await AuthRequestHeaders.initialize();
+    // 确保首次请求使用已加载的代理配置。
+    await rebuildHttpClient();
     authToken = await AuthSession.token();
     debugPrint(
-      'NetworkBootstrap baseUrl=${ApiConfig.baseUrl} hasToken=${authToken != null}',
+      'NetworkBootstrap baseUrl=${ApiConfig.baseUrl} hasToken=${authToken != null}'
+      ' proxy=${ProxyConfigStore.isConfigured ? '${ProxyConfigStore.ip}:${ProxyConfigStore.port}' : 'off'}',
     );
 
     // 对齐 forya LoginManager 自动登录：冷启动时刷新 token。

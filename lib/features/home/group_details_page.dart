@@ -1,15 +1,19 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui';
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../core/audio/app_audio_playback.dart';
 import '../../core/auth/auth_session.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/im/im_service.dart';
 import '../../core/network/app_apis.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_emoji.dart';
 import '../../core/widgets/app_action_bottom_sheet.dart';
 import '../../core/widgets/app_tip_dialog.dart';
 import '../../core/widgets/center_toast.dart';
@@ -21,6 +25,7 @@ import '../report/report_page.dart';
 import 'chat_user_profile_page.dart';
 import 'models/chat_user_profile.dart';
 import 'models/group_item.dart';
+import 'widgets/chat_user_profile_sheet.dart';
 import 'widgets/group_chat_input_bar.dart';
 import 'widgets/group_level_badge.dart';
 import 'widgets/group_members_sheet.dart';
@@ -58,10 +63,23 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
   List<GroupPhotoSection> _photoSections = const [];
   final GlobalKey<GroupChatInputBarState> _inputBarKey =
       GlobalKey<GroupChatInputBarState>();
+  String _selfAvatarUrl = '';
+  /// 防止短时间连点头像叠多层资料弹窗。
+  bool _openingSenderProfile = false;
+  /// uid → 头像 URL（消息 attributes 缺 avatar 时用资料接口补全）。
+  final Map<String, String> _senderAvatarByUid = {};
+  final Set<String> _avatarFetchInFlight = {};
 
   PopularGroupItem get _group => widget.group;
 
   String get _emGroupId => _group.id.trim();
+
+  /// 群聊发出消息的对端公共 attributes（群名 / 头像 / 群 id）。
+  ImPeerAttrs get _groupPeerAttrs => ImPeerAttrs(
+        name: _group.name.trim(),
+        avatar: (_group.avatarUrl ?? '').trim(),
+        userid: _group.id.trim(),
+      );
 
   List<String> get _flatPhotos => [
         for (final s in _photoSections) ...s.urls,
@@ -70,24 +88,31 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
   @override
   void initState() {
     super.initState();
+    unawaited(_loadSelfAvatar());
     unawaited(_loadPhotos());
     _imSub = ImService.messages.listen(_onImMessage);
     widget.chatsController?.setActiveConversation(_emGroupId);
-    if (_isJoined) {
-      unawaited(_loadImHistory());
-    }
+    // 未加入也拉最近 10 条预览（对齐 forya）；图片加锁模糊。
+    unawaited(_loadImHistory());
+  }
+
+  Future<void> _loadSelfAvatar() async {
+    final url = (await AuthSession.avatarUrl())?.trim() ?? '';
+    if (!mounted || url.isEmpty) return;
+    setState(() => _selfAvatarUrl = url);
   }
 
   Future<void> _loadImHistory() async {
     final gid = _emGroupId;
     if (gid.isEmpty) return;
+    final previewLimit = _isJoined ? 40 : 10;
     try {
       if (!ImService.isConnected) {
         await ImService.connectFromServer();
       }
       final page = await ImService.loadHistory(
         gid,
-        count: 40,
+        count: previewLimit,
         isGroup: true,
       );
       if (!mounted) return;
@@ -107,12 +132,94 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
         );
         _sentMessages.insertAll(0, added);
         _sentMessages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
+        if (!_isJoined && _sentMessages.length > 10) {
+          final drop = _sentMessages.length - 10;
+          for (final m in _sentMessages.take(drop)) {
+            if (m.msgId.isNotEmpty) _seenMsgIds.remove(m.msgId);
+          }
+          _sentMessages.removeRange(0, drop);
+        }
       });
       _scrollToBottom(force: true);
-      unawaited(ImService.markConversationRead(gid, isGroup: true));
+      if (_isJoined) {
+        unawaited(ImService.markConversationRead(gid, isGroup: true));
+      }
+      unawaited(_hydrateMissingSenderAvatars());
     } catch (error) {
       debugPrint('GroupDetails loadImHistory: $error');
     }
+  }
+
+  void _rememberSenderAvatar(String uid, String avatar) {
+    final id = uid.trim();
+    final url = avatar.trim();
+    if (id.isEmpty || url.isEmpty) return;
+    if (url == 'null' || url == 'undefined') return;
+    _senderAvatarByUid[id] = url;
+  }
+
+  String _resolvedSenderAvatar({
+    required String uid,
+    required String avatar,
+    required bool isSelf,
+  }) {
+    final fromMsg = avatar.trim();
+    if (fromMsg.isNotEmpty && fromMsg != 'null' && fromMsg != 'undefined') {
+      _rememberSenderAvatar(uid, fromMsg);
+      return fromMsg;
+    }
+    if (isSelf && _selfAvatarUrl.trim().isNotEmpty) {
+      return _selfAvatarUrl.trim();
+    }
+    final cached = _senderAvatarByUid[uid.trim()];
+    if (cached != null && cached.isNotEmpty) return cached;
+    return '';
+  }
+
+  /// 历史/实时消息若 attributes 无 avatar，按 userid 拉资料补全，避免一直显示占位图。
+  Future<void> _hydrateMissingSenderAvatars() async {
+    final need = <String>{};
+    for (final m in _sentMessages) {
+      if (m.isSelf) continue;
+      final uid = m.senderUid.trim();
+      if (uid.isEmpty) continue;
+      if (m.senderAvatar.trim().isNotEmpty) {
+        _rememberSenderAvatar(uid, m.senderAvatar);
+        continue;
+      }
+      if (_senderAvatarByUid.containsKey(uid)) continue;
+      if (_avatarFetchInFlight.contains(uid)) continue;
+      need.add(uid);
+    }
+    if (need.isEmpty) return;
+
+    for (final uid in need) {
+      _avatarFetchInFlight.add(uid);
+      try {
+        final res = await AppApis.user.profileByUidOrNull(uid);
+        final url = (res.data?.avatarUrl ?? '').trim();
+        if (res.ok && url.isNotEmpty) {
+          _rememberSenderAvatar(uid, url);
+        }
+      } catch (_) {
+        // ignore; keep placeholder
+      } finally {
+        _avatarFetchInFlight.remove(uid);
+      }
+    }
+    if (!mounted) return;
+    var changed = false;
+    for (var i = 0; i < _sentMessages.length; i++) {
+      final m = _sentMessages[i];
+      final uid = m.senderUid.trim();
+      if (uid.isEmpty) continue;
+      final cached = _senderAvatarByUid[uid];
+      if (cached == null || cached.isEmpty) continue;
+      if (m.senderAvatar.trim() == cached) continue;
+      _sentMessages[i] = m.copyWith(senderAvatar: cached);
+      changed = true;
+    }
+    if (changed) setState(() {});
   }
 
   void _onImMessage(ImChatMessage m) {
@@ -124,15 +231,32 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
     if (line == null) return;
     if (m.id.isNotEmpty) _seenMsgIds.add(m.id);
     if (!mounted) return;
-    setState(() => _sentMessages.add(line));
+    setState(() {
+      _sentMessages.add(line);
+      if (!_isJoined && _sentMessages.length > 10) {
+        final removed = _sentMessages.removeAt(0);
+        if (removed.msgId.isNotEmpty) _seenMsgIds.remove(removed.msgId);
+      }
+    });
     // 列表预览 / 未读由 ChatsListController 的 IM 订阅处理。
     _scrollToBottom();
+    if (line.senderAvatar.trim().isEmpty && line.senderUid.trim().isNotEmpty) {
+      unawaited(_hydrateMissingSenderAvatars());
+    }
   }
 
   _OutgoingMessage? _lineFromIm(ImChatMessage m) {
     final at = m.serverTimeMs > 0
         ? DateTime.fromMillisecondsSinceEpoch(m.serverTimeMs)
         : DateTime.now();
+    final name = m.senderName;
+    final uid = m.senderUid;
+    final gender = m.senderGender;
+    final avatar = _resolvedSenderAvatar(
+      uid: uid,
+      avatar: m.senderAvatar,
+      isSelf: m.isSelf,
+    );
     switch (m.msgType) {
       case 'join':
         return _OutgoingMessage.join(
@@ -140,6 +264,8 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
           uid: m.joinUid,
           at: at,
           msgId: m.id,
+          senderAvatar: avatar,
+          senderGender: gender,
         );
       case 'txt':
         return _OutgoingMessage.text(
@@ -147,15 +273,34 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
           at: at,
           msgId: m.id,
           isSelf: m.isSelf,
+          senderAvatar: avatar,
+          senderName: name,
+          senderUid: uid,
+          senderGender: gender,
         );
       case 'image':
-        final src = m.playableOrDisplayUrl;
+        // 预览优先用可下载的 http(s) 远程 / 缩略图，避免裸路径被当成本地文件。
+        final remote = m.mediaRemoteUrl.trim();
+        final thumb = m.thumbnailUrl.trim();
+        final src = () {
+          if (remote.startsWith('http://') || remote.startsWith('https://')) {
+            return remote;
+          }
+          if (thumb.startsWith('http://') || thumb.startsWith('https://')) {
+            return thumb;
+          }
+          return m.playableOrDisplayUrl;
+        }();
         if (src.isEmpty) return null;
         return _OutgoingMessage.image(
           src,
           at: at,
           msgId: m.id,
           isSelf: m.isSelf,
+          senderAvatar: avatar,
+          senderName: name,
+          senderUid: uid,
+          senderGender: gender,
         );
       case 'voice':
         return _OutgoingMessage.voice(
@@ -163,6 +308,11 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
           at: at,
           msgId: m.id,
           isSelf: m.isSelf,
+          mediaSource: m.playableOrDisplayUrl,
+          senderAvatar: avatar,
+          senderName: name,
+          senderUid: uid,
+          senderGender: gender,
         );
       case 'emote':
         final src = m.emoteUrl.isNotEmpty ? m.emoteUrl : m.playableOrDisplayUrl;
@@ -172,6 +322,10 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
           at: at,
           msgId: m.id,
           isSelf: m.isSelf,
+          senderAvatar: avatar,
+          senderName: name,
+          senderUid: uid,
+          senderGender: gender,
         );
       default:
         return null;
@@ -336,7 +490,9 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
     }
     _inputController.clear();
     setState(() {
-      _sentMessages.add(_OutgoingMessage.text(text));
+      _sentMessages.add(
+        _OutgoingMessage.text(text, senderAvatar: _selfAvatarUrl),
+      );
       _tabIndex = 0;
     });
     _notifyNewMessage(text);
@@ -349,6 +505,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
         peerEmUsername: gid,
         content: text,
         isGroup: true,
+        peer: _groupPeerAttrs,
       );
       if (sent != null && sent.id.isNotEmpty) {
         _seenMsgIds.add(sent.id);
@@ -364,14 +521,45 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
     }
   }
 
-  void _sendVoice(int seconds) {
+  Future<void> _sendVoice(String path, int seconds) async {
     if (!_isJoined || seconds <= 0) return;
+    final local = path.trim();
+    if (local.isEmpty) return;
     setState(() {
-      _sentMessages.add(_OutgoingMessage.voice(seconds));
+      _sentMessages.add(
+        _OutgoingMessage.voice(
+          seconds,
+          mediaSource: local,
+          senderAvatar: _selfAvatarUrl,
+        ),
+      );
       _tabIndex = 0;
     });
     _notifyNewMessage('[Voice] ${seconds}s');
     _scrollToBottom();
+
+    final gid = _emGroupId;
+    if (gid.isEmpty) return;
+    try {
+      final sent = await ImService.sendVoice(
+        peerEmUsername: gid,
+        filePath: local,
+        durationSecs: seconds,
+        isGroup: true,
+        peer: _groupPeerAttrs,
+      );
+      if (sent != null && sent.id.isNotEmpty) {
+        _seenMsgIds.add(sent.id);
+      }
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Send voice failed: $error'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   Future<void> _sendImages(List<String> paths) async {
@@ -383,7 +571,13 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
     final now = DateTime.now();
     setState(() {
       for (final path in files) {
-        _sentMessages.add(_OutgoingMessage.image(path, at: now));
+        _sentMessages.add(
+          _OutgoingMessage.image(
+            path,
+            at: now,
+            senderAvatar: _selfAvatarUrl,
+          ),
+        );
       }
       _tabIndex = 0;
     });
@@ -410,6 +604,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
           peerEmUsername: gid,
           filePath: path,
           isGroup: true,
+          peer: _groupPeerAttrs,
         );
         if (sent != null && sent.id.isNotEmpty) {
           _seenMsgIds.add(sent.id);
@@ -500,6 +695,48 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
         ),
       ),
     );
+  }
+
+  /// 点击对方头像：底部资料弹层（对齐 forya PersonalUnit.showBottom）。
+  Future<void> _openSenderProfile(_OutgoingMessage message) async {
+    if (message.isSelf) return;
+    if (_openingSenderProfile) return;
+    _openingSenderProfile = true;
+    try {
+      final uid = message.senderUid.trim();
+      final name = message.senderName.trim();
+      var profile = ChatUserProfile.placeholder(
+        id: uid,
+        nickname: name.isEmpty ? 'User' : name,
+        avatarUrl: message.senderAvatar.trim().isEmpty
+            ? null
+            : message.senderAvatar.trim(),
+      );
+      if (uid.isNotEmpty) {
+        try {
+          final res = await AppApis.user.profileByUidOrNull(uid);
+          if (res.ok && res.data != null) {
+            profile = res.data!;
+            final apiAvatar = (profile.avatarUrl ?? '').trim();
+            final msgAvatar = message.senderAvatar.trim();
+            if (apiAvatar.isEmpty && msgAvatar.isNotEmpty) {
+              profile = profile.copyWith(avatarUrl: msgAvatar);
+            }
+            if (profile.nickname.trim().isEmpty && name.isNotEmpty) {
+              profile = profile.copyWith(nickname: name);
+            }
+          }
+        } catch (_) {}
+      }
+      if (!mounted) return;
+      await ChatUserProfileSheet.show(
+        context,
+        profile: profile,
+        chatsController: widget.chatsController,
+      );
+    } finally {
+      _openingSenderProfile = false;
+    }
   }
 
   @override
@@ -602,6 +839,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
                           messagesScroll: _messagesScroll,
                           onTabChanged: (i) => setState(() => _tabIndex = i),
                           onPhotoTap: _openPhotoViewer,
+                          onSenderAvatarTap: _openSenderProfile,
                           onBlankTap: () =>
                               _inputBarKey.currentState?.dismissComposer(),
                         ),
@@ -919,6 +1157,7 @@ class _ChatBody extends StatelessWidget {
     required this.messagesScroll,
     required this.onTabChanged,
     required this.onPhotoTap,
+    this.onSenderAvatarTap,
     this.onBlankTap,
   });
 
@@ -929,6 +1168,7 @@ class _ChatBody extends StatelessWidget {
   final ScrollController messagesScroll;
   final ValueChanged<int> onTabChanged;
   final ValueChanged<int> onPhotoTap;
+  final ValueChanged<_OutgoingMessage>? onSenderAvatarTap;
   final VoidCallback? onBlankTap;
 
   @override
@@ -969,6 +1209,7 @@ class _ChatBody extends StatelessWidget {
                     sentMessages: sentMessages,
                     scrollController: messagesScroll,
                     onBlankTap: onBlankTap,
+                    onSenderAvatarTap: onSenderAvatarTap,
                   )
                 : _PhotosGrid(
                     isJoined: isJoined,
@@ -1030,12 +1271,25 @@ class _MessagesFeed extends StatelessWidget {
     required this.sentMessages,
     required this.scrollController,
     this.onBlankTap,
+    this.onSenderAvatarTap,
   });
 
   final bool isJoined;
   final List<_OutgoingMessage> sentMessages;
   final ScrollController scrollController;
   final VoidCallback? onBlankTap;
+  final ValueChanged<_OutgoingMessage>? onSenderAvatarTap;
+
+  bool _sameSender(_OutgoingMessage a, _OutgoingMessage b) {
+    if (a.isSelf != b.isSelf) return false;
+    final au = a.senderUid.trim();
+    final bu = b.senderUid.trim();
+    if (au.isNotEmpty && bu.isNotEmpty) return au == bu;
+    final an = a.senderName.trim();
+    final bn = b.senderName.trim();
+    if (an.isNotEmpty && bn.isNotEmpty) return an == bn;
+    return a.isSelf && b.isSelf;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1050,9 +1304,7 @@ class _MessagesFeed extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 48, 16, 20),
           children: [
             Text(
-              isJoined
-                  ? 'No messages yet'
-                  : 'Join the group to chat.',
+              'No messages yet',
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: Color(0xFFAEAEAE),
@@ -1086,12 +1338,19 @@ class _MessagesFeed extends StatelessWidget {
             else
               _GroupChatBubble(
                 message: sentMessages[i],
+                isLocked: !isJoined,
                 showAvatar: i == 0 ||
                     sentMessages[i - 1].kind == _OutgoingKind.join ||
-                    sentMessages[i].isSelf != sentMessages[i - 1].isSelf ||
+                    !_sameSender(sentMessages[i], sentMessages[i - 1]) ||
                     sentMessages[i].kind != sentMessages[i - 1].kind,
-                onImageTap: sentMessages[i].kind == _OutgoingKind.image
-                    ? () {
+                onAvatarTap: sentMessages[i].isSelf ||
+                        onSenderAvatarTap == null
+                    ? null
+                    : () => onSenderAvatarTap!(sentMessages[i]),
+                onImageTap: !isJoined ||
+                        sentMessages[i].kind != _OutgoingKind.image
+                    ? null
+                    : () {
                         final paths = [
                           for (final m in sentMessages)
                             if (m.kind == _OutgoingKind.image &&
@@ -1106,8 +1365,7 @@ class _MessagesFeed extends StatelessWidget {
                           initialIndex: initial < 0 ? 0 : initial,
                           showPageIndicator: false,
                         );
-                      }
-                    : null,
+                      },
               ),
           ],
         ],
@@ -1184,10 +1442,15 @@ class _OutgoingMessage {
     this.text,
     this.voiceSeconds,
     this.imagePath,
+    this.mediaSource,
     this.joinName,
     this.joinUid,
     this.msgId = '',
     this.isSelf = true,
+    this.senderAvatar = '',
+    this.senderName = '',
+    this.senderUid = '',
+    this.senderGender = '',
   });
 
   factory _OutgoingMessage.text(
@@ -1195,6 +1458,10 @@ class _OutgoingMessage {
     DateTime? at,
     String msgId = '',
     bool isSelf = true,
+    String senderAvatar = '',
+    String senderName = '',
+    String senderUid = '',
+    String senderGender = '',
   }) =>
       _OutgoingMessage._(
         kind: _OutgoingKind.text,
@@ -1202,6 +1469,10 @@ class _OutgoingMessage {
         sentAt: at ?? DateTime.now(),
         msgId: msgId,
         isSelf: isSelf,
+        senderAvatar: senderAvatar,
+        senderName: senderName,
+        senderUid: senderUid,
+        senderGender: senderGender,
       );
 
   factory _OutgoingMessage.voice(
@@ -1209,13 +1480,23 @@ class _OutgoingMessage {
     DateTime? at,
     String msgId = '',
     bool isSelf = true,
+    String mediaSource = '',
+    String senderAvatar = '',
+    String senderName = '',
+    String senderUid = '',
+    String senderGender = '',
   }) =>
       _OutgoingMessage._(
         kind: _OutgoingKind.voice,
         voiceSeconds: seconds,
+        mediaSource: mediaSource,
         sentAt: at ?? DateTime.now(),
         msgId: msgId,
         isSelf: isSelf,
+        senderAvatar: senderAvatar,
+        senderName: senderName,
+        senderUid: senderUid,
+        senderGender: senderGender,
       );
 
   factory _OutgoingMessage.image(
@@ -1223,6 +1504,10 @@ class _OutgoingMessage {
     DateTime? at,
     String msgId = '',
     bool isSelf = true,
+    String senderAvatar = '',
+    String senderName = '',
+    String senderUid = '',
+    String senderGender = '',
   }) =>
       _OutgoingMessage._(
         kind: _OutgoingKind.image,
@@ -1230,6 +1515,10 @@ class _OutgoingMessage {
         sentAt: at ?? DateTime.now(),
         msgId: msgId,
         isSelf: isSelf,
+        senderAvatar: senderAvatar,
+        senderName: senderName,
+        senderUid: senderUid,
+        senderGender: senderGender,
       );
 
   factory _OutgoingMessage.join(
@@ -1237,6 +1526,8 @@ class _OutgoingMessage {
     String uid = '',
     DateTime? at,
     String msgId = '',
+    String senderAvatar = '',
+    String senderGender = '',
   }) =>
       _OutgoingMessage._(
         kind: _OutgoingKind.join,
@@ -1245,6 +1536,10 @@ class _OutgoingMessage {
         sentAt: at ?? DateTime.now(),
         msgId: msgId,
         isSelf: false,
+        senderName: name,
+        senderUid: uid,
+        senderAvatar: senderAvatar,
+        senderGender: senderGender,
       );
 
   final int kind;
@@ -1252,10 +1547,55 @@ class _OutgoingMessage {
   final String? text;
   final int? voiceSeconds;
   final String? imagePath;
+  /// 语音本地 / 远程播放源（对齐私聊 mediaSource）。
+  final String? mediaSource;
   final String? joinName;
   final String? joinUid;
   final String msgId;
   final bool isSelf;
+  final String senderAvatar;
+  final String senderName;
+  final String senderUid;
+  final String senderGender;
+
+  bool get hasSenderGender {
+    final g = senderGender.trim().toLowerCase();
+    return g == 'male' ||
+        g == 'm' ||
+        g == '1' ||
+        g == 'female' ||
+        g == 'f' ||
+        g == '2';
+  }
+
+  _OutgoingMessage copyWith({
+    String? senderAvatar,
+    String? senderName,
+    String? senderUid,
+    String? senderGender,
+  }) {
+    return _OutgoingMessage._(
+      kind: kind,
+      sentAt: sentAt,
+      text: text,
+      voiceSeconds: voiceSeconds,
+      imagePath: imagePath,
+      mediaSource: mediaSource,
+      joinName: joinName,
+      joinUid: joinUid,
+      msgId: msgId,
+      isSelf: isSelf,
+      senderAvatar: senderAvatar ?? this.senderAvatar,
+      senderName: senderName ?? this.senderName,
+      senderUid: senderUid ?? this.senderUid,
+      senderGender: senderGender ?? this.senderGender,
+    );
+  }
+
+  bool get senderIsMale {
+    final g = senderGender.trim().toLowerCase();
+    return g == 'male' || g == 'm' || g == '1';
+  }
 }
 
 /// Forya CustomGroupJoinItem：青绿昵称 + 灰色 "joined the community"。
@@ -1307,12 +1647,16 @@ class _GroupChatBubble extends StatelessWidget {
   const _GroupChatBubble({
     required this.message,
     this.showAvatar = true,
+    this.isLocked = false,
     this.onImageTap,
+    this.onAvatarTap,
   });
 
   final _OutgoingMessage message;
   final bool showAvatar;
+  final bool isLocked;
   final VoidCallback? onImageTap;
+  final VoidCallback? onAvatarTap;
 
   static const double _avatar = 40;
   static const double _avatarGap = 10;
@@ -1321,17 +1665,24 @@ class _GroupChatBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isSelf = message.isSelf;
-    final avatar = showAvatar
+    Widget avatar = showAvatar
         ? ClipRRect(
             borderRadius: BorderRadius.circular(8),
-            child: Image.asset(
-              AppAssets.avatarPlace,
+            child: NetworkOrAssetAvatar(
+              asset: AppAssets.avatarPlace,
+              url: message.senderAvatar,
               width: _avatar,
               height: _avatar,
-              fit: BoxFit.cover,
             ),
           )
         : const SizedBox(width: _avatar);
+    if (showAvatar && onAvatarTap != null) {
+      avatar = GestureDetector(
+        onTap: onAvatarTap,
+        behavior: HitTestBehavior.opaque,
+        child: avatar,
+      );
+    }
 
     Widget imageBubble() {
       final path = (message.imagePath ?? '').trim();
@@ -1342,15 +1693,18 @@ class _GroupChatBubble extends StatelessWidget {
           bottomLeft: const Radius.circular(18),
           bottomRight: const Radius.circular(18),
         ),
-        child: _OutgoingImage(path: path),
+        child: _OutgoingImage(path: path, locked: isLocked),
       );
     }
 
     final bubble = ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: _bubbleMax),
       child: switch (message.kind) {
-        _OutgoingKind.voice => _SelfVoiceBubble(
+        _OutgoingKind.voice => _GroupVoiceBubble(
             seconds: message.voiceSeconds ?? 0,
+            isSelf: isSelf,
+            locked: isLocked,
+            mediaSource: message.mediaSource ?? '',
           ),
         _OutgoingKind.image => onImageTap == null
             ? imageBubble()
@@ -1359,29 +1713,27 @@ class _GroupChatBubble extends StatelessWidget {
                 behavior: HitTestBehavior.opaque,
                 child: imageBubble(),
               ),
-        _ => Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-            decoration: BoxDecoration(
-              color: isSelf ? const Color(0xFFB8FF6A) : const Color(0xFFF0F0F0),
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(isSelf ? 18 : 4),
-                topRight: Radius.circular(isSelf ? 4 : 18),
-                bottomLeft: const Radius.circular(18),
-                bottomRight: const Radius.circular(18),
-              ),
-            ),
-            child: Text(
-              message.text ?? '',
-              style: const TextStyle(
-                color: Color(0xFF111111),
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
-                height: 20 / 15,
-              ),
-            ),
+        _ => _GroupTextBubble(
+            text: message.text ?? '',
+            isSelf: isSelf,
           ),
       },
     );
+
+    // 群聊对方：头像旁显示昵称 + 性别（未设置性别则只显示昵称）。
+    final peerBody = !isSelf
+        ? Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (showAvatar) ...[
+                _GroupSenderNameRow(message: message),
+                const SizedBox(height: 6),
+              ],
+              bubble,
+            ],
+          )
+        : bubble;
 
     if (isSelf) {
       return Row(
@@ -1399,163 +1751,407 @@ class _GroupChatBubble extends StatelessWidget {
       children: [
         avatar,
         const SizedBox(width: _avatarGap),
-        bubble,
+        Flexible(child: peerBody),
       ],
     );
   }
 }
 
+/// 群聊对方昵称 + 性别图标（对齐 forya SexAgeLabel isOnlySex）。
+class _GroupSenderNameRow extends StatelessWidget {
+  const _GroupSenderNameRow({required this.message});
+
+  final _OutgoingMessage message;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = message.senderName.trim().isEmpty
+        ? 'User'
+        : message.senderName.trim();
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Flexible(
+          child: Text(
+            name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xFFAEAEAE),
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              height: 1.2,
+            ),
+          ),
+        ),
+        if (message.hasSenderGender) ...[
+          const SizedBox(width: 2),
+          Image.asset(
+            message.senderIsMale ? AppAssets.genderMan : AppAssets.genderWoman,
+            width: 16,
+            height: 16,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// 文本 / forya 自定义表情（PUA）。纯表情时放大且不套灰气泡，对齐 forya。
+class _GroupTextBubble extends StatelessWidget {
+  const _GroupTextBubble({
+    required this.text,
+    required this.isSelf,
+  });
+
+  final String text;
+  final bool isSelf;
+
+  @override
+  Widget build(BuildContext context) {
+    final pureEmoji = AppEmoji.isCustomEmojiOnly(text);
+    final style = (pureEmoji
+            ? const TextStyle(
+                color: Color(0xFF111111),
+                fontSize: 28,
+                fontWeight: FontWeight.w500,
+                height: 1.2,
+                letterSpacing: 1.5,
+              )
+            : const TextStyle(
+                color: Color(0xFF111111),
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+                height: 20 / 15,
+              ))
+        .withAppEmoji;
+
+    final child = Text(text, style: style);
+    if (pureEmoji) return child;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      decoration: BoxDecoration(
+        color: isSelf ? const Color(0xFFB8FF6A) : const Color(0xFFF0F0F0),
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(isSelf ? 18 : 4),
+          topRight: Radius.circular(isSelf ? 4 : 18),
+          bottomLeft: const Radius.circular(18),
+          bottomRight: const Radius.circular(18),
+        ),
+      ),
+      child: child,
+    );
+  }
+}
+
 class _OutgoingImage extends StatelessWidget {
-  const _OutgoingImage({required this.path});
+  const _OutgoingImage({
+    required this.path,
+    this.locked = false,
+  });
 
   final String path;
+  final bool locked;
 
   /// 对齐私聊 / forya 媒体气泡：约 3:4 竖图，非正方形。
   static const double _w = 132;
   static const double _h = 176;
 
-  bool get _isAsset => path.startsWith('assets/');
-
-  Widget _child({required Widget Function(BoxFit fit) buildImage}) {
-    return SizedBox(
+  Widget _placeholder({required String label}) {
+    return Container(
       width: _w,
       height: _h,
-      child: buildImage(BoxFit.cover),
+      color: const Color(0xFF262624),
+      alignment: Alignment.center,
+      child: Text(
+        label,
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          color: Color(0xFF666666),
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
+  }
+
+  Widget _rawImage() {
+    final src = path.trim();
+    if (src.isEmpty) {
+      return _placeholder(label: 'Picture expired');
+    }
+    if (src.startsWith('http://') || src.startsWith('https://')) {
+      return Image.network(
+        src,
+        width: _w,
+        height: _h,
+        fit: BoxFit.cover,
+        gaplessPlayback: true,
+        loadingBuilder: (context, child, progress) {
+          if (progress == null) return child;
+          return ColoredBox(
+            color: locked ? const Color(0xFF3A3A3A) : const Color(0xFFF3F3F3),
+            child: const Center(
+              child: SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          );
+        },
+        errorBuilder: (_, _, _) =>
+            _placeholder(label: 'Picture expired'),
+      );
+    }
+    if (src.startsWith('assets/')) {
+      return Image.asset(
+        src,
+        width: _w,
+        height: _h,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) =>
+            _placeholder(label: 'Picture expired'),
+      );
+    }
+    final file = File(src);
+    if (file.existsSync()) {
+      return Image.file(
+        file,
+        width: _w,
+        height: _h,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) =>
+            _placeholder(label: 'Picture expired'),
+      );
+    }
+    return _placeholder(label: 'Picture expired');
   }
 
   @override
   Widget build(BuildContext context) {
-    final error = Container(
+    final image = SizedBox(width: _w, height: _h, child: _rawImage());
+    if (!locked) return image;
+
+    return SizedBox(
       width: _w,
       height: _h,
-      color: const Color(0xFFE8E8E8),
-      alignment: Alignment.center,
-      child: const Icon(Icons.broken_image_outlined),
-    );
-    if (_isAsset) {
-      return _child(
-        buildImage: (fit) => Image.asset(
-          path,
-          width: _w,
-          height: _h,
-          fit: fit,
-          errorBuilder: (_, _, _) => error,
-        ),
-      );
-    }
-    if (path.startsWith('http://') || path.startsWith('https://')) {
-      return _child(
-        buildImage: (fit) => Image.network(
-          path,
-          width: _w,
-          height: _h,
-          fit: fit,
-          errorBuilder: (_, _, _) => error,
-        ),
-      );
-    }
-    return _child(
-      buildImage: (fit) => Image.file(
-        File(path),
-        width: _w,
-        height: _h,
-        fit: fit,
-        errorBuilder: (_, _, _) => error,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          ImageFiltered(
+            imageFilter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+            child: image,
+          ),
+          const ColoredBox(color: Color(0x33000000)),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Container(
+              height: 32,
+              color: Colors.black.withValues(alpha: 0.28),
+              alignment: Alignment.center,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SvgPicture.asset(
+                    AppAssets.lockIcon,
+                    width: 14,
+                    height: 14,
+                    colorFilter: const ColorFilter.mode(
+                      Colors.white,
+                      BlendMode.srcIn,
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  const Text(
+                    'Join to view',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _SelfVoiceBubble extends StatefulWidget {
-  const _SelfVoiceBubble({required this.seconds});
+class _GroupVoiceBubble extends StatefulWidget {
+  const _GroupVoiceBubble({
+    required this.seconds,
+    required this.isSelf,
+    this.mediaSource = '',
+    this.locked = false,
+  });
 
   final int seconds;
+  final bool isSelf;
+  final String mediaSource;
+  final bool locked;
 
   @override
-  State<_SelfVoiceBubble> createState() => _SelfVoiceBubbleState();
+  State<_GroupVoiceBubble> createState() => _GroupVoiceBubbleState();
 }
 
-class _SelfVoiceBubbleState extends State<_SelfVoiceBubble> {
+class _GroupVoiceBubbleState extends State<_GroupVoiceBubble>
+    with SingleTickerProviderStateMixin {
+  static final AudioPlayer _player = AudioPlayer();
+
   bool _playing = false;
   int _remaining = 0;
-  Timer? _timer;
+  Timer? _playTimer;
+  StreamSubscription<void>? _completeSub;
+  late final AnimationController _waveController;
+
+  String get _source => widget.mediaSource.trim();
+
+  @override
+  void initState() {
+    super.initState();
+    _waveController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    );
+  }
 
   @override
   void dispose() {
-    _timer?.cancel();
+    AppVoiceExclusive.release(_stopPlay);
+    if (_playing) {
+      unawaited(_player.stop());
+    }
+    unawaited(_completeSub?.cancel() ?? Future<void>.value());
+    _playTimer?.cancel();
+    _waveController.dispose();
     super.dispose();
   }
 
-  void _toggle() {
-    if (widget.seconds <= 0) return;
-    if (_playing) {
-      _timer?.cancel();
-      setState(() {
-        _playing = false;
-        _remaining = 0;
-      });
+  void _stopPlay() {
+    _playTimer?.cancel();
+    _playTimer = null;
+    unawaited(_completeSub?.cancel() ?? Future<void>.value());
+    _completeSub = null;
+    unawaited(_player.stop());
+    _waveController.stop();
+    _waveController.reset();
+    AppVoiceExclusive.release(_stopPlay);
+    if (!mounted) {
+      _playing = false;
+      _remaining = 0;
       return;
     }
     setState(() {
+      _playing = false;
+      _remaining = 0;
+    });
+  }
+
+  Future<void> _togglePlay() async {
+    if (widget.locked) return;
+    if (widget.seconds <= 0 && _source.isEmpty) return;
+    if (_playing) {
+      _stopPlay();
+      return;
+    }
+    AppVoiceExclusive.claim(_stopPlay);
+    setState(() {
       _playing = true;
-      _remaining = widget.seconds;
+      _remaining = widget.seconds > 0 ? widget.seconds : 1;
     });
-    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (!mounted) {
-        t.cancel();
-        return;
-      }
-      if (_remaining <= 1) {
-        t.cancel();
-        setState(() {
-          _playing = false;
-          _remaining = 0;
+    _waveController.repeat();
+
+    final src = _source;
+    if (src.isNotEmpty) {
+      try {
+        await AppAudioPlayback.play(_player, src);
+        await _completeSub?.cancel();
+        _completeSub = _player.onPlayerComplete.listen((_) {
+          if (mounted) _stopPlay();
         });
-        return;
+      } catch (error) {
+        debugPrint('Group voice play failed: $error');
       }
-      setState(() => _remaining -= 1);
-    });
+    }
+
+    _playTimer?.cancel();
+    if (widget.seconds > 0) {
+      _playTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (!mounted) {
+          timer.cancel();
+          return;
+        }
+        if (_remaining <= 1) {
+          timer.cancel();
+          _playTimer = null;
+          _stopPlay();
+          return;
+        }
+        setState(() => _remaining -= 1);
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final sec = _playing ? _remaining : widget.seconds;
+    final isSelf = widget.isSelf;
+    final displaySeconds = _playing ? _remaining : widget.seconds;
+    final expired = _source.isEmpty && widget.seconds <= 0;
+    final secs = widget.seconds.clamp(1, 60);
+
     return GestureDetector(
-      onTap: _toggle,
+      onTap: (expired || widget.locked) ? null : _togglePlay,
+      behavior: HitTestBehavior.opaque,
       child: Container(
-        constraints: BoxConstraints(
-          minWidth: 88,
-          maxWidth: 88 + (widget.seconds.clamp(1, 60) * 1.6),
-        ),
-        height: 44,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        decoration: const BoxDecoration(
-          color: Color(0xFFB8FF6A),
+        width: expired
+            ? 140
+            : (80 + secs * (200 - 80) / 60).clamp(80.0, 200.0),
+        height: 40,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: isSelf ? const Color(0xFFB8FF6A) : const Color(0xFFF0F0F0),
           borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(18),
-            topRight: Radius.circular(4),
-            bottomLeft: Radius.circular(18),
-            bottomRight: Radius.circular(18),
+            topLeft: Radius.circular(isSelf ? 16 : 4),
+            topRight: Radius.circular(isSelf ? 4 : 16),
+            bottomLeft: const Radius.circular(16),
+            bottomRight: const Radius.circular(16),
           ),
         ),
         child: Row(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Icon(
-              _playing ? Icons.stop_rounded : Icons.play_arrow_rounded,
-              size: 22,
-              color: const Color(0xFF111111),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              '$sec"',
-              style: const TextStyle(
-                color: Color(0xFF111111),
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
+            if (expired)
+              const Expanded(
+                child: Text(
+                  'Voice expired',
+                  style: TextStyle(
+                    color: Color(0xFF666666),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              )
+            else ...[
+              _GroupVoiceBarsIcon(
+                playing: _playing,
+                animation: _waveController,
               ),
-            ),
+              Text(
+                '${displaySeconds > 0 ? displaySeconds : widget.seconds}s',
+                style: const TextStyle(
+                  color: Color(0xFF111111),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -1563,6 +2159,81 @@ class _SelfVoiceBubbleState extends State<_SelfVoiceBubble> {
   }
 }
 
+class _GroupVoiceBarsIcon extends StatelessWidget {
+  const _GroupVoiceBarsIcon({
+    this.playing = false,
+    this.animation,
+  });
+
+  final bool playing;
+  final Animation<double>? animation;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!playing || animation == null) {
+      return const SizedBox(
+        width: 16,
+        height: 16,
+        child: CustomPaint(painter: _GroupVoiceBarsPainter()),
+      );
+    }
+    return AnimatedBuilder(
+      animation: animation!,
+      builder: (context, _) {
+        return SizedBox(
+          width: 16,
+          height: 16,
+          child: CustomPaint(
+            painter: _GroupVoiceBarsPainter(
+              phase: animation!.value * 2 * math.pi,
+              playing: true,
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _GroupVoiceBarsPainter extends CustomPainter {
+  const _GroupVoiceBarsPainter({this.phase = 0, this.playing = false});
+
+  final double phase;
+  final bool playing;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFF111111)
+      ..style = PaintingStyle.fill
+      ..strokeCap = StrokeCap.round;
+
+    const widths = 2.4;
+    final base = [size.height * 0.45, size.height, size.height * 0.62];
+    final gap = (size.width - widths * 3) / 2;
+    for (var i = 0; i < 3; i++) {
+      var h = base[i];
+      if (playing) {
+        final pulse = 0.55 + 0.45 * ((math.sin(phase + i * 1.7) + 1) / 2);
+        h = size.height * (0.28 + 0.72 * pulse * (base[i] / size.height));
+      }
+      final x = i * (widths + gap);
+      final y = (size.height - h) / 2;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(x, y, widths, h),
+          const Radius.circular(1.2),
+        ),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _GroupVoiceBarsPainter oldDelegate) {
+    return oldDelegate.phase != phase || oldDelegate.playing != playing;
+  }
+}
 
 class _PhotosGrid extends StatelessWidget {
   const _PhotosGrid({

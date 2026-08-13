@@ -102,6 +102,17 @@ abstract final class AuthSession {
     return value is String && value.isNotEmpty ? value : null;
   }
 
+  /// 原始性别字符串（如 `male` / `female`）；未设置则为 null。
+  static Future<String?> gender() async {
+    final data = await _read();
+    final value = data['gender'];
+    if (value is! String) return null;
+    final g = value.trim();
+    return g.isEmpty || g == 'null' || g.toLowerCase() == 'unknown' || g == '0'
+        ? null
+        : g;
+  }
+
   static Future<String?> emUsername() async {
     final data = await _read();
     final value = data['emUsername'];
@@ -176,6 +187,7 @@ abstract final class AuthSession {
     String? userId,
     String? nickname,
     String? avatarUrl,
+    String? gender,
     String? emUsername,
     String? emPassword,
   }) async {
@@ -192,6 +204,14 @@ abstract final class AuthSession {
     if (nickname != null && nickname.isNotEmpty) data['nickname'] = nickname;
     if (avatarUrl != null && avatarUrl.isNotEmpty) {
       data['avatarUrl'] = avatarUrl;
+    }
+    if (gender != null) {
+      final g = gender.trim();
+      if (g.isEmpty || g.toLowerCase() == 'unknown' || g == '0') {
+        data.remove('gender');
+      } else {
+        data['gender'] = g;
+      }
     }
     if (emUsername != null && emUsername.isNotEmpty) {
       data['emUsername'] = emUsername;

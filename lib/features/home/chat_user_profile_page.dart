@@ -67,6 +67,7 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
 
   String get _bioText {
     if (_profile.bio.trim().isNotEmpty) return _profile.bio;
+    if (!_profile.hasGender) return 'No personal signature yet.';
     return _profile.isMale
         ? 'He has not set up his personal signature yet.'
         : 'She has not set up her personal signature yet.';
@@ -505,6 +506,8 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
           isMale: _profile.isMale,
           age: _profile.age,
           zodiac: _profile.zodiac,
+          showZodiac: _profile.zodiac.trim().isNotEmpty,
+          showGenderAge: _profile.hasGender,
           bio: _bioText,
           voiceSeconds: _profile.voiceSeconds,
           voiceUrl: _profile.voiceUrl,

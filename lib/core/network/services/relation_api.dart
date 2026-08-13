@@ -21,6 +21,14 @@ class RelationApi {
     );
   }
 
+  /// 首页 ID 搜索（`GET /search?no=`），对齐 forya；可命中自己。
+  Future<ApiResult<List<FriendUser>>> homeSearch(String no) {
+    return ApiGateway.request(
+      () => NetworkBootstrap.api.homeSearch(no),
+      map: FriendDto.parseHomeSearch,
+    );
+  }
+
   Future<ApiResult<List<FriendUser>>> searchFollowing({
     int pageNum = 1,
     int pageSize = 20,

@@ -95,9 +95,19 @@ abstract final class UserDto {
     final genderRaw = '${json['gender'] ?? ''}'.toLowerCase();
     final isMale = switch (genderRaw) {
       'female' || 'f' || '2' => false,
+      'male' || 'm' || '1' => true,
       _ => true,
     };
-    final birthday = '${json['birthday'] ?? ''}';
+    final hasGender = switch (genderRaw) {
+      'female' || 'f' || '2' || 'male' || 'm' || '1' => true,
+      _ => false,
+    };
+    final birthdayRaw = '${json['birthday'] ?? ''}'.trim();
+    final birthday = (birthdayRaw.isEmpty ||
+            birthdayRaw == 'null' ||
+            birthdayRaw == '0')
+        ? ''
+        : birthdayRaw;
     final ageFromField = int.tryParse('${json['age'] ?? ''}');
     final age = ageFromField ?? _ageFromBirthday(birthday);
     final signature =
@@ -126,8 +136,8 @@ abstract final class UserDto {
       avatarAsset: AppAssets.avatarPlace,
       avatarUrl: avatar.isEmpty ? null : avatar,
       isMale: isMale,
-      age: age,
-      zodiac: zodiacFromBirthday(birthday.isEmpty ? '1995-01-01' : birthday),
+      age: hasGender ? age : 0,
+      zodiac: birthday.isEmpty ? '' : zodiacFromBirthday(birthday),
       level: _asInt(json['vipLevel'], fallback: 1),
       bio: signature,
       heightInches: _asInt(json['height']),
@@ -147,6 +157,7 @@ abstract final class UserDto {
       cardDynamicResource:
           '${json['cardDynamicResource'] ?? json['card_dynamic_resource'] ?? ''}'
               .trim(),
+      hasGender: hasGender,
     );
   }
 

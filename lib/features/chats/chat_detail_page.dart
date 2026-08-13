@@ -18,6 +18,7 @@ import '../../core/constants/app_assets.dart';
 import '../../core/im/im_service.dart';
 import '../../core/network/app_apis.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_emoji.dart';
 import '../../core/utils/zodiac.dart';
 import '../../core/widgets/app_action_bottom_sheet.dart';
 import '../../core/widgets/app_asset_image.dart';
@@ -25,13 +26,13 @@ import '../../core/widgets/app_tip_dialog.dart';
 import '../../core/widgets/center_toast.dart';
 import '../../core/widgets/network_or_asset_avatar.dart';
 import '../home/chat_user_profile_page.dart';
-import '../home/home_search_page.dart';
 import '../home/models/chat_user_profile.dart';
 import '../report/report_page.dart';
 import '../wallet/wallet_page.dart';
 import 'data/cash_gift_dto.dart';
 import 'data/chats_list_controller.dart';
 import 'data/emote_dto.dart';
+import 'im_search_page.dart';
 import 'models/chat_conversation.dart';
 import 'widgets/album_selection_preview_page.dart';
 import '../profile/album_photo_viewer_page.dart';
@@ -113,6 +114,25 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     if (_peerEmUser.isNotEmpty) return _peerEmUser;
     if (_conversation.emUserName.isNotEmpty) return _conversation.emUserName;
     return '';
+  }
+
+  /// 私聊发出消息的对端公共 attributes（对齐 forya toName / toAvatar / …）。
+  ImPeerAttrs get _dmPeerAttrs {
+    final peer = _peerProfile;
+    final name = (peer?.nickname.trim().isNotEmpty ?? false)
+        ? peer!.nickname.trim()
+        : _conversation.title.trim();
+    final avatar = (peer?.avatarUrl ?? _conversation.avatarUrl ?? '').trim();
+    var gender = '';
+    if (peer != null && peer.hasGender) {
+      gender = peer.isMale ? 'male' : 'female';
+    }
+    return ImPeerAttrs(
+      name: name,
+      avatar: avatar,
+      userid: _relationUid,
+      gender: gender,
+    );
   }
 
   @override
@@ -485,17 +505,20 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           saved = await ImService.appendFailedImage(
             peerEmUsername: peer,
             filePath: line.displayMedia,
+            peer: _dmPeerAttrs,
           );
         case _ChatLineKind.voice:
           saved = await ImService.appendFailedVoice(
             peerEmUsername: peer,
             filePath: line.mediaSource,
             durationSecs: line.voiceSeconds,
+            peer: _dmPeerAttrs,
           );
         case _ChatLineKind.emote:
           saved = await ImService.appendFailedText(
             peerEmUsername: peer,
             content: line.text.isEmpty ? '[Sticker]' : line.text,
+            peer: _dmPeerAttrs,
             extra: {
               'type': 'emote',
               'emote': {
@@ -510,6 +533,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           saved = await ImService.appendFailedText(
             peerEmUsername: peer,
             content: line.text,
+            peer: _dmPeerAttrs,
           );
       }
       final id = saved?.id ?? '';
@@ -603,15 +627,18 @@ class _ChatDetailPageState extends State<ChatDetailPage>
             peerEmUsername: peer,
             filePath: line.displayMedia,
             sendOriginalImage: true,
+            peer: _dmPeerAttrs,
           ),
         _ChatLineKind.voice => await ImService.sendVoice(
             peerEmUsername: peer,
             filePath: line.mediaSource,
             durationSecs: line.voiceSeconds > 0 ? line.voiceSeconds : 1,
+            peer: _dmPeerAttrs,
           ),
         _ChatLineKind.emote => await ImService.sendText(
             peerEmUsername: peer,
             content: line.text.isEmpty ? '[Sticker]' : line.text,
+            peer: _dmPeerAttrs,
             extra: {
               'type': 'emote',
               'emote': {
@@ -627,6 +654,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           await ImService.sendText(
             peerEmUsername: peer,
             content: line.text,
+            peer: _dmPeerAttrs,
           ),
       };
 
@@ -706,6 +734,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         final sent = await ImService.sendText(
           peerEmUsername: peerEm,
           content: text,
+          peer: _dmPeerAttrs,
         );
         if (sent != null && sent.id.isNotEmpty) {
           _seenMsgIds.add(sent.id);
@@ -788,6 +817,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         stickerId: sticker.id,
         name: name,
         url: url,
+        peer: _dmPeerAttrs,
       );
       if (sent != null && sent.id.isNotEmpty) {
         _seenMsgIds.add(sent.id);
@@ -835,6 +865,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         peerEmUsername: peerEm,
         filePath: localPath,
         durationSecs: seconds,
+        peer: _dmPeerAttrs,
       );
       if (sent != null && sent.id.isNotEmpty) {
         _seenMsgIds.add(sent.id);
@@ -896,6 +927,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           peerEmUsername: peerEm,
           filePath: path,
           sendOriginalImage: true,
+          peer: _dmPeerAttrs,
         );
         if (sent != null && sent.id.isNotEmpty) {
           _seenMsgIds.add(sent.id);
@@ -1061,8 +1093,10 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       case _DmMoreAction.search:
         Navigator.of(context).push(
           MaterialPageRoute<void>(
-            builder: (_) =>
-                HomeSearchPage(chatsController: widget.chatsController),
+            builder: (_) => ImSearchPage(
+              chatsController: widget.chatsController,
+              scopeConversation: _conversation,
+            ),
           ),
         );
       case _DmMoreAction.follow:

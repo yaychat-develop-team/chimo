@@ -7,6 +7,7 @@ import '../../core/network/api_probe_suite.dart';
 import '../../core/network/network_bootstrap.dart';
 import '../../core/widgets/app_page_scaffold.dart';
 import '../../core/widgets/center_toast.dart';
+import 'proxy_config_page.dart';
 
 /// 调试页：服务端环境 / 开关 / 代理与快捷入口。
 class DebugPage extends StatefulWidget {
@@ -107,7 +108,13 @@ class _DebugPageState extends State<DebugPage> {
             ),
             _NavRow(
               label: 'Proxy config',
-              onTap: () => _toast('Proxy config'),
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const ProxyConfigPage(),
+                  ),
+                );
+              },
             ),
             _InputActionRow(
               label: 'Platform domain',

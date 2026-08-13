@@ -51,12 +51,21 @@ class _PersonalProfilePageState extends State<PersonalProfilePage> {
     return age.clamp(0, 120);
   }
 
-  String get _zodiac =>
-      widget.zodiac ?? zodiacFromBirthday(_profile.birthday);
+  String get _zodiac {
+    if (_profile.birthday.trim().isEmpty) return '';
+    return widget.zodiac ?? zodiacFromBirthday(_profile.birthday);
+  }
+
+  bool get _hasGender => _profile.gender.trim().isNotEmpty;
+
+  bool get _hasBirthday => _profile.birthday.trim().isNotEmpty;
 
   String get _signatureText {
     if (_profile.signature.trim().isNotEmpty) {
       return _profile.signature;
+    }
+    if (!_hasGender) {
+      return 'No personal signature yet.';
     }
     return _profile.isMale
         ? 'He has not set up his personal signature yet.'
@@ -135,6 +144,8 @@ class _PersonalProfilePageState extends State<PersonalProfilePage> {
             isMale: _profile.isMale,
             age: _age,
             zodiac: _zodiac,
+            showZodiac: _hasBirthday,
+            showGenderAge: _hasGender,
             bio: _signatureText,
             voiceSeconds: _profile.voiceSeconds,
             voiceUrl: _profile.voiceUrl,

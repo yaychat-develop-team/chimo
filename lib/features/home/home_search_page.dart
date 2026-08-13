@@ -14,10 +14,12 @@ import '../../shared/models/friend_user.dart';
 import '../chats/chat_detail_page.dart';
 import '../chats/data/chats_list_controller.dart';
 import '../chats/models/chat_conversation.dart';
+import 'chat_user_profile_page.dart';
+import 'models/chat_user_profile.dart';
 
 enum _SearchRelation { self, notFollowing, following }
 
-/// 首页搜索命中的用户（`/user-relation/searchUser`）。
+/// 首页搜索命中的用户（`GET /search?no=`，对齐 forya）。
 class _SearchUser {
   const _SearchUser({
     required this.id,
@@ -29,6 +31,10 @@ class _SearchUser {
     this.avatarUrl,
     this.momentAssets = const [],
     this.relation = _SearchRelation.notFollowing,
+    this.emUsername = '',
+    this.zodiac = '',
+    this.bio = '',
+    this.hasGender = true,
   });
 
   final String id;
@@ -40,6 +46,10 @@ class _SearchUser {
   final int age;
   final List<String> momentAssets;
   final _SearchRelation relation;
+  final String emUsername;
+  final String zodiac;
+  final String bio;
+  final bool hasGender;
 
   _SearchUser copyWith({_SearchRelation? relation}) {
     return _SearchUser(
@@ -52,6 +62,10 @@ class _SearchUser {
       age: age,
       momentAssets: momentAssets,
       relation: relation ?? this.relation,
+      emUsername: emUsername,
+      zodiac: zodiac,
+      bio: bio,
+      hasGender: hasGender,
     );
   }
 }
@@ -236,6 +250,10 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
       age: u.age,
       momentAssets: const [],
       relation: relation,
+      emUsername: u.emUsername,
+      zodiac: u.zodiac,
+      bio: u.bio,
+      hasGender: u.hasGender,
     );
   }
 
@@ -279,19 +297,30 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
     });
 
     try {
-      final res = await AppApis.relation.searchUsers(query);
+      // forya：首页用 `/search?no=`；`searchUser` 搜自己会 System error。
+      var users = <FriendUser>[];
+      final homeRes = await AppApis.relation.homeSearch(query);
       if (!mounted || seq != _searchSeq) return;
 
-      if (!res.ok) {
-        setState(() => _searching = false);
-        showCenterToast(
-          context,
-          message: res.message.isEmpty ? 'Search failed' : res.message,
-        );
-        return;
+      if (homeRes.ok) {
+        users = homeRes.data ?? const [];
+      } else {
+        final legacy = await AppApis.relation.searchUsers(query);
+        if (!mounted || seq != _searchSeq) return;
+        if (legacy.ok) {
+          users = legacy.data ?? const [];
+        } else if (_selfUserId != query) {
+          setState(() => _searching = false);
+          showCenterToast(
+            context,
+            message: homeRes.message.isEmpty
+                ? (legacy.message.isEmpty ? 'Search failed' : legacy.message)
+                : homeRes.message,
+          );
+          return;
+        }
       }
 
-      final users = res.data ?? const [];
       _SearchUser? hit;
       for (final u in users) {
         if (u.userId == query || u.id == query) {
@@ -300,6 +329,12 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
         }
       }
       hit ??= users.isEmpty ? null : _fromFriend(users.first);
+
+      // 搜自己的 ID：接口无命中时用本人资料兜底。
+      if (hit == null && _selfUserId != null && query == _selfUserId) {
+        hit = await _selfAsSearchUser();
+        if (!mounted || seq != _searchSeq) return;
+      }
 
       if (hit != null &&
           _selfUserId != null &&
@@ -320,6 +355,33 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
       if (!mounted || seq != _searchSeq) return;
       setState(() => _searching = false);
       showCenterToast(context, message: 'Search failed: $error');
+    }
+  }
+
+  Future<_SearchUser?> _selfAsSearchUser() async {
+    try {
+      final res = await AppApis.user.profileByUidOrNull(
+        _selfUserId ?? '',
+      );
+      final p = res.data;
+      if (p == null || p.userId.isEmpty) return null;
+      return _SearchUser(
+        id: 'dm_${p.userId}',
+        nickname: p.nickname,
+        userId: p.userId,
+        avatarAsset: p.avatarAsset,
+        avatarUrl: p.avatarUrl,
+        isMale: p.isMale,
+        age: p.age,
+        relation: _SearchRelation.self,
+        emUsername: p.emUsername,
+        zodiac: p.zodiac,
+        bio: p.bio,
+        momentAssets: p.momentAssets,
+        hasGender: p.hasGender,
+      );
+    } catch (_) {
+      return null;
     }
   }
 
@@ -358,7 +420,34 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
     }
   }
 
+  void _openProfile(_SearchUser user) {
+    FocusScope.of(context).unfocus();
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ChatUserProfilePage(
+          profile: ChatUserProfile(
+            id: user.userId,
+            nickname: user.nickname,
+            userId: user.userId,
+            avatarAsset: user.avatarAsset,
+            avatarUrl: user.avatarUrl,
+            isMale: user.isMale,
+            age: user.age,
+            zodiac: user.zodiac,
+            level: 1,
+            bio: user.bio,
+            isFollowing: user.relation == _SearchRelation.following,
+            emUsername: user.emUsername,
+            momentAssets: user.momentAssets,
+          ),
+          chatsController: widget.chatsController,
+        ),
+      ),
+    );
+  }
+
   void _openChat(_SearchUser user) {
+    FocusScope.of(context).unfocus();
     final conversation = ChatConversation(
       id: user.id,
       title: user.nickname,
@@ -369,6 +458,9 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
       isMale: user.isMale,
       isFollowing: true,
       momentAssets: user.momentAssets,
+      emUserName: user.emUsername,
+      signature: user.bio,
+      zodiac: user.zodiac.isEmpty ? 'Capricorn' : user.zodiac,
     );
     widget.chatsController?.upsertPrivateChat(conversation);
     Navigator.of(context).push(
@@ -494,6 +586,7 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
                             user: _result!,
                             onFollow: () => unawaited(_follow(_result!)),
                             onChat: () => _openChat(_result!),
+                            onProfile: () => _openProfile(_result!),
                           ),
               )
             else ...[
@@ -640,11 +733,13 @@ class _UsersResult extends StatelessWidget {
     required this.user,
     required this.onFollow,
     required this.onChat,
+    required this.onProfile,
   });
 
   final _SearchUser user;
   final VoidCallback onFollow;
   final VoidCallback onChat;
+  final VoidCallback onProfile;
 
   @override
   Widget build(BuildContext context) {
@@ -662,47 +757,57 @@ class _UsersResult extends StatelessWidget {
         const SizedBox(height: 16),
         Row(
           children: [
-            ClipOval(
-              child: NetworkOrAssetAvatar(
-                asset: user.avatarAsset,
-                url: user.avatarUrl,
-                width: 52,
-                height: 52,
+            GestureDetector(
+              onTap: onProfile,
+              behavior: HitTestBehavior.opaque,
+              child: ClipOval(
+                child: NetworkOrAssetAvatar(
+                  asset: user.avatarAsset,
+                  url: user.avatarUrl,
+                  width: 52,
+                  height: 52,
+                ),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          user.nickname,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: AppColors.textPrimary,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
+              child: GestureDetector(
+                onTap: onProfile,
+                behavior: HitTestBehavior.opaque,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            user.nickname,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      _GenderAgeChip(isMale: user.isMale, age: user.age),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'ID:${user.userId}',
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w400,
+                        if (user.hasGender) ...[
+                          const SizedBox(width: 8),
+                          _GenderAgeChip(isMale: user.isMale, age: user.age),
+                        ],
+                      ],
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 6),
+                    Text(
+                      'ID:${user.userId}',
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
             if (user.relation != _SearchRelation.self) ...[
@@ -726,22 +831,27 @@ class _FollowAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 32,
-        padding: const EdgeInsets.symmetric(horizontal: 18),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: const Color(0xFF1CFF8A),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: const Text(
-          'Follow',
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 14,
-            fontWeight: FontWeight.w800,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Ink(
+          height: 32,
+          padding: const EdgeInsets.symmetric(horizontal: 18),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1CFF8A),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: const Center(
+            child: Text(
+              'Follow',
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
           ),
         ),
       ),
@@ -756,22 +866,27 @@ class _ChatAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 32,
-        padding: const EdgeInsets.symmetric(horizontal: 18),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: const Color(0xFF1A3A28),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: const Text(
-          'Chat',
-          style: TextStyle(
-            color: Color(0xFF1CFF8A),
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Ink(
+          height: 32,
+          padding: const EdgeInsets.symmetric(horizontal: 18),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1A3A28),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: const Center(
+            child: Text(
+              'Chat',
+              style: TextStyle(
+                color: Color(0xFF1CFF8A),
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
         ),
       ),

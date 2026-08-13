@@ -1,5 +1,32 @@
 import 'package:audioplayers/audioplayers.dart';
 
+/// 全局同一时间只播一条语音：点下一条时先停上一条（私聊 / 群聊 / 资料 / 录音预览）。
+abstract final class AppVoiceExclusive {
+  static void Function()? _activeStop;
+
+  /// 登记当前播放方；若已有其它播放中，立即回调其 stop。
+  static void claim(void Function() stop) {
+    final prev = _activeStop;
+    if (identical(prev, stop)) return;
+    _activeStop = stop;
+    prev?.call();
+  }
+
+  /// 仅当 [stop] 仍是当前持有者时释放（避免误清后来者）。
+  static void release(void Function() stop) {
+    if (identical(_activeStop, stop)) {
+      _activeStop = null;
+    }
+  }
+
+  /// 强制停止当前语音（不登记新播放方）。
+  static void stopActive() {
+    final prev = _activeStop;
+    _activeStop = null;
+    prev?.call();
+  }
+}
+
 /// 统一资料 / 聊天语音播放：外放、mediaPlayer、补齐 MIME（CDN 常为 octet-stream）。
 abstract final class AppAudioPlayback {
   static bool _globalContextReady = false;

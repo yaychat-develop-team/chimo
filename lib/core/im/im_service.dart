@@ -9,6 +9,27 @@ import '../auth/auth_session.dart';
 import '../network/app_apis.dart';
 import 'im_system_accounts.dart';
 
+/// 对齐 forya `ChatInputController.attributes` 的对端 / 群公共字段。
+class ImPeerAttrs {
+  const ImPeerAttrs({
+    this.name = '',
+    this.avatar = '',
+    this.userid = '',
+    this.gender = '',
+  });
+
+  final String name;
+  final String avatar;
+  final String userid;
+  final String gender;
+
+  bool get isEmpty =>
+      name.trim().isEmpty &&
+      avatar.trim().isEmpty &&
+      userid.trim().isEmpty &&
+      gender.trim().isEmpty;
+}
+
 /// 供 UI 使用的轻量私聊消息事件（对端或自己）。
 class ImChatMessage {
   const ImChatMessage({
@@ -33,6 +54,10 @@ class ImChatMessage {
     this.emoteName = '',
     this.joinName = '',
     this.joinUid = '',
+    this.senderName = '',
+    this.senderAvatar = '',
+    this.senderUid = '',
+    this.senderGender = '',
     this.isGroup = false,
     this.failed = false,
   });
@@ -79,20 +104,34 @@ class ImChatMessage {
   final String joinName;
   final String joinUid;
 
+  /// 发送方资料（环信公共 attributes：name / avatar / userid / gender）。
+  final String senderName;
+  final String senderAvatar;
+  final String senderUid;
+  /// 原始性别（`male` / `female` 等）；空表示未设置。
+  final String senderGender;
+
   /// GroupChat 与 Chat（私聊 / 系统）。
   final bool isGroup;
 
   /// 优先已有本地文件，否则远程 URL，再否则缩略图。
   String get playableOrDisplayUrl {
+    final remote = mediaRemoteUrl.trim();
+    final thumb = thumbnailUrl.trim();
     final local = mediaLocalPath.trim();
+    if (remote.startsWith('http://') || remote.startsWith('https://')) {
+      return remote;
+    }
+    if (thumb.startsWith('http://') || thumb.startsWith('https://')) {
+      return thumb;
+    }
     if (local.isNotEmpty) {
       try {
         if (File(local).existsSync()) return local;
       } catch (_) {}
     }
-    final remote = mediaRemoteUrl.trim();
     if (remote.isNotEmpty) return remote;
-    return thumbnailUrl.trim();
+    return thumb;
   }
 }
 
@@ -182,6 +221,7 @@ abstract final class ImService {
               creds.profile.avatarUrl!.isEmpty)
           ? null
           : creds.profile.avatarUrl,
+      gender: creds.profile.gender,
       emUsername: creds.emUser,
       emPassword: creds.emPwd,
     );
@@ -300,6 +340,7 @@ abstract final class ImService {
     required String content,
     Map<String, dynamic>? extra,
     bool isGroup = false,
+    ImPeerAttrs? peer,
   }) async {
     final text = content.trim();
     if (text.isEmpty || peerEmUsername.isEmpty) return null;
@@ -310,7 +351,7 @@ abstract final class ImService {
     );
     msg.chatType = isGroup ? ChatType.GroupChat : ChatType.Chat;
     try {
-      await _applySenderAttrs(msg);
+      await _applyCommonAttrs(msg, peer: peer);
       if (extra != null && extra.isNotEmpty) {
         final attrs = Map<String, dynamic>.from(msg.attributes ?? const {});
         attrs['extra'] = extra;
@@ -333,11 +374,13 @@ abstract final class ImService {
     required String name,
     required String url,
     bool isGroup = false,
+    ImPeerAttrs? peer,
   }) {
     return sendText(
       peerEmUsername: peerEmUsername,
       content: '[${name.isEmpty ? 'Sticker' : name}]',
       isGroup: isGroup,
+      peer: peer,
       extra: {
         'type': 'emote',
         'emote': {
@@ -356,6 +399,7 @@ abstract final class ImService {
     required String content,
     Map<String, dynamic>? extra,
     bool isGroup = false,
+    ImPeerAttrs? peer,
   }) async {
     final text = content.trim();
     if (text.isEmpty || peerEmUsername.isEmpty) return null;
@@ -365,7 +409,7 @@ abstract final class ImService {
       content: text,
     );
     msg.chatType = isGroup ? ChatType.GroupChat : ChatType.Chat;
-    await _applySenderAttrs(msg);
+    await _applyCommonAttrs(msg, peer: peer);
     if (extra != null && extra.isNotEmpty) {
       final attrs = Map<String, dynamic>.from(msg.attributes ?? const {});
       attrs['extra'] = extra;
@@ -379,6 +423,7 @@ abstract final class ImService {
     required String peerEmUsername,
     required String filePath,
     bool isGroup = false,
+    ImPeerAttrs? peer,
   }) async {
     final path = filePath.trim();
     if (path.isEmpty || peerEmUsername.isEmpty) return null;
@@ -395,7 +440,7 @@ abstract final class ImService {
       displayName: local.split(RegExp(r'[/\\]')).last,
     );
     msg.chatType = isGroup ? ChatType.GroupChat : ChatType.Chat;
-    await _applySenderAttrs(msg);
+    await _applyCommonAttrs(msg, peer: peer);
     await _persistFailed(msg, peerEmUsername, isGroup: isGroup);
     return _fromEm(msg, forceSelf: true);
   }
@@ -405,6 +450,7 @@ abstract final class ImService {
     required String filePath,
     required int durationSecs,
     bool isGroup = false,
+    ImPeerAttrs? peer,
   }) async {
     final path = filePath.trim();
     if (path.isEmpty || peerEmUsername.isEmpty) return null;
@@ -421,7 +467,7 @@ abstract final class ImService {
       displayName: local.split(RegExp(r'[/\\]')).last,
     );
     msg.chatType = isGroup ? ChatType.GroupChat : ChatType.Chat;
-    await _applySenderAttrs(msg);
+    await _applyCommonAttrs(msg, peer: peer);
     await _persistFailed(msg, peerEmUsername, isGroup: isGroup);
     return _fromEm(msg, forceSelf: true);
   }
@@ -486,6 +532,7 @@ abstract final class ImService {
   static Future<ImChatMessage?> sendFollowTip({
     required String peerEmUsername,
     required bool followed,
+    ImPeerAttrs? peer,
   }) async {
     if (peerEmUsername.isEmpty) return null;
     if (!_sdkInited) await connectFromServer();
@@ -496,7 +543,7 @@ abstract final class ImService {
         params: {'follow': followed ? '1' : '0'},
       );
       msg.chatType = ChatType.Chat;
-      await _applySenderAttrs(msg);
+      await _applyCommonAttrs(msg, peer: peer);
       final sent = await EMClient.getInstance.chatManager.sendMessage(msg);
       return _emitAndReturn(sent, forceSelf: true);
     } on EMError catch (e) {
@@ -511,6 +558,7 @@ abstract final class ImService {
     required String filePath,
     required int durationSecs,
     bool isGroup = false,
+    ImPeerAttrs? peer,
   }) async {
     final path = filePath.trim();
     if (path.isEmpty || peerEmUsername.isEmpty) return null;
@@ -535,7 +583,7 @@ abstract final class ImService {
     );
     msg.chatType = isGroup ? ChatType.GroupChat : ChatType.Chat;
     try {
-      await _applySenderAttrs(msg);
+      await _applyCommonAttrs(msg, peer: peer);
       final sent = await EMClient.getInstance.chatManager.sendMessage(msg);
       return _emitAndReturn(sent, forceSelf: true);
     } on EMError catch (e) {
@@ -551,6 +599,7 @@ abstract final class ImService {
     required String filePath,
     bool sendOriginalImage = false,
     bool isGroup = false,
+    ImPeerAttrs? peer,
   }) async {
     final path = filePath.trim();
     if (path.isEmpty || peerEmUsername.isEmpty) return null;
@@ -572,7 +621,7 @@ abstract final class ImService {
     );
     msg.chatType = isGroup ? ChatType.GroupChat : ChatType.Chat;
     try {
-      await _applySenderAttrs(msg);
+      await _applyCommonAttrs(msg, peer: peer);
       final sent = await EMClient.getInstance.chatManager.sendMessage(msg);
       return _emitAndReturn(sent, forceSelf: true);
     } on EMError catch (e) {
@@ -582,14 +631,46 @@ abstract final class ImService {
     }
   }
 
-  static Future<void> _applySenderAttrs(EMMessage msg) async {
+  /// userid / toUserid：能解析则写 int（对齐 forya），否则写字符串。
+  static dynamic _attrIdValue(String raw) {
+    final text = raw.trim();
+    if (text.isEmpty) return '';
+    return int.tryParse(text) ?? text;
+  }
+
+  /// 对齐 forya 消息公共 attributes：
+  /// `name` / `avatar` / `userid` / `gender` / `emID` /
+  /// `toName` / `toAvatar` / `toUserid` / `toGender` / `category`。
+  static Future<void> _applyCommonAttrs(
+    EMMessage msg, {
+    ImPeerAttrs? peer,
+  }) async {
     final self = _currentEmUser ?? (await AuthSession.emUsername()) ?? '';
     if (self.isEmpty) return;
-    msg.attributes = {
-      'emID': self,
-      'name': await AuthSession.nickname() ?? '',
-      'userid': await AuthSession.userId() ?? '',
-    };
+    final attrs = Map<String, dynamic>.from(msg.attributes ?? const {});
+    attrs['emID'] = self;
+    attrs['name'] = await AuthSession.nickname() ?? '';
+    attrs['userid'] = _attrIdValue(await AuthSession.userId() ?? '');
+    attrs['avatar'] = await AuthSession.avatarUrl() ?? '';
+    final gender = (await AuthSession.gender())?.trim() ?? '';
+    attrs['gender'] = gender;
+
+    final to = peer;
+    if (to != null && !to.isEmpty) {
+      attrs['toName'] = to.name.trim();
+      attrs['toAvatar'] = to.avatar.trim();
+      attrs['toUserid'] = _attrIdValue(to.userid);
+      attrs['toGender'] = to.gender.trim();
+    } else {
+      attrs.putIfAbsent('toName', () => '');
+      attrs.putIfAbsent('toAvatar', () => '');
+      attrs.putIfAbsent('toUserid', () => '');
+      attrs.putIfAbsent('toGender', () => '');
+    }
+
+    // 对齐 forya ConversationClassify.normal()
+    attrs.putIfAbsent('category', () => <String, dynamic>{'type': 'normal'});
+    msg.attributes = attrs;
   }
 
   static ImChatMessage? _emitAndReturn(
@@ -957,6 +1038,28 @@ abstract final class ImService {
     );
   }
 
+  static String _attrText(dynamic value) {
+    if (value == null) return '';
+    final text = '$value'.trim();
+    if (text.isEmpty || text == 'null' || text == 'undefined') return '';
+    return text;
+  }
+
+  static ({String name, String avatar, String uid, String gender})
+      _senderFromAttributes(
+    Map<String, dynamic>? attributes,
+  ) {
+    if (attributes == null || attributes.isEmpty) {
+      return (name: '', avatar: '', uid: '', gender: '');
+    }
+    return (
+      name: _attrText(attributes['name']),
+      avatar: _attrText(attributes['avatar']),
+      uid: _attrText(attributes['userid']),
+      gender: _attrText(attributes['gender']),
+    );
+  }
+
   static ImChatMessage _finishEm(
     EMMessage message, {
     required bool forceSelf,
@@ -983,6 +1086,7 @@ abstract final class ImService {
     final conversationId = convIdRaw.isNotEmpty
         ? convIdRaw
         : (isSelf ? (message.to ?? '') : (message.from ?? ''));
+    final sender = _senderFromAttributes(message.attributes);
 
     return ImChatMessage(
       id: message.msgId,
@@ -1004,6 +1108,10 @@ abstract final class ImService {
       giftIconUrl: giftIconUrl,
       emoteUrl: emoteUrl,
       emoteName: emoteName,
+      senderName: sender.name,
+      senderAvatar: sender.avatar,
+      senderUid: sender.uid,
+      senderGender: sender.gender,
       isGroup: message.chatType == ChatType.GroupChat,
       failed: message.status == MessageStatus.FAIL,
     );
@@ -1053,6 +1161,7 @@ abstract final class ImService {
     final event = body.event;
     final params = body.params ?? const <String, String>{};
     final isGroup = message.chatType == ChatType.GroupChat;
+    final sender = _senderFromAttributes(message.attributes);
 
     if (event == 'SendGift') {
       final gift = _parseGiftParams(params);
@@ -1075,6 +1184,10 @@ abstract final class ImService {
         giftQty: qty,
         giftName: name,
         giftIconUrl: gift.iconUrl,
+        senderName: sender.name,
+        senderAvatar: sender.avatar,
+        senderUid: sender.uid,
+        senderGender: sender.gender,
         isGroup: isGroup,
         failed: message.status == MessageStatus.FAIL,
       );
@@ -1099,6 +1212,10 @@ abstract final class ImService {
         serverTimeMs: message.serverTime,
         msgType: 'follow',
         customEvent: event,
+        senderName: sender.name,
+        senderAvatar: sender.avatar,
+        senderUid: sender.uid,
+        senderGender: sender.gender,
         isGroup: isGroup,
         failed: message.status == MessageStatus.FAIL,
       );
@@ -1119,6 +1236,10 @@ abstract final class ImService {
         customEvent: event,
         joinName: name,
         joinUid: join.uid,
+        senderName: sender.name.isNotEmpty ? sender.name : name,
+        senderAvatar: sender.avatar,
+        senderUid: sender.uid.isNotEmpty ? sender.uid : join.uid,
+        senderGender: sender.gender,
         isGroup: isGroup,
         failed: message.status == MessageStatus.FAIL,
       );
@@ -1143,6 +1264,10 @@ abstract final class ImService {
         serverTimeMs: message.serverTime,
         msgType: 'txt',
         customEvent: event,
+        senderName: sender.name,
+        senderAvatar: sender.avatar,
+        senderUid: sender.uid,
+        senderGender: sender.gender,
         isGroup: isGroup,
         failed: message.status == MessageStatus.FAIL,
       );
@@ -1159,6 +1284,10 @@ abstract final class ImService {
       serverTimeMs: message.serverTime,
       msgType: 'custom',
       customEvent: event,
+      senderName: sender.name,
+      senderAvatar: sender.avatar,
+      senderUid: sender.uid,
+      senderGender: sender.gender,
       isGroup: isGroup,
       failed: message.status == MessageStatus.FAIL,
     );

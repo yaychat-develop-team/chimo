@@ -121,6 +121,7 @@ class _MePageState extends State<MePage> {
         avatarUrl: profile.avatarUrl,
         userId: profile.userId,
         email: email.isEmpty ? null : email,
+        gender: profile.gender,
       );
       // 应用 token 刷新路径后保持 IM 在线。
       unawaited(NetworkBootstrap.connectImAfterLogin());
@@ -200,8 +201,9 @@ class _MePageState extends State<MePage> {
             child: RefreshIndicator(
               color: AppColors.primaryBright,
               onRefresh: _loadProfile,
+              // 内容未超出页面高度时不可滑动；超出后才能滚。
               child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
+                physics: const ClampingScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16, 80, 16, 24),
                 children: [
                   if (_loading)

@@ -40,6 +40,8 @@ class PopularGroupCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
+      // 整卡可点进详情；避免 Joined 图标区域因无命中子节点变成死区。
+      behavior: HitTestBehavior.opaque,
       child: Container(
         height: cardHeight,
         margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -95,9 +97,11 @@ class PopularGroupCard extends StatelessWidget {
                       ),
                       if (showJoinAction) ...[
                         const SizedBox(width: 4),
-                        // Joined = 仅状态展示（非退出）。Join = 可点的 +。
+                        // Joined = 灰色仅展示，吞掉点击（不可再点）。Join = 可点的 +。
                         if (group.isJoined)
-                          IgnorePointer(
+                          GestureDetector(
+                            onTap: () {},
+                            behavior: HitTestBehavior.opaque,
                             child: Opacity(
                               opacity: 0.9,
                               child: _JoinIcon(asset: AppAssets.homeJoined),

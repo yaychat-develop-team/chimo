@@ -102,6 +102,11 @@ class ChimoApi {
     return _client.get('/user-relation/searchUser', query: {'key': key});
   }
 
+  /// 首页搜索（forya `getHomeSearchData`）：用户 + 房间，支持搜自己的 ID。
+  Future<ApiResponse> homeSearch(String no) {
+    return _client.get('/search', query: {'no': no});
+  }
+
   /// 我关注的人（`Follow` 标签）。空关键字 = 完整列表。
   Future<ApiResponse> searchFollowing({
     int pageNum = 1,

@@ -1,12 +1,18 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:photo_manager/photo_manager.dart';
+import 'package:record/record.dart';
 
+import '../../../core/audio/app_audio_playback.dart';
 import '../../../core/constants/app_assets.dart';
+import '../../../core/theme/app_emoji.dart';
 import '../../../core/widgets/center_toast.dart';
 import '../../chats/widgets/album_selection_preview_page.dart';
 
@@ -29,7 +35,8 @@ class GroupChatInputBar extends StatefulWidget {
   final double bottomInset;
   final TextEditingController controller;
   final ValueChanged<String> onSendText;
-  final ValueChanged<int> onSendVoice;
+  /// (filePath, durationSeconds)
+  final void Function(String path, int seconds) onSendVoice;
   final ValueChanged<List<String>> onSendImages;
   /// 语音 / 相册 / 表情面板打开或关闭时回调。
   final ValueChanged<bool>? onPanelChanged;
@@ -53,12 +60,15 @@ class GroupChatInputBarState extends State<GroupChatInputBar> {
   ]);
 
   final FocusNode _focus = FocusNode();
+  final AudioRecorder _recorder = AudioRecorder();
+  final AudioPlayer _previewPlayer = AudioPlayer();
   GroupChatPanel _panel = GroupChatPanel.none;
   _VoicePhase _voicePhase = _VoicePhase.idle;
   int _voiceSeconds = 0;
   double _voiceProgress = 0;
   DateTime? _voiceStartedAt;
   Timer? _voiceTimer;
+  String? _voicePath;
 
   List<AssetEntity> _albumPhotos = const [];
   bool _albumLoading = false;
@@ -77,7 +87,10 @@ class GroupChatInputBarState extends State<GroupChatInputBar> {
 
   @override
   void dispose() {
+    AppVoiceExclusive.release(_stopPreviewExclusive);
     _voiceTimer?.cancel();
+    unawaited(_recorder.dispose());
+    unawaited(_previewPlayer.dispose());
     _focus.removeListener(_onFocusChanged);
     _focus.dispose();
     widget.controller.removeListener(_onChanged);
@@ -101,14 +114,18 @@ class GroupChatInputBarState extends State<GroupChatInputBar> {
 
   void _closePanel() {
     if (_panel == GroupChatPanel.none) return;
+    AppVoiceExclusive.release(_stopPreviewExclusive);
+    unawaited(_stopRecorderIfNeeded(deleteFile: true));
     _voiceTimer?.cancel();
     _voiceTimer = null;
     _voiceStartedAt = null;
+    unawaited(_previewPlayer.stop());
     setState(() {
       _panel = GroupChatPanel.none;
       _voicePhase = _VoicePhase.idle;
       _voiceSeconds = 0;
       _voiceProgress = 0;
+      _voicePath = null;
       _selectedPhotos.clear();
     });
     _notifyPanel(false);
@@ -120,18 +137,63 @@ class GroupChatInputBarState extends State<GroupChatInputBar> {
     _closePanel();
   }
 
+  Future<void> _closeVoicePanel({bool deleteFile = true}) async {
+    AppVoiceExclusive.release(_stopPreviewExclusive);
+    await _stopRecorderIfNeeded(deleteFile: deleteFile);
+    _voiceTimer?.cancel();
+    _voiceTimer = null;
+    _voiceStartedAt = null;
+    await _previewPlayer.stop();
+    if (!mounted) return;
+    final wasOpen = _panel == GroupChatPanel.voice;
+    setState(() {
+      if (wasOpen) _panel = GroupChatPanel.none;
+      _voicePhase = _VoicePhase.idle;
+      _voiceSeconds = 0;
+      _voiceProgress = 0;
+      if (deleteFile) _voicePath = null;
+    });
+    if (wasOpen) _notifyPanel(false);
+  }
+
+  Future<void> _stopRecorderIfNeeded({required bool deleteFile}) async {
+    try {
+      if (await _recorder.isRecording()) {
+        final path = await _recorder.stop();
+        if (path != null && path.isNotEmpty) {
+          _voicePath = path;
+        }
+      }
+    } catch (_) {}
+    if (deleteFile) {
+      _deleteVoiceFile(_voicePath);
+      _voicePath = null;
+    }
+  }
+
+  void _deleteVoiceFile(String? path) {
+    final p = path?.trim() ?? '';
+    if (p.isEmpty) return;
+    try {
+      final f = File(p);
+      if (f.existsSync()) f.deleteSync();
+    } catch (_) {}
+  }
+
   void _toggleVoice() {
     if (_panel == GroupChatPanel.voice) {
-      _closePanel();
+      unawaited(_closeVoicePanel());
       return;
     }
     _dismissKeyboard();
+    unawaited(_stopRecorderIfNeeded(deleteFile: true));
     _voiceTimer?.cancel();
     setState(() {
       _panel = GroupChatPanel.voice;
       _voicePhase = _VoicePhase.idle;
       _voiceSeconds = 0;
       _voiceProgress = 0;
+      _voicePath = null;
       _selectedPhotos.clear();
     });
     _notifyPanel(true);
@@ -147,6 +209,7 @@ class GroupChatInputBarState extends State<GroupChatInputBar> {
       return;
     }
     _dismissKeyboard();
+    unawaited(_stopRecorderIfNeeded(deleteFile: true));
     _voiceTimer?.cancel();
     setState(() {
       _panel = GroupChatPanel.photo;
@@ -154,6 +217,7 @@ class GroupChatInputBarState extends State<GroupChatInputBar> {
       _voiceSeconds = 0;
       _voiceProgress = 0;
       _voiceStartedAt = null;
+      _voicePath = null;
       _selectedPhotos.clear();
       _originalPhoto = true;
       _albumError = null;
@@ -271,6 +335,7 @@ class GroupChatInputBarState extends State<GroupChatInputBar> {
       _panel = GroupChatPanel.none;
       _selectedPhotos.clear();
     });
+    _notifyPanel(false);
 
     final paths = <String>[];
     for (final entity in entities) {
@@ -300,6 +365,7 @@ class GroupChatInputBarState extends State<GroupChatInputBar> {
     try {
       if (_panel != GroupChatPanel.none) {
         setState(() => _panel = GroupChatPanel.none);
+        _notifyPanel(false);
       }
       final file = await ImagePicker().pickImage(
         source: ImageSource.camera,
@@ -335,6 +401,7 @@ class GroupChatInputBarState extends State<GroupChatInputBar> {
         _panel = GroupChatPanel.none;
         _selectedPhotos.clear();
       });
+      _notifyPanel(false);
       widget.onSendImages([for (final f in files) f.path]);
     } catch (error) {
       if (!mounted) return;
@@ -355,12 +422,14 @@ class GroupChatInputBarState extends State<GroupChatInputBar> {
       return;
     }
     _dismissKeyboard();
+    unawaited(_stopRecorderIfNeeded(deleteFile: true));
     _voiceTimer?.cancel();
     setState(() {
       _panel = GroupChatPanel.emoji;
       _voicePhase = _VoicePhase.idle;
       _voiceSeconds = 0;
       _voiceProgress = 0;
+      _voicePath = null;
       _selectedPhotos.clear();
     });
     _notifyPanel(true);
@@ -394,78 +463,166 @@ class GroupChatInputBarState extends State<GroupChatInputBar> {
     return '$m:$s';
   }
 
-  void _startRecording() {
-    _voiceTimer?.cancel();
-    final started = DateTime.now();
-    setState(() {
-      _voicePhase = _VoicePhase.recording;
-      _voiceSeconds = 0;
-      _voiceProgress = 0;
-      _voiceStartedAt = started;
-    });
-    _voiceTimer = Timer.periodic(const Duration(milliseconds: 50), (_) {
-      if (!mounted || _voiceStartedAt == null) return;
-      final elapsed =
-          DateTime.now().difference(_voiceStartedAt!).inMilliseconds / 1000;
-      if (elapsed >= _maxVoiceSeconds) {
-        setState(() {
-          _voiceSeconds = _maxVoiceSeconds;
-          _voiceProgress = 1;
-        });
-        _finishRecording();
-        return;
-      }
-      setState(() {
-        _voiceSeconds = elapsed.floor();
-        _voiceProgress = elapsed / _maxVoiceSeconds;
-      });
-    });
-  }
-
-  void _finishRecording() {
-    _voiceTimer?.cancel();
-    _voiceTimer = null;
-    _voiceStartedAt = null;
-    if (!mounted) return;
-    setState(() {
-      _voicePhase =
-          _voiceSeconds > 0 ? _VoicePhase.preview : _VoicePhase.idle;
-      if (_voicePhase == _VoicePhase.idle) _voiceProgress = 0;
-    });
-  }
-
-  void _onVoiceMainTap() {
-    switch (_voicePhase) {
-      case _VoicePhase.idle:
-        _startRecording();
-      case _VoicePhase.recording:
-        _finishRecording();
-      case _VoicePhase.preview:
+  Future<void> _startRecording() async {
+    try {
+      AppVoiceExclusive.stopActive();
+      final ok = await _recorder.hasPermission();
+      if (!ok) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Playing…'),
+            content: Text('Microphone permission is required for voice messages'),
             behavior: SnackBarBehavior.floating,
-            duration: Duration(seconds: 1),
           ),
         );
+        return;
+      }
+      await _stopRecorderIfNeeded(deleteFile: true);
+      await _previewPlayer.stop();
+      final dir = await getTemporaryDirectory();
+      final path =
+          '${dir.path}/chimo_group_voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      await _recorder.start(
+        const RecordConfig(
+          encoder: AudioEncoder.aacLc,
+          bitRate: 128000,
+          sampleRate: 44100,
+          numChannels: 1,
+        ),
+        path: path,
+      );
+      _voicePath = path;
+      _voiceTimer?.cancel();
+      final started = DateTime.now();
+      if (!mounted) return;
+      setState(() {
+        _voicePhase = _VoicePhase.recording;
+        _voiceSeconds = 0;
+        _voiceProgress = 0;
+        _voiceStartedAt = started;
+      });
+      _voiceTimer = Timer.periodic(const Duration(milliseconds: 50), (_) {
+        if (!mounted || _voiceStartedAt == null) return;
+        final elapsed =
+            DateTime.now().difference(_voiceStartedAt!).inMilliseconds / 1000;
+        if (elapsed >= _maxVoiceSeconds) {
+          setState(() {
+            _voiceSeconds = _maxVoiceSeconds;
+            _voiceProgress = 1;
+          });
+          unawaited(_finishRecording());
+          return;
+        }
+        setState(() {
+          _voiceSeconds = elapsed.floor();
+          _voiceProgress = elapsed / _maxVoiceSeconds;
+        });
+      });
+    } catch (error) {
+      debugPrint('Group start recording failed: $error');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not start recording: $error'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
-  void _resetVoice() {
+  Future<void> _finishRecording() async {
+    _voiceTimer?.cancel();
+    _voiceTimer = null;
+    final started = _voiceStartedAt;
+    _voiceStartedAt = null;
+    try {
+      if (await _recorder.isRecording()) {
+        final path = await _recorder.stop();
+        if (path != null && path.isNotEmpty) {
+          _voicePath = path;
+        }
+      }
+    } catch (error) {
+      debugPrint('Group stop recording failed: $error');
+    }
+    if (!mounted) return;
+    final secs = started == null
+        ? _voiceSeconds
+        : DateTime.now().difference(started).inMilliseconds / 1000;
+    final duration = secs.floor().clamp(0, _maxVoiceSeconds);
+    setState(() {
+      _voiceSeconds = duration;
+      _voiceProgress = duration / _maxVoiceSeconds;
+      _voicePhase = duration > 0 && (_voicePath?.isNotEmpty ?? false)
+          ? _VoicePhase.preview
+          : _VoicePhase.idle;
+      if (_voicePhase == _VoicePhase.idle) {
+        _deleteVoiceFile(_voicePath);
+        _voicePath = null;
+        _voiceProgress = 0;
+      }
+    });
+  }
+
+  Future<void> _onVoiceMainTap() async {
+    switch (_voicePhase) {
+      case _VoicePhase.idle:
+        await _startRecording();
+      case _VoicePhase.recording:
+        await _finishRecording();
+      case _VoicePhase.preview:
+        final path = _voicePath;
+        if (path == null || path.isEmpty) return;
+        try {
+          AppVoiceExclusive.claim(_stopPreviewExclusive);
+          await _previewPlayer.stop();
+          await AppAudioPlayback.play(_previewPlayer, path);
+        } catch (error) {
+          debugPrint('Preview voice failed: $error');
+          AppVoiceExclusive.release(_stopPreviewExclusive);
+        }
+    }
+  }
+
+  void _stopPreviewExclusive() {
+    unawaited(_previewPlayer.stop());
+  }
+
+  Future<void> _resetVoice() async {
+    AppVoiceExclusive.release(_stopPreviewExclusive);
+    await _stopRecorderIfNeeded(deleteFile: true);
     _voiceTimer?.cancel();
     _voiceTimer = null;
     _voiceStartedAt = null;
+    await _previewPlayer.stop();
+    if (!mounted) return;
     setState(() {
       _voicePhase = _VoicePhase.idle;
       _voiceSeconds = 0;
       _voiceProgress = 0;
+      _voicePath = null;
     });
   }
 
-  void _confirmVoice() {
+  Future<void> _confirmVoice() async {
+    if (_voicePhase == _VoicePhase.recording) {
+      await _finishRecording();
+    }
     final seconds = _voiceSeconds;
-    _closePanel();
-    if (seconds > 0) widget.onSendVoice(seconds);
+    final path = _voicePath?.trim() ?? '';
+    if (seconds < 1 || path.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please record at least 1 second'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    // 保留文件供发送/播放；关闭面板时不删除。
+    await _closeVoicePanel(deleteFile: false);
+    widget.onSendVoice(path, seconds);
   }
 
   void _submit() {
@@ -531,7 +688,7 @@ class GroupChatInputBarState extends State<GroupChatInputBar> {
                         color: Color(0xFF111111),
                         fontSize: 15,
                         fontWeight: FontWeight.w500,
-                      ),
+                      ).withAppEmoji,
                       decoration: const InputDecoration(
                         isDense: true,
                         hintText: 'Please type here...',
@@ -584,9 +741,9 @@ class GroupChatInputBarState extends State<GroupChatInputBar> {
                         timeLabel: _voiceTimeLabel,
                         phase: _voicePhase,
                         progress: _voiceProgress,
-                        onMainTap: _onVoiceMainTap,
-                        onReset: _resetVoice,
-                        onConfirm: _confirmVoice,
+                        onMainTap: () => unawaited(_onVoiceMainTap()),
+                        onReset: () => unawaited(_resetVoice()),
+                        onConfirm: () => unawaited(_confirmVoice()),
                       ),
                     ),
                   ),
@@ -1160,7 +1317,7 @@ class _AlbumPhotoCell extends StatelessWidget {
   }
 }
 
-class _EmojiPanel extends StatelessWidget {
+class _EmojiPanel extends StatefulWidget {
   const _EmojiPanel({
     required this.bottomInset,
     required this.canSend,
@@ -1175,49 +1332,70 @@ class _EmojiPanel extends StatelessWidget {
   final VoidCallback onBackspace;
   final VoidCallback onSend;
 
-  static const _emojis = [
-    '😀', '😁', '😂', '🤣', '😃', '😄', '😅', '😆',
-    '😉', '😊', '😋', '😎', '😍', '😘', '🥰', '😗',
-    '😙', '😚', '🙂', '🤗', '🤩', '🤔', '🤨', '😐',
-    '😑', '😶', '🙄', '😏', '😣', '😥', '😮', '🤐',
-    '😯', '😪', '😫', '🥱', '😴', '😌', '😛', '😜',
-    '😝', '🤤', '😒', '😓', '😔', '😕', '🙃', '🤑',
-    '😲', '☹️', '🙁', '😖', '😞', '😟', '😤', '😢',
-    '😭', '😦', '😧', '😨', '😩', '🤯', '😬', '😰',
-    '😱', '🥵', '🥶', '😳', '🤪', '😵', '😡', '😠',
-    '👍', '👎', '👏', '🙏', '💪', '❤️', '🧡', '💛',
-    '💚', '💙', '💜', '🖤', '💔', '💕', '✨', '🔥',
-  ];
+  @override
+  State<_EmojiPanel> createState() => _EmojiPanelState();
+}
+
+class _EmojiPanelState extends State<_EmojiPanel> {
+  List<String> _glyphs = const [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadGlyphs());
+  }
+
+  Future<void> _loadGlyphs() async {
+    final glyphs = await AppEmoji.loadGlyphs();
+    if (!mounted) return;
+    setState(() {
+      _glyphs = glyphs;
+      _loading = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return ColoredBox(
       color: const Color(0xFFF7F7F7),
       child: Padding(
-        padding: EdgeInsets.only(bottom: bottomInset),
+        padding: EdgeInsets.only(bottom: widget.bottomInset),
         child: Column(
           children: [
             Expanded(
-              child: GridView.builder(
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-                physics: const BouncingScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 8,
-                  mainAxisSpacing: 4,
-                  crossAxisSpacing: 4,
-                ),
-                itemCount: _emojis.length,
-                itemBuilder: (context, index) {
-                  final emoji = _emojis[index];
-                  return GestureDetector(
-                    onTap: () => onEmojiTap(emoji),
-                    behavior: HitTestBehavior.opaque,
-                    child: Center(
-                      child: Text(emoji, style: const TextStyle(fontSize: 26)),
+              child: _loading
+                  ? const Center(
+                      child: SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    )
+                  : GridView.builder(
+                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+                      physics: const BouncingScrollPhysics(),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 6,
+                        mainAxisSpacing: 4,
+                        crossAxisSpacing: 4,
+                      ),
+                      itemCount: _glyphs.length,
+                      itemBuilder: (context, index) {
+                        final emoji = _glyphs[index];
+                        return GestureDetector(
+                          onTap: () => widget.onEmojiTap(emoji),
+                          behavior: HitTestBehavior.opaque,
+                          child: Center(
+                            child: Text(
+                              emoji,
+                              style: const TextStyle(fontSize: 26).withAppEmoji,
+                            ),
+                          ),
+                        );
+                      },
                     ),
-                  );
-                },
-              ),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
@@ -1225,7 +1403,7 @@ class _EmojiPanel extends StatelessWidget {
                 children: [
                   const Spacer(),
                   GestureDetector(
-                    onTap: onBackspace,
+                    onTap: widget.onBackspace,
                     child: Container(
                       width: 44,
                       height: 36,
@@ -1243,13 +1421,13 @@ class _EmojiPanel extends StatelessWidget {
                   ),
                   const SizedBox(width: 10),
                   GestureDetector(
-                    onTap: canSend ? onSend : null,
+                    onTap: widget.canSend ? widget.onSend : null,
                     child: Container(
                       height: 36,
                       padding: const EdgeInsets.symmetric(horizontal: 18),
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: canSend
+                        color: widget.canSend
                             ? const Color(0xFF00F875)
                             : const Color(0xFFE0E0E0),
                         borderRadius: BorderRadius.circular(18),
@@ -1257,7 +1435,7 @@ class _EmojiPanel extends StatelessWidget {
                       child: Text(
                         'Send',
                         style: TextStyle(
-                          color: canSend
+                          color: widget.canSend
                               ? Colors.black
                               : const Color(0xFF999999),
                           fontSize: 14,

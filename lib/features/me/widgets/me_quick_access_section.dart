@@ -4,6 +4,9 @@ import '../../../core/theme/app_colors.dart';
 import '../models/me_models.dart';
 
 /// 快捷入口：标题 + 四列网格，42×42 图标。
+///
+/// 不用 shrinkWrap [GridView]，避免嵌在 Me 页 [ListView] 里时
+/// 「内容未撑满视口就拖不动」的手势问题。
 class MeQuickAccessSection extends StatelessWidget {
   const MeQuickAccessSection({
     super.key,
@@ -15,6 +18,7 @@ class MeQuickAccessSection extends StatelessWidget {
   final ValueChanged<QuickAccessItem>? onItemTap;
 
   static const double iconSize = 42;
+  static const int crossAxisCount = 4;
 
   @override
   Widget build(BuildContext context) {
@@ -34,25 +38,27 @@ class MeQuickAccessSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: items.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 4,
-            mainAxisSpacing: 16,
-            crossAxisSpacing: 8,
-            // 42 icon + spacing + 18 label
-            childAspectRatio: 0.85,
+        for (var rowStart = 0;
+            rowStart < items.length;
+            rowStart += crossAxisCount) ...[
+          if (rowStart > 0) const SizedBox(height: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (var col = 0; col < crossAxisCount; col++)
+                Expanded(
+                  child: rowStart + col < items.length
+                      ? _QuickAccessTile(
+                          item: items[rowStart + col],
+                          onTap: onItemTap == null
+                              ? null
+                              : () => onItemTap!(items[rowStart + col]),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+            ],
           ),
-          itemBuilder: (context, index) {
-            final item = items[index];
-            return _QuickAccessTile(
-              item: item,
-              onTap: onItemTap == null ? null : () => onItemTap!(item),
-            );
-          },
-        ),
+        ],
       ],
     );
   }

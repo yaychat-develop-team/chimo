@@ -5,6 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/constants/app_assets.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/center_toast.dart';
+import '../../../core/widgets/network_or_asset_avatar.dart';
 import '../chat_user_profile_page.dart';
 import '../../chats/chat_detail_page.dart';
 import '../../chats/data/chats_list_controller.dart';
@@ -46,9 +47,20 @@ class ChatUserProfileSheet extends StatefulWidget {
 }
 
 class _ChatUserProfileSheetState extends State<ChatUserProfileSheet> {
-  bool _following = false;
+  late bool _following = widget.profile.isFollowing;
 
   ChatUserProfile get _profile => widget.profile;
+
+  String get _bioDisplay {
+    final bio = _profile.bio.trim();
+    if (bio.isNotEmpty) return bio;
+    if (!_profile.hasGender) {
+      return 'They have not set up their personal signature yet.';
+    }
+    return _profile.isMale
+        ? 'He has not set up his personal signature yet.'
+        : 'She has not set up her personal signature yet.';
+  }
 
   Future<void> _copyId() async {
     await Clipboard.setData(ClipboardData(text: _profile.userId));
@@ -112,13 +124,17 @@ class _ChatUserProfileSheetState extends State<ChatUserProfileSheet> {
   Widget build(BuildContext context) {
     final bottom = MediaQuery.paddingOf(context).bottom;
 
+    // 对齐 forya PersonalBottomPage：头像叠在卡片左上，仅轻微探出顶边。
+    const avatarSize = 72.0;
+    const sheetOverlap = 12.0;
+
     return Padding(
       padding: EdgeInsets.only(bottom: bottom),
       child: Stack(
         clipBehavior: Clip.none,
         children: [
           Container(
-            margin: const EdgeInsets.only(top: 36),
+            margin: const EdgeInsets.only(top: sheetOverlap),
             decoration: const BoxDecoration(
               color: Color(0xFF1A1F1C),
               borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
@@ -129,7 +145,7 @@ class _ChatUserProfileSheetState extends State<ChatUserProfileSheet> {
               ),
             ),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -137,19 +153,19 @@ class _ChatUserProfileSheetState extends State<ChatUserProfileSheet> {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(width: 88),
+                      const SizedBox(width: 83),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               _profile.nickname,
-                              maxLines: 1,
+                              maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 color: AppColors.textPrimary,
-                                fontSize: 20,
-                                fontWeight: FontWeight.w800,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -218,74 +234,64 @@ class _ChatUserProfileSheetState extends State<ChatUserProfileSheet> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  Row(
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      _TagChip(
-                        color: const Color(0xFF6B5CFF),
-                        child: Text(
-                          _profile.zodiac,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
+                      if (_profile.zodiac.trim().isNotEmpty)
+                        _TagChip(
+                          color: const Color(0xFF6B5CFF),
+                          child: Text(
+                            _profile.zodiac,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      _TagChip(
-                        color: _profile.isMale
-                            ? const Color(0xFF3B82F6)
-                            : const Color(0xFFFF5BA8),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Image.asset(
-                              _profile.isMale
-                                  ? AppAssets.genderMan
-                                  : AppAssets.genderWoman,
-                              width: 12,
-                              height: 12,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${_profile.age}',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
+                      if (_profile.hasGender)
+                        _TagChip(
+                          color: _profile.isMale
+                              ? const Color(0xFF3B82F6)
+                              : const Color(0xFFFF5BA8),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Image.asset(
+                                _profile.isMale
+                                    ? AppAssets.genderMan
+                                    : AppAssets.genderWoman,
+                                width: 12,
+                                height: 12,
                               ),
-                            ),
-                          ],
+                              if (_profile.age > 0) ...[
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${_profile.age}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      _TagChip(
-                        color: const Color(0xFF7C5CFF),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.star_rounded,
-                              size: 14,
-                              color: Color(0xFFFFD56A),
-                            ),
-                            const SizedBox(width: 2),
-                            Text(
-                              '${_profile.level}',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
+                      if ((_profile.vipIconUrl ?? '').trim().isNotEmpty)
+                        Image.network(
+                          _profile.vipIconUrl!.trim(),
+                          height: 22,
+                          fit: BoxFit.fitHeight,
+                          errorBuilder: (_, _, _) => const SizedBox.shrink(),
                         ),
-                      ),
                     ],
                   ),
                   const SizedBox(height: 14),
                   Text(
-                    _profile.bio,
+                    _bioDisplay,
                     style: const TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 14,
@@ -394,14 +400,22 @@ class _ChatUserProfileSheetState extends State<ChatUserProfileSheet> {
             child: GestureDetector(
               onTap: _openProfilePage,
               child: Container(
-                width: 72,
-                height: 72,
+                width: avatarSize,
+                height: avatarSize,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFF1A1F1C), width: 3),
+                  border: Border.all(
+                    color: const Color(0xFF1A1F1C),
+                    width: 2,
+                  ),
                 ),
                 child: ClipOval(
-                  child: Image.asset(_profile.avatarAsset, fit: BoxFit.cover),
+                  child: NetworkOrAssetAvatar(
+                    asset: _profile.avatarAsset,
+                    url: _profile.avatarUrl,
+                    width: avatarSize,
+                    height: avatarSize,
+                  ),
                 ),
               ),
             ),

@@ -29,6 +29,7 @@ class ChatUserProfile {
     this.isOnline = false,
     this.emUsername = '',
     this.cardDynamicResource = '',
+    this.hasGender = true,
   });
 
   final String id;
@@ -73,6 +74,9 @@ class ChatUserProfile {
   /// 打开个人主页时的 PAG 特效 URL（`cardDynamicResource`）。
   final String cardDynamicResource;
 
+  /// 是否已设置性别；未设置时资料页不展示性别 / 年龄芯片。
+  final bool hasGender;
+
   static ChatUserProfile placeholder({
     String id = '',
     String nickname = 'User',
@@ -89,6 +93,7 @@ class ChatUserProfile {
       zodiac: '',
       level: 1,
       bio: '',
+      hasGender: false,
     );
   }
 
@@ -104,6 +109,7 @@ class ChatUserProfile {
       zodiac: '',
       level: 1,
       bio: '',
+      hasGender: true,
     );
   }
 
@@ -135,6 +141,7 @@ class ChatUserProfile {
     bool? isOnline,
     String? emUsername,
     String? cardDynamicResource,
+    bool? hasGender,
   }) {
     return ChatUserProfile(
       id: id ?? this.id,
@@ -163,6 +170,7 @@ class ChatUserProfile {
       emUsername: emUsername ?? this.emUsername,
       cardDynamicResource:
           cardDynamicResource ?? this.cardDynamicResource,
+      hasGender: hasGender ?? this.hasGender,
     );
   }
 }

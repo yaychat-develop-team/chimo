@@ -8,7 +8,6 @@ import '../../core/network/app_apis.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_tip_dialog.dart';
 import '../../core/widgets/app_top_loading_bar.dart';
-import '../friends/add_user_page.dart';
 import '../friends/friends_page.dart';
 import '../home/chat_user_profile_page.dart';
 import '../home/group_details_page.dart';
@@ -18,6 +17,7 @@ import '../me/models/me_models.dart';
 import '../profile/edit_profile_page.dart';
 import 'chat_detail_page.dart';
 import 'data/chats_list_controller.dart';
+import 'im_search_page.dart';
 import 'models/chat_conversation.dart';
 import 'widgets/chats_app_bar.dart';
 import 'widgets/chats_conversation_tile.dart';
@@ -232,7 +232,9 @@ class _ChatsPageState extends State<ChatsPage> {
                 onSearchTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(
-                      builder: (_) => const AddUserPage(),
+                      builder: (_) => ImSearchPage(
+                        chatsController: _controller,
+                      ),
                     ),
                   );
                 },
