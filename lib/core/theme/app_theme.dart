@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'app_colors.dart';
-import 'app_emoji.dart';
 
 /// 应用主题配置。
 abstract final class AppTheme {
@@ -12,8 +11,8 @@ abstract final class AppTheme {
       useMaterial3: true,
       brightness: Brightness.dark,
       scaffoldBackgroundColor: AppColors.background,
-      // 群聊/私聊里 forya 自定义表情（PUA）依赖 Emoji 字体回落。
-      fontFamilyFallback: const [AppEmoji.fontFamily],
+      // 不要全局挂 Emoji 字体：其字距/行高会把普通文字撑出大间隔。
+      // 自定义表情仅在聊天气泡/输入框用 TextStyle.withAppEmoji。
       colorScheme: const ColorScheme.dark(
         primary: AppColors.primary,
         surface: AppColors.surface,

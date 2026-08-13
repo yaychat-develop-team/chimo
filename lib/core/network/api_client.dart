@@ -44,14 +44,14 @@ class ApiResponse {
 }
 
 /// 轻量 HTTP 客户端，对齐 D:\forya `JRNetwork` + `HeaderInterceptor`：
-/// - Accept: application/x-protobuf
 /// - Content-Type: application/json
 /// - Body: `{"bizParam":{...}}` 的 JSON 字符串
+/// - Accept: 暂用 JSON（Chimo 尚无 BaseRsp proto；forya 默认 protobuf）
 class ApiClient {
   ApiClient({http.Client? httpClient, this.tokenProvider})
       : _http = httpClient ?? http.Client();
 
-  /// forya `JRNetwork.headerProto`
+  /// forya `JRNetwork.headerProto`（接入 BaseRsp 后再切回）
   static const acceptProto = 'application/x-protobuf';
 
   final http.Client _http;
@@ -82,7 +82,8 @@ class ApiClient {
     // commonParam 全部以 df_ 前缀写入。
     final headers = <String, String>{
       'Content-Type': 'application/json',
-      'Accept': acceptProto,
+      // Chimo 目前只解 JSON；用 protobuf Accept 会拿到二进制回包导致登录刷新失败。
+      'Accept': 'application/json',
       'timestamp': '${DateTime.now().millisecondsSinceEpoch}',
     };
     AuthRequestHeaders.commonParam.forEach((key, value) {
