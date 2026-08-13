@@ -4,6 +4,8 @@
 <dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
+	<key>CFBundleAllowMixedLocalizations</key>
+	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
@@ -22,20 +24,93 @@
 	<string>$(FLUTTER_BUILD_NAME)</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>facebook</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>fb818342966470813</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>weixin</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>wx0d371d0c9cbb4f1b</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>chimo</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.149926752982-dhul5n0ia0pear9vjuigmg3q6c1eefp6</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>FacebookAppID</key>
+	<string>818342966470813</string>
+	<key>FacebookClientToken</key>
+	<string>b23537a42b7fbc09a866392d9a9aa2af</string>
+	<key>FacebookDisplayName</key>
+	<string>Chimo</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>weixin</string>
+		<string>weixinULAPI</string>
+		<string>weixinURLParamsAPI</string>
+		<string>fbapi</string>
+		<string>fb-messenger-share-api</string>
+		<string>whatsapp</string>
+	</array>
+	<key>LSMinimumSystemVersion</key>
+	<string>13.0</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
+	<key>NSAppleMusicUsageDescription</key>
+	<string>Access to your Apple Music is required to share music files in Chimo.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Allow camera access to take profile photos.</string>
+	<string>Access to your camera is required to take photos or videos in Chimo.If not, you will not be able to upload photos or share photos taken</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Access to your location is required to share your location in the chat</string>
+	<key>NSLocationUsageDescription</key>
+	<string>Access to your location is required to share your location in the chat</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Access to your location is required to share your location in the chat</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Allow microphone access to send voice messages.</string>
+	<string>Access to your microphone is required to join voice chatroom, send voice message</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Allow saving profile photos to your library.</string>
+	<string>Access to your photo library is required to take photos or videos in Chimo.If not, you will not be able to upload photos or share photos taken</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Allow photo library access to choose photos for chat and profile.</string>
+	<string>Access to your photo library is required to take photos or videos in Chimo.If not, you will not be able to upload photos or share photos taken</string>
 	<key>NSUserTrackingUsageDescription</key>
 	<string>Access to your Tracking is required to accurately push the content you like</string>
+	<key>PermissionGroupNotification</key>
+	<string>If this is not allowed, Chimo will not be able to push the latest news and activities</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -67,16 +142,22 @@
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
+	<key>UIRequiresFullScreen</key>
+	<true/>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
 	</array>
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
 		<string>UIInterfaceOrientationPortrait</string>
 		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<false/>
+	<key>io.flutter.embedded_views_preview</key>
+	<string>YES</string>
 </dict>
 </plist>
