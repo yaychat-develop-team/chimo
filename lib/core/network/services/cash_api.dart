@@ -66,7 +66,7 @@ class CashApi {
 
   Future<ApiResult<String>> createChargeOrder({
     required String productId,
-    required String payItemType,
+    required int payItemType,
   }) {
     return ApiGateway.request(
       () => NetworkBootstrap.api.cashChargeCreate(
@@ -76,8 +76,13 @@ class CashApi {
       map: (res) {
         final data = res.data;
         if (data is Map) {
-          final id = '${data['orderId'] ?? ''}';
+          final nested = data['data'];
+          final id = '${data['orderId'] ?? (nested is Map ? nested['orderId'] : '')}';
           if (id.isNotEmpty && id != 'null') return id;
+        }
+        if (data != null && '$data' != 'null') {
+          final id = '$data'.trim();
+          if (id.isNotEmpty) return id;
         }
         return '';
       },

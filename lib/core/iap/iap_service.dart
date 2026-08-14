@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:in_app_purchase_android/in_app_purchase_android.dart';
+import 'package:in_app_purchase_storekit/in_app_purchase_storekit.dart';
+import 'package:in_app_purchase_storekit/store_kit_wrappers.dart';
 
 import '../auth/auth_session.dart';
 import '../network/app_apis.dart';
@@ -13,8 +15,8 @@ import '../network/auth_request_headers.dart';
 
 /// 对齐 forya `JRIap`：商店购买 → 服务端验单。
 abstract final class IapService {
-  static const applePayType = 'APPLE_APP_STORE';
-  static const googlePayType = 'GOOGLE_PLAY';
+  static const applePayType = 4; // PayItemType.APPLE_APP_STORE
+  static const googlePayType = 13; // PayItemType.GOOGLE_PLAY
 
   static final scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
   static final StreamController<void> _recharged =
@@ -35,6 +37,11 @@ abstract final class IapService {
   static Future<void> init() async {
     if (_inited) return;
     _inited = true;
+    if (Platform.isIOS) {
+      final ios = InAppPurchase.instance
+          .getPlatformAddition<InAppPurchaseStoreKitPlatformAddition>();
+      await ios.setDelegate(_IosPaymentQueueDelegate());
+    }
     _sub = InAppPurchase.instance.purchaseStream.listen(
       _onPurchases,
       onError: (Object error) {
@@ -86,19 +93,29 @@ abstract final class IapService {
     final sku = product.goodsId.trim();
     final bizId = product.productId.trim();
     if (sku.isEmpty || bizId.isEmpty) {
-      _toast('Failed to load data.');
+      _toast('Package SKU missing. Cannot start purchase.');
       return;
     }
     _paying = true;
     try {
+      final available = await InAppPurchase.instance.isAvailable();
+      if (!available) {
+        _paying = false;
+        _toast(
+          Platform.isIOS
+              ? 'App Store is unavailable on this device.'
+              : 'Google Play Billing is unavailable on this device.',
+        );
+        return;
+      }
       ProductDetails? details = _products[sku];
       details ??= await _queryOne(sku);
       if (details == null) {
-        _toast('Failed to load data.');
         _paying = false;
+        _toast('Store product not found: $sku');
         return;
       }
-      _toast('Place an order');
+      debugPrint('IapService createOrder bizId=$bizId sku=$sku');
       final payType = Platform.isIOS ? applePayType : googlePayType;
       final created = await AppApis.cash.createChargeOrder(
         productId: bizId,
@@ -106,24 +123,28 @@ abstract final class IapService {
       );
       final orderId = (created.data ?? '').trim();
       if (!created.ok || orderId.isEmpty) {
+        _paying = false;
         _toast(
           created.message.isEmpty
               ? 'Order creation failed'
               : 'Order creation failed: ${created.message}',
         );
-        _paying = false;
         return;
       }
       _orderBySku[sku] = orderId;
       _products[sku] = details;
-      _toast('Payment in progress');
+      debugPrint('IapService buyConsumable orderId=$orderId');
       final uid = (await AuthSession.userId())?.trim();
-      await InAppPurchase.instance.buyConsumable(
+      final started = await InAppPurchase.instance.buyConsumable(
         purchaseParam: PurchaseParam(
           productDetails: details,
           applicationUserName: (uid == null || uid.isEmpty) ? null : uid,
         ),
       );
+      if (!started) {
+        _paying = false;
+        _toast('Unable to start the store purchase sheet.');
+      }
     } on PlatformException catch (error) {
       debugPrint('IapService buy: $error');
       _paying = false;
@@ -131,13 +152,17 @@ abstract final class IapService {
     } catch (error) {
       debugPrint('IapService buy: $error');
       _paying = false;
-      _toast('Purchase failed');
+      _toast('Purchase failed: $error');
     }
   }
 
   static Future<ProductDetails?> _queryOne(String sku) async {
     try {
       final resp = await InAppPurchase.instance.queryProductDetails({sku});
+      debugPrint(
+        'IapService query sku=$sku found=${resp.productDetails.map((e) => e.id).toList()} '
+        'notFound=${resp.notFoundIDs}',
+      );
       if (resp.productDetails.isEmpty) return null;
       final details = resp.productDetails.first;
       _products[details.id] = details;
@@ -313,3 +338,16 @@ const iapErrorMap = {
   'E_NETWORK_ERROR':
       'Network connection error! Please check your network and try again',
 };
+
+class _IosPaymentQueueDelegate implements SKPaymentQueueDelegateWrapper {
+  @override
+  bool shouldContinueTransaction(
+    SKPaymentTransactionWrapper transaction,
+    SKStorefrontWrapper storefront,
+  ) {
+    return true;
+  }
+
+  @override
+  bool shouldShowPriceConsent() => false;
+}

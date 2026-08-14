@@ -257,15 +257,15 @@ class ChimoApi {
   }
 
   /// 对齐 forya `POST /cash/charge/create`。
-  /// [payItemType]：`APPLE_APP_STORE` / `GOOGLE_PLAY`。
+  /// [payItemType]：4 = APPLE_APP_STORE，13 = GOOGLE_PLAY。
   Future<ApiResponse> cashChargeCreate({
     required String productId,
-    required String payItemType,
+    required int payItemType,
   }) {
     return _client.post(
       '/cash/charge/create',
       bizParam: {
-        'productId': productId,
+        'productId': int.tryParse(productId) ?? productId,
         'payItemType': payItemType,
         'v2': true,
       },
