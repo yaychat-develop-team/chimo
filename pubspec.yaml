@@ -33,6 +33,10 @@ dependencies:
   # iOS Sign in with Apple（对齐 forya apple_login_platform）
   sign_in_with_apple: ^7.0.1
   crypto: ^3.0.6
+  dio: ^5.11.0
+  in_app_purchase: ^3.2.3
+  in_app_purchase_android: ^0.4.0
+  in_app_purchase_storekit: ^0.4.0
 
 dev_dependencies:
   flutter_test:

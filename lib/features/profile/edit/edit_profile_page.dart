@@ -6,6 +6,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../../core/audio/app_audio_playback.dart';
 import '../../../core/auth/auth_session.dart';
@@ -65,6 +66,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   final List<String> _photoPaths = [];
   bool _loading = true;
   bool _saving = false;
+  bool _albumUploading = false;
   /// Values loaded from API; used to decide whether delete* should be sent.
   int? _loadedHeight;
   int? _loadedWeight;
@@ -81,8 +83,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     });
   }
 
-  void _applyProfile(MeProfile p, {bool keepLocalPhotosIfRemoteEmpty = false}) {
-    final previousPhotos = List<String>.from(_photoPaths);
+  void _applyProfile(MeProfile p) {
     _profile = p;
     _signature = p.signature;
     _nickname = p.displayName;
@@ -100,17 +101,30 @@ class _EditProfilePageState extends State<EditProfilePage> {
     _nicknameChangedOnce = p.nicknameChangedOnce;
     _photoPaths
       ..clear()
-      ..addAll(p.momentUrls);
-    // Keep local previews while /user/info is still loading,
-    // or when pending audit items are omitted by the backend.
-    if (keepLocalPhotosIfRemoteEmpty &&
-        _photoPaths.isEmpty &&
-        previousPhotos.isNotEmpty) {
-      _photoPaths.addAll(previousPhotos);
-    } else if (keepLocalPhotosIfRemoteEmpty && previousPhotos.isNotEmpty) {
-      for (final path in previousPhotos) {
-        if (!_photoPaths.contains(path)) _photoPaths.add(path);
+      ..addAll(
+        p.momentUrls.where(
+          (url) => url.startsWith('http://') || url.startsWith('https://'),
+        ),
+      );
+  }
+
+  Future<String?> _persistPickedPhoto(XFile file) async {
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final folder = Directory('${dir.path}/album_photos');
+      if (!await folder.exists()) {
+        await folder.create(recursive: true);
       }
+      // iOS PHPicker 临时文件会很快失效；立刻读字节落到沙盒才能预览/上传。
+      final destPath =
+          '${folder.path}/${DateTime.now().microsecondsSinceEpoch}.jpg';
+      final bytes = await file.readAsBytes();
+      if (bytes.isEmpty) return null;
+      await File(destPath).writeAsBytes(bytes, flush: true);
+      return destPath;
+    } catch (error) {
+      debugPrint('EditProfile persist photo failed: $error');
+      return null;
     }
   }
 
@@ -120,9 +134,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       if (!mounted) return;
       final parsed = res.data;
       if (parsed != null) {
-        setState(
-          () => _applyProfile(parsed, keepLocalPhotosIfRemoteEmpty: true),
-        );
+        setState(() => _applyProfile(parsed));
       }
     } catch (_) {
       // Keep seeded profile if refresh fails.
@@ -217,7 +229,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         if (pending.isNotEmpty &&
             !pending.startsWith('http://') &&
             !pending.startsWith('https://')) {
-          final uploaded = await MediaUpload.uploadFile(pending, sceneCode: 102);
+          final uploaded = await MediaUpload.uploadVoice(pending);
           if (uploaded == null || uploaded.isEmpty) {
             if (!mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
@@ -344,17 +356,25 @@ class _EditProfilePageState extends State<EditProfilePage> {
       // Avatar is handled by a dedicated page.
       return;
     }
-    if (_photoCount >= EditProfilePage.maxPhotos) return;
+    if (_photoCount >= EditProfilePage.maxPhotos || _albumUploading) return;
 
-    // Optimistic local preview; each photo posts newPic independently.
-    final localPath = file.path;
-    setState(() => _photoPaths.add(localPath));
+    final localPath = await _persistPickedPhoto(file);
+    if (!mounted) return;
+    if (localPath == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not read this photo. Try another one.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
 
+    setState(() => _albumUploading = true);
     try {
-      final remote = await MediaUpload.uploadFile(localPath);
+      final remote = await MediaUpload.uploadImage(localPath);
       if (!mounted) return;
-      if (remote == null) {
-        setState(() => _photoPaths.remove(localPath));
+      if (remote == null || remote.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Photo upload failed'),
@@ -369,7 +389,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
       });
       if (!mounted) return;
       if (!res.ok) {
-        setState(() => _photoPaths.remove(localPath));
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -382,7 +401,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
       }
 
       setState(() {
-        _photoPaths.remove(localPath);
         if (!_photoPaths.contains(remote)) {
           _photoPaths.add(remote);
         }
@@ -397,22 +415,36 @@ class _EditProfilePageState extends State<EditProfilePage> {
       );
     } catch (error) {
       if (!mounted) return;
-      setState(() => _photoPaths.remove(localPath));
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Photo upload failed: $error'),
           behavior: SnackBarBehavior.floating,
         ),
       );
+    } finally {
+      unawaited(_deleteLocalFile(localPath));
+      if (mounted) setState(() => _albumUploading = false);
     }
+  }
+
+  Future<void> _deleteLocalFile(String path) async {
+    if (path.startsWith('http://') || path.startsWith('https://')) return;
+    try {
+      final file = File(path);
+      if (await file.exists()) await file.delete();
+    } catch (_) {}
   }
 
   Future<void> _removeAlbumPhoto(int index) async {
     if (index < 0 || index >= _photoPaths.length) return;
     final path = _photoPaths[index];
-    setState(() => _photoPaths.removeAt(index));
-
-    if (!path.startsWith('http')) return;
+    setState(() {
+      _photoPaths.removeAt(index);
+    });
+    if (!path.startsWith('http')) {
+      unawaited(_deleteLocalFile(path));
+      return;
+    }
 
     try {
       final res = await AppApis.user.update({
@@ -523,7 +555,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     if (!mounted || result == null || result.seconds <= 0) return;
     final local = result.path.trim();
     if (local.isEmpty) return;
-    final uploaded = await MediaUpload.uploadFile(local, sceneCode: 102);
+    final uploaded = await MediaUpload.uploadVoice(local);
     if (!mounted) return;
     if (uploaded == null || uploaded.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -709,7 +741,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     ? () => unawaited(OnboardingExit.finishToHome(context))
                     : null,
               ),
-              if (_loading) const AppTopLoadingBar(),
+              if (_loading || _albumUploading) const AppTopLoadingBar(),
               Expanded(
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -735,6 +767,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     const SizedBox(height: 16),
                     _PhotoCard(
                       paths: _photoPaths,
+                      busy: _albumUploading,
                       onAdd: () => _pickPhoto(forAlbum: true),
                       onRemove: (index) => unawaited(_removeAlbumPhoto(index)),
                       onOpen: (index) {
@@ -777,16 +810,17 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   ],
                 ),
               ),
-              Padding(
-                padding: EdgeInsets.fromLTRB(16, 8, 16, 12 + bottom),
-                child: AppGradientButton(
-                  label: widget.fromOnboarding ? 'Save' : 'Done',
-                  onTap: widget.fromOnboarding ? _save : _leave,
-                  height: 48,
-                  borderRadius: 24,
-                  loading: _saving,
+              if (widget.fromOnboarding)
+                Padding(
+                  padding: EdgeInsets.fromLTRB(16, 8, 16, 12 + bottom),
+                  child: AppGradientButton(
+                    label: 'Save',
+                    onTap: _save,
+                    height: 48,
+                    borderRadius: 24,
+                    loading: _saving,
+                  ),
                 ),
-              ),
             ],
           ),
         ),
@@ -978,17 +1012,19 @@ class _PhotoCard extends StatelessWidget {
     required this.onAdd,
     required this.onRemove,
     required this.onOpen,
+    this.busy = false,
   });
 
   final List<String> paths;
   final VoidCallback onAdd;
   final ValueChanged<int> onRemove;
   final ValueChanged<int> onOpen;
+  final bool busy;
 
   @override
   Widget build(BuildContext context) {
     final count = paths.length;
-    final canAdd = count < EditProfilePage.maxPhotos;
+    final canAdd = !busy && count < EditProfilePage.maxPhotos;
 
     return _SectionCard(
       child: Column(
@@ -1052,15 +1088,20 @@ class _PhotoThumb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    var local = path.trim();
+    if (local.startsWith('file://')) {
+      local = Uri.parse(local).toFilePath();
+    }
+    final remote = local.startsWith('http://') || local.startsWith('https://');
     return Stack(
       children: [
         GestureDetector(
           onTap: onTap,
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
-            child: path.startsWith('http')
+            child: remote
                 ? AppNetworkImage(
-                    path,
+                    local,
                     width: 98,
                     height: 98,
                     fit: BoxFit.cover,
@@ -1076,7 +1117,7 @@ class _PhotoThumb extends StatelessWidget {
                     ),
                   )
                 : Image.file(
-                    File(path),
+                    File(local),
                     width: 98,
                     height: 98,
                     fit: BoxFit.cover,

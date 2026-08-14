@@ -7,16 +7,32 @@ class CashChargeProduct {
     required this.price,
     this.goodsId = '',
     this.productId = '',
+    this.localPrice = '',
   });
 
   final int coins;
   final double price;
+  /// 商店 SKU（如 `oumi.giap.3`）。
   final String goodsId;
+  /// 业务套餐 id，创建订单用。
   final String productId;
+  /// 商店本地化价格；有则优先展示。
+  final String localPrice;
 
   String get priceLabel {
+    if (localPrice.trim().isNotEmpty) return localPrice.trim();
     if (price <= 0) return '—';
     return '\$${price.toStringAsFixed(2)}';
+  }
+
+  CashChargeProduct copyWith({String? localPrice}) {
+    return CashChargeProduct(
+      coins: coins,
+      price: price,
+      goodsId: goodsId,
+      productId: productId,
+      localPrice: localPrice ?? this.localPrice,
+    );
   }
 }
 
@@ -82,5 +98,30 @@ abstract final class CashChargeDto {
     final cent = int.tryParse('${item['cent'] ?? 0}') ?? 0;
     if (cent > 0) return cent / 100.0;
     return 0;
+  }
+}
+
+class CashChargeVerify {
+  const CashChargeVerify({required this.payStatus});
+
+  final String payStatus;
+
+  bool get isSuccess => payStatus == 'SUCCESS' || payStatus == '2';
+  bool get isPaying => payStatus == 'PAYING' || payStatus == '1';
+
+  static CashChargeVerify parse(ApiResponse response) {
+    final data = response.data;
+    if (data is Map) {
+      final list = data['item'] ?? data['items'];
+      if (list is List && list.isNotEmpty && list.first is Map) {
+        return CashChargeVerify(
+          payStatus: '${(list.first as Map)['payStatus'] ?? ''}',
+        );
+      }
+      if (data['payStatus'] != null) {
+        return CashChargeVerify(payStatus: '${data['payStatus']}');
+      }
+    }
+    return const CashChargeVerify(payStatus: '');
   }
 }

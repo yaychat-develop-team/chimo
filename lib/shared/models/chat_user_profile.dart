@@ -109,7 +109,7 @@ class ChatUserProfile {
       zodiac: '',
       level: 1,
       bio: '',
-      hasGender: true,
+      hasGender: member.hasGender,
     );
   }
 

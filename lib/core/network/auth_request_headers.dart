@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 /// forya `GlobalConfig.commonParam` 的尽力子集。
 ///
-/// 写入 HTTP 时必须加 `df_` 前缀（见 [ApiClient] / forya HeaderInterceptor）。
+/// 写入 HTTP 时必须加 `df_` 前缀（见 Dio [HeaderInterceptor] / forya）。
 abstract final class AuthRequestHeaders {
   static const _distinctIdKey = 'te_distinct_id';
 

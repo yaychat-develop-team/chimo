@@ -1,6 +1,7 @@
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../core/auth/auth_onboarding_gate.dart';
 import '../core/repositories/repositories.dart';
 import '../features/auth/almost_in_page.dart';
 import '../features/auth/login_page.dart';
@@ -36,7 +37,7 @@ abstract final class AppRoutes {
   static const almostIn = '/onboarding/almost-in';
   static const welcomeBrand = '/onboarding/welcome';
   static const tribes = '/onboarding/tribes';
-  /// 新邮箱账号在进入首页前在此完善资料。
+  /// 新账号完善资料（兼容旧路径，重定向到性别+生日引导）。
   static const editProfileOnboarding = '/onboarding/edit-profile';
   static const shell = '/app';
   static const chat = '/app/chat/:id';
@@ -75,8 +76,11 @@ GoRouter createAppRouter({required ChatsListController chatsController}) {
       final goingToApp = loc.startsWith('/app');
 
       if (!loggedIn && goingToApp) return AppRoutes.login;
-      // 已标记登录（OTP 后）时仍允许走 onboarding。
-      if (loggedIn && loc == AppRoutes.login) return AppRoutes.shell;
+      // 已登录访问登录页：资料未完成则进同一条完善资料流程。
+      if (loggedIn && loc == AppRoutes.login) {
+        final goHome = await AuthOnboardingGate.shouldEnterHome(const {});
+        return goHome ? AppRoutes.shell : AppRoutes.profileSetup;
+      }
       return null;
     },
     routes: [
@@ -109,10 +113,7 @@ GoRouter createAppRouter({required ChatsListController chatsController}) {
       ),
       GoRoute(
         path: AppRoutes.editProfileOnboarding,
-        builder: (_, _) => const EditProfilePage(
-          profile: MeProfile.empty,
-          fromOnboarding: true,
-        ),
+        redirect: (_, _) => AppRoutes.profileSetup,
       ),
       GoRoute(
         path: AppRoutes.welcomeBrand,

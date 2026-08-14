@@ -11,9 +11,85 @@ abstract final class AppEmoji {
   /// 与 forya `RegExp(r'^[\ue601-\ue62e]+$')` 一致。
   static final RegExp customOnly = RegExp(r'^[\ue601-\ue62e]+$');
 
+  /// 任意位置包含自定义表情码点。
+  static final RegExp customChar = RegExp(r'[\ue601-\ue62e]');
+
   static bool isCustomEmojiOnly(String text) {
-    final t = text.trim();
+    final t = normalize(text).trim();
     return t.isNotEmpty && customOnly.hasMatch(t);
+  }
+
+  static bool containsCustom(String text) => customChar.hasMatch(normalize(text));
+
+  static bool _isCustomCode(int rune) => rune >= 0xE601 && rune <= 0xE62E;
+
+  /// 还原环信 / JSON 里被写成 `\ue601` 的自定义表情，并去掉零宽字符。
+  static String normalize(String raw) {
+    var t = raw;
+    t = t.replaceAllMapped(RegExp(r'\\u([eE][0-9a-fA-F]{3})'), (m) {
+      return String.fromCharCode(int.parse(m[1]!, radix: 16));
+    });
+    t = t.replaceAllMapped(RegExp(r'&#x([eE][0-9a-fA-F]{3});', caseSensitive: false), (m) {
+      return String.fromCharCode(int.parse(m[1]!, radix: 16));
+    });
+    t = t.replaceAll(RegExp(r'[\u200B-\u200D\uFEFF\u00AD]'), '');
+    return t;
+  }
+
+  static TextStyle emojiStyleOf(TextStyle base) {
+    return base.copyWith(
+      fontFamily: fontFamily,
+      fontFamilyFallback: [
+        fontFamily,
+        ...?base.fontFamilyFallback?.where((f) => f != fontFamily),
+      ],
+    );
+  }
+
+  /// 将文本拆成 span：PUA 段强制 [fontFamily]，避免 iOS fallback 失效成「?」。
+  static TextSpan toSpan(String text, {TextStyle? style}) {
+    final decoded = normalize(text);
+    final base = style ?? const TextStyle();
+    if (!containsCustom(decoded)) {
+      return TextSpan(text: decoded, style: base);
+    }
+    final emojiStyle = emojiStyleOf(base);
+    if (isCustomEmojiOnly(decoded)) {
+      return TextSpan(text: decoded.trim(), style: emojiStyle);
+    }
+
+    final children = <InlineSpan>[];
+    final buf = StringBuffer();
+    var inEmoji = false;
+
+    void flush() {
+      if (buf.isEmpty) return;
+      children.add(
+        TextSpan(
+          text: buf.toString(),
+          style: inEmoji ? emojiStyle : base,
+        ),
+      );
+      buf.clear();
+    }
+
+    for (final rune in decoded.runes) {
+      final isEmoji = _isCustomCode(rune);
+      if (buf.isEmpty) {
+        inEmoji = isEmoji;
+        buf.writeCharCode(rune);
+        continue;
+      }
+      if (isEmoji == inEmoji) {
+        buf.writeCharCode(rune);
+        continue;
+      }
+      flush();
+      inEmoji = isEmoji;
+      buf.writeCharCode(rune);
+    }
+    flush();
+    return TextSpan(style: base, children: children);
   }
 
   static List<String>? _glyphs;
@@ -61,12 +137,56 @@ abstract final class AppEmoji {
 }
 
 extension AppEmojiTextStyle on TextStyle {
-  /// 对齐 forya `withEmoji`：缺字形时回落到 [AppEmoji.fontFamily]。
-  TextStyle get withAppEmoji => copyWith(
-        fontFamilyFallback: [
-          if (fontFamily != null && fontFamily!.isNotEmpty) fontFamily!,
-          AppEmoji.fontFamily,
-          ...?fontFamilyFallback,
-        ],
-      );
+  /// 对齐 forya `withEmoji`：优先回落自定义表情字体。
+  ///
+  /// 展示含 PUA 的文案请优先用 [AppEmojiText]（强制 fontFamily），
+  /// 本扩展主要用于 [TextField] 等无法拆 span 的场景。
+  TextStyle get withAppEmoji {
+    // iOS 对 PUA 常不走 fallback，输入框混排时仍尽量把 Emoji 放最前。
+    final primary = fontFamily;
+    return copyWith(
+      fontFamilyFallback: [
+        AppEmoji.fontFamily,
+        if (primary != null &&
+            primary.isNotEmpty &&
+            primary != AppEmoji.fontFamily)
+          primary,
+        ...?fontFamilyFallback?.where((f) => f != AppEmoji.fontFamily),
+      ],
+    );
+  }
+
+  /// 纯自定义表情：直接指定字体（比 fallback 可靠）。
+  TextStyle get withAppEmojiFont => copyWith(fontFamily: AppEmoji.fontFamily);
+}
+
+/// 安全展示可能含自定义表情的文本。
+class AppEmojiText extends StatelessWidget {
+  const AppEmojiText(
+    this.text, {
+    super.key,
+    this.style,
+    this.maxLines,
+    this.overflow,
+    this.textAlign,
+    this.softWrap,
+  });
+
+  final String text;
+  final TextStyle? style;
+  final int? maxLines;
+  final TextOverflow? overflow;
+  final TextAlign? textAlign;
+  final bool? softWrap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text.rich(
+      AppEmoji.toSpan(text, style: style),
+      maxLines: maxLines,
+      overflow: overflow ?? TextOverflow.clip,
+      textAlign: textAlign ?? TextAlign.start,
+      softWrap: softWrap ?? true,
+    );
+  }
 }

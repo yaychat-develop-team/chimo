@@ -86,7 +86,7 @@ class _MyPicturePageState extends State<MyPicturePage> {
       _uploading = true;
     });
 
-    final remote = await MediaUpload.uploadFile(file.path);
+    final remote = await MediaUpload.uploadImage(file.path);
     if (!mounted) return;
 
     if (remote == null || remote.isEmpty) {

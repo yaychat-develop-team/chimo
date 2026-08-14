@@ -24,6 +24,9 @@ import '../../../shared/models/group_item.dart';
 class ChatsListController extends ChangeNotifier {
   ChatsListController() {
     _imSub = ImService.messages.listen(_onImMessage);
+    _imConnSub = ImService.connectionChanges.listen((_) {
+      unawaited(_onImConnectionChanged());
+    });
   }
 
   final List<ChatConversation> _conversations = [];
@@ -35,7 +38,9 @@ class ChatsListController extends ChangeNotifier {
   String? _activeConversationKey;
   /// 当前列表绑定的业务 uid；换号时整表清空，避免沿用上一账号群聊。
   String? _sessionUserId;
+  String? _sessionEmUser;
   StreamSubscription<ImChatMessage>? _imSub;
+  StreamSubscription<void>? _imConnSub;
   bool _loading = false;
   String? _loadError;
 
@@ -80,6 +85,7 @@ class ChatsListController extends ChangeNotifier {
     _hiddenIds.clear();
     _activeConversationKey = null;
     _sessionUserId = null;
+    _sessionEmUser = null;
     _loading = false;
     _loadError = null;
     if (notify) notifyListeners();
@@ -88,9 +94,24 @@ class ChatsListController extends ChangeNotifier {
   /// 绑定当前登录用户；uid 变化时清空上一账号残留。
   Future<void> ensureBoundToCurrentUser() async {
     final uid = (await AuthSession.userId())?.trim() ?? '';
-    if (uid == _sessionUserId) return;
+    final em = (await AuthSession.emUsername())?.trim() ?? '';
+    if (uid == (_sessionUserId ?? '') && em == (_sessionEmUser ?? '')) return;
     clearLocalState(notify: true);
     _sessionUserId = uid.isEmpty ? null : uid;
+    _sessionEmUser = em.isEmpty ? null : em;
+  }
+
+  Future<void> _onImConnectionChanged() async {
+    if (!ImService.isConnected) return;
+    final em = (await AuthSession.emUsername())?.trim() ?? '';
+    final sdk = (await ImService.sdkUserId())?.trim() ?? '';
+    if (em.isEmpty || sdk.isEmpty || em != sdk) return;
+    if (_conversations.isEmpty && _joinedGroupIds.isEmpty) {
+      await refreshFromApi();
+      return;
+    }
+    await _mergeImConversations();
+    notifyListeners();
   }
 
   /// 从 API 加载我的群组并重建列表（保留置顶/未读/本地预览）。
@@ -164,8 +185,17 @@ class ChatsListController extends ChangeNotifier {
 
   Future<void> _mergeImConversations() async {
     try {
+      final sessionEm = (await AuthSession.emUsername())?.trim() ?? '';
+      if (sessionEm.isEmpty) return;
       if (!ImService.isConnected) {
         await ImService.connectFromServer();
+      }
+      final sdkEm = (await ImService.sdkUserId())?.trim() ?? '';
+      if (sdkEm.isEmpty || sdkEm != sessionEm) {
+        debugPrint(
+          'ChatsListController skip IM merge sdk=$sdkEm session=$sessionEm',
+        );
+        return;
       }
       final all = await ImService.loadListConversations();
       for (final conv in all) {
@@ -570,6 +600,9 @@ class ChatsListController extends ChangeNotifier {
 
   void _onImMessage(ImChatMessage m) {
     if (m.msgType == 'follow') return;
+    final boundEm = _sessionEmUser?.trim() ?? '';
+    final sdkEm = ImService.currentEmUser?.trim() ?? '';
+    if (boundEm.isNotEmpty && sdkEm.isNotEmpty && boundEm != sdkEm) return;
     final emId = m.conversationId.trim();
     if (emId.isEmpty) return;
 
@@ -721,7 +754,9 @@ class ChatsListController extends ChangeNotifier {
   @override
   void dispose() {
     unawaited(_imSub?.cancel() ?? Future<void>.value());
+    unawaited(_imConnSub?.cancel() ?? Future<void>.value());
     _imSub = null;
+    _imConnSub = null;
     super.dispose();
   }
 }

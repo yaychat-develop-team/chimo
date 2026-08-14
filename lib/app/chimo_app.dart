@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../core/iap/iap_service.dart';
 import '../core/theme/app_theme.dart';
 import '../features/chats/data/chats_list_controller.dart';
 import 'app_providers.dart';
@@ -43,6 +44,7 @@ class _ChimoAppViewState extends State<_ChimoAppView> {
       title: 'Chimo',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark,
+      scaffoldMessengerKey: IapService.scaffoldMessengerKey,
       routerConfig: _router!,
     );
   }

@@ -870,6 +870,23 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       );
       if (sent != null && sent.id.isNotEmpty) {
         _seenMsgIds.add(sent.id);
+        final playable = sent.playableOrDisplayUrl;
+        if (!mounted) return;
+        setState(() {
+          for (var i = _messages.length - 1; i >= 0; i--) {
+            final m = _messages[i];
+            if (m.kind != _ChatLineKind.voice ||
+                m.side != _ChatSide.self ||
+                m.msgId.isNotEmpty) {
+              continue;
+            }
+            _messages[i] = m.copyWith(
+              msgId: sent.id,
+              mediaSource: playable.isNotEmpty ? playable : localPath,
+            );
+            break;
+          }
+        });
       }
     } catch (error) {
       _onSendError(error);

@@ -393,7 +393,7 @@ class _BindEmailCodePageState extends State<_BindEmailCodePage> {
           email: widget.email,
         );
         if (!mounted) return;
-        context.go(goHome ? AppRoutes.shell : AppRoutes.editProfileOnboarding);
+        context.go(goHome ? AppRoutes.shell : AppRoutes.profileSetup);
         return;
       }
 

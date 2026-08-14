@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/app_router.dart';
+import '../../core/auth/auth_onboarding_gate.dart';
 import '../../core/auth/auth_session.dart';
 import '../../core/constants/app_assets.dart';
 
@@ -40,7 +41,13 @@ class _SplashPageState extends State<SplashPage> {
     if (!mounted) return;
     final loggedIn = await AuthSession.isLoggedIn();
     if (!mounted) return;
-    context.go(loggedIn ? AppRoutes.shell : AppRoutes.login);
+    if (!loggedIn) {
+      context.go(AppRoutes.login);
+      return;
+    }
+    final goHome = await AuthOnboardingGate.shouldEnterHome(const {});
+    if (!mounted) return;
+    context.go(goHome ? AppRoutes.shell : AppRoutes.profileSetup);
   }
 
   @override

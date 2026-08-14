@@ -138,7 +138,7 @@ abstract final class AppleSignInAuth {
     unawaited(NetworkBootstrap.connectImAfterLogin());
     final goHome = await AuthOnboardingGate.shouldEnterHome(payload.raw);
     if (!context.mounted) return;
-    context.go(goHome ? AppRoutes.shell : AppRoutes.editProfileOnboarding);
+    context.go(goHome ? AppRoutes.shell : AppRoutes.profileSetup);
   }
 
   static String _generateNonce([int length = 32]) {

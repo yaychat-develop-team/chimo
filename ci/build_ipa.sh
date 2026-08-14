@@ -25,6 +25,37 @@ if [ -z "$apiKey" ] || [ -z "$apiIssuer" ]; then
     exit 1
 fi
 
+resolve_auth_key_path() {
+    local explicit="${APP_STORE_API_KEY_PATH:-}"
+    if [ -n "$explicit" ] && [ -f "$explicit" ]; then
+        echo "$explicit"
+        return 0
+    fi
+    local name="AuthKey_${apiKey}.p8"
+    local candidate
+    for candidate in \
+        "$HOME/.appstoreconnect/private_keys/$name" \
+        "$HOME/private_keys/$name" \
+        "$HOME/.private_keys/$name" \
+        "$projectPath/private_keys/$name"
+    do
+        if [ -f "$candidate" ]; then
+            echo "$candidate"
+            return 0
+        fi
+    done
+    return 1
+}
+
+authKeyPath="$(resolve_auth_key_path || true)"
+if [ -z "$authKeyPath" ]; then
+    echo "ERROR: App Store Connect .p8 not found (AuthKey_${apiKey}.p8)." >&2
+    echo "Put it at ~/.appstoreconnect/private_keys/ or set APP_STORE_API_KEY_PATH." >&2
+    echo "Without it, xcodebuild falls back to Xcode Apple ID (giant@… Xcode-Token) and export fails." >&2
+    exit 1
+fi
+echo "Using App Store Connect API key file: $authKeyPath"
+
 require_plist() {
     local plist=$1
     if [ ! -f "$plist" ]; then
@@ -33,21 +64,38 @@ require_plist() {
     fi
 }
 
-# flutter build ipa 已导出 IPA 时跳过二次 export；否则用 xcodebuild 补导出
-export_archive_if_needed() {
+# flutter build ipa 会自己 export，且不带 API Key，Xcode Apple ID 过期就会失败。
+# 编译出 xcarchive 即可；真正导出用下面带 Key 的 xcodebuild。
+build_archive() {
+    local extra=()
+    if [ "$#" -gt 0 ]; then
+        extra=("$@")
+    fi
+    set +e
+    flutter build ipa "${extra[@]}"
+    local status=$?
+    set -e
+    local archivePath="$projectPath/build/ios/archive/Runner.xcarchive"
+    if [ ! -d "$archivePath" ]; then
+        echo "ERROR: flutter build ipa failed (exit $status) and no archive at $archivePath" >&2
+        exit "${status:-1}"
+    fi
+    if [ "$status" -ne 0 ]; then
+        echo "WARN: flutter IPA export failed (exit $status); archive exists, will export with API key."
+    fi
+    # 丢掉 Flutter 自带的未带 API Key 的导出，统一走 xcodebuild。
+    rm -f "$projectPath/build/ios/ipa/"*.ipa 2>/dev/null || true
+}
+
+export_archive() {
     local exportPlist=$1
     require_plist "$exportPlist"
-    local existing
-    existing=$(find "$projectPath/build/ios/ipa" -name "*.ipa" 2>/dev/null | head -n 1 || true)
-    if [ -n "$existing" ]; then
-        echo "IPA already present, skip xcodebuild export: $existing"
-        return 0
-    fi
     local archivePath="$projectPath/build/ios/archive/Runner.xcarchive"
     if [ ! -d "$archivePath" ]; then
         echo "ERROR: archive not found: $archivePath" >&2
         exit 1
     fi
+    mkdir -p "$projectPath/build/ios/ipa"
     echo "[DEBUG] $(date '+%Y-%m-%d %H:%M:%S') 开始 export"
     xcodebuild -exportArchive \
         -archivePath "$archivePath" \
@@ -55,7 +103,8 @@ export_archive_if_needed() {
         -exportOptionsPlist "$exportPlist" \
         -allowProvisioningUpdates \
         -authenticationKeyID "$apiKey" \
-        -authenticationKeyIssuerID "$apiIssuer"
+        -authenticationKeyIssuerID "$apiIssuer" \
+        -authenticationKeyPath "$authKeyPath"
     echo "[DEBUG] $(date '+%Y-%m-%d %H:%M:%S') export 命令结束"
 }
 
@@ -67,11 +116,10 @@ function buildStore() {
     local buildOutputPath="$projectPath/package_app"
 
     require_plist "$storePlist"
-    flutter build ipa --release \
+    build_archive --release \
         --build-number "$versionCode" \
-        --build-name "$versionName" \
-        --export-options-plist="$storePlist"
-    export_archive_if_needed "$storePlist"
+        --build-name "$versionName"
+    export_archive "$storePlist"
 
     if [ -f "$ipaPath" ]; then
         local targetPath="$buildOutputPath/$versionName-$buildType-$versionCode.ipa"
@@ -116,22 +164,20 @@ if [ "$buildType" == "debug" ] || [ "$buildType" == "profile" ]; then
         rm -rf "$projectPath/build/ios"
     fi
     if [[ "$debugModel" == "enable" ]]; then
-        flutter build ipa --profile \
+        build_archive --profile \
             --build-number "$versionCode" \
             --build-name "$versionName" \
             --dart-define=DEBUG_MODE=true \
             --dart-define=CI_NUM="$ciNum" \
-            --export-options-plist="$adhocPlist" \
             -v
     else
-        flutter build ipa --profile \
+        build_archive --profile \
             --build-number "$versionCode" \
             --build-name "$versionName" \
             --dart-define=DEBUG_MODE=false \
-            --export-options-plist="$adhocPlist" \
             -v
     fi
-    export_archive_if_needed "$adhocPlist"
+    export_archive "$adhocPlist"
 
 elif [ "$buildType" == "release" ]; then
     if [ -d "$projectPath/build/ios" ]; then
@@ -139,22 +185,20 @@ elif [ "$buildType" == "release" ]; then
     fi
 
     if [[ "$debugModel" == "enable" ]]; then
-        flutter build ipa --release \
+        build_archive --release \
             --build-number "$versionCode" \
             --build-name "$versionName" \
             --dart-define=DEBUG_MODE=true \
             --dart-define=CI_NUM="$ciNum" \
-            --export-options-plist="$adhocPlist" \
             -v
     else
-        flutter build ipa --release \
+        build_archive --release \
             --build-number "$versionCode" \
             --build-name "$versionName" \
             --dart-define=DEBUG_MODE=false \
-            --export-options-plist="$adhocPlist" \
             -v
     fi
-    export_archive_if_needed "$adhocPlist"
+    export_archive "$adhocPlist"
 elif [ "$buildType" == "store" ]; then
     buildStore
 else

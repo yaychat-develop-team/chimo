@@ -256,6 +256,38 @@ class ChimoApi {
     );
   }
 
+  /// 对齐 forya `POST /cash/charge/create`。
+  /// [payItemType]：4 = APPLE_APP_STORE，13 = GOOGLE_PLAY。
+  Future<ApiResponse> cashChargeCreate({
+    required String productId,
+    required int payItemType,
+  }) {
+    return _client.post(
+      '/cash/charge/create',
+      bizParam: {
+        'productId': int.tryParse(productId) ?? productId,
+        'payItemType': payItemType,
+        'v2': true,
+      },
+    );
+  }
+
+  /// 对齐 forya `POST /cash/charge/verify_receipt`。
+  Future<ApiResponse> cashChargeVerifyReceipt({
+    required String orderId,
+    required String userId,
+    required String extraJson,
+  }) {
+    return _client.post(
+      '/cash/charge/verify_receipt',
+      bizParam: {
+        'orderId': orderId,
+        'userId': userId,
+        'extraJson': extraJson,
+      },
+    );
+  }
+
   /// 批量获取会话列表用的用户头像 / 昵称。
   Future<ApiResponse> msgUsers(String emUserNames) {
     return _client.get(

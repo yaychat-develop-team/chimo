@@ -64,6 +64,46 @@ class CashApi {
     );
   }
 
+  Future<ApiResult<String>> createChargeOrder({
+    required String productId,
+    required int payItemType,
+  }) {
+    return ApiGateway.request(
+      () => NetworkBootstrap.api.cashChargeCreate(
+        productId: productId,
+        payItemType: payItemType,
+      ),
+      map: (res) {
+        final data = res.data;
+        if (data is Map) {
+          final nested = data['data'];
+          final id = '${data['orderId'] ?? (nested is Map ? nested['orderId'] : '')}';
+          if (id.isNotEmpty && id != 'null') return id;
+        }
+        if (data != null && '$data' != 'null') {
+          final id = '$data'.trim();
+          if (id.isNotEmpty) return id;
+        }
+        return '';
+      },
+    );
+  }
+
+  Future<ApiResult<CashChargeVerify>> verifyReceipt({
+    required String orderId,
+    required String userId,
+    required String extraJson,
+  }) {
+    return ApiGateway.request(
+      () => NetworkBootstrap.api.cashChargeVerifyReceipt(
+        orderId: orderId,
+        userId: userId,
+        extraJson: extraJson,
+      ),
+      map: CashChargeVerify.parse,
+    );
+  }
+
   /// 金币消费 / 充值明细。
   Future<ApiResult<List<CashOpHistoryItem>>> opHistory({
     required int pageNum,
