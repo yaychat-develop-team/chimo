@@ -1,7 +1,7 @@
 import 'dart:io';
 
-import 'package:http/http.dart' as http;
-import 'package:http/io_client.dart';
+import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// 调试代理（对齐 forya CacheUtil `ip` / `port` + `JRNetwork.updateProxy`）。
@@ -49,23 +49,27 @@ abstract final class ProxyConfigStore {
     } catch (_) {}
   }
 
-  /// 带可选代理的 [http.Client]（Charles / Proxyman 等）。
-  static http.Client buildIoClient() {
-    final native = HttpClient();
-    if (isConfigured) {
-      final proxy = '${ip.trim()}:${port.trim()}';
-      native.findProxy = (url) {
-        return HttpClient.findProxyFromEnvironment(
-          url,
-          environment: {
-            'http_proxy': proxy,
-            'https_proxy': proxy,
-          },
-        );
-      };
-      // 抓包证书常为自签。
-      native.badCertificateCallback = (cert, host, port) => true;
-    }
-    return IOClient(native);
+  /// 给 [Dio] 挂上可选代理（Charles / Proxyman 等），对齐 forya `updateProxy`。
+  static void configureDio(Dio dio) {
+    dio.httpClientAdapter = IOHttpClientAdapter(
+      createHttpClient: () {
+        final client = HttpClient();
+        if (isConfigured) {
+          final proxy = '${ip.trim()}:${port.trim()}';
+          client.findProxy = (url) {
+            return HttpClient.findProxyFromEnvironment(
+              url,
+              environment: {
+                'http_proxy': proxy,
+                'https_proxy': proxy,
+              },
+            );
+          };
+          // 抓包证书常为自签。
+          client.badCertificateCallback = (cert, host, port) => true;
+        }
+        return client;
+      },
+    );
   }
 }

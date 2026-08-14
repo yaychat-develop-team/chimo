@@ -115,7 +115,7 @@ class _ReportPageState extends State<ReportPage> {
     final item = _ReportImage(localPath: file.path, uploading: true);
     setState(() => _images.add(item));
 
-    final remote = await MediaUpload.uploadFile(file.path);
+    final remote = await MediaUpload.uploadImage(file.path);
     if (!mounted) return;
 
     final index = _images.indexOf(item);

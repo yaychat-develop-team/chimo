@@ -65,11 +65,19 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
   final GlobalKey<GroupChatInputBarState> _inputBarKey =
       GlobalKey<GroupChatInputBarState>();
   String _selfAvatarUrl = '';
+
   /// 防止短时间连点头像叠多层资料弹窗。
   bool _openingSenderProfile = false;
+
   /// uid → 头像 URL（消息 attributes 缺 avatar 时用资料接口补全）。
   final Map<String, String> _senderAvatarByUid = {};
-  final Set<String> _avatarFetchInFlight = {};
+
+  /// uid → `male` / `female`（消息 attributes 缺 gender 时用资料接口补全）。
+  final Map<String, String> _senderGenderByUid = {};
+
+  /// 已查过资料的 uid（含未设置性别），避免重复请求。
+  final Set<String> _senderProfileLookupDone = {};
+  final Set<String> _profileFetchInFlight = {};
 
   PopularGroupItem get _group => widget.group;
 
@@ -77,14 +85,12 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
 
   /// 群聊发出消息的对端公共 attributes（群名 / 头像 / 群 id）。
   ImPeerAttrs get _groupPeerAttrs => ImPeerAttrs(
-        name: _group.name.trim(),
-        avatar: (_group.avatarUrl ?? '').trim(),
-        userid: _group.id.trim(),
-      );
+    name: _group.name.trim(),
+    avatar: (_group.avatarUrl ?? '').trim(),
+    userid: _group.id.trim(),
+  );
 
-  List<String> get _flatPhotos => [
-        for (final s in _photoSections) ...s.urls,
-      ];
+  List<String> get _flatPhotos => [for (final s in _photoSections) ...s.urls];
 
   @override
   void initState() {
@@ -145,7 +151,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
       if (_isJoined) {
         unawaited(ImService.markConversationRead(gid, isGroup: true));
       }
-      unawaited(_hydrateMissingSenderAvatars());
+      unawaited(_hydrateMissingSenderProfiles());
     } catch (error) {
       debugPrint('GroupDetails loadImHistory: $error');
     }
@@ -157,6 +163,27 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
     if (id.isEmpty || url.isEmpty) return;
     if (url == 'null' || url == 'undefined') return;
     _senderAvatarByUid[id] = url;
+  }
+
+  void _rememberSenderGender(String uid, String gender) {
+    final id = uid.trim();
+    if (id.isEmpty) return;
+    final normalized = _OutgoingMessage.normalizeGender(gender);
+    if (normalized == null) return;
+    _senderGenderByUid[id] = normalized;
+  }
+
+  void _rememberSenderProfile(ChatUserProfile profile) {
+    final uid = profile.userId.trim().isEmpty
+        ? profile.id.trim()
+        : profile.userId.trim();
+    if (uid.isEmpty) return;
+    final url = (profile.avatarUrl ?? '').trim();
+    if (url.isNotEmpty) _rememberSenderAvatar(uid, url);
+    if (profile.hasGender) {
+      _rememberSenderGender(uid, profile.isMale ? 'male' : 'female');
+    }
+    _senderProfileLookupDone.add(uid);
   }
 
   String _resolvedSenderAvatar({
@@ -177,8 +204,20 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
     return '';
   }
 
-  /// 历史/实时消息若 attributes 无 avatar，按 userid 拉资料补全，避免一直显示占位图。
-  Future<void> _hydrateMissingSenderAvatars() async {
+  String _resolvedSenderGender({
+    required String uid,
+    required String gender,
+  }) {
+    final fromMsg = _OutgoingMessage.normalizeGender(gender);
+    if (fromMsg != null) {
+      _rememberSenderGender(uid, fromMsg);
+      return fromMsg;
+    }
+    return _senderGenderByUid[uid.trim()] ?? '';
+  }
+
+  /// 历史/实时消息若 attributes 缺 avatar / gender，按 userid 拉资料补全。
+  Future<void> _hydrateMissingSenderProfiles() async {
     final need = <String>{};
     for (final m in _sentMessages) {
       if (m.isSelf) continue;
@@ -186,26 +225,34 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
       if (uid.isEmpty) continue;
       if (m.senderAvatar.trim().isNotEmpty) {
         _rememberSenderAvatar(uid, m.senderAvatar);
-        continue;
       }
-      if (_senderAvatarByUid.containsKey(uid)) continue;
-      if (_avatarFetchInFlight.contains(uid)) continue;
+      if (m.hasSenderGender) {
+        _rememberSenderGender(uid, m.senderGender);
+      }
+      final needAvatar = m.senderAvatar.trim().isEmpty &&
+          !_senderAvatarByUid.containsKey(uid);
+      final needGender = !m.hasSenderGender &&
+          !_senderGenderByUid.containsKey(uid) &&
+          !_senderProfileLookupDone.contains(uid);
+      if (!needAvatar && !needGender) continue;
+      if (_profileFetchInFlight.contains(uid)) continue;
       need.add(uid);
     }
     if (need.isEmpty) return;
 
     for (final uid in need) {
-      _avatarFetchInFlight.add(uid);
+      _profileFetchInFlight.add(uid);
       try {
         final res = await AppApis.user.profileByUidOrNull(uid);
-        final url = (res.data?.avatarUrl ?? '').trim();
-        if (res.ok && url.isNotEmpty) {
-          _rememberSenderAvatar(uid, url);
+        if (res.ok && res.data != null) {
+          _rememberSenderProfile(res.data!);
+        } else {
+          _senderProfileLookupDone.add(uid);
         }
       } catch (_) {
-        // ignore; keep placeholder
+        _senderProfileLookupDone.add(uid);
       } finally {
-        _avatarFetchInFlight.remove(uid);
+        _profileFetchInFlight.remove(uid);
       }
     }
     if (!mounted) return;
@@ -214,11 +261,25 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
       final m = _sentMessages[i];
       final uid = m.senderUid.trim();
       if (uid.isEmpty) continue;
-      final cached = _senderAvatarByUid[uid];
-      if (cached == null || cached.isEmpty) continue;
-      if (m.senderAvatar.trim() == cached) continue;
-      _sentMessages[i] = m.copyWith(senderAvatar: cached);
-      changed = true;
+      var next = m;
+      final cachedAvatar = _senderAvatarByUid[uid];
+      if (cachedAvatar != null &&
+          cachedAvatar.isNotEmpty &&
+          m.senderAvatar.trim() != cachedAvatar) {
+        next = next.copyWith(senderAvatar: cachedAvatar);
+      }
+      final cachedGender = _senderGenderByUid[uid];
+      if (cachedGender != null &&
+          cachedGender.isNotEmpty &&
+          !m.hasSenderGender) {
+        next = next.copyWith(senderGender: cachedGender);
+      }
+      if (!identical(next, m) &&
+          (next.senderAvatar != m.senderAvatar ||
+              next.senderGender != m.senderGender)) {
+        _sentMessages[i] = next;
+        changed = true;
+      }
     }
     if (changed) setState(() {});
   }
@@ -241,8 +302,10 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
     });
     // 列表预览 / 未读由 ChatsListController 的 IM 订阅处理。
     _scrollToBottom();
-    if (line.senderAvatar.trim().isEmpty && line.senderUid.trim().isNotEmpty) {
-      unawaited(_hydrateMissingSenderAvatars());
+    final needProfile = line.senderUid.trim().isNotEmpty &&
+        (line.senderAvatar.trim().isEmpty || !line.hasSenderGender);
+    if (needProfile) {
+      unawaited(_hydrateMissingSenderProfiles());
     }
   }
 
@@ -252,7 +315,10 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
         : DateTime.now();
     final name = m.senderName;
     final uid = m.senderUid;
-    final gender = m.senderGender;
+    final gender = _resolvedSenderGender(
+      uid: uid,
+      gender: m.senderGender,
+    );
     final avatar = _resolvedSenderAvatar(
       uid: uid,
       avatar: m.senderAvatar,
@@ -461,6 +527,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
             if (left > 0) retry();
           });
         }
+
         retry();
       });
       return;
@@ -551,6 +618,23 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
       );
       if (sent != null && sent.id.isNotEmpty) {
         _seenMsgIds.add(sent.id);
+        final playable = sent.playableOrDisplayUrl;
+        if (!mounted) return;
+        setState(() {
+          for (var i = _sentMessages.length - 1; i >= 0; i--) {
+            final m = _sentMessages[i];
+            if (m.kind != _OutgoingKind.voice ||
+                !m.isSelf ||
+                m.msgId.isNotEmpty) {
+              continue;
+            }
+            _sentMessages[i] = m.copyWith(
+              msgId: sent.id,
+              mediaSource: playable.isNotEmpty ? playable : local,
+            );
+            break;
+          }
+        });
       }
     } catch (error) {
       if (!mounted) return;
@@ -565,19 +649,17 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
 
   Future<void> _sendImages(List<String> paths) async {
     if (!_isJoined || paths.isEmpty) return;
-    final files =
-        paths.map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    final files = paths
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
     if (files.isEmpty) return;
 
     final now = DateTime.now();
     setState(() {
       for (final path in files) {
         _sentMessages.add(
-          _OutgoingMessage.image(
-            path,
-            at: now,
-            senderAvatar: _selfAvatarUrl,
-          ),
+          _OutgoingMessage.image(path, at: now, senderAvatar: _selfAvatarUrl),
         );
       }
       _tabIndex = 0;
@@ -629,8 +711,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
         AppActionSheetItem(
           label: 'Report',
           destructive: true,
-          onTap: () =>
-              Navigator.of(sheetContext).pop(_GroupMoreAction.report),
+          onTap: () => Navigator.of(sheetContext).pop(_GroupMoreAction.report),
         ),
         if (_isJoined)
           AppActionSheetItem(
@@ -690,10 +771,8 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
     if (!_isJoined || photos.isEmpty) return;
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => _GroupPhotoViewerPage(
-          photos: photos,
-          initialIndex: initialIndex,
-        ),
+        builder: (_) =>
+            _GroupPhotoViewerPage(photos: photos, initialIndex: initialIndex),
       ),
     );
   }
@@ -718,6 +797,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
           final res = await AppApis.user.profileByUidOrNull(uid);
           if (res.ok && res.data != null) {
             profile = res.data!;
+            _rememberSenderProfile(profile);
             final apiAvatar = (profile.avatarUrl ?? '').trim();
             final msgAvatar = message.senderAvatar.trim();
             if (apiAvatar.isEmpty && msgAvatar.isNotEmpty) {
@@ -725,6 +805,27 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
             }
             if (profile.nickname.trim().isEmpty && name.isNotEmpty) {
               profile = profile.copyWith(nickname: name);
+            }
+            // 打开资料时同步补全列表里该用户的性别 / 头像。
+            if (profile.hasGender || apiAvatar.isNotEmpty) {
+              final g = profile.hasGender
+                  ? (profile.isMale ? 'male' : 'female')
+                  : null;
+              var patched = false;
+              for (var i = 0; i < _sentMessages.length; i++) {
+                final m = _sentMessages[i];
+                if (m.senderUid.trim() != uid) continue;
+                final next = m.copyWith(
+                  senderAvatar: apiAvatar.isNotEmpty ? apiAvatar : null,
+                  senderGender: g,
+                );
+                if (next.senderAvatar != m.senderAvatar ||
+                    next.senderGender != m.senderGender) {
+                  _sentMessages[i] = next;
+                  patched = true;
+                }
+              }
+              if (patched && mounted) setState(() {});
             }
           }
         } catch (_) {}
@@ -807,9 +908,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
               Expanded(
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: _isJoined
-                        ? Colors.white
-                        : const Color(0x1FC0F600),
+                    color: _isJoined ? Colors.white : const Color(0x1FC0F600),
                     borderRadius: const BorderRadius.vertical(
                       top: Radius.circular(22),
                     ),
@@ -865,10 +964,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
                   },
                 )
               else
-                _JoinCommunityBar(
-                  bottomInset: bottomPadding,
-                  onTap: _join,
-                ),
+                _JoinCommunityBar(bottomInset: bottomPadding, onTap: _join),
             ],
           ),
         ],
@@ -902,11 +998,7 @@ class _DetailsAppBar extends StatelessWidget {
         children: [
           IconButton(
             onPressed: () => Navigator.of(context).pop(),
-            icon: SvgPicture.asset(
-              AppAssets.chatBack,
-              width: 17,
-              height: 7,
-            ),
+            icon: SvgPicture.asset(AppAssets.chatBack, width: 17, height: 7),
           ),
           if (!descExpanded) ...[
             Flexible(
@@ -966,9 +1058,7 @@ class _DescToggleChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = joinedStyle
-        ? _joinedBg
-        : Colors.white.withValues(alpha: 0.12);
+    final bg = joinedStyle ? _joinedBg : Colors.white.withValues(alpha: 0.12);
     final fg = joinedStyle ? _joinedFg : AppColors.textPrimary;
 
     return GestureDetector(
@@ -1103,11 +1193,7 @@ class _ProfileHeader extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        Image.asset(
-                          AppAssets.homeImg,
-                          width: 11,
-                          height: 11,
-                        ),
+                        Image.asset(AppAssets.homeImg, width: 11, height: 11),
                         const SizedBox(width: 3),
                         Text(
                           '${group.postCount}',
@@ -1245,7 +1331,9 @@ class _TabLabel extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              color: selected ? const Color(0xFF111111) : AppColors.textTertiary,
+              color: selected
+                  ? const Color(0xFF111111)
+                  : AppColors.textTertiary,
               fontSize: 16,
               fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
             ),
@@ -1340,16 +1428,16 @@ class _MessagesFeed extends StatelessWidget {
               _GroupChatBubble(
                 message: sentMessages[i],
                 isLocked: !isJoined,
-                showAvatar: i == 0 ||
+                showAvatar:
+                    i == 0 ||
                     sentMessages[i - 1].kind == _OutgoingKind.join ||
                     !_sameSender(sentMessages[i], sentMessages[i - 1]) ||
                     sentMessages[i].kind != sentMessages[i - 1].kind,
-                onAvatarTap: sentMessages[i].isSelf ||
-                        onSenderAvatarTap == null
+                onAvatarTap: sentMessages[i].isSelf || onSenderAvatarTap == null
                     ? null
                     : () => onSenderAvatarTap!(sentMessages[i]),
-                onImageTap: !isJoined ||
-                        sentMessages[i].kind != _OutgoingKind.image
+                onImageTap:
+                    !isJoined || sentMessages[i].kind != _OutgoingKind.image
                     ? null
                     : () {
                         final paths = [
@@ -1398,7 +1486,6 @@ class _TimestampLabel extends StatelessWidget {
   }
 }
 
-
 class _OutgoingKind {
   static const text = 0;
   static const voice = 1;
@@ -1416,8 +1503,18 @@ bool _shouldShowOutgoingTimestamp(List<_OutgoingMessage> list, int index) {
 
 String _formatChatTimestamp(DateTime time) {
   const months = <String>[
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
   final now = DateTime.now();
   final local = time.toLocal();
@@ -1463,18 +1560,17 @@ class _OutgoingMessage {
     String senderName = '',
     String senderUid = '',
     String senderGender = '',
-  }) =>
-      _OutgoingMessage._(
-        kind: _OutgoingKind.text,
-        text: text,
-        sentAt: at ?? DateTime.now(),
-        msgId: msgId,
-        isSelf: isSelf,
-        senderAvatar: senderAvatar,
-        senderName: senderName,
-        senderUid: senderUid,
-        senderGender: senderGender,
-      );
+  }) => _OutgoingMessage._(
+    kind: _OutgoingKind.text,
+    text: text,
+    sentAt: at ?? DateTime.now(),
+    msgId: msgId,
+    isSelf: isSelf,
+    senderAvatar: senderAvatar,
+    senderName: senderName,
+    senderUid: senderUid,
+    senderGender: senderGender,
+  );
 
   factory _OutgoingMessage.voice(
     int seconds, {
@@ -1486,19 +1582,18 @@ class _OutgoingMessage {
     String senderName = '',
     String senderUid = '',
     String senderGender = '',
-  }) =>
-      _OutgoingMessage._(
-        kind: _OutgoingKind.voice,
-        voiceSeconds: seconds,
-        mediaSource: mediaSource,
-        sentAt: at ?? DateTime.now(),
-        msgId: msgId,
-        isSelf: isSelf,
-        senderAvatar: senderAvatar,
-        senderName: senderName,
-        senderUid: senderUid,
-        senderGender: senderGender,
-      );
+  }) => _OutgoingMessage._(
+    kind: _OutgoingKind.voice,
+    voiceSeconds: seconds,
+    mediaSource: mediaSource,
+    sentAt: at ?? DateTime.now(),
+    msgId: msgId,
+    isSelf: isSelf,
+    senderAvatar: senderAvatar,
+    senderName: senderName,
+    senderUid: senderUid,
+    senderGender: senderGender,
+  );
 
   factory _OutgoingMessage.image(
     String path, {
@@ -1509,18 +1604,17 @@ class _OutgoingMessage {
     String senderName = '',
     String senderUid = '',
     String senderGender = '',
-  }) =>
-      _OutgoingMessage._(
-        kind: _OutgoingKind.image,
-        imagePath: path,
-        sentAt: at ?? DateTime.now(),
-        msgId: msgId,
-        isSelf: isSelf,
-        senderAvatar: senderAvatar,
-        senderName: senderName,
-        senderUid: senderUid,
-        senderGender: senderGender,
-      );
+  }) => _OutgoingMessage._(
+    kind: _OutgoingKind.image,
+    imagePath: path,
+    sentAt: at ?? DateTime.now(),
+    msgId: msgId,
+    isSelf: isSelf,
+    senderAvatar: senderAvatar,
+    senderName: senderName,
+    senderUid: senderUid,
+    senderGender: senderGender,
+  );
 
   factory _OutgoingMessage.join(
     String name, {
@@ -1529,25 +1623,25 @@ class _OutgoingMessage {
     String msgId = '',
     String senderAvatar = '',
     String senderGender = '',
-  }) =>
-      _OutgoingMessage._(
-        kind: _OutgoingKind.join,
-        joinName: name,
-        joinUid: uid,
-        sentAt: at ?? DateTime.now(),
-        msgId: msgId,
-        isSelf: false,
-        senderName: name,
-        senderUid: uid,
-        senderAvatar: senderAvatar,
-        senderGender: senderGender,
-      );
+  }) => _OutgoingMessage._(
+    kind: _OutgoingKind.join,
+    joinName: name,
+    joinUid: uid,
+    sentAt: at ?? DateTime.now(),
+    msgId: msgId,
+    isSelf: false,
+    senderName: name,
+    senderUid: uid,
+    senderAvatar: senderAvatar,
+    senderGender: senderGender,
+  );
 
   final int kind;
   final DateTime sentAt;
   final String? text;
   final int? voiceSeconds;
   final String? imagePath;
+
   /// 语音本地 / 远程播放源（对齐私聊 mediaSource）。
   final String? mediaSource;
   final String? joinName;
@@ -1559,14 +1653,14 @@ class _OutgoingMessage {
   final String senderUid;
   final String senderGender;
 
-  bool get hasSenderGender {
-    final g = senderGender.trim().toLowerCase();
-    return g == 'male' ||
-        g == 'm' ||
-        g == '1' ||
-        g == 'female' ||
-        g == 'f' ||
-        g == '2';
+  bool get hasSenderGender => normalizeGender(senderGender) != null;
+
+  /// 归一化为 `male` / `female`；未设置返回 null。
+  static String? normalizeGender(String? raw) {
+    final g = (raw ?? '').trim().toLowerCase();
+    if (g == 'male' || g == 'm' || g == '1') return 'male';
+    if (g == 'female' || g == 'f' || g == '2') return 'female';
+    return null;
   }
 
   _OutgoingMessage copyWith({
@@ -1574,6 +1668,8 @@ class _OutgoingMessage {
     String? senderName,
     String? senderUid,
     String? senderGender,
+    String? msgId,
+    String? mediaSource,
   }) {
     return _OutgoingMessage._(
       kind: kind,
@@ -1581,10 +1677,10 @@ class _OutgoingMessage {
       text: text,
       voiceSeconds: voiceSeconds,
       imagePath: imagePath,
-      mediaSource: mediaSource,
+      mediaSource: mediaSource ?? this.mediaSource,
       joinName: joinName,
       joinUid: joinUid,
-      msgId: msgId,
+      msgId: msgId ?? this.msgId,
       isSelf: isSelf,
       senderAvatar: senderAvatar ?? this.senderAvatar,
       senderName: senderName ?? this.senderName,
@@ -1593,10 +1689,7 @@ class _OutgoingMessage {
     );
   }
 
-  bool get senderIsMale {
-    final g = senderGender.trim().toLowerCase();
-    return g == 'male' || g == 'm' || g == '1';
-  }
+  bool get senderIsMale => normalizeGender(senderGender) == 'male';
 }
 
 /// Forya CustomGroupJoinItem：青绿昵称 + 灰色 "joined the community"。
@@ -1702,22 +1795,21 @@ class _GroupChatBubble extends StatelessWidget {
       constraints: const BoxConstraints(maxWidth: _bubbleMax),
       child: switch (message.kind) {
         _OutgoingKind.voice => _GroupVoiceBubble(
-            seconds: message.voiceSeconds ?? 0,
-            isSelf: isSelf,
-            locked: isLocked,
-            mediaSource: message.mediaSource ?? '',
-          ),
-        _OutgoingKind.image => onImageTap == null
-            ? imageBubble()
-            : GestureDetector(
-                onTap: onImageTap,
-                behavior: HitTestBehavior.opaque,
-                child: imageBubble(),
-              ),
-        _ => _GroupTextBubble(
-            text: message.text ?? '',
-            isSelf: isSelf,
-          ),
+          seconds: message.voiceSeconds ?? 0,
+          isSelf: isSelf,
+          locked: isLocked,
+          mediaSource: message.mediaSource ?? '',
+          msgId: message.msgId,
+        ),
+        _OutgoingKind.image =>
+          onImageTap == null
+              ? imageBubble()
+              : GestureDetector(
+                  onTap: onImageTap,
+                  behavior: HitTestBehavior.opaque,
+                  child: imageBubble(),
+                ),
+        _ => _GroupTextBubble(text: message.text ?? '', isSelf: isSelf),
       },
     );
 
@@ -1800,10 +1892,7 @@ class _GroupSenderNameRow extends StatelessWidget {
 
 /// 文本 / forya 自定义表情（PUA）。纯表情时放大且不套灰气泡，对齐 forya。
 class _GroupTextBubble extends StatelessWidget {
-  const _GroupTextBubble({
-    required this.text,
-    required this.isSelf,
-  });
+  const _GroupTextBubble({required this.text, required this.isSelf});
 
   final String text;
   final bool isSelf;
@@ -1811,23 +1900,23 @@ class _GroupTextBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pureEmoji = AppEmoji.isCustomEmojiOnly(text);
-    final style = (pureEmoji
-            ? const TextStyle(
-                color: Color(0xFF111111),
-                fontSize: 28,
-                fontWeight: FontWeight.w500,
-                height: 1.2,
-                letterSpacing: 1.5,
-              )
-            : const TextStyle(
-                color: Color(0xFF111111),
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
-                height: 20 / 15,
-              ))
-        .withAppEmoji;
+    final style =
+        (pureEmoji
+                ? const TextStyle(
+                    color: Color(0xFF111111),
+                    fontSize: 28,
+                    fontWeight: FontWeight.w500,
+                    height: 1.2,
+                    letterSpacing: 1.5,
+                  )
+                : const TextStyle(
+                    color: Color(0xFF111111),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    height: 20 / 15,
+                  ));
 
-    final child = Text(text, style: style);
+    final child = AppEmojiText(text, style: style);
     if (pureEmoji) return child;
 
     return Container(
@@ -1847,10 +1936,7 @@ class _GroupTextBubble extends StatelessWidget {
 }
 
 class _OutgoingImage extends StatelessWidget {
-  const _OutgoingImage({
-    required this.path,
-    this.locked = false,
-  });
+  const _OutgoingImage({required this.path, this.locked = false});
 
   final String path;
   final bool locked;
@@ -1907,8 +1993,7 @@ class _OutgoingImage extends StatelessWidget {
         width: _w,
         height: _h,
         fit: BoxFit.cover,
-        errorBuilder: (_, _, _) =>
-            _placeholder(label: 'Picture expired'),
+        errorBuilder: (_, _, _) => _placeholder(label: 'Picture expired'),
       );
     }
     final file = File(src);
@@ -1918,8 +2003,7 @@ class _OutgoingImage extends StatelessWidget {
         width: _w,
         height: _h,
         fit: BoxFit.cover,
-        errorBuilder: (_, _, _) =>
-            _placeholder(label: 'Picture expired'),
+        errorBuilder: (_, _, _) => _placeholder(label: 'Picture expired'),
       );
     }
     return _placeholder(label: 'Picture expired');
@@ -1985,12 +2069,14 @@ class _GroupVoiceBubble extends StatefulWidget {
     required this.seconds,
     required this.isSelf,
     this.mediaSource = '',
+    this.msgId = '',
     this.locked = false,
   });
 
   final int seconds;
   final bool isSelf;
   final String mediaSource;
+  final String msgId;
   final bool locked;
 
   @override
@@ -2065,16 +2151,26 @@ class _GroupVoiceBubbleState extends State<_GroupVoiceBubble>
     _waveController.repeat();
 
     final src = _source;
-    if (src.isNotEmpty) {
-      try {
-        await AppAudioPlayback.play(_player, src);
-        await _completeSub?.cancel();
-        _completeSub = _player.onPlayerComplete.listen((_) {
-          if (mounted) _stopPlay();
-        });
-      } catch (error) {
-        debugPrint('Group voice play failed: $error');
+    try {
+      final playable = await ImService.resolvePlayableMedia(
+        mediaSource: src,
+        msgId: widget.msgId,
+      );
+      if (!mounted || !_playing) return;
+      if (playable == null || playable.isEmpty) {
+        debugPrint('Group voice play failed: no local file');
+        _stopPlay();
+        return;
       }
+      await AppAudioPlayback.play(_player, playable);
+      await _completeSub?.cancel();
+      _completeSub = _player.onPlayerComplete.listen((_) {
+        if (mounted) _stopPlay();
+      });
+    } catch (error) {
+      debugPrint('Group voice play failed: $error');
+      if (mounted) _stopPlay();
+      return;
     }
 
     _playTimer?.cancel();
@@ -2106,9 +2202,7 @@ class _GroupVoiceBubbleState extends State<_GroupVoiceBubble>
       onTap: (expired || widget.locked) ? null : _togglePlay,
       behavior: HitTestBehavior.opaque,
       child: Container(
-        width: expired
-            ? 140
-            : (80 + secs * (200 - 80) / 60).clamp(80.0, 200.0),
+        width: expired ? 140 : (80 + secs * (200 - 80) / 60).clamp(80.0, 200.0),
         height: 40,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
@@ -2156,10 +2250,7 @@ class _GroupVoiceBubbleState extends State<_GroupVoiceBubble>
 }
 
 class _GroupVoiceBarsIcon extends StatelessWidget {
-  const _GroupVoiceBarsIcon({
-    this.playing = false,
-    this.animation,
-  });
+  const _GroupVoiceBarsIcon({this.playing = false, this.animation});
 
   final bool playing;
   final Animation<double>? animation;
@@ -2328,19 +2419,16 @@ class _PhotosGrid extends StatelessWidget {
               mainAxisSpacing: 4,
               childAspectRatio: 1,
             ),
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                final flatIndex = startIndex + index;
-                return GestureDetector(
-                  onTap: () => onPhotoTap(flatIndex),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: _GroupPhotoImage(src: section.urls[index]),
-                  ),
-                );
-              },
-              childCount: count,
-            ),
+            delegate: SliverChildBuilderDelegate((context, index) {
+              final flatIndex = startIndex + index;
+              return GestureDetector(
+                onTap: () => onPhotoTap(flatIndex),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: _GroupPhotoImage(src: section.urls[index]),
+                ),
+              );
+            }, childCount: count),
           ),
         ),
       );
@@ -2441,10 +2529,7 @@ class _GroupPhotoViewerPageState extends State<_GroupPhotoViewerPage> {
 }
 
 class _JoinCommunityBar extends StatelessWidget {
-  const _JoinCommunityBar({
-    required this.bottomInset,
-    required this.onTap,
-  });
+  const _JoinCommunityBar({required this.bottomInset, required this.onTap});
 
   final double bottomInset;
   final VoidCallback onTap;
@@ -2482,10 +2567,7 @@ class _JoinCommunityBar extends StatelessWidget {
 }
 
 class _GroupPhotoImage extends StatelessWidget {
-  const _GroupPhotoImage({
-    required this.src,
-    this.fit = BoxFit.cover,
-  });
+  const _GroupPhotoImage({required this.src, this.fit = BoxFit.cover});
 
   final String src;
   final BoxFit fit;

@@ -316,12 +316,14 @@ class _MemberRow extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 8),
-          Image.asset(
-            member.isMale ? AppAssets.genderMan : AppAssets.genderWoman,
-            width: 18,
-            height: 18,
-          ),
+          if (member.hasGender) ...[
+            const SizedBox(width: 8),
+            Image.asset(
+              member.isMale ? AppAssets.genderMan : AppAssets.genderWoman,
+              width: 18,
+              height: 18,
+            ),
+          ],
         ],
       ),
     );

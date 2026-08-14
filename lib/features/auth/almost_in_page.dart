@@ -106,7 +106,7 @@ class _AlmostInPageState extends State<AlmostInPage> {
       _uploadingAvatar = true;
     });
 
-    final remote = await MediaUpload.uploadFile(file.path);
+    final remote = await MediaUpload.uploadImage(file.path);
     if (!mounted) return;
 
     if (remote == null || remote.isEmpty) {

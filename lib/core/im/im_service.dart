@@ -4,9 +4,11 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:im_flutter_sdk/im_flutter_sdk.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../auth/auth_session.dart';
 import '../network/app_apis.dart';
+import '../theme/app_emoji.dart';
 import 'im_system_accounts.dart';
 
 /// 对齐 forya `ChatInputController.attributes` 的对端 / 群公共字段。
@@ -114,22 +116,20 @@ class ImChatMessage {
   /// GroupChat 与 Chat（私聊 / 系统）。
   final bool isGroup;
 
-  /// 优先已有本地文件，否则远程 URL，再否则缩略图。
+  /// 优先已有本地文件。环信 chatfiles URL 需要 secret，不能直接给播放器。
   String get playableOrDisplayUrl {
-    final remote = mediaRemoteUrl.trim();
-    final thumb = thumbnailUrl.trim();
     final local = mediaLocalPath.trim();
-    if (remote.startsWith('http://') || remote.startsWith('https://')) {
-      return remote;
-    }
-    if (thumb.startsWith('http://') || thumb.startsWith('https://')) {
-      return thumb;
-    }
     if (local.isNotEmpty) {
       try {
-        if (File(local).existsSync()) return local;
+        final path = ImService.stripFileUri(local);
+        if (ImService.localFileExists(path)) return path;
       } catch (_) {}
     }
+    final remote = mediaRemoteUrl.trim();
+    final thumb = thumbnailUrl.trim();
+    if (ImService.isDirectPlayableUrl(remote)) return remote;
+    if (ImService.isDirectPlayableUrl(thumb)) return thumb;
+    if (local.isNotEmpty) return ImService.stripFileUri(local);
     if (remote.isNotEmpty) return remote;
     return thumb;
   }
@@ -172,6 +172,211 @@ abstract final class ImService {
   static bool get isConnected => _connected;
 
   static String? get currentEmUser => _currentEmUser;
+
+  static String stripFileUri(String path) {
+    var s = path.trim();
+    if (s.startsWith('file://')) {
+      try {
+        return Uri.parse(s).toFilePath();
+      } catch (_) {
+        return s.substring(7);
+      }
+    }
+    return s;
+  }
+
+  /// iOS 上 `/var` 与 `/private/var` 是同一路径，existsSync 可能漏检。
+  static bool localFileExists(String path) {
+    final p = stripFileUri(path);
+    if (p.isEmpty) return false;
+    bool ok(String candidate) {
+      try {
+        final f = File(candidate);
+        return f.existsSync() && f.lengthSync() > 0;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    if (ok(p)) return true;
+    if (p.startsWith('/var/')) return ok('/private$p');
+    if (p.startsWith('/private/var/')) {
+      return ok(p.replaceFirst('/private', ''));
+    }
+    return false;
+  }
+
+  static String? _existingPath(String path) {
+    final p = stripFileUri(path);
+    if (p.isEmpty) return null;
+    if (p.startsWith('/var/')) {
+      final priv = '/private$p';
+      if (localFileExists(priv)) return priv;
+    }
+    if (localFileExists(p)) return p;
+    if (p.startsWith('/private/var/')) {
+      final alt = p.replaceFirst('/private', '');
+      if (localFileExists(alt)) return alt;
+    }
+    return null;
+  }
+
+  static Future<Directory> _voiceCacheDir() async {
+    final root = await getApplicationSupportDirectory();
+    final dir = Directory('${root.path}/im_voice');
+    if (!dir.existsSync()) {
+      await dir.create(recursive: true);
+    }
+    return dir;
+  }
+
+  static Future<String?> _cachedVoice(String msgId) async {
+    final id = msgId.trim();
+    if (id.isEmpty) return null;
+    final dir = await _voiceCacheDir();
+    final file = File('${dir.path}/$id.m4a');
+    return _existingPath(file.path);
+  }
+
+  static Future<String?> _copyToVoiceCache(String msgId, String source) async {
+    final id = msgId.trim();
+    final srcPath = _existingPath(source);
+    if (id.isEmpty || srcPath == null) return null;
+    try {
+      final dir = await _voiceCacheDir();
+      final dest = File('${dir.path}/$id.m4a');
+      if (_existingPath(dest.path) != null) return dest.path;
+      await File(srcPath).copy(dest.path);
+      return dest.path;
+    } catch (error) {
+      debugPrint('ImService cache voice failed: $error');
+      return srcPath;
+    }
+  }
+
+  /// 录音在 tmp，离开页面后 iOS 常清掉；发送前拷到持久目录。
+  static Future<String> persistOutgoingVoice(String path) async {
+    final srcPath = _existingPath(path);
+    if (srcPath == null) return stripFileUri(path);
+    try {
+      final dir = await _voiceCacheDir();
+      final dest =
+          File('${dir.path}/out_${DateTime.now().millisecondsSinceEpoch}.m4a');
+      await File(srcPath).copy(dest.path);
+      return dest.path;
+    } catch (error) {
+      debugPrint('ImService persistOutgoingVoice failed: $error');
+      return srcPath;
+    }
+  }
+
+  /// CDN / 公开 http 可直接播；环信附件必须走 [downloadAttachment]。
+  static bool isDirectPlayableUrl(String url) {
+    final u = url.trim().toLowerCase();
+    if (!(u.startsWith('http://') || u.startsWith('https://'))) return false;
+    if (u.contains('chatfiles') ||
+        u.contains('easemob.com') ||
+        u.contains('chat.agora.io')) {
+      return false;
+    }
+    return true;
+  }
+
+  static String? _localOf(EMMessage m) {
+    final body = m.body;
+    if (body is! EMFileMessageBody) return null;
+    return _existingPath(body.localPath);
+  }
+
+  /// 语音/图片：本地已有则返回路径，否则按 msgId 重新下载附件。
+  static Future<String?> ensureLocalAttachment(String msgId) async {
+    final id = msgId.trim();
+    if (id.isEmpty) return null;
+    final cached = await _cachedVoice(id);
+    if (cached != null) return cached;
+    if (!_sdkInited) await connectFromServer();
+    try {
+      var msg = await EMClient.getInstance.chatManager.loadMessage(id);
+      if (msg == null) return null;
+      final existing = _localOf(msg);
+      if (existing != null) {
+        return await _copyToVoiceCache(id, existing) ?? existing;
+      }
+
+      final body = msg.body;
+      if (body is EMFileMessageBody) {
+        // 自己发出的语音：SDK 标 SUCCESS 但 tmp 文件已不在，必须强制再下。
+        if (body.fileStatus == DownloadStatus.SUCCESS ||
+            body.fileStatus == DownloadStatus.FAILED) {
+          body.fileStatus = DownloadStatus.PENDING;
+        }
+      }
+
+      final eventId = 'chimo_att_$id';
+      final done = Completer<EMMessage?>();
+      EMClient.getInstance.chatManager.addMessageEvent(
+        eventId,
+        ChatMessageEvent(
+          onSuccess: (mid, message) {
+            if (mid == id || message.msgId == id) {
+              if (!done.isCompleted) done.complete(message);
+            }
+          },
+          onError: (mid, message, error) {
+            if (mid == id || message.msgId == id) {
+              if (!done.isCompleted) done.completeError(error);
+            }
+          },
+        ),
+      );
+      try {
+        await EMClient.getInstance.chatManager.downloadAttachment(msg);
+        final quick = _localOf(
+          await EMClient.getInstance.chatManager.loadMessage(id) ?? msg,
+        );
+        if (quick != null) {
+          return await _copyToVoiceCache(id, quick) ?? quick;
+        }
+        final downloaded = await done.future.timeout(
+          const Duration(seconds: 20),
+        );
+        final path = _localOf(downloaded ?? msg);
+        if (path != null) {
+          return await _copyToVoiceCache(id, path) ?? path;
+        }
+      } finally {
+        EMClient.getInstance.chatManager.removeMessageEvent(eventId);
+      }
+      msg = await EMClient.getInstance.chatManager.loadMessage(id) ?? msg;
+      final last = _localOf(msg);
+      if (last != null) return await _copyToVoiceCache(id, last) ?? last;
+      return null;
+    } catch (error) {
+      debugPrint('ImService ensureLocalAttachment failed: $error');
+      return null;
+    }
+  }
+
+  /// 播放前解析：本地文件 / 公开 URL / 环信下载。
+  static Future<String?> resolvePlayableMedia({
+    required String mediaSource,
+    String msgId = '',
+  }) async {
+    final cached = await _cachedVoice(msgId);
+    if (cached != null) return cached;
+    final src = stripFileUri(mediaSource);
+    final existing = _existingPath(src);
+    if (existing != null) {
+      if (msgId.trim().isNotEmpty) {
+        return await _copyToVoiceCache(msgId, existing) ?? existing;
+      }
+      return existing;
+    }
+    if (isDirectPlayableUrl(src)) return src;
+    final downloaded = await ensureLocalAttachment(msgId);
+    if (downloaded != null && downloaded.isNotEmpty) return downloaded;
+    return _existingPath(src);
+  }
 
   /// 加载配置 + 凭证并连接。可安全多次调用。
   static Future<void> connectFromServer() async {
@@ -292,44 +497,70 @@ abstract final class ImService {
   static Future<void> _login(String user, String password) async {
     if (user.isEmpty || password.isEmpty) return;
     try {
-      if (_currentEmUser != null &&
-          _currentEmUser != user &&
-          await EMClient.getInstance.isLoginBefore()) {
-        await EMClient.getInstance.logout(true);
-      }
-      // 优先使用密码 API（4.15 上 login() 已弃用）。
+      await _ensureLoggedOutOfOthers(user);
       await EMClient.getInstance.loginWithPassword(user, password);
       _currentEmUser = user;
+      _connected = true;
       debugPrint('ImService loginWithPassword ok: $user');
     } on EMError catch (e) {
       debugPrint('ImService login failed code=${e.code} desc=${e.description}');
-      // 同一账号已登录通常可接受。
-      if (e.code == 200 || e.description.contains('already')) {
+      final already = e.code == 200 || e.description.contains('already');
+      if (!already) return;
+      final current = await sdkUserId();
+      if (current == user) {
         _currentEmUser = user;
+        _connected = true;
+        return;
       }
+      debugPrint('ImService already login as $current, switching to $user');
+      await _forceLogout();
+      await EMClient.getInstance.loginWithPassword(user, password);
+      _currentEmUser = user;
+      _connected = true;
     }
   }
 
-  static Future<void> logout() async {
+  static Future<String?> sdkUserId() async {
     try {
-      if (_sdkInited) {
-        // 弱网下 unbindDeviceToken 可能卡住；保持登出快速。
-        try {
-          await EMClient.getInstance
-              .logout(true)
-              .timeout(const Duration(seconds: 2));
-        } on TimeoutException {
-          debugPrint('ImService logout(true) timed out; retry without unbind');
-          await EMClient.getInstance
-              .logout(false)
-              .timeout(const Duration(seconds: 1));
-        }
+      final id = await EMClient.getInstance.getCurrentUserId();
+      if (id != null && id.trim().isNotEmpty) return id.trim();
+    } catch (_) {}
+    final cached = EMClient.getInstance.currentUserId?.trim();
+    return (cached != null && cached.isNotEmpty) ? cached : _currentEmUser;
+  }
+
+  static Future<void> _ensureLoggedOutOfOthers(String nextUser) async {
+    final current = await sdkUserId();
+    var logged = false;
+    try {
+      logged = await EMClient.getInstance.isLoginBefore();
+    } catch (_) {}
+    if (!logged && (current == null || current.isEmpty)) return;
+    if (current == nextUser) return;
+    debugPrint('ImService logout previous IM user=$current before $nextUser');
+    await _forceLogout();
+  }
+
+  static Future<void> _forceLogout() async {
+    try {
+      await EMClient.getInstance
+          .logout(true)
+          .timeout(const Duration(seconds: 2));
+    } catch (_) {
+      try {
+        await EMClient.getInstance
+            .logout(false)
+            .timeout(const Duration(seconds: 1));
+      } catch (error) {
+        debugPrint('ImService forceLogout: $error');
       }
-    } catch (error) {
-      debugPrint('ImService logout error: $error');
     }
     _currentEmUser = null;
     _connected = false;
+  }
+
+  static Future<void> logout() async {
+    await _forceLogout();
   }
 
   /// 发送文本。[peerEmUsername] 为对端环信 id；[isGroup] 时为群 id。
@@ -566,10 +797,8 @@ abstract final class ImService {
       throw StateError('Voice too short');
     }
     if (!_sdkInited) await connectFromServer();
-    var local = path;
-    if (local.startsWith('file://')) {
-      local = local.substring(7);
-    }
+    var local = stripFileUri(path);
+    local = await persistOutgoingVoice(local);
     final file = File(local);
     if (!file.existsSync()) {
       throw StateError('Voice file missing: $local');
@@ -579,13 +808,18 @@ abstract final class ImService {
       filePath: local,
       duration: durationSecs,
       fileSize: file.lengthSync(),
-      displayName: local.split(RegExp(r'[/\\]')).last,
+      // 对齐 forya：扩展名决定 MIME；全名会被 SDK 误判成 audio/mpeg。
+      displayName: '.m4a',
     );
     msg.chatType = isGroup ? ChatType.GroupChat : ChatType.Chat;
     try {
       await _applyCommonAttrs(msg, peer: peer);
       final sent = await EMClient.getInstance.chatManager.sendMessage(msg);
-      return _emitAndReturn(sent, forceSelf: true);
+      final out = _emitAndReturn(sent, forceSelf: true);
+      if (out != null && out.id.isNotEmpty) {
+        unawaited(_copyToVoiceCache(out.id, local));
+      }
+      return out;
     } on EMError catch (e) {
       debugPrint('ImService sendVoice failed ${e.code} ${e.description}');
       await _persistFailed(msg, peerEmUsername, isGroup: isGroup);
@@ -901,7 +1135,7 @@ abstract final class ImService {
       if (emote != null) {
         return emote.name.isEmpty ? '[Sticker]' : '[${emote.name}]';
       }
-      return body.content;
+      return AppEmoji.normalize(body.content);
     }
     if (body is EMImageMessageBody) return '[Image]';
     if (body is EMVoiceMessageBody) {
@@ -990,7 +1224,7 @@ abstract final class ImService {
     var durationSecs = 0;
 
     if (body is EMTextMessageBody) {
-      text = body.content;
+      text = AppEmoji.normalize(body.content);
       final emote = _emoteFromAttributes(message.attributes);
       if (emote != null) {
         type = 'emote';

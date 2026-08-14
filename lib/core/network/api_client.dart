@@ -1,9 +1,9 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
 
 import 'api_config.dart';
-import 'auth_request_headers.dart';
 
 /// echimo / forya 通用响应信封（JSON 或 protobuf 解码后的字段）。
 class ApiResponse {
@@ -43,19 +43,40 @@ class ApiResponse {
   }
 }
 
-/// 轻量 HTTP 客户端，对齐 D:\forya `JRNetwork` + `HeaderInterceptor`：
+/// Dio 客户端：拦截器链对齐 forya `JRNetwork` + `HeaderInterceptor`。
+///
 /// - Content-Type: application/json
 /// - Body: `{"bizParam":{...}}` 的 JSON 字符串
-/// - Accept: 暂用 JSON（Chimo 尚无 BaseRsp proto；forya 默认 protobuf）
+/// - Accept: 暂用 JSON（Chimo 尚无 BaseRsp proto）
 class ApiClient {
-  ApiClient({http.Client? httpClient, this.tokenProvider})
-      : _http = httpClient ?? http.Client();
+  ApiClient({
+    Dio? dio,
+    List<Interceptor>? interceptors,
+  }) : _dio = dio ??
+            Dio(
+              BaseOptions(
+                baseUrl: ApiConfig.baseUrl,
+                connectTimeout: const Duration(seconds: 10),
+                receiveTimeout: const Duration(seconds: 10),
+                sendTimeout: const Duration(seconds: 10),
+                contentType: Headers.jsonContentType,
+                responseType: ResponseType.plain,
+                headers: {
+                  Headers.acceptHeader: Headers.jsonContentType,
+                },
+              ),
+            ) {
+    if (interceptors != null && interceptors.isNotEmpty) {
+      _dio.interceptors.addAll(interceptors);
+    }
+  }
 
   /// forya `JRNetwork.headerProto`（接入 BaseRsp 后再切回）
   static const acceptProto = 'application/x-protobuf';
 
-  final http.Client _http;
-  final String? Function()? tokenProvider;
+  final Dio _dio;
+
+  Dio get dio => _dio;
 
   Uri _uri(String path, [Map<String, String>? query]) {
     final normalized = path.startsWith('/') ? path : '/$path';
@@ -76,28 +97,6 @@ class ApiClient {
     return base.replace(query: pairs.join('&'));
   }
 
-  Map<String, String> _headers() {
-    // 对齐 forya JRNetwork BaseOptions + HeaderInterceptor：
-    // Accept=protobuf，Content-Type=json；token/timestamp 无前缀；
-    // commonParam 全部以 df_ 前缀写入。
-    final headers = <String, String>{
-      'Content-Type': 'application/json',
-      // Chimo 目前只解 JSON；用 protobuf Accept 会拿到二进制回包导致登录刷新失败。
-      'Accept': 'application/json',
-      'timestamp': '${DateTime.now().millisecondsSinceEpoch}',
-    };
-    AuthRequestHeaders.commonParam.forEach((key, value) {
-      final text = value.trim();
-      if (text.isEmpty) return;
-      headers['df_$key'] = text;
-    });
-    final token = tokenProvider?.call();
-    if (token != null && token.isNotEmpty) {
-      headers['token'] = token;
-    }
-    return headers;
-  }
-
   Map<String, dynamic> _wrapBizParam(Map<String, dynamic> bizParam) {
     final payload = Map<String, dynamic>.from(bizParam);
     payload.putIfAbsent(
@@ -110,33 +109,52 @@ class ApiClient {
   Future<ApiResponse> post(
     String path, {
     Map<String, dynamic>? bizParam,
-  }) async {
-    final uri = _uri(path);
-    final body = jsonEncode(_wrapBizParam(bizParam ?? const {}));
-    // ignore: avoid_print
-    print('ApiClient POST $uri body=$body');
-    final response = await _send(
-      () => _http.post(uri, headers: _headers(), body: body),
+  }) {
+    return _request(
+      method: 'POST',
+      uri: _uri(path),
+      data: jsonEncode(_wrapBizParam(bizParam ?? const {})),
     );
-    return _decode(response);
   }
 
   Future<ApiResponse> get(
     String path, {
     Map<String, String>? query,
+  }) {
+    return _request(method: 'GET', uri: _uri(path, query));
+  }
+
+  Future<ApiResponse> _request({
+    required String method,
+    required Uri uri,
+    Object? data,
   }) async {
-    final uri = _uri(path, query);
     // ignore: avoid_print
-    print('ApiClient GET $uri');
-    final response = await _send(
-      () => _http.get(uri, headers: _headers()),
+    print(
+      'ApiClient $method $uri'
+      '${data == null ? '' : ' body=$data'}',
     );
-    return _decode(response);
+
+    try {
+      final response = await _send(
+        () => _dio.requestUri(
+          uri,
+          data: data,
+          options: Options(method: method),
+        ),
+      );
+      return _decode(response);
+    } on DioException catch (error) {
+      if (error.response != null) {
+        return _decode(error.response!);
+      }
+      rethrow;
+    }
   }
 
   /// 重试瞬时 TLS / socket 失败（模拟器网络不稳定）。
-  Future<http.Response> _send(
-    Future<http.Response> Function() call, {
+  Future<Response<dynamic>> _send(
+    Future<Response<dynamic>> Function() call, {
     int maxAttempts = 3,
   }) async {
     Object? lastError;
@@ -151,7 +169,10 @@ class ApiClient {
             text.contains('Connection closed') ||
             text.contains('SocketException') ||
             text.contains('ClientException') ||
-            text.contains('Connection reset');
+            text.contains('Connection reset') ||
+            (error is DioException &&
+                (error.type == DioExceptionType.connectionError ||
+                    error.type == DioExceptionType.connectionTimeout));
         // ignore: avoid_print
         print(
           'ApiClient transport error attempt=$attempt/$maxAttempts: $error',
@@ -160,36 +181,39 @@ class ApiClient {
         await Future<void>.delayed(Duration(milliseconds: 350 * attempt));
       }
     }
-    // 不可达；让 analyzer 满意。
     throw lastError ?? StateError('ApiClient send failed');
   }
 
-  ApiResponse _decode(http.Response response) {
-    final contentType = response.headers['content-type'] ?? '';
-    final rawBody = response.body;
+  ApiResponse _decode(Response<dynamic> response) {
+    final contentType =
+        response.headers.value(Headers.contentTypeHeader) ?? '';
+    final rawBody = _bodyAsString(response.data);
     final preview =
         rawBody.length > 400 ? '${rawBody.substring(0, 400)}…' : rawBody;
     // ignore: avoid_print
-    print('ApiClient ← ${response.statusCode} content-type=$contentType $preview');
+    print(
+      'ApiClient ← ${response.statusCode} content-type=$contentType $preview',
+    );
 
-    // forya：Content-Type 含 application/x-protobuf 时走 BaseRsp.fromBuffer；
-    // Chimo 暂无完整 proto，若服务端回包仍是 JSON 则按 JSON 解（response_ext 也有 JSON 回退）。
     final looksJson = rawBody.trimLeft().startsWith('{') ||
         rawBody.trimLeft().startsWith('[');
     if (contentType.contains(acceptProto) && !looksJson) {
       // ignore: avoid_print
       print('ApiClient protobuf body not decoded (no BaseRsp proto in Chimo)');
+      final length = response.data is List<int>
+          ? (response.data as List<int>).length
+          : rawBody.length;
       return ApiResponse(
         success: false,
         code: response.statusCode,
         message: 'protobuf.response.unsupported',
-        raw: {'bodyLength': response.bodyBytes.length},
+        raw: {'bodyLength': length},
         httpStatus: response.statusCode,
       );
     }
 
     try {
-      final decoded = jsonDecode(rawBody);
+      final decoded = rawBody.isEmpty ? null : jsonDecode(rawBody);
       if (decoded is Map<String, dynamic>) {
         return ApiResponse.fromJson(decoded, httpStatus: response.statusCode);
       }
@@ -212,9 +236,18 @@ class ApiClient {
     );
   }
 
+  static String _bodyAsString(Object? data) {
+    if (data == null) return '';
+    if (data is String) return data;
+    if (data is Uint8List) return utf8.decode(data);
+    if (data is List<int>) return utf8.decode(data);
+    if (data is Map || data is List) return jsonEncode(data);
+    return '$data';
+  }
+
   Future<ApiResponse> pingUserOpen({bool open = false}) {
     return post('/user/open', bizParam: {'open': open});
   }
 
-  void close() => _http.close();
+  void close() => _dio.close(force: true);
 }

@@ -30,10 +30,15 @@ abstract final class GroupMemberDto {
   static GroupMember fromUserMap(Map<String, dynamic> json) {
     final id = '${json['id'] ?? ''}';
     final avatar = '${json['avatar'] ?? ''}'.trim();
-    final genderRaw = '${json['gender'] ?? ''}'.toLowerCase();
+    final genderRaw = '${json['gender'] ?? ''}'.trim().toLowerCase();
     final isMale = switch (genderRaw) {
       'female' || 'f' || '2' => false,
+      'male' || 'm' || '1' => true,
       _ => true,
+    };
+    final hasGender = switch (genderRaw) {
+      'female' || 'f' || '2' || 'male' || 'm' || '1' => true,
+      _ => false,
     };
     return GroupMember(
       id: id,
@@ -41,6 +46,7 @@ abstract final class GroupMemberDto {
       avatarAsset: AppAssets.avatarPlace,
       avatarUrl: avatar.isEmpty ? null : avatar,
       isMale: isMale,
+      hasGender: hasGender,
     );
   }
 }

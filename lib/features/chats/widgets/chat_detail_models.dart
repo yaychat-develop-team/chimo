@@ -10,6 +10,7 @@ class _ChatLine {
     this.kind = _ChatLineKind.text,
     this.text = '',
     this.voiceSeconds = 0,
+
     /// 资源路径、绝对文件路径或 http(s) URL（图片 / 语音 / 表情）。
     this.mediaSource = '',
     this.imageAssets = const [],
@@ -46,13 +47,13 @@ class _ChatLine {
   /// 发送失败（如被对方拉黑），气泡旁显示红色感叹号。
   final bool failed;
 
-  _ChatLine copyWith({bool? failed, String? msgId}) {
+  _ChatLine copyWith({bool? failed, String? msgId, String? mediaSource}) {
     return _ChatLine(
       side: side,
       kind: kind,
       text: text,
       voiceSeconds: voiceSeconds,
-      mediaSource: mediaSource,
+      mediaSource: mediaSource ?? this.mediaSource,
       imageAssets: imageAssets,
       giftId: giftId,
       giftQty: giftQty,
@@ -101,14 +102,17 @@ abstract final class _BubbleLayout {
   static const double padV = 12;
   static const double peerMax = 243;
   static const double selfMax = 260;
+
   /// 连续同发送者消息间距（尤其媒体堆叠）。
   static const double sameGap = 6;
   static const double sameMediaGap = 4;
   static const double otherGap = 20;
+
   /// 缩略图式媒体（接近 forya 110×~196）。
   static const double imageW = 132;
   static const double imageH = 176;
   static const double imageRadius = 12;
+
   /// 贴纸气泡（forya _EmoteItem：宽 65，fitWidth）。
   static const double emoteSize = 65;
   static const Color peerColor = Color(0xFFF0F0F0);

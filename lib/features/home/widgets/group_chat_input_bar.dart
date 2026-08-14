@@ -1390,7 +1390,8 @@ class _EmojiPanelState extends State<_EmojiPanel> {
                           child: Center(
                             child: Text(
                               emoji,
-                              style: const TextStyle(fontSize: 26).withAppEmoji,
+                              style: const TextStyle(fontSize: 26)
+                                  .withAppEmojiFont,
                             ),
                           ),
                         );

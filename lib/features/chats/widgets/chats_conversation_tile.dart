@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_assets.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_emoji.dart';
 import '../../../core/widgets/app_asset_image.dart';
 import '../../../core/widgets/app_avatar.dart';
 import '../../../core/widgets/network_or_asset_avatar.dart';
@@ -235,7 +236,7 @@ class _ChatsConversationTileState extends State<ChatsConversationTile> {
                                   ],
                                 ),
                                 const SizedBox(height: 4),
-                                Text(
+                                AppEmojiText(
                                   conversation.listSubtitle,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -303,7 +304,7 @@ class _TitleText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!useBrandGradient) {
-      return Text(
+      return AppEmojiText(
         text,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
@@ -315,7 +316,7 @@ class _TitleText extends StatelessWidget {
       blendMode: BlendMode.srcIn,
       shaderCallback: (bounds) =>
           AppColors.brandTextGradient.createShader(bounds),
-      child: Text(
+      child: AppEmojiText(
         text,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,

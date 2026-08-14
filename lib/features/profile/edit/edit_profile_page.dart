@@ -217,7 +217,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         if (pending.isNotEmpty &&
             !pending.startsWith('http://') &&
             !pending.startsWith('https://')) {
-          final uploaded = await MediaUpload.uploadFile(pending, sceneCode: 102);
+          final uploaded = await MediaUpload.uploadVoice(pending);
           if (uploaded == null || uploaded.isEmpty) {
             if (!mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
@@ -351,7 +351,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     setState(() => _photoPaths.add(localPath));
 
     try {
-      final remote = await MediaUpload.uploadFile(localPath);
+      final remote = await MediaUpload.uploadImage(localPath);
       if (!mounted) return;
       if (remote == null) {
         setState(() => _photoPaths.remove(localPath));
@@ -523,7 +523,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     if (!mounted || result == null || result.seconds <= 0) return;
     final local = result.path.trim();
     if (local.isEmpty) return;
-    final uploaded = await MediaUpload.uploadFile(local, sceneCode: 102);
+    final uploaded = await MediaUpload.uploadVoice(local);
     if (!mounted) return;
     if (uploaded == null || uploaded.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -777,16 +777,17 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   ],
                 ),
               ),
-              Padding(
-                padding: EdgeInsets.fromLTRB(16, 8, 16, 12 + bottom),
-                child: AppGradientButton(
-                  label: widget.fromOnboarding ? 'Save' : 'Done',
-                  onTap: widget.fromOnboarding ? _save : _leave,
-                  height: 48,
-                  borderRadius: 24,
-                  loading: _saving,
+              if (widget.fromOnboarding)
+                Padding(
+                  padding: EdgeInsets.fromLTRB(16, 8, 16, 12 + bottom),
+                  child: AppGradientButton(
+                    label: 'Save',
+                    onTap: _save,
+                    height: 48,
+                    borderRadius: 24,
+                    loading: _saving,
+                  ),
                 ),
-              ),
             ],
           ),
         ),

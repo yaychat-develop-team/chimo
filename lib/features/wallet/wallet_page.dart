@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_assets.dart';
+import '../../core/iap/iap_service.dart';
 import '../../core/network/app_apis.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_nav_bar.dart';
@@ -23,6 +24,7 @@ class _WalletPageState extends State<WalletPage> {
   List<CashChargeProduct> _options = const [];
   int _selectedIndex = 0;
   bool _loading = true;
+  StreamSubscription<void>? _rechargeSub;
 
   CashChargeProduct? get _selected {
     if (_options.isEmpty) return null;
@@ -43,9 +45,18 @@ class _WalletPageState extends State<WalletPage> {
   @override
   void initState() {
     super.initState();
+    _rechargeSub = IapService.rechargeCompleted.listen((_) {
+      unawaited(_load());
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(_load());
     });
+  }
+
+  @override
+  void dispose() {
+    unawaited(_rechargeSub?.cancel() ?? Future<void>.value());
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -58,7 +69,11 @@ class _WalletPageState extends State<WalletPage> {
       if (!mounted) return;
 
       final balance = balanceRes.data ?? 0;
-      final products = optionsRes.data ?? const [];
+      var products = optionsRes.data ?? const <CashChargeProduct>[];
+      if (products.isNotEmpty) {
+        products = await IapService.applyStorePrices(products);
+      }
+      if (!mounted) return;
 
       setState(() {
         _balance = balance;
@@ -88,7 +103,7 @@ class _WalletPageState extends State<WalletPage> {
     );
   }
 
-  void _onTopUp() {
+  Future<void> _onTopUp() async {
     final selected = _selected;
     if (selected == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -99,19 +114,7 @@ class _WalletPageState extends State<WalletPage> {
       );
       return;
     }
-    final id = selected.goodsId.isNotEmpty
-        ? selected.goodsId
-        : selected.productId;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          id.isEmpty
-              ? 'Top up ${selected.priceLabel} (${selected.coins} coins)'
-              : 'Package $id · ${selected.coins} coins · ${selected.priceLabel} (IAP pending)',
-        ),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    await IapService.buy(selected);
   }
 
   @override

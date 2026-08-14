@@ -8,7 +8,9 @@ import 'api_client.dart';
 import 'auth_request_headers.dart';
 import 'api_config.dart';
 import 'api_config_store.dart';
+import 'auth_response_interceptor.dart';
 import 'chimo_api.dart';
+import 'header_interceptor.dart';
 import 'proxy_config_store.dart';
 
 /// 应用级网络启动：加载环境与可选心跳。
@@ -26,10 +28,22 @@ abstract final class NetworkBootstrap {
   static ChimoApi get api => _api ??= ChimoApi(client);
 
   static ApiClient _createClient() {
-    return ApiClient(
-      httpClient: ProxyConfigStore.buildIoClient(),
-      tokenProvider: () => authToken,
+    final client = ApiClient(
+      interceptors: [
+        HeaderInterceptor(tokenProvider: () => authToken),
+        // 仅观测业务未登录；真正清会话仍由 ApiGateway（retry 之后）负责。
+        AuthResponseInterceptor(
+          onNotLogin: (options, response) async {
+            debugPrint(
+              'AuthResponseInterceptor not-login '
+              '${options.uri.path} code=${response.code}',
+            );
+          },
+        ),
+      ],
     );
+    ProxyConfigStore.configureDio(client.dio);
+    return client;
   }
 
   /// 代理变更后重建 HTTP 客户端（对齐 forya `JRNetwork.updateProxy`）。

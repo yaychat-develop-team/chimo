@@ -234,6 +234,7 @@ class _DmMessagesFeed extends StatelessWidget {
             side: line.side,
             seconds: line.voiceSeconds,
             mediaSource: line.mediaSource,
+            msgId: line.msgId,
             peerAvatar: peerAvatar,
             peerAvatarUrl: peerAvatarUrl,
             selfAvatarUrl: selfAvatarUrl,
@@ -476,10 +477,9 @@ class _PeerBubble extends StatelessWidget {
                 letterSpacing: 1.5,
                 fontWeight: FontWeight.w500,
               )
-            : _BubbleLayout.peerTextStyle)
-        .withAppEmoji;
+            : _BubbleLayout.peerTextStyle);
     final child = pureEmoji
-        ? Text(text, style: style)
+        ? AppEmojiText(text, style: style)
         : Container(
             padding: const EdgeInsets.symmetric(
               horizontal: _BubbleLayout.padH,
@@ -494,7 +494,7 @@ class _PeerBubble extends StatelessWidget {
                 bottomRight: Radius.circular(18),
               ),
             ),
-            child: Text(text, style: style),
+            child: AppEmojiText(text, style: style),
           );
     return _ChatRow(
       isSelf: false,
@@ -534,10 +534,9 @@ class _SelfBubble extends StatelessWidget {
                 letterSpacing: 1.5,
                 fontWeight: FontWeight.w500,
               )
-            : _BubbleLayout.textStyle)
-        .withAppEmoji;
+            : _BubbleLayout.textStyle);
     final child = pureEmoji
-        ? Text(text, style: style)
+        ? AppEmojiText(text, style: style)
         : Container(
             padding: const EdgeInsets.symmetric(
               horizontal: _BubbleLayout.padH,
@@ -552,7 +551,7 @@ class _SelfBubble extends StatelessWidget {
                 bottomRight: Radius.circular(18),
               ),
             ),
-            child: Text(text, style: style),
+            child: AppEmojiText(text, style: style),
           );
     return _ChatRow(
       isSelf: true,
@@ -576,6 +575,7 @@ class _VoiceBubble extends StatefulWidget {
     required this.peerAvatar,
     required this.showAvatar,
     this.mediaSource = '',
+    this.msgId = '',
     this.peerAvatarUrl,
     this.selfAvatarUrl,
     this.failed = false,
@@ -585,6 +585,7 @@ class _VoiceBubble extends StatefulWidget {
   final _ChatSide side;
   final int seconds;
   final String mediaSource;
+  final String msgId;
   final String peerAvatar;
   final String? peerAvatarUrl;
   final String? selfAvatarUrl;
@@ -665,16 +666,26 @@ class _VoiceBubbleState extends State<_VoiceBubble>
     _waveController.repeat();
 
     final src = _source;
-    if (src.isNotEmpty) {
-      try {
-        await AppAudioPlayback.play(_player, src);
-        await _completeSub?.cancel();
-        _completeSub = _player.onPlayerComplete.listen((_) {
-          if (mounted) _stopPlay();
-        });
-      } catch (error) {
-        debugPrint('Voice play failed: $error');
+    try {
+      final playable = await ImService.resolvePlayableMedia(
+        mediaSource: src,
+        msgId: widget.msgId,
+      );
+      if (!mounted || !_playing) return;
+      if (playable == null || playable.isEmpty) {
+        debugPrint('Voice play failed: no local file');
+        _stopPlay();
+        return;
       }
+      await AppAudioPlayback.play(_player, playable);
+      await _completeSub?.cancel();
+      _completeSub = _player.onPlayerComplete.listen((_) {
+        if (mounted) _stopPlay();
+      });
+    } catch (error) {
+      debugPrint('Voice play failed: $error');
+      if (mounted) _stopPlay();
+      return;
     }
 
     // 即使音频失败也做 UI 倒计时（保持波形条动画）。

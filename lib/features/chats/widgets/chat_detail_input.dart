@@ -995,7 +995,7 @@ class _ChatEmojiPanelState extends State<_ChatEmojiPanel> {
               child: Center(
                 child: Text(
                   emoji,
-                  style: const TextStyle(fontSize: 24).withAppEmoji,
+                  style: const TextStyle(fontSize: 24).withAppEmojiFont,
                 ),
               ),
             );

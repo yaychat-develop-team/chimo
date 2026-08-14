@@ -8,15 +8,27 @@ import 'network_bootstrap.dart';
 
 /// 通过 `GET /aws/upload-url` 获取签名 URL，再 PUT 上传本地媒体。
 ///
-/// 对齐 D:\forya `S3UploadApi`（sceneCode 101 = 图片，102 = 语音）。
+/// 对齐 D:\forya `S3UploadApi`（sceneCode 101 = 图片，102 = 语音，103 = 视频）。
+/// 签名接口会按 **filename 扩展名** 决定场景文案；iOS 相册临时文件经常没有后缀，
+/// 会被后端当成「将音频上传」。因此必须补齐扩展名，并显式传 sceneCode。
 abstract final class MediaUpload {
+  static const imageScene = 101;
+  static const voiceScene = 102;
+  static const videoScene = 103;
+
   static const _cdnDomain = 'https://cdn.echimo.com';
   static const _maxAttempts = 3;
+
+  static Future<String?> uploadImage(String path) =>
+      uploadFile(path, sceneCode: imageScene);
+
+  static Future<String?> uploadVoice(String path) =>
+      uploadFile(path, sceneCode: voiceScene);
 
   /// 成功返回面向 CDN 的 URL；否则 `null`。
   static Future<String?> uploadFile(
     String path, {
-    int sceneCode = 101,
+    int sceneCode = imageScene,
   }) async {
     var filePath = path;
     if (filePath.startsWith('file://')) {
@@ -28,7 +40,7 @@ abstract final class MediaUpload {
     final length = await file.length();
     if (length <= 0 || length > 10 * 1024 * 1024) return null;
 
-    final name = filePath.split(RegExp(r'[/\\]')).last;
+    final name = _filenameForScene(filePath, sceneCode);
     final signed = await ApiGateway.request(
       () => NetworkBootstrap.api.uploadUrl(
         sceneCode: sceneCode,
@@ -40,12 +52,14 @@ abstract final class MediaUpload {
     final signedUrl = signed.data;
     if (signedUrl == null || signedUrl.isEmpty) return null;
 
-    // Forya：按扩展名猜 mime，回退 application/octet-stream。
-    // 语音场景始终用 octet-stream——签名 URL 仅覆盖 `host` 时，
+    // 语音/视频场景始终用 octet-stream——签名 URL 仅覆盖 `host` 时，
     // 模拟器上 audio/* 常导致 S3 重置连接。
-    final contentType = sceneCode == 102 || sceneCode == 103
+    var contentType = (sceneCode == voiceScene || sceneCode == videoScene)
         ? 'application/octet-stream'
         : _guessMime(name);
+    if (sceneCode == imageScene && contentType == 'application/octet-stream') {
+      contentType = 'image/jpeg';
+    }
 
     final ok = await _putWithRetry(
       signedUrl: signedUrl,
@@ -56,6 +70,42 @@ abstract final class MediaUpload {
     if (!ok) return null;
 
     return _toCdnUrl(signedUrl);
+  }
+
+  /// 给签名接口一个能识别场景的文件名（无后缀时补上）。
+  static String _filenameForScene(String filePath, int sceneCode) {
+    final raw = filePath.split(RegExp(r'[/\\]')).last.trim();
+    final lower = raw.toLowerCase();
+    if (sceneCode == voiceScene) {
+      if (_hasExt(lower, const ['.m4a', '.aac', '.mp3', '.wav', '.caf'])) {
+        return raw;
+      }
+      return _withExt(raw, 'voice.m4a');
+    }
+    if (sceneCode == videoScene) {
+      if (_hasExt(lower, const ['.mp4', '.mov', '.m4v', '.webm'])) return raw;
+      return _withExt(raw, 'video.mp4');
+    }
+    if (_hasExt(lower, const [
+      '.jpg',
+      '.jpeg',
+      '.png',
+      '.webp',
+      '.gif',
+      '.heic',
+      '.heif',
+    ])) {
+      return raw;
+    }
+    return _withExt(raw, 'image.jpg');
+  }
+
+  static bool _hasExt(String lower, List<String> exts) =>
+      exts.any(lower.endsWith);
+
+  static String _withExt(String raw, String fallback) {
+    if (raw.isEmpty || !raw.contains('.')) return fallback;
+    return '$raw.${fallback.split('.').last}';
   }
 
   static Future<bool> _putWithRetry({
