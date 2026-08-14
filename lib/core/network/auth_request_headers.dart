@@ -15,7 +15,6 @@ abstract final class AuthRequestHeaders {
     'accept_language': 'en_US',
     'system_language': 'en_US',
     'platform': 'android',
-    'app_id': '1003',
   };
 
   static Future<void> initialize() async {
@@ -23,7 +22,7 @@ abstract final class AuthRequestHeaders {
       'accept_language': 'en_US',
       'system_language': 'en_US',
       'platform': Platform.isIOS ? 'ios' : 'android',
-      'app_id': '1003',
+      'app_id': '1004',
       'timezone':
           '${DateTime.now().timeZoneName},${DateTime.now().timeZoneOffset.inMilliseconds}',
     };
