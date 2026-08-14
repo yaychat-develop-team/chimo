@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_assets.dart';
+import '../../../core/widgets/app_network_image.dart';
 import '../data/banner_dto.dart';
 
 /// 首页推广横幅轮播（网络图，本地资源回退）。
@@ -132,12 +133,13 @@ class _HomeHeroBannerState extends State<HomeHeroBanner> {
 
   Widget _image(String src) {
     if (_useNetwork) {
-      return Image.network(
+      return AppNetworkImage(
         src,
         fit: BoxFit.cover,
         width: double.infinity,
         height: double.infinity,
-        errorBuilder: (_, error, stack) => Image.asset(
+        memCacheWidth: 1080,
+        errorWidget: (_, error, stack) => Image.asset(
           AppAssets.homeBanners.first,
           fit: BoxFit.cover,
           width: double.infinity,

@@ -889,24 +889,21 @@ class _ImageBubble extends StatelessWidget {
       );
     }
     if (src.startsWith('http://') || src.startsWith('https://')) {
-      return Image.network(
+      return AppNetworkImage(
         src,
         fit: BoxFit.cover,
-        gaplessPlayback: true,
-        loadingBuilder: (context, child, progress) {
-          if (progress == null) return child;
-          return const ColoredBox(
-            color: Color(0xFFF3F3F3),
-            child: Center(
-              child: SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
+        memCacheWidth: 720,
+        placeholder: (_, _) => const ColoredBox(
+          color: Color(0xFFF3F3F3),
+          child: Center(
+            child: SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(strokeWidth: 2),
             ),
-          );
-        },
-        errorBuilder: (_, _, _) => Container(
+          ),
+        ),
+        errorWidget: (_, _, _) => Container(
           color: const Color(0xFF262624),
           alignment: Alignment.center,
           child: const Text(
@@ -1075,30 +1072,26 @@ class _EmoteBubble extends StatelessWidget {
 
     final Widget image;
     if (src.startsWith('http://') || src.startsWith('https://')) {
-      image = Image.network(
+      image = AppNetworkImage(
         src,
         width: size,
         fit: BoxFit.fitWidth,
-        gaplessPlayback: true,
         filterQuality: FilterQuality.medium,
-        loadingBuilder: (context, child, progress) {
-          if (progress == null) return child;
-          return const SizedBox(
-            width: size,
-            height: size,
-            child: ColoredBox(
-              color: Color(0xFFF5F5F5),
-              child: Center(
-                child: SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
+        placeholder: (_, _) => const SizedBox(
+          width: size,
+          height: size,
+          child: ColoredBox(
+            color: Color(0xFFF5F5F5),
+            child: Center(
+              child: SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
               ),
             ),
-          );
-        },
-        errorBuilder: (_, _, _) => const SizedBox(
+          ),
+        ),
+        errorWidget: (_, _, _) => const SizedBox(
           width: size,
           height: size,
           child: ColoredBox(
@@ -1180,12 +1173,12 @@ class _GiftMessageCard extends StatelessWidget {
 
   Widget _giftIcon() {
     if (giftIconUrl.isNotEmpty) {
-      return Image.network(
+      return AppNetworkImage(
         giftIconUrl,
         width: 56,
         height: 56,
         fit: BoxFit.contain,
-        errorBuilder: (_, _, _) => Text(
+        errorWidget: (_, _, _) => Text(
           emoji.isEmpty ? '🎁' : emoji,
           style: const TextStyle(fontSize: 36, height: 1),
         ),

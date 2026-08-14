@@ -5,6 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/constants/app_assets.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/center_toast.dart';
+import '../../../core/widgets/app_network_image.dart';
 import '../../../core/widgets/network_or_asset_avatar.dart';
 import '../chat_user_profile_page.dart';
 import '../../chats/chat_detail_page.dart';
@@ -281,11 +282,11 @@ class _ChatUserProfileSheetState extends State<ChatUserProfileSheet> {
                           ),
                         ),
                       if ((_profile.vipIconUrl ?? '').trim().isNotEmpty)
-                        Image.network(
+                        AppNetworkImage(
                           _profile.vipIconUrl!.trim(),
                           height: 22,
                           fit: BoxFit.fitHeight,
-                          errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                          errorWidget: (_, _, _) => const SizedBox.shrink(),
                         ),
                     ],
                   ),
