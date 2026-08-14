@@ -49,23 +49,20 @@ class ApiResponse {
 /// - Body: `{"bizParam":{...}}` 的 JSON 字符串
 /// - Accept: 暂用 JSON（Chimo 尚无 BaseRsp proto）
 class ApiClient {
-  ApiClient({
-    Dio? dio,
-    List<Interceptor>? interceptors,
-  }) : _dio = dio ??
-            Dio(
-              BaseOptions(
-                baseUrl: ApiConfig.baseUrl,
-                connectTimeout: const Duration(seconds: 10),
-                receiveTimeout: const Duration(seconds: 10),
-                sendTimeout: const Duration(seconds: 10),
-                contentType: Headers.jsonContentType,
-                responseType: ResponseType.plain,
-                headers: {
-                  Headers.acceptHeader: Headers.jsonContentType,
-                },
-              ),
-            ) {
+  ApiClient({Dio? dio, List<Interceptor>? interceptors})
+    : _dio =
+          dio ??
+          Dio(
+            BaseOptions(
+              baseUrl: ApiConfig.baseUrl,
+              connectTimeout: const Duration(seconds: 10),
+              receiveTimeout: const Duration(seconds: 10),
+              sendTimeout: const Duration(seconds: 10),
+              contentType: Headers.jsonContentType,
+              responseType: ResponseType.plain,
+              headers: {Headers.acceptHeader: Headers.jsonContentType},
+            ),
+          ) {
     if (interceptors != null && interceptors.isNotEmpty) {
       _dio.interceptors.addAll(interceptors);
     }
@@ -85,10 +82,7 @@ class ApiClient {
     // Uri.replace(queryParameters:) 会丢掉空值的 "="（变成 "keyword"
     // 而不是 "keyword="），而 echimo 列表接口与 forya 一样期望显式空关键字：
     // keyword=$searchStr。
-    final merged = <String, String>{
-      ...base.queryParameters,
-      ...query,
-    };
+    final merged = <String, String>{...base.queryParameters, ...query};
     final pairs = <String>[
       for (final e in merged.entries)
         '${Uri.encodeQueryComponent(e.key)}='
@@ -106,10 +100,7 @@ class ApiClient {
     return {'bizParam': payload};
   }
 
-  Future<ApiResponse> post(
-    String path, {
-    Map<String, dynamic>? bizParam,
-  }) {
+  Future<ApiResponse> post(String path, {Map<String, dynamic>? bizParam}) {
     return _request(
       method: 'POST',
       uri: _uri(path),
@@ -117,10 +108,7 @@ class ApiClient {
     );
   }
 
-  Future<ApiResponse> get(
-    String path, {
-    Map<String, String>? query,
-  }) {
+  Future<ApiResponse> get(String path, {Map<String, String>? query}) {
     return _request(method: 'GET', uri: _uri(path, query));
   }
 
@@ -164,7 +152,8 @@ class ApiClient {
       } catch (error) {
         lastError = error;
         final text = '$error';
-        final retryable = text.contains('HandshakeException') ||
+        final retryable =
+            text.contains('HandshakeException') ||
             text.contains('Connection terminated') ||
             text.contains('Connection closed') ||
             text.contains('SocketException') ||
@@ -185,17 +174,18 @@ class ApiClient {
   }
 
   ApiResponse _decode(Response<dynamic> response) {
-    final contentType =
-        response.headers.value(Headers.contentTypeHeader) ?? '';
+    final contentType = response.headers.value(Headers.contentTypeHeader) ?? '';
     final rawBody = _bodyAsString(response.data);
-    final preview =
-        rawBody.length > 400 ? '${rawBody.substring(0, 400)}…' : rawBody;
+    final preview = rawBody.length > 400
+        ? '${rawBody.substring(0, 400)}…'
+        : rawBody;
     // ignore: avoid_print
     print(
       'ApiClient ← ${response.statusCode} content-type=$contentType $preview',
     );
 
-    final looksJson = rawBody.trimLeft().startsWith('{') ||
+    final looksJson =
+        rawBody.trimLeft().startsWith('{') ||
         rawBody.trimLeft().startsWith('[');
     if (contentType.contains(acceptProto) && !looksJson) {
       // ignore: avoid_print
