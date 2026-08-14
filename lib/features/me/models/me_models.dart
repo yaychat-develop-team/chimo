@@ -11,6 +11,7 @@ class MeProfile {
     required this.follows,
     required this.visitors,
     this.avatarUrl,
+    this.avatarAuditUrl,
     this.email = '',
     this.gender = '',
     this.birthday = '',
@@ -27,6 +28,7 @@ class MeProfile {
     this.moreExpForNextLevel = 0,
     this.totalExperience = 0,
     this.momentUrls = const [],
+    this.albumUrls = const [],
     this.cardDynamicResource = '',
   });
 
@@ -53,8 +55,20 @@ class MeProfile {
   /// 本地头像资源路径（回退）。
   final String avatarAsset;
 
-  /// 接口返回的远程头像 URL（若有）。
+  /// 已通过审核的头像（个人主页 / 对外展示）。
   final String? avatarUrl;
+
+  /// 审核中的头像（仅编辑资料展示）。
+  final String? avatarAuditUrl;
+
+  bool get avatarUnderReview => (avatarAuditUrl ?? '').trim().isNotEmpty;
+
+  /// 编辑资料用：有审核中头像则展示审核中图。
+  String? get editAvatarUrl {
+    final pending = (avatarAuditUrl ?? '').trim();
+    if (pending.isNotEmpty) return pending;
+    return avatarUrl;
+  }
 
   /// 好友数。
   final int friends;
@@ -89,7 +103,11 @@ class MeProfile {
   final int moreExpForNextLevel;
   /// 满级时的终身经验（forya `totalExperience`）。
   final int totalExperience;
+  /// 个人主页 Moments：仅审核通过。
   final List<String> momentUrls;
+
+  /// 编辑资料相册：含审核中。
+  final List<String> albumUrls;
 
   /// 打开个人主页时的 PAG 特效 URL。
   final String cardDynamicResource;
@@ -127,6 +145,7 @@ class MeProfile {
     String? userId,
     String? avatarAsset,
     String? avatarUrl,
+    String? avatarAuditUrl,
     String? email,
     int? friends,
     int? fans,
@@ -150,6 +169,7 @@ class MeProfile {
     int? moreExpForNextLevel,
     int? totalExperience,
     List<String>? momentUrls,
+    List<String>? albumUrls,
     String? cardDynamicResource,
   }) {
     return MeProfile(
@@ -157,6 +177,7 @@ class MeProfile {
       userId: userId ?? this.userId,
       avatarAsset: avatarAsset ?? this.avatarAsset,
       avatarUrl: avatarUrl ?? this.avatarUrl,
+      avatarAuditUrl: avatarAuditUrl ?? this.avatarAuditUrl,
       email: email ?? this.email,
       friends: friends ?? this.friends,
       fans: fans ?? this.fans,
@@ -177,6 +198,7 @@ class MeProfile {
       moreExpForNextLevel: moreExpForNextLevel ?? this.moreExpForNextLevel,
       totalExperience: totalExperience ?? this.totalExperience,
       momentUrls: momentUrls ?? this.momentUrls,
+      albumUrls: albumUrls ?? this.albumUrls,
       cardDynamicResource:
           cardDynamicResource ?? this.cardDynamicResource,
     );

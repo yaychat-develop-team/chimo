@@ -37,10 +37,32 @@ class MeProfileHeader extends StatelessWidget {
               shape: BoxShape.circle,
               border: Border.all(color: Colors.white, width: 2),
             ),
-            child: AppAvatar(
-              asset: profile.avatarAsset,
-              url: profile.avatarUrl,
-              size: avatarSize,
+            child: ClipOval(
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  AppAvatar(
+                    asset: profile.avatarAsset,
+                    url: profile.editAvatarUrl,
+                    size: avatarSize,
+                  ),
+                  if (profile.avatarUnderReview)
+                    ColoredBox(
+                      color: Colors.black.withValues(alpha: 0.5),
+                      child: const Center(
+                        child: Text(
+                          'Under review',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            height: 1.1,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ),

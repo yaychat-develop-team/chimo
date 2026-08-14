@@ -34,9 +34,12 @@ dependencies:
   sign_in_with_apple: ^7.0.1
   crypto: ^3.0.6
   dio: ^5.11.0
-  in_app_purchase: ^3.2.3
+  # 对齐 forya：内购走本地 in_app_purchase + StoreKit 0.4.3
+  in_app_purchase:
+    path: third_party/in_app_purchase-3.2.3
   in_app_purchase_android: ^0.4.0
-  in_app_purchase_storekit: ^0.4.0
+  in_app_purchase_storekit:
+    path: third_party/in_app_purchase_storekit-0.4.3
 
 dev_dependencies:
   flutter_test:

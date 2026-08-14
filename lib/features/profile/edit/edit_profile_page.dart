@@ -20,6 +20,7 @@ import '../../../core/widgets/app_top_loading_bar.dart';
 import '../../../core/widgets/network_or_asset_avatar.dart';
 import '../../auth/onboarding_exit.dart';
 import '../../auth/widgets/onboarding_skip_button.dart';
+import '../../me/data/user_dto.dart';
 import '../../me/models/me_models.dart';
 import 'body_metric_page.dart';
 import '../album_photo_viewer_page.dart';
@@ -102,10 +103,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
     _photoPaths
       ..clear()
       ..addAll(
-        p.momentUrls.where(
-          (url) => url.startsWith('http://') || url.startsWith('https://'),
-        ),
+        (p.albumUrls.isNotEmpty ? p.albumUrls : p.momentUrls).where((url) {
+          final t = url.trim();
+          return t.startsWith('http://') ||
+              t.startsWith('https://') ||
+              t.startsWith('/');
+        }),
       );
+    debugPrint('EditProfile picList=${_photoPaths.length} $_photoPaths');
   }
 
   Future<String?> _persistPickedPhoto(XFile file) async {
@@ -158,7 +163,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
       voiceUrl: _voiceUrl,
       clearVoice: _voiceSeconds == null,
       nicknameChangedOnce: _nicknameChangedOnce,
-      momentUrls: List<String>.from(_photoPaths),
+      albumUrls: List<String>.from(_photoPaths),
+      momentUrls: [
+        for (final p in _photoPaths)
+          if (UserDto.lastPicReviewed[p] != false) p,
+      ],
       avatarUrl: _profile.avatarUrl,
     );
   }
@@ -435,34 +444,88 @@ class _EditProfilePageState extends State<EditProfilePage> {
     } catch (_) {}
   }
 
+  /// 服务端存的是 CDN path（forya `content`），JSON 展示时才拼完整 URL。
+  static const _cdnHost = 'https://cdn.echimo.com';
+
+  String _albumDisplayUrl(String stored) {
+    final text = stored.trim();
+    if (text.startsWith('http://') || text.startsWith('https://')) return text;
+    if (text.isEmpty) return text;
+    return text.startsWith('/') ? '$_cdnHost$text' : '$_cdnHost/$text';
+  }
+
+  String _albumStoredKey(String url) {
+    var text = url.trim();
+    if (text.startsWith(_cdnHost)) {
+      text = text.substring(_cdnHost.length);
+    } else {
+      try {
+        final uri = Uri.parse(text);
+        if (uri.hasScheme && uri.host.isNotEmpty) {
+          text = uri.path;
+        }
+      } catch (_) {}
+    }
+    if (text.isEmpty) return url.trim();
+    return text.startsWith('/') ? text : '/$text';
+  }
+
   Future<void> _removeAlbumPhoto(int index) async {
-    if (index < 0 || index >= _photoPaths.length) return;
+    if (index < 0 || index >= _photoPaths.length || _albumUploading) return;
     final path = _photoPaths[index];
-    setState(() {
-      _photoPaths.removeAt(index);
-    });
-    if (!path.startsWith('http')) {
+    if (UserDto.lastPicReviewed[path] == false) return;
+    if (!path.startsWith('http') && !path.startsWith('/')) {
+      setState(() => _photoPaths.removeAt(index));
       unawaited(_deleteLocalFile(path));
       return;
     }
 
+    final swapped = path.trim()
+        .replaceFirst('https://cdn.echimo.com', 'https://cdn.oumiapp.com')
+        .replaceFirst('http://cdn.echimo.com', 'http://cdn.oumiapp.com');
+    final stored = _albumStoredKey(path);
+    final keys = <String>{
+      path.trim(),
+      swapped,
+      stored,
+      stored.startsWith('/') ? stored.substring(1) : stored,
+    }.where((e) => e.isNotEmpty).toList();
+
+    setState(() => _albumUploading = true);
     try {
-      final res = await AppApis.user.update({
-        'delPic': [path],
-      });
-      if (!mounted) return;
-      if (!res.ok) {
-        setState(() {
-          if (index <= _photoPaths.length) {
-            _photoPaths.insert(index.clamp(0, _photoPaths.length), path);
-          } else {
-            _photoPaths.add(path);
+      var deleted = false;
+      for (final key in keys) {
+        debugPrint('Album delPic try=$key');
+        for (final fields in [
+          {'delPic': <String>[key]},
+          {'delPic': key},
+        ]) {
+          final res = await AppApis.user.update(fields);
+          if (!res.ok) continue;
+          await _loadFromApi();
+          if (!mounted) return;
+          final still = _photoPaths.any(
+            (url) =>
+                url == path ||
+                _albumStoredKey(url) == _albumStoredKey(path) ||
+                url == key,
+          );
+          if (!still) {
+            deleted = true;
+            break;
           }
-        });
+        }
+        if (deleted) break;
+      }
+      if (!deleted && mounted) {
+        final pending = UserDto.lastPicReviewed[path] == false;
+        debugPrint('Album delete still on server: $path pending=$pending keys=$keys');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              res.message.isEmpty ? 'Delete failed' : res.message,
+              pending
+                  ? 'This photo is still under review and cannot be deleted yet.'
+                  : 'Delete failed',
             ),
             behavior: SnackBarBehavior.floating,
           ),
@@ -470,13 +533,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
       }
     } catch (error) {
       if (!mounted) return;
-      setState(() => _photoPaths.add(path));
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Delete failed: $error'),
           behavior: SnackBarBehavior.floating,
         ),
       );
+    } finally {
+      if (mounted) setState(() => _albumUploading = false);
     }
   }
 
@@ -748,19 +812,22 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   children: [
                     _AvatarCard(
                       avatarAsset: _profile.avatarAsset,
-                      avatarUrl: _profile.avatarUrl,
+                      avatarUrl: _profile.editAvatarUrl,
+                      underReview: _profile.avatarUnderReview,
                       onTap: () async {
                         final url = await Navigator.of(context).push<String?>(
                           MaterialPageRoute(
                             builder: (_) => MyPicturePage(
                               avatarAsset: _profile.avatarAsset,
-                              avatarUrl: _profile.avatarUrl,
+                              avatarUrl: _profile.editAvatarUrl,
                             ),
                           ),
                         );
                         if (!mounted || url == null || url.isEmpty) return;
                         setState(
-                          () => _profile = _profile.copyWith(avatarUrl: url),
+                          () => _profile = _profile.copyWith(
+                            avatarAuditUrl: url,
+                          ),
                         );
                       },
                     ),
@@ -954,10 +1021,12 @@ class _AvatarCard extends StatelessWidget {
     required this.avatarAsset,
     required this.onTap,
     this.avatarUrl,
+    this.underReview = false,
   });
 
   final String avatarAsset;
   final String? avatarUrl;
+  final bool underReview;
   final VoidCallback onTap;
 
   @override
@@ -971,11 +1040,39 @@ class _AvatarCard extends StatelessWidget {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: NetworkOrAssetAvatar(
-                asset: avatarAsset,
-                url: avatarUrl,
+              child: SizedBox(
                 width: 96,
                 height: 96,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    NetworkOrAssetAvatar(
+                      asset: avatarAsset,
+                      url: avatarUrl,
+                      width: 96,
+                      height: 96,
+                    ),
+                    if (underReview)
+                      const Align(
+                        alignment: Alignment.bottomCenter,
+                        child: ColoredBox(
+                          color: Color(0x99000000),
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(vertical: 4),
+                            child: Text(
+                              'Under review',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Color(0xFFFDF652),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w400,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(width: 12),
@@ -1064,6 +1161,7 @@ class _PhotoCard extends StatelessWidget {
               for (var i = 0; i < paths.length; i++)
                 _PhotoThumb(
                   path: paths[i],
+                  underReview: UserDto.lastPicReviewed[paths[i]] == false,
                   onTap: () => onOpen(i),
                   onRemove: () => onRemove(i),
                 ),
@@ -1080,11 +1178,13 @@ class _PhotoThumb extends StatelessWidget {
     required this.path,
     required this.onTap,
     required this.onRemove,
+    this.underReview = false,
   });
 
   final String path;
   final VoidCallback onTap;
   final VoidCallback onRemove;
+  final bool underReview;
 
   @override
   Widget build(BuildContext context) {
@@ -1092,7 +1192,12 @@ class _PhotoThumb extends StatelessWidget {
     if (local.startsWith('file://')) {
       local = Uri.parse(local).toFilePath();
     }
-    final remote = local.startsWith('http://') || local.startsWith('https://');
+    final remote = local.startsWith('http://') ||
+        local.startsWith('https://') ||
+        local.startsWith('/');
+    final display = local.startsWith('/')
+        ? 'https://cdn.echimo.com$local'
+        : local;
     return Stack(
       children: [
         GestureDetector(
@@ -1101,7 +1206,7 @@ class _PhotoThumb extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             child: remote
                 ? AppNetworkImage(
-                    local,
+                    display,
                     width: 98,
                     height: 98,
                     fit: BoxFit.cover,
@@ -1134,22 +1239,48 @@ class _PhotoThumb extends StatelessWidget {
                   ),
           ),
         ),
-        Positioned(
-          top: 4,
-          right: 4,
-          child: GestureDetector(
-            onTap: onRemove,
-            child: Container(
-              width: 22,
-              height: 22,
-              decoration: const BoxDecoration(
-                color: Color(0xCC000000),
-                shape: BoxShape.circle,
+        if (underReview)
+          const Positioned(
+            left: 4,
+            right: 4,
+            bottom: 4,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: Color(0x80000000),
+                borderRadius: BorderRadius.all(Radius.circular(8)),
               ),
-              child: const Icon(Icons.close, size: 14, color: Colors.white),
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 2),
+                child: Text(
+                  'Under review',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Color(0xFFFDF652),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ),
             ),
           ),
-        ),
+        if (!underReview)
+          Positioned(
+            top: 4,
+            right: 4,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onRemove,
+              child: Container(
+                width: 22,
+                height: 22,
+                decoration: const BoxDecoration(
+                  color: Color(0xCC000000),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.close, size: 14, color: Colors.white),
+              ),
+            ),
+          ),
       ],
     );
   }
