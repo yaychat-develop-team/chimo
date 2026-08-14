@@ -64,9 +64,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
   List<String> _tags = const [];
   bool _nicknameChangedOnce = false;
   final List<String> _photoPaths = [];
-  final Set<String> _uploadingPhotoPaths = {};
   bool _loading = true;
   bool _saving = false;
+  bool _albumUploading = false;
   /// Values loaded from API; used to decide whether delete* should be sent.
   int? _loadedHeight;
   int? _loadedWeight;
@@ -84,7 +84,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   void _applyProfile(MeProfile p) {
-    final previousPhotos = List<String>.from(_photoPaths);
     _profile = p;
     _signature = p.signature;
     _nickname = p.displayName;
@@ -102,11 +101,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
     _nicknameChangedOnce = p.nicknameChangedOnce;
     _photoPaths
       ..clear()
-      ..addAll(p.momentUrls);
-    for (final path in previousPhotos) {
-      if (path.trim().isEmpty) continue;
-      if (!_photoPaths.contains(path)) _photoPaths.add(path);
-    }
+      ..addAll(
+        p.momentUrls.where(
+          (url) => url.startsWith('http://') || url.startsWith('https://'),
+        ),
+      );
   }
 
   Future<String?> _persistPickedPhoto(XFile file) async {
@@ -357,7 +356,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       // Avatar is handled by a dedicated page.
       return;
     }
-    if (_photoCount >= EditProfilePage.maxPhotos) return;
+    if (_photoCount >= EditProfilePage.maxPhotos || _albumUploading) return;
 
     final localPath = await _persistPickedPhoto(file);
     if (!mounted) return;
@@ -371,16 +370,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
       return;
     }
 
-    setState(() {
-      _photoPaths.add(localPath);
-      _uploadingPhotoPaths.add(localPath);
-    });
-
+    setState(() => _albumUploading = true);
     try {
       final remote = await MediaUpload.uploadImage(localPath);
       if (!mounted) return;
-      if (remote == null) {
-        _dropLocalPhoto(localPath);
+      if (remote == null || remote.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Photo upload failed'),
@@ -395,7 +389,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
       });
       if (!mounted) return;
       if (!res.ok) {
-        _dropLocalPhoto(localPath);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -408,16 +401,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
       }
 
       setState(() {
-        _uploadingPhotoPaths.remove(localPath);
-        final index = _photoPaths.indexOf(localPath);
-        if (index >= 0) {
-          _photoPaths[index] = remote;
-        } else if (!_photoPaths.contains(remote)) {
+        if (!_photoPaths.contains(remote)) {
           _photoPaths.add(remote);
         }
       });
       unawaited(_loadFromApi());
-      unawaited(_deleteLocalFile(localPath));
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Photo saved'),
@@ -427,22 +415,16 @@ class _EditProfilePageState extends State<EditProfilePage> {
       );
     } catch (error) {
       if (!mounted) return;
-      _dropLocalPhoto(localPath);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Photo upload failed: $error'),
           behavior: SnackBarBehavior.floating,
         ),
       );
+    } finally {
+      unawaited(_deleteLocalFile(localPath));
+      if (mounted) setState(() => _albumUploading = false);
     }
-  }
-
-  void _dropLocalPhoto(String localPath) {
-    setState(() {
-      _photoPaths.remove(localPath);
-      _uploadingPhotoPaths.remove(localPath);
-    });
-    unawaited(_deleteLocalFile(localPath));
   }
 
   Future<void> _deleteLocalFile(String path) async {
@@ -458,7 +440,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
     final path = _photoPaths[index];
     setState(() {
       _photoPaths.removeAt(index);
-      _uploadingPhotoPaths.remove(path);
     });
     if (!path.startsWith('http')) {
       unawaited(_deleteLocalFile(path));
@@ -760,7 +741,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     ? () => unawaited(OnboardingExit.finishToHome(context))
                     : null,
               ),
-              if (_loading) const AppTopLoadingBar(),
+              if (_loading || _albumUploading) const AppTopLoadingBar(),
               Expanded(
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -786,7 +767,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     const SizedBox(height: 16),
                     _PhotoCard(
                       paths: _photoPaths,
-                      uploadingPaths: _uploadingPhotoPaths,
+                      busy: _albumUploading,
                       onAdd: () => _pickPhoto(forAlbum: true),
                       onRemove: (index) => unawaited(_removeAlbumPhoto(index)),
                       onOpen: (index) {
@@ -1028,22 +1009,22 @@ class _AvatarCard extends StatelessWidget {
 class _PhotoCard extends StatelessWidget {
   const _PhotoCard({
     required this.paths,
-    required this.uploadingPaths,
     required this.onAdd,
     required this.onRemove,
     required this.onOpen,
+    this.busy = false,
   });
 
   final List<String> paths;
-  final Set<String> uploadingPaths;
   final VoidCallback onAdd;
   final ValueChanged<int> onRemove;
   final ValueChanged<int> onOpen;
+  final bool busy;
 
   @override
   Widget build(BuildContext context) {
     final count = paths.length;
-    final canAdd = count < EditProfilePage.maxPhotos;
+    final canAdd = !busy && count < EditProfilePage.maxPhotos;
 
     return _SectionCard(
       child: Column(
@@ -1083,7 +1064,6 @@ class _PhotoCard extends StatelessWidget {
               for (var i = 0; i < paths.length; i++)
                 _PhotoThumb(
                   path: paths[i],
-                  uploading: uploadingPaths.contains(paths[i]),
                   onTap: () => onOpen(i),
                   onRemove: () => onRemove(i),
                 ),
@@ -1098,13 +1078,11 @@ class _PhotoCard extends StatelessWidget {
 class _PhotoThumb extends StatelessWidget {
   const _PhotoThumb({
     required this.path,
-    required this.uploading,
     required this.onTap,
     required this.onRemove,
   });
 
   final String path;
-  final bool uploading;
   final VoidCallback onTap;
   final VoidCallback onRemove;
 
@@ -1156,27 +1134,6 @@ class _PhotoThumb extends StatelessWidget {
                   ),
           ),
         ),
-        if (uploading)
-          Positioned.fill(
-            child: IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: Colors.black45,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Center(
-                  child: SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
         Positioned(
           top: 4,
           right: 4,

@@ -1,0 +1,154 @@
+{
+  "identifier" : "IAP",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+    {
+      "displayPrice" : "0.99",
+      "familyShareable" : false,
+      "internalID" : "A1B2C3D4-0001-4000-8000-000000000001",
+      "localizations" : [
+        {
+          "description" : "50 Coins",
+          "displayName" : "50 Coins",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "chimo.chat.api.1",
+      "referenceName" : "chimo.chat.api.1",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "A1B2C3D4-0001-4000-8000-000000000002",
+      "localizations" : [
+        {
+          "description" : "150 Coins",
+          "displayName" : "150 Coins",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "chimo.chat.api.2",
+      "referenceName" : "chimo.chat.api.2",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "4.99",
+      "familyShareable" : false,
+      "internalID" : "A1B2C3D4-0001-4000-8000-000000000003",
+      "localizations" : [
+        {
+          "description" : "250 Coins",
+          "displayName" : "250 Coins",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "chimo.chat.api.3",
+      "referenceName" : "chimo.chat.api.3",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "9.99",
+      "familyShareable" : false,
+      "internalID" : "A1B2C3D4-0001-4000-8000-000000000004",
+      "localizations" : [
+        {
+          "description" : "500 Coins",
+          "displayName" : "500 Coins",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "chimo.chat.api.4",
+      "referenceName" : "chimo.chat.api.4",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "19.99",
+      "familyShareable" : false,
+      "internalID" : "A1B2C3D4-0001-4000-8000-000000000005",
+      "localizations" : [
+        {
+          "description" : "1000 Coins",
+          "displayName" : "1000 Coins",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "chimo.chat.api.5",
+      "referenceName" : "chimo.chat.api.5",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "49.99",
+      "familyShareable" : false,
+      "internalID" : "A1B2C3D4-0001-4000-8000-000000000006",
+      "localizations" : [
+        {
+          "description" : "2500 Coins",
+          "displayName" : "2500 Coins",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "chimo.chat.api.6",
+      "referenceName" : "chimo.chat.api.6",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "99.99",
+      "familyShareable" : false,
+      "internalID" : "A1B2C3D4-0001-4000-8000-000000000007",
+      "localizations" : [
+        {
+          "description" : "5000 Coins",
+          "displayName" : "5000 Coins",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "chimo.chat.api.7",
+      "referenceName" : "chimo.chat.api.7",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "199.99",
+      "familyShareable" : false,
+      "internalID" : "A1B2C3D4-0001-4000-8000-000000000008",
+      "localizations" : [
+        {
+          "description" : "10000 Coins",
+          "displayName" : "10000 Coins",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "chimo.chat.api.8",
+      "referenceName" : "chimo.chat.api.8",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "399.99",
+      "familyShareable" : false,
+      "internalID" : "A1B2C3D4-0001-4000-8000-000000000009",
+      "localizations" : [
+        {
+          "description" : "20000 Coins",
+          "displayName" : "20000 Coins",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "chimo.chat.api.9",
+      "referenceName" : "chimo.chat.api.9",
+      "type" : "Consumable"
+    }
+  ],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_storeKitError" : 0
+  },
+  "subscriptionGroups" : [
+
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}
