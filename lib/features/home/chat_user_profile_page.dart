@@ -505,7 +505,7 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
           userId: _profile.userId,
           avatarAsset: _profile.avatarAsset,
           avatarUrl: _profile.avatarUrl,
-          avatarUnderReview: _profile.avatarUnderReview,
+          avatarUnderReview: _isSelf && _profile.avatarUnderReview,
           isMale: _profile.isMale,
           age: _profile.age,
           zodiac: _profile.zodiac,

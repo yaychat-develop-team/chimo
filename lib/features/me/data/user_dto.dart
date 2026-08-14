@@ -103,10 +103,6 @@ abstract final class UserDto {
   static ChatUserProfile chatFromUserMap(Map<String, dynamic> json) {
     final id = '${json['id'] ?? ''}';
     final avatar = _parseAvatarField(json['avatar'] ?? json['avatarUrl']);
-    final avatarAudit = _parseAvatarField(
-      json['avatarAudit'] ?? json['avatar_audit'],
-    );
-    final displayAvatar = avatarAudit.isNotEmpty ? avatarAudit : avatar;
     final genderRaw = '${json['gender'] ?? ''}'.toLowerCase();
     final isMale = switch (genderRaw) {
       'female' || 'f' || '2' => false,
@@ -149,8 +145,8 @@ abstract final class UserDto {
       nickname: '${json['nickname'] ?? json['nickName'] ?? ''}',
       userId: id,
       avatarAsset: AppAssets.avatarPlace,
-      avatarUrl: displayAvatar.isEmpty ? null : displayAvatar,
-      avatarUnderReview: avatarAudit.isNotEmpty,
+      avatarUrl: avatar.isEmpty ? null : avatar,
+      avatarUnderReview: false,
       isMale: isMale,
       age: hasGender ? age : 0,
       zodiac: birthday.isEmpty ? '' : zodiacFromBirthday(birthday),
