@@ -15,6 +15,7 @@ import '../../core/network/app_apis.dart';
 import '../../core/network/media_upload.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_gradient_button.dart';
+import '../../core/widgets/app_network_image.dart';
 import '../profile/edit/photo_pick_sheet.dart';
 import 'onboarding_profile_draft.dart';
 import 'widgets/onboarding_skip_button.dart';
@@ -261,12 +262,12 @@ class _AlmostInPageState extends State<AlmostInPage> {
         ),
       );
     } else if (remote != null && remote.isNotEmpty) {
-      image = Image.network(
+      image = AppNetworkImage(
         remote,
         width: 112,
         height: 112,
         fit: BoxFit.cover,
-        errorBuilder: (_, _, _) => Image.asset(
+        errorWidget: (_, _, _) => Image.asset(
           AppAssets.defaultAvatar,
           width: 112,
           height: 112,

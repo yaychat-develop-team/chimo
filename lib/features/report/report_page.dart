@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/network/app_apis.dart';
 import '../../core/network/media_upload.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/app_network_image.dart';
 import '../../core/widgets/app_page_scaffold.dart';
 import '../../core/widgets/center_toast.dart';
 import '../profile/edit/photo_pick_sheet.dart';
@@ -399,12 +400,12 @@ class _ImageThumb extends StatelessWidget {
         ),
       );
     } else if (remote.isNotEmpty) {
-      image = Image.network(
+      image = AppNetworkImage(
         remote,
         width: _AddImageButton.size,
         height: _AddImageButton.size,
         fit: BoxFit.cover,
-        errorBuilder: (_, _, _) => const ColoredBox(
+        errorWidget: (_, _, _) => const ColoredBox(
           color: Color(0xFF3A3A3C),
           child: Icon(Icons.broken_image_outlined, color: Colors.white54),
         ),

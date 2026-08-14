@@ -61,11 +61,6 @@ export_archive_if_needed() {
 
 function buildStore() {
     cd "$projectPath"
-    flutter pub get
-    cd ios
-    arch -x86_64 pod install --repo-update
-
-    cd "$projectPath"
 
     local ipaPath="$projectPath/build/ios/ipa/Partying.ipa"
     local archivePath="$projectPath/build/ios/archive/Runner.xcarchive"
@@ -99,6 +94,22 @@ function buildStore() {
 
 cd "$projectPath"
 require_plist "$adhocPlist"
+
+# 清理缓存后重装 Pods，避免 Info.plist / 签名变更被旧 DerivedData 卡住
+echo "[DEBUG] $(date '+%Y-%m-%d %H:%M:%S') clean caches"
+flutter clean
+rm -rf "$projectPath/ios/Pods" "$projectPath/ios/Podfile.lock"
+rm -rf "$HOME/Library/Developer/Xcode/DerivedData"
+flutter pub get
+echo "[DEBUG] $(date '+%Y-%m-%d %H:%M:%S') pod install"
+(
+  cd "$projectPath/ios"
+  if command -v arch >/dev/null 2>&1; then
+    arch -x86_64 pod install --repo-update || pod install --repo-update
+  else
+    pod install --repo-update
+  fi
+)
 
 if [ "$buildType" == "debug" ] || [ "$buildType" == "profile" ]; then
     if [ -d "$projectPath/build/ios" ]; then

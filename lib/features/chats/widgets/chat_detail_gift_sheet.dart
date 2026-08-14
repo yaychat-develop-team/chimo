@@ -162,12 +162,12 @@ class _GiftSheetState extends State<_GiftSheet> {
 
   Widget _giftIcon(CashGiftItem g) {
     if (g.iconUrl.isNotEmpty) {
-      return Image.network(
+      return AppNetworkImage(
         g.iconUrl,
         width: 40,
         height: 40,
         fit: BoxFit.contain,
-        errorBuilder: (_, _, _) => const Text('🎁', style: TextStyle(fontSize: 28)),
+        errorWidget: (_, _, _) => const Text('🎁', style: TextStyle(fontSize: 28)),
       );
     }
     return const Text('🎁', style: TextStyle(fontSize: 28));

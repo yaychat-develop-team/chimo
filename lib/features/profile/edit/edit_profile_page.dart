@@ -14,6 +14,7 @@ import '../../../core/network/app_apis.dart';
 import '../../../core/network/media_upload.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_gradient_button.dart';
+import '../../../core/widgets/app_network_image.dart';
 import '../../../core/widgets/app_top_loading_bar.dart';
 import '../../../core/widgets/network_or_asset_avatar.dart';
 import '../../auth/onboarding_exit.dart';
@@ -1058,12 +1059,12 @@ class _PhotoThumb extends StatelessWidget {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: path.startsWith('http')
-                ? Image.network(
+                ? AppNetworkImage(
                     path,
                     width: 98,
                     height: 98,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, error, stack) => Container(
+                    errorWidget: (_, error, stack) => Container(
                       width: 98,
                       height: 98,
                       color: const Color(0xFF2C2C2E),

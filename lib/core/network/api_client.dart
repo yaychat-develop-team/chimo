@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 import 'api_config.dart';
 import 'auth_request_headers.dart';
 
-/// echimo 后端的最小 JSON API 信封。
+/// echimo / forya 通用响应信封（JSON 或 protobuf 解码后的字段）。
 class ApiResponse {
   const ApiResponse({
     required this.success,
@@ -43,10 +43,16 @@ class ApiResponse {
   }
 }
 
-/// 轻量 HTTP 客户端，请求头形态对齐 D:\forya HeaderInterceptor。
+/// 轻量 HTTP 客户端，对齐 D:\forya `JRNetwork` + `HeaderInterceptor`：
+/// - Content-Type: application/json
+/// - Body: `{"bizParam":{...}}` 的 JSON 字符串
+/// - Accept: 暂用 JSON（Chimo 尚无 BaseRsp proto；forya 默认 protobuf）
 class ApiClient {
   ApiClient({http.Client? httpClient, this.tokenProvider})
       : _http = httpClient ?? http.Client();
+
+  /// forya `JRNetwork.headerProto`（接入 BaseRsp 后再切回）
+  static const acceptProto = 'application/x-protobuf';
 
   final http.Client _http;
   final String? Function()? tokenProvider;
@@ -71,12 +77,20 @@ class ApiClient {
   }
 
   Map<String, String> _headers() {
+    // 对齐 forya JRNetwork BaseOptions + HeaderInterceptor：
+    // Accept=protobuf，Content-Type=json；token/timestamp 无前缀；
+    // commonParam 全部以 df_ 前缀写入。
     final headers = <String, String>{
       'Content-Type': 'application/json',
+      // Chimo 目前只解 JSON；用 protobuf Accept 会拿到二进制回包导致登录刷新失败。
       'Accept': 'application/json',
       'timestamp': '${DateTime.now().millisecondsSinceEpoch}',
-      ...AuthRequestHeaders.prefixed,
     };
+    AuthRequestHeaders.commonParam.forEach((key, value) {
+      final text = value.trim();
+      if (text.isEmpty) return;
+      headers['df_$key'] = text;
+    });
     final token = tokenProvider?.call();
     if (token != null && token.isNotEmpty) {
       headers['token'] = token;
@@ -151,11 +165,29 @@ class ApiClient {
   }
 
   ApiResponse _decode(http.Response response) {
+    final contentType = response.headers['content-type'] ?? '';
     final rawBody = response.body;
     final preview =
         rawBody.length > 400 ? '${rawBody.substring(0, 400)}…' : rawBody;
     // ignore: avoid_print
-    print('ApiClient ← ${response.statusCode} $preview');
+    print('ApiClient ← ${response.statusCode} content-type=$contentType $preview');
+
+    // forya：Content-Type 含 application/x-protobuf 时走 BaseRsp.fromBuffer；
+    // Chimo 暂无完整 proto，若服务端回包仍是 JSON 则按 JSON 解（response_ext 也有 JSON 回退）。
+    final looksJson = rawBody.trimLeft().startsWith('{') ||
+        rawBody.trimLeft().startsWith('[');
+    if (contentType.contains(acceptProto) && !looksJson) {
+      // ignore: avoid_print
+      print('ApiClient protobuf body not decoded (no BaseRsp proto in Chimo)');
+      return ApiResponse(
+        success: false,
+        code: response.statusCode,
+        message: 'protobuf.response.unsupported',
+        raw: {'bodyLength': response.bodyBytes.length},
+        httpStatus: response.statusCode,
+      );
+    }
+
     try {
       final decoded = jsonDecode(rawBody);
       if (decoded is Map<String, dynamic>) {

@@ -15,6 +15,7 @@ import '../../core/network/app_apis.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_emoji.dart';
 import '../../core/widgets/app_action_bottom_sheet.dart';
+import '../../core/widgets/app_network_image.dart';
 import '../../core/widgets/app_tip_dialog.dart';
 import '../../core/widgets/center_toast.dart';
 import '../../core/widgets/network_or_asset_avatar.dart';
@@ -1882,27 +1883,22 @@ class _OutgoingImage extends StatelessWidget {
       return _placeholder(label: 'Picture expired');
     }
     if (src.startsWith('http://') || src.startsWith('https://')) {
-      return Image.network(
+      return AppNetworkImage(
         src,
         width: _w,
         height: _h,
         fit: BoxFit.cover,
-        gaplessPlayback: true,
-        loadingBuilder: (context, child, progress) {
-          if (progress == null) return child;
-          return ColoredBox(
-            color: locked ? const Color(0xFF3A3A3A) : const Color(0xFFF3F3F3),
-            child: const Center(
-              child: SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
+        placeholder: (_, _) => ColoredBox(
+          color: locked ? const Color(0xFF3A3A3A) : const Color(0xFFF3F3F3),
+          child: const Center(
+            child: SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(strokeWidth: 2),
             ),
-          );
-        },
-        errorBuilder: (_, _, _) =>
-            _placeholder(label: 'Picture expired'),
+          ),
+        ),
+        errorWidget: (_, _, _) => _placeholder(label: 'Picture expired'),
       );
     }
     if (src.startsWith('assets/')) {
@@ -2500,12 +2496,13 @@ class _GroupPhotoImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (_isNetwork) {
-      return Image.network(
+      return AppNetworkImage(
         src,
         fit: fit,
         width: double.infinity,
         height: double.infinity,
-        errorBuilder: (_, _, _) => const ColoredBox(color: Color(0xFF2C2C2E)),
+        memCacheWidth: 1080,
+        errorWidget: (_, _, _) => const ColoredBox(color: Color(0xFF2C2C2E)),
       );
     }
     return Image.asset(

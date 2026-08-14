@@ -947,12 +947,12 @@ class _ChatEmojiPanelState extends State<_ChatEmojiPanel> {
   Widget _packCover(EmotePack pack) {
     final cover = pack.cover.trim();
     if (cover.startsWith('http://') || cover.startsWith('https://')) {
-      return Image.network(
+      return AppNetworkImage(
         cover,
         width: 22,
         height: 22,
         fit: BoxFit.contain,
-        errorBuilder: (_, _, _) => const Icon(
+        errorWidget: (_, _, _) => const Icon(
           Icons.emoji_emotions_outlined,
           size: 18,
           color: Color(0xFF999999),
@@ -1100,23 +1100,22 @@ class _ChatEmojiPanelState extends State<_ChatEmojiPanel> {
               height: 50,
               child: thumb.isEmpty
                   ? const ColoredBox(color: Color(0xFFEAEAEA))
-                  : Image.network(
+                  : AppNetworkImage(
                       thumb,
+                      width: 50,
+                      height: 50,
                       fit: BoxFit.contain,
-                      loadingBuilder: (context, child, progress) {
-                        if (progress == null) return child;
-                        return const ColoredBox(
-                          color: Color(0xFFF0F0F0),
-                          child: Center(
-                            child: SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
+                      placeholder: (_, _) => const ColoredBox(
+                        color: Color(0xFFF0F0F0),
+                        child: Center(
+                          child: SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
                           ),
-                        );
-                      },
-                      errorBuilder: (_, _, _) => const ColoredBox(
+                        ),
+                      ),
+                      errorWidget: (_, _, _) => const ColoredBox(
                         color: Color(0xFFEAEAEA),
                         child: Icon(
                           Icons.broken_image_outlined,

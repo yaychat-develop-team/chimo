@@ -6,6 +6,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/app_network_image.dart';
 
 /// 全屏照片详情（可滑动）；支持资源路径与文件路径。
 class AlbumPhotoViewerPage extends StatefulWidget {
@@ -76,10 +77,14 @@ class _AlbumPhotoViewerPageState extends State<AlbumPhotoViewerPage> {
       );
     }
     if (path.startsWith('http://') || path.startsWith('https://')) {
-      return Image.network(
+      final screenW = MediaQuery.sizeOf(context).width;
+      return AppNetworkImage(
         path,
         fit: BoxFit.contain,
-        errorBuilder: (_, _, _) => error,
+        memCacheWidth: (screenW * MediaQuery.devicePixelRatioOf(context))
+            .round()
+            .clamp(1, 2048),
+        errorWidget: (_, _, _) => error,
       );
     }
     return Image.file(

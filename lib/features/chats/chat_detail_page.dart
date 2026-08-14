@@ -22,6 +22,7 @@ import '../../core/theme/app_emoji.dart';
 import '../../core/utils/zodiac.dart';
 import '../../core/widgets/app_action_bottom_sheet.dart';
 import '../../core/widgets/app_asset_image.dart';
+import '../../core/widgets/app_network_image.dart';
 import '../../core/widgets/app_tip_dialog.dart';
 import '../../core/widgets/center_toast.dart';
 import '../../core/widgets/network_or_asset_avatar.dart';

@@ -4,11 +4,14 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// forya `GlobalConfig.commonParam` 的尽力子集，用于认证 / 网络请求头。
+/// forya `GlobalConfig.commonParam` 的尽力子集。
+///
+/// 写入 HTTP 时必须加 `df_` 前缀（见 [ApiClient] / forya HeaderInterceptor）。
 abstract final class AuthRequestHeaders {
   static const _distinctIdKey = 'te_distinct_id';
 
-  static Map<String, String> _headers = const {
+  /// 未加前缀的公共参数（对齐 forya `GlobalConfig.commonParam`）。
+  static Map<String, String> commonParam = {
     'accept_language': 'en_US',
     'system_language': 'en_US',
     'platform': 'android',
@@ -50,19 +53,16 @@ abstract final class AuthRequestHeaders {
             [info.manufacturer, info.brand, info.model].where((e) => e.isNotEmpty).join(' ');
         next['device_id'] = info.id;
         next['mac'] = info.fingerprint;
+        next['channel'] = 'google';
       } else if (Platform.isIOS) {
         final info = await plugin.iosInfo;
         next['device_model'] = info.utsname.machine;
         next['device_id'] = info.identifierForVendor ?? '';
         next['mac'] = info.identifierForVendor ?? '';
+        next['channel'] = 'App Store';
       }
     } catch (_) {}
 
-    _headers = next;
+    commonParam = next;
   }
-
-  static Map<String, String> get prefixed => {
-        for (final e in _headers.entries)
-          if (e.value.trim().isNotEmpty) 'df_${e.key}': e.value,
-      };
 }

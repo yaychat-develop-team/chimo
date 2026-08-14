@@ -10,6 +10,7 @@ import '../../../core/audio/app_audio_playback.dart';
 import '../../../core/constants/app_assets.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/center_toast.dart';
+import '../../../core/widgets/app_network_image.dart';
 import '../../../core/widgets/network_or_asset_avatar.dart';
 import '../album_photo_viewer_page.dart';
 
@@ -424,12 +425,12 @@ class UserProfileScaffold extends StatelessWidget {
                                     borderRadius: BorderRadius.circular(10),
                                     child: hasRemoteMoments ||
                                             src.startsWith('http')
-                                        ? Image.network(
+                                        ? AppNetworkImage(
                                             src,
                                             width: 90,
                                             height: 89,
                                             fit: BoxFit.cover,
-                                            errorBuilder:
+                                            errorWidget:
                                                 (_, error, stack) =>
                                                     Image.asset(
                                               avatarAsset,
@@ -730,11 +731,11 @@ class _VipLevelIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsetsDirectional.only(end: 4),
-      child: Image.network(
+      child: AppNetworkImage(
         url,
         height: 22,
         fit: BoxFit.fitHeight,
-        errorBuilder: (_, error, stack) => const SizedBox.shrink(),
+        errorWidget: (_, error, stack) => const SizedBox.shrink(),
       ),
     );
   }

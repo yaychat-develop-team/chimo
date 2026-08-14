@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../core/auth/auth_session.dart';
 import '../../../core/network/app_apis.dart';
 import '../../../core/network/media_upload.dart';
+import '../../../core/widgets/app_network_image.dart';
 import '../../../core/widgets/app_page_scaffold.dart';
 import 'photo_pick_sheet.dart';
 
@@ -156,12 +157,12 @@ class _MyPicturePageState extends State<MyPicturePage> {
     }
     final remote = (_avatarUrl ?? '').trim();
     if (remote.isNotEmpty) {
-      return Image.network(
+      return AppNetworkImage(
         remote,
         width: size,
         height: size,
         fit: BoxFit.cover,
-        errorBuilder: (_, error, stackTrace) => Image.asset(
+        errorWidget: (_, error, stackTrace) => Image.asset(
           widget.avatarAsset,
           width: size,
           height: size,

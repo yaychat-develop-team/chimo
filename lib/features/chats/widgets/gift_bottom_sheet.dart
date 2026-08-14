@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_assets.dart';
 import '../../../core/network/app_apis.dart';
+import '../../../core/widgets/app_network_image.dart';
 import '../../../core/widgets/center_toast.dart';
 import '../../wallet/wallet_page.dart';
 import '../data/cash_gift_dto.dart';
@@ -175,12 +176,12 @@ class _GiftBottomSheetState extends State<GiftBottomSheet> {
 
   Widget _giftIcon(CashGiftItem g) {
     if (g.iconUrl.isNotEmpty) {
-      return Image.network(
+      return AppNetworkImage(
         g.iconUrl,
         width: 40,
         height: 40,
         fit: BoxFit.contain,
-        errorBuilder: (_, _, _) =>
+        errorWidget: (_, _, _) =>
             const Text('🎁', style: TextStyle(fontSize: 28)),
       );
     }
