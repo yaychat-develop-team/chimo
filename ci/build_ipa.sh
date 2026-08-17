@@ -64,25 +64,40 @@ require_plist() {
     fi
 }
 
-# flutter build ipa 的 archive/export 都不带 API Key；本机 Apple ID 过期时
-# archive 也会挂（~1 分钟就失败、无 xcarchive）。改为：
-# 1) flutter build ios --no-codesign 编译
-# 2) xcodebuild archive + API Key 签名/拉描述文件
-# 3) xcodebuild -exportArchive + API Key 导出 IPA
+# Jenkins 无 GUI 时常锁住 login keychain → codesign 报 errSecInternalComponent。
+unlock_signing_keychain() {
+    local kc="${KEYCHAIN_PATH:-$HOME/Library/Keychains/login.keychain-db}"
+    if [ ! -f "$kc" ] && [ -f "$HOME/Library/Keychains/login.keychain" ]; then
+        kc="$HOME/Library/Keychains/login.keychain"
+    fi
+    local pw="${KEYCHAIN_PASSWORD:-}"
+    echo "[DEBUG] unlock keychain: $kc"
+    if [ -n "$pw" ]; then
+        security unlock-keychain -p "$pw" "$kc" || true
+        # 允许 codesign 在无 UI 下使用私钥（否则仍可能 errSecInternalComponent）
+        security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$pw" "$kc" >/dev/null 2>&1 || true
+        security set-keychain-settings -t 21600 -u "$kc" >/dev/null 2>&1 || true
+    else
+        # 已登录会话偶发可直接 unlock；失败只告警
+        security unlock-keychain "$kc" 2>/dev/null || \
+            echo "WARN: KEYCHAIN_PASSWORD unset; if codesign fails with errSecInternalComponent, set it in ci.env" >&2
+    fi
+    security list-keychains -d user -s "$kc" >/dev/null 2>&1 || true
+    security default-keychain -d user -s "$kc" >/dev/null 2>&1 || true
+    security find-identity -v -p codesigning 2>/dev/null | head -n 20 || true
+}
+
+# IPA 归档必须用 Release：Profile 会触发
+# “Flutter archive not built in Release mode”，且 xcode_backend 签名易失败。
+# 测试服/正式服由 --dart-define=DEBUG_MODE 控制，不靠 Profile。
+# 流程：flutter build ios → xcodebuild archive(API Key) → export(API Key)
 build_archive() {
-    local config="Release"
-    local flutter_mode=(--release)
     local extra=()
     local arg
     for arg in "$@"; do
         case "$arg" in
-            --release)
-                config="Release"
-                flutter_mode=(--release)
-                ;;
-            --profile)
-                config="Profile"
-                flutter_mode=(--profile)
+            --release|--profile)
+                # 忽略调用方 mode；统一 Release 归档
                 ;;
             *)
                 extra+=("$arg")
@@ -94,14 +109,16 @@ build_archive() {
     local workspace="$projectPath/ios/Runner.xcworkspace"
     rm -rf "$archivePath"
 
-    echo "[DEBUG] $(date '+%Y-%m-%d %H:%M:%S') flutter build ios ${flutter_mode[*]} (no-codesign)"
-    flutter build ios "${flutter_mode[@]}" "${extra[@]}" --no-codesign
+    unlock_signing_keychain
 
-    echo "[DEBUG] $(date '+%Y-%m-%d %H:%M:%S') xcodebuild archive ($config) with API key"
+    echo "[DEBUG] $(date '+%Y-%m-%d %H:%M:%S') flutter build ios --release"
+    flutter build ios --release "${extra[@]}"
+
+    echo "[DEBUG] $(date '+%Y-%m-%d %H:%M:%S') xcodebuild archive (Release) with API key"
     xcodebuild archive \
         -workspace "$workspace" \
         -scheme Runner \
-        -configuration "$config" \
+        -configuration Release \
         -destination 'generic/platform=iOS' \
         -archivePath "$archivePath" \
         -allowProvisioningUpdates \
@@ -191,31 +208,11 @@ echo "[DEBUG] $(date '+%Y-%m-%d %H:%M:%S') pod install"
   fi
 )
 
-if [ "$buildType" == "debug" ] || [ "$buildType" == "profile" ]; then
+if [ "$buildType" == "debug" ] || [ "$buildType" == "profile" ] || [ "$buildType" == "release" ]; then
     if [ -d "$projectPath/build/ios" ]; then
         rm -rf "$projectPath/build/ios"
     fi
-    if [[ "$debugModel" == "enable" ]]; then
-        build_archive --profile \
-            --build-number "$versionCode" \
-            --build-name "$versionName" \
-            --dart-define=DEBUG_MODE=true \
-            --dart-define=CI_NUM="$ciNum" \
-            -v
-    else
-        build_archive --profile \
-            --build-number "$versionCode" \
-            --build-name "$versionName" \
-            --dart-define=DEBUG_MODE=false \
-            -v
-    fi
-    export_archive "$adhocPlist"
-
-elif [ "$buildType" == "release" ]; then
-    if [ -d "$projectPath/build/ios" ]; then
-        rm -rf "$projectPath/build/ios"
-    fi
-
+    # debug/profile/release 统一 Release 出 IPA；环境靠 DEBUG_MODE。
     if [[ "$debugModel" == "enable" ]]; then
         build_archive --release \
             --build-number "$versionCode" \
