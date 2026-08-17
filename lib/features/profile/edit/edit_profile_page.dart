@@ -447,13 +447,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
   /// 服务端存的是 CDN path（forya `content`），JSON 展示时才拼完整 URL。
   static const _cdnHost = 'https://cdn.echimo.com';
 
-  String _albumDisplayUrl(String stored) {
-    final text = stored.trim();
-    if (text.startsWith('http://') || text.startsWith('https://')) return text;
-    if (text.isEmpty) return text;
-    return text.startsWith('/') ? '$_cdnHost$text' : '$_cdnHost/$text';
-  }
-
   String _albumStoredKey(String url) {
     var text = url.trim();
     if (text.startsWith(_cdnHost)) {

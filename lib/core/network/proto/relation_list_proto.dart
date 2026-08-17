@@ -26,6 +26,18 @@ abstract final class RelationListProto {
         raw: const {},
       );
     }
+    final typeUrl = envelope.data.typeUrl;
+    if (typeUrl.contains('UserInfoRsp')) {
+      final info = _UserInfoRsp.fromBuffer(envelope.data.value);
+      final user = info.hasUser ? info.user.toJsonMap() : const <String, dynamic>{};
+      return ApiResponse(
+        success: true,
+        code: envelope.code,
+        message: envelope.message,
+        data: {'user': user},
+        raw: const {},
+      );
+    }
     final list = _UserListRsp.fromBuffer(envelope.data.value);
     return ApiResponse(
       success: true,
@@ -113,6 +125,37 @@ class _UserListRsp extends pb.GeneratedMessage {
   _UserListRsp clone() => deepCopy();
 
   List<_RelationUser> get userList => $_getList(2);
+}
+
+class _UserInfoRsp extends pb.GeneratedMessage {
+  factory _UserInfoRsp.fromBuffer(List<int> data) =>
+      create()..mergeFromBuffer(data);
+
+  _UserInfoRsp._();
+
+  static final pb.BuilderInfo _i = pb.BuilderInfo(
+    'UserInfoRsp',
+    package: const pb.PackageName('user'),
+    createEmptyInstance: create,
+  )
+    ..aOB(1, 'success')
+    ..aOS(2, 'message')
+    ..aOM<_RelationUser>(3, 'user', subBuilder: _RelationUser.create)
+    ..hasRequiredFields = false;
+
+  @override
+  pb.BuilderInfo get info_ => _i;
+
+  static _UserInfoRsp create() => _UserInfoRsp._();
+
+  @override
+  _UserInfoRsp createEmptyInstance() => create();
+
+  @override
+  _UserInfoRsp clone() => deepCopy();
+
+  bool get hasUser => $_has(2);
+  _RelationUser get user => $_getN(2);
 }
 
 class _RelationUser extends pb.GeneratedMessage {

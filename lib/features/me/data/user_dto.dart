@@ -140,6 +140,12 @@ abstract final class UserDto {
         json['isHidden'] == 1 ||
         '${json['isHidden'] ?? ''}' == 'true';
 
+    final constellation =
+        '${json['constellation'] ?? json['zodiac'] ?? ''}'.trim();
+    final zodiac = constellation.isNotEmpty
+        ? constellation
+        : (birthday.isEmpty ? '' : zodiacFromBirthday(birthday));
+
     return ChatUserProfile(
       id: id,
       nickname: '${json['nickname'] ?? json['nickName'] ?? ''}',
@@ -149,7 +155,7 @@ abstract final class UserDto {
       avatarUnderReview: false,
       isMale: isMale,
       age: hasGender ? age : 0,
-      zodiac: birthday.isEmpty ? '' : zodiacFromBirthday(birthday),
+      zodiac: zodiac,
       level: _asInt(json['vipLevel'], fallback: 1),
       bio: signature,
       heightInches: _asInt(json['height']),
@@ -247,7 +253,7 @@ abstract final class UserDto {
   }
 
   static int _ageFromBirthday(String birthday) {
-    final birth = DateTime.tryParse(birthday);
+    final birth = parseBirthday(birthday);
     if (birth == null) return 0;
     final now = DateTime.now();
     var age = now.year - birth.year;

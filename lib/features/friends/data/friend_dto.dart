@@ -190,7 +190,7 @@ abstract final class FriendDto {
   }
 
   static int _ageFromBirthday(String birthday) {
-    final birth = DateTime.tryParse(birthday);
+    final birth = parseBirthday(birthday);
     if (birth == null) return 0;
     final now = DateTime.now();
     var age = now.year - birth.year;

@@ -93,7 +93,11 @@ class ChimoApi {
   }
 
   Future<ApiResponse> userInfoByUid(String uid, {int scene = 0}) {
-    return _client.get('/user/info/$uid', query: {'scene': '$scene'});
+    return _client.get(
+      '/user/info/$uid',
+      query: {'scene': '$scene'},
+      accept: ApiClient.acceptProto,
+    );
   }
 
   Future<ApiResponse> userConf() => _client.get('/user/conf');
