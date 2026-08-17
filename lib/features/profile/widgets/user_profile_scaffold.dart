@@ -54,6 +54,7 @@ class UserProfileScaffold extends StatelessWidget {
     required this.bio,
     required this.bottomBar,
     this.avatarUrl,
+    this.avatarUnderReview = false,
     this.voiceSeconds,
     this.voiceUrl,
     this.vipIconUrl,
@@ -73,6 +74,7 @@ class UserProfileScaffold extends StatelessWidget {
   final String userId;
   final String avatarAsset;
   final String? avatarUrl;
+  final bool avatarUnderReview;
   final bool isMale;
   final int age;
   final String zodiac;
@@ -229,9 +231,31 @@ class UserProfileScaffold extends StatelessWidget {
                                     ),
                                   ),
                                   child: ClipOval(
-                                    child: NetworkOrAssetAvatar(
-                                      asset: avatarAsset,
-                                      url: avatarUrl,
+                                    child: Stack(
+                                      fit: StackFit.expand,
+                                      children: [
+                                        NetworkOrAssetAvatar(
+                                          asset: avatarAsset,
+                                          url: avatarUrl,
+                                        ),
+                                        if (avatarUnderReview)
+                                          ColoredBox(
+                                            color: Colors.black.withValues(
+                                              alpha: 0.5,
+                                            ),
+                                            child: const Center(
+                                              child: Text(
+                                                'Under review',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 11,
+                                                  height: 1.1,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                      ],
                                     ),
                                   ),
                                 ),

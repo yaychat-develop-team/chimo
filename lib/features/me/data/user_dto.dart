@@ -6,6 +6,8 @@ import '../models/me_models.dart';
 
 /// 将 `/user/info` JSON 映射为 [MeProfile] / [ChatUserProfile]。
 abstract final class UserDto {
+  /// 最近一次 `/user/info` 解析到的照片墙审核状态（content → 是否已通过）。
+  static final Map<String, bool> lastPicReviewed = {};
   static MeProfile? parseProfile(ApiResponse response) {
     final user = _userMap(response);
     if (user == null) return null;
@@ -31,7 +33,9 @@ abstract final class UserDto {
   }
 
   static MeProfile fromUserMap(Map<String, dynamic> json) {
-    final avatar = '${json['avatar'] ?? ''}';
+    final avatar = '${json['avatar'] ?? json['avatarUrl'] ?? ''}'.trim();
+    final avatarAudit =
+        '${json['avatarAudit'] ?? json['avatar_audit'] ?? ''}'.trim();
     final genderRaw = '${json['gender'] ?? ''}'.trim().toLowerCase();
     // 未设置 / 未知不要默认成 Male（跳过引导后会误显示假资料）。
     final gender = switch (genderRaw) {
@@ -52,11 +56,14 @@ abstract final class UserDto {
         ? ''
         : birthdayRaw;
 
+    final album = _parsePicUrls(json['picList'], includePending: true);
+
     return MeProfile(
       displayName: '${json['nickname'] ?? json['nickName'] ?? ''}',
       userId: '${json['id'] ?? ''}',
       avatarAsset: AppAssets.avatarPlace,
       avatarUrl: avatar.isEmpty ? null : avatar,
+      avatarAuditUrl: avatarAudit.isEmpty ? null : avatarAudit,
       email: email,
       friends: _asInt(json['friendNum']),
       fans: _asInt(json['fanNum']),
@@ -76,7 +83,11 @@ abstract final class UserDto {
       totalExperience: _asInt(
         json['totalExperience'] ?? json['totalExp'],
       ),
-      momentUrls: _parsePicUrls(json['picList']),
+      albumUrls: album,
+      momentUrls: [
+        for (final u in album)
+          if (lastPicReviewed[u] != false) u,
+      ],
       voiceSeconds: _asIntOrNull(json['voiceDuration']),
       voiceUrl: () {
         final v = '${json['voice'] ?? ''}'.trim();
@@ -91,7 +102,7 @@ abstract final class UserDto {
 
   static ChatUserProfile chatFromUserMap(Map<String, dynamic> json) {
     final id = '${json['id'] ?? ''}';
-    final avatar = '${json['avatar'] ?? ''}';
+    final avatar = _parseAvatarField(json['avatar'] ?? json['avatarUrl']);
     final genderRaw = '${json['gender'] ?? ''}'.toLowerCase();
     final isMale = switch (genderRaw) {
       'female' || 'f' || '2' => false,
@@ -135,6 +146,7 @@ abstract final class UserDto {
       userId: id,
       avatarAsset: AppAssets.avatarPlace,
       avatarUrl: avatar.isEmpty ? null : avatar,
+      avatarUnderReview: false,
       isMale: isMale,
       age: hasGender ? age : 0,
       zodiac: birthday.isEmpty ? '' : zodiacFromBirthday(birthday),
@@ -148,7 +160,7 @@ abstract final class UserDto {
         return v.isEmpty ? null : v;
       }(),
       vipIconUrl: _parseVipSmallIcon(json),
-      momentUrls: _parsePicUrls(json['picList']),
+      momentUrls: _parsePicUrls(json['picList'], includePending: false),
       tags: _parseTags(json['makeFriendsLabel']),
       isFollowing: isFollowing,
       inPartyName: inParty,
@@ -159,6 +171,15 @@ abstract final class UserDto {
               .trim(),
       hasGender: hasGender,
     );
+  }
+
+  static String _parseAvatarField(Object? raw) {
+    if (raw == null) return '';
+    if (raw is String) return raw.trim();
+    if (raw is Map) {
+      return '${raw['content'] ?? raw['url'] ?? raw['avatar'] ?? ''}'.trim();
+    }
+    return '$raw'.trim();
   }
 
   /// Forya UserLevWidget：仅当 `icons.smallIcon` 非空时展示。
@@ -180,19 +201,28 @@ abstract final class UserDto {
     ];
   }
 
-  static List<String> _parsePicUrls(Object? raw) {
+  /// 个人主页 / 访客只展示 `ok == true`；编辑页用 [includePending] 含审核中。
+  static List<String> _parsePicUrls(
+    Object? raw, {
+    required bool includePending,
+  }) {
+    if (includePending) lastPicReviewed.clear();
     if (raw is! List) return const [];
     final urls = <String>[];
     for (final item in raw) {
       if (item is String && item.trim().isNotEmpty) {
-        urls.add(item.trim());
+        final url = item.trim();
+        lastPicReviewed[url] = true;
+        urls.add(url);
         continue;
       }
       if (item is Map) {
-        // AuditItem: { content, ok, ... } — 待审核项（ok:false）也展示。
         final content =
             '${item['content'] ?? item['url'] ?? item['value'] ?? ''}'.trim();
-        if (content.isNotEmpty) urls.add(content);
+        if (content.isEmpty) continue;
+        final reviewed = item['ok'] == true;
+        lastPicReviewed[content] = reviewed;
+        if (includePending || reviewed) urls.add(content);
       }
     }
     // 去重并保持顺序

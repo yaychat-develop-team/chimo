@@ -450,11 +450,10 @@ packages:
   in_app_purchase:
     dependency: "direct main"
     description:
-      name: in_app_purchase
-      sha256: ad59b45d998868b8ace0f606e09b348ffd888952a3cf8ff9f7956aaf4844e6e2
-      url: "https://mirrors.tuna.tsinghua.edu.cn/dart-pub/"
-    source: hosted
-    version: "3.2.4"
+      path: "third_party/in_app_purchase-3.2.3"
+      relative: true
+    source: path
+    version: "3.2.3"
   in_app_purchase_android:
     dependency: "direct main"
     description:
@@ -474,11 +473,10 @@ packages:
   in_app_purchase_storekit:
     dependency: "direct main"
     description:
-      name: in_app_purchase_storekit
-      sha256: "9602e249a0e30351f047d5715957f27709ed7b42f631fba8941dcad51489932a"
-      url: "https://mirrors.tuna.tsinghua.edu.cn/dart-pub/"
-    source: hosted
-    version: "0.4.11+1"
+      path: "third_party/in_app_purchase_storekit-0.4.3"
+      relative: true
+    source: path
+    version: "0.4.3"
   jni:
     dependency: transitive
     description:

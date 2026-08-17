@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../../../core/auth/auth_session.dart';
 import '../../../core/network/app_apis.dart';
 import '../../../core/network/media_upload.dart';
 import '../../../core/widgets/app_network_image.dart';
@@ -122,7 +121,6 @@ class _MyPicturePageState extends State<MyPicturePage> {
       return;
     }
 
-    await AuthSession.markLoggedIn(avatarUrl: remote);
     if (!mounted) return;
 
     setState(() {

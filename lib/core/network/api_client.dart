@@ -92,19 +92,22 @@ class ApiClient {
   }
 
   Map<String, dynamic> _wrapBizParam(Map<String, dynamic> bizParam) {
-    final payload = Map<String, dynamic>.from(bizParam);
-    payload.putIfAbsent(
-      'timestamp',
-      () => DateTime.now().millisecondsSinceEpoch,
-    );
-    return {'bizParam': payload};
+    // 对齐 forya：timestamp 只放 HTTP 头，不要塞进 bizParam。
+    // UserInfoUpdateReq 没有 timestamp 字段，protobuf JSON 解析到未知字段会整单丢弃，
+    // 表现为 newPic/delPic 接口成功但资料墙不变更。
+    return {'bizParam': Map<String, dynamic>.from(bizParam)};
   }
 
-  Future<ApiResponse> post(String path, {Map<String, dynamic>? bizParam}) {
+  Future<ApiResponse> post(
+    String path, {
+    Map<String, dynamic>? bizParam,
+    String? accept,
+  }) {
     return _request(
       method: 'POST',
       uri: _uri(path),
       data: jsonEncode(_wrapBizParam(bizParam ?? const {})),
+      accept: accept,
     );
   }
 
@@ -116,11 +119,13 @@ class ApiClient {
     required String method,
     required Uri uri,
     Object? data,
+    String? accept,
   }) async {
     // ignore: avoid_print
     print(
       'ApiClient $method $uri'
-      '${data == null ? '' : ' body=$data'}',
+      '${data == null ? '' : ' body=$data'}'
+      '${accept == null ? '' : ' accept=$accept'}',
     );
 
     try {
@@ -128,7 +133,15 @@ class ApiClient {
         () => _dio.requestUri(
           uri,
           data: data,
-          options: Options(method: method),
+          options: Options(
+            method: method,
+            headers: {
+              if (accept != null) Headers.acceptHeader: accept,
+            },
+            responseType: accept == acceptProto
+                ? ResponseType.bytes
+                : ResponseType.plain,
+          ),
         ),
       );
       return _decode(response);
@@ -175,7 +188,26 @@ class ApiClient {
 
   ApiResponse _decode(Response<dynamic> response) {
     final contentType = response.headers.value(Headers.contentTypeHeader) ?? '';
-    final rawBody = _bodyAsString(response.data);
+    final status = response.statusCode;
+    String rawBody;
+    try {
+      rawBody = _bodyAsString(response.data);
+    } on FormatException {
+      // Accept: protobuf 时回包是二进制，不能当 UTF-8 解。
+      final ok = status == 200;
+      // ignore: avoid_print
+      print(
+        'ApiClient ← $status content-type=$contentType protobuf-bytes '
+        'treated as ${ok ? 'success' : 'fail'}',
+      );
+      return ApiResponse(
+        success: ok,
+        code: status,
+        message: '',
+        raw: {'httpStatus': status},
+        httpStatus: status,
+      );
+    }
     final preview = rawBody.length > 400
         ? '${rawBody.substring(0, 400)}…'
         : rawBody;
@@ -188,16 +220,17 @@ class ApiClient {
         rawBody.trimLeft().startsWith('{') ||
         rawBody.trimLeft().startsWith('[');
     if (contentType.contains(acceptProto) && !looksJson) {
+      final ok = response.statusCode == 200;
       // ignore: avoid_print
-      print('ApiClient protobuf body not decoded (no BaseRsp proto in Chimo)');
-      final length = response.data is List<int>
-          ? (response.data as List<int>).length
-          : rawBody.length;
+      print(
+        'ApiClient protobuf body http=${response.statusCode} '
+        'treated as ${ok ? 'success' : 'fail'}',
+      );
       return ApiResponse(
-        success: false,
+        success: ok,
         code: response.statusCode,
-        message: 'protobuf.response.unsupported',
-        raw: {'bodyLength': length},
+        message: ok ? '' : 'protobuf.response.unsupported',
+        raw: {'httpStatus': response.statusCode},
         httpStatus: response.statusCode,
       );
     }

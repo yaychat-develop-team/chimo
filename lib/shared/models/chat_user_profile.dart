@@ -14,6 +14,7 @@ class ChatUserProfile {
     required this.level,
     required this.bio,
     this.avatarUrl,
+    this.avatarUnderReview = false,
     this.heightInches = 0,
     this.weightLb = 0,
     this.voiceSeconds,
@@ -37,6 +38,7 @@ class ChatUserProfile {
   final String userId;
   final String avatarAsset;
   final String? avatarUrl;
+  final bool avatarUnderReview;
   final bool isMale;
   final int age;
   final String zodiac;
@@ -119,6 +121,7 @@ class ChatUserProfile {
     String? userId,
     String? avatarAsset,
     String? avatarUrl,
+    bool? avatarUnderReview,
     bool? isMale,
     int? age,
     String? zodiac,
@@ -149,6 +152,7 @@ class ChatUserProfile {
       userId: userId ?? this.userId,
       avatarAsset: avatarAsset ?? this.avatarAsset,
       avatarUrl: avatarUrl ?? this.avatarUrl,
+      avatarUnderReview: avatarUnderReview ?? this.avatarUnderReview,
       isMale: isMale ?? this.isMale,
       age: age ?? this.age,
       zodiac: zodiac ?? this.zodiac,
