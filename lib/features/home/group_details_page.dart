@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -1423,7 +1424,12 @@ class _MessagesFeed extends StatelessWidget {
             ] else
               SizedBox(height: i == 0 ? 0 : 10),
             if (sentMessages[i].kind == _OutgoingKind.join)
-              _JoinCommunityTip(name: sentMessages[i].joinName ?? 'Someone')
+              _JoinCommunityTip(
+                name: sentMessages[i].joinName ?? 'Someone',
+                onNameTap: onSenderAvatarTap == null
+                    ? null
+                    : () => onSenderAvatarTap!(sentMessages[i]),
+              )
             else
               _GroupChatBubble(
                 message: sentMessages[i],
@@ -1693,10 +1699,12 @@ class _OutgoingMessage {
 }
 
 /// Forya CustomGroupJoinItem：青绿昵称 + 灰色 "joined the community"。
+/// 点昵称与点头像一样弹出资料层。
 class _JoinCommunityTip extends StatelessWidget {
-  const _JoinCommunityTip({required this.name});
+  const _JoinCommunityTip({required this.name, this.onNameTap});
 
   final String name;
+  final VoidCallback? onNameTap;
 
   static const _nameColor = Color(0xFF00D68F);
   static const _restColor = Color(0xFFBCBCBC);
@@ -1718,6 +1726,9 @@ class _JoinCommunityTip extends StatelessWidget {
                   fontWeight: FontWeight.w500,
                   height: 1.3,
                 ),
+                recognizer: onNameTap == null
+                    ? null
+                    : (TapGestureRecognizer()..onTap = onNameTap),
               ),
               const TextSpan(
                 text: '  joined the community',

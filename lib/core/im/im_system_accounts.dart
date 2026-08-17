@@ -9,6 +9,13 @@ abstract final class ImSystemAccounts {
   static const String newFriends = 'new-friends-system-account';
   static const String gameCenter = 'game-official-account';
 
+  /// 官方号：环信侧始终为私聊（Chat），不得当群聊处理。
+  static bool isOfficialAccount(String? conversationId) {
+    final id = conversationId?.trim() ?? '';
+    if (id.isEmpty) return false;
+    return id == official || id == officialCmd || id == gameCenter;
+  }
+
   static bool isSystemAccount(String? conversationId) {
     final id = conversationId?.trim() ?? '';
     if (id.isEmpty) return false;
@@ -22,6 +29,7 @@ abstract final class ImSystemAccounts {
 
   static String displayName(String conversationId) {
     return switch (conversationId) {
+      official || officialCmd => 'Official',
       gameCenter => 'Game Center',
       fleet => 'Fleet notification',
       risingStar => 'Rising Star',

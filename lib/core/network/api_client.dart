@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 
 import 'api_config.dart';
+import 'proto/relation_list_proto.dart';
 
 /// echimo / forya 通用响应信封（JSON 或 protobuf 解码后的字段）。
 class ApiResponse {
@@ -55,9 +56,9 @@ class ApiClient {
           Dio(
             BaseOptions(
               baseUrl: ApiConfig.baseUrl,
-              connectTimeout: const Duration(seconds: 10),
-              receiveTimeout: const Duration(seconds: 10),
-              sendTimeout: const Duration(seconds: 10),
+              connectTimeout: const Duration(seconds: 15),
+              receiveTimeout: const Duration(seconds: 20),
+              sendTimeout: const Duration(seconds: 20),
               contentType: Headers.jsonContentType,
               responseType: ResponseType.plain,
               headers: {Headers.acceptHeader: Headers.jsonContentType},
@@ -111,8 +112,12 @@ class ApiClient {
     );
   }
 
-  Future<ApiResponse> get(String path, {Map<String, String>? query}) {
-    return _request(method: 'GET', uri: _uri(path, query));
+  Future<ApiResponse> get(
+    String path, {
+    Map<String, String>? query,
+    String? accept,
+  }) {
+    return _request(method: 'GET', uri: _uri(path, query), accept: accept);
   }
 
   Future<ApiResponse> _request({
@@ -149,7 +154,15 @@ class ApiClient {
       if (error.response != null) {
         return _decode(error.response!);
       }
-      rethrow;
+      // ignore: avoid_print
+      print('ApiClient transport failed: $error');
+      return ApiResponse(
+        success: false,
+        code: null,
+        message: _transportMessage(error),
+        raw: {'error': '$error'},
+        httpStatus: error.response?.statusCode,
+      );
     }
   }
 
@@ -174,7 +187,9 @@ class ApiClient {
             text.contains('Connection reset') ||
             (error is DioException &&
                 (error.type == DioExceptionType.connectionError ||
-                    error.type == DioExceptionType.connectionTimeout));
+                    error.type == DioExceptionType.connectionTimeout ||
+                    error.type == DioExceptionType.receiveTimeout ||
+                    error.type == DioExceptionType.sendTimeout));
         // ignore: avoid_print
         print(
           'ApiClient transport error attempt=$attempt/$maxAttempts: $error',
@@ -189,21 +204,37 @@ class ApiClient {
   ApiResponse _decode(Response<dynamic> response) {
     final contentType = response.headers.value(Headers.contentTypeHeader) ?? '';
     final status = response.statusCode;
+    final data = response.data;
+    if (_isProtoBody(contentType, data)) {
+      try {
+        final parsed = RelationListProto.decode(_asBytes(data));
+        // ignore: avoid_print
+        print(
+          'ApiClient ← $status protobuf success=${parsed.success} '
+          'code=${parsed.code} message=${parsed.message}',
+        );
+        return parsed;
+      } catch (error) {
+        // ignore: avoid_print
+        print('ApiClient protobuf decode failed: $error');
+        return ApiResponse(
+          success: false,
+          code: status,
+          message: '$error',
+          raw: {'httpStatus': status},
+          httpStatus: status,
+        );
+      }
+    }
+
     String rawBody;
     try {
-      rawBody = _bodyAsString(response.data);
+      rawBody = _bodyAsString(data);
     } on FormatException {
-      // Accept: protobuf 时回包是二进制，不能当 UTF-8 解。
-      final ok = status == 200;
-      // ignore: avoid_print
-      print(
-        'ApiClient ← $status content-type=$contentType protobuf-bytes '
-        'treated as ${ok ? 'success' : 'fail'}',
-      );
       return ApiResponse(
-        success: ok,
+        success: false,
         code: status,
-        message: '',
+        message: 'invalid.response',
         raw: {'httpStatus': status},
         httpStatus: status,
       );
@@ -215,25 +246,6 @@ class ApiClient {
     print(
       'ApiClient ← ${response.statusCode} content-type=$contentType $preview',
     );
-
-    final looksJson =
-        rawBody.trimLeft().startsWith('{') ||
-        rawBody.trimLeft().startsWith('[');
-    if (contentType.contains(acceptProto) && !looksJson) {
-      final ok = response.statusCode == 200;
-      // ignore: avoid_print
-      print(
-        'ApiClient protobuf body http=${response.statusCode} '
-        'treated as ${ok ? 'success' : 'fail'}',
-      );
-      return ApiResponse(
-        success: ok,
-        code: response.statusCode,
-        message: ok ? '' : 'protobuf.response.unsupported',
-        raw: {'httpStatus': response.statusCode},
-        httpStatus: response.statusCode,
-      );
-    }
 
     try {
       final decoded = rawBody.isEmpty ? null : jsonDecode(rawBody);
@@ -259,6 +271,18 @@ class ApiClient {
     );
   }
 
+  static bool _isProtoBody(String contentType, Object? data) {
+    if (contentType.contains(acceptProto)) return true;
+    return false;
+  }
+
+  static List<int> _asBytes(Object? data) {
+    if (data is Uint8List) return data;
+    if (data is List<int>) return data;
+    if (data is String) return utf8.encode(data);
+    return const [];
+  }
+
   static String _bodyAsString(Object? data) {
     if (data == null) return '';
     if (data is String) return data;
@@ -270,6 +294,20 @@ class ApiClient {
 
   Future<ApiResponse> pingUserOpen({bool open = false}) {
     return post('/user/open', bizParam: {'open': open});
+  }
+
+  static String _transportMessage(DioException error) {
+    return switch (error.type) {
+      DioExceptionType.connectionTimeout ||
+      DioExceptionType.receiveTimeout ||
+      DioExceptionType.sendTimeout =>
+        'Network timeout. Please check your connection and try again.',
+      DioExceptionType.connectionError =>
+        'Network error. Please check your connection.',
+      _ => error.message?.trim().isNotEmpty == true
+          ? error.message!.trim()
+          : 'Network request failed.',
+    };
   }
 
   void close() => _dio.close(force: true);

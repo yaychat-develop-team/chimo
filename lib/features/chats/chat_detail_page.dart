@@ -97,6 +97,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   String get _peerUid {
     final id = _conversation.id;
     if (id.startsWith('dm_')) return id.substring(3);
+    if (id.startsWith('sys_')) return id.substring(4);
     return id;
   }
 
@@ -259,14 +260,11 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         }
       }
     } catch (error) {
+      debugPrint('load chat profile failed: $error');
       if (!mounted) return;
       setState(() => _loadingPeer = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to load chat profile: $error'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      final em = _imConversationId;
+      if (em.isNotEmpty) unawaited(_loadImHistory(em));
     }
   }
 
@@ -606,9 +604,9 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       return;
     }
 
-    // 先清失败态，避免连点。
+    // 从原位置移除；成功后追加到底部（不是仅去掉感叹号）。
     setState(() {
-      _messages[index] = line.copyWith(failed: false);
+      _messages.removeAt(index);
     });
 
     try {
@@ -663,15 +661,25 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       if (sent != null && sent.id.isNotEmpty) {
         _seenMsgIds.add(sent.id);
         setState(() {
-          _messages[index] = _lineFromIm(sent!).copyWith(failed: false);
+          _messages.add(_lineFromIm(sent!).copyWith(failed: false));
         });
         _afterSend(line.listPreview);
+      } else {
+        setState(() {
+          _messages.add(line.copyWith(failed: true));
+        });
+        _scrollToBottom();
+        showCenterToast(
+          context,
+          message: 'Message failed to send',
+        );
       }
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _messages[index] = line.copyWith(failed: true);
+        _messages.add(line.copyWith(failed: true));
       });
+      _scrollToBottom();
       if (_isPeerBlockSendError(error)) {
         _blockedByPeer = true;
         await AppTipDialog.alert(

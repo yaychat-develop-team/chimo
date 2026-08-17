@@ -130,6 +130,7 @@ class ChimoApi {
         'pageSize': '$pageSize',
         'keyword': keyword,
       },
+      accept: ApiClient.acceptProto,
     );
   }
 
@@ -146,6 +147,7 @@ class ChimoApi {
         'pageSize': '$pageSize',
         'keyword': keyword,
       },
+      accept: ApiClient.acceptProto,
     );
   }
 
@@ -162,6 +164,7 @@ class ChimoApi {
         'pageSize': '$pageSize',
         'keyword': keyword,
       },
+      accept: ApiClient.acceptProto,
     );
   }
 

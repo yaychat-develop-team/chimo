@@ -40,6 +40,8 @@ dependencies:
   in_app_purchase_android: ^0.4.0
   in_app_purchase_storekit:
     path: third_party/in_app_purchase_storekit-0.4.3
+  protobuf: ^6.0.0
+  fixnum: ^1.1.1
 
 dev_dependencies:
   flutter_test:

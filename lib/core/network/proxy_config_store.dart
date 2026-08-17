@@ -51,6 +51,7 @@ abstract final class ProxyConfigStore {
 
   /// 给 [Dio] 挂上可选代理（Charles / Proxyman 等），对齐 forya `updateProxy`。
   static void configureDio(Dio dio) {
+    if (!isConfigured) return;
     dio.httpClientAdapter = IOHttpClientAdapter(
       createHttpClient: () {
         final client = HttpClient();

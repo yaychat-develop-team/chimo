@@ -1575,7 +1575,7 @@ abstract final class ImService {
     if (params == null || params.isEmpty) {
       return (name: '', uid: '');
     }
-    var name = (params['name'] ?? '').trim();
+    var name = _displayJoinName(params['name'] ?? '');
     var uid = (params['uid'] ?? params['userId'] ?? '').trim();
     final raw = (params['content'] ?? '').trim();
     if (raw.startsWith('{')) {
@@ -1583,7 +1583,9 @@ abstract final class ImService {
         final decoded = jsonDecode(raw);
         if (decoded is Map) {
           final map = Map<String, dynamic>.from(decoded);
-          final n = '${map['name'] ?? map['nickname'] ?? ''}'.trim();
+          final n = _displayJoinName(
+            '${map['name'] ?? map['nickname'] ?? ''}',
+          );
           final u = '${map['uid'] ?? map['userId'] ?? map['id'] ?? ''}'.trim();
           if (n.isNotEmpty) name = n;
           if (u.isNotEmpty) uid = u;
@@ -1591,6 +1593,14 @@ abstract final class ImService {
       } catch (_) {}
     }
     return (name: name, uid: uid);
+  }
+
+  /// 过滤占位昵称（全下划线 / 波浪线），避免列表预览变成 `____ joined…`。
+  static String _displayJoinName(String raw) {
+    final name = raw.trim();
+    if (name.isEmpty) return '';
+    if (RegExp(r'^[_~\-\s·.]+$').hasMatch(name)) return '';
+    return name;
   }
 
   static String _firstParam(Map<String, String> params, List<String> keys) {

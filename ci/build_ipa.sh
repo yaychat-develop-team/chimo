@@ -64,26 +64,74 @@ require_plist() {
     fi
 }
 
-# flutter build ipa 会自己 export，且不带 API Key，Xcode Apple ID 过期就会失败。
-# 编译出 xcarchive 即可；真正导出用下面带 Key 的 xcodebuild。
+# Jenkins 无 GUI 时常锁住 login keychain → codesign 报 errSecInternalComponent。
+unlock_signing_keychain() {
+    local kc="${KEYCHAIN_PATH:-$HOME/Library/Keychains/login.keychain-db}"
+    if [ ! -f "$kc" ] && [ -f "$HOME/Library/Keychains/login.keychain" ]; then
+        kc="$HOME/Library/Keychains/login.keychain"
+    fi
+    local pw="${KEYCHAIN_PASSWORD:-}"
+    echo "[DEBUG] unlock keychain: $kc"
+    if [ -n "$pw" ]; then
+        security unlock-keychain -p "$pw" "$kc" || true
+        # 允许 codesign 在无 UI 下使用私钥（否则仍可能 errSecInternalComponent）
+        security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$pw" "$kc" >/dev/null 2>&1 || true
+        security set-keychain-settings -t 21600 -u "$kc" >/dev/null 2>&1 || true
+    else
+        # 已登录会话偶发可直接 unlock；失败只告警
+        security unlock-keychain "$kc" 2>/dev/null || \
+            echo "WARN: KEYCHAIN_PASSWORD unset; if codesign fails with errSecInternalComponent, set it in ci.env" >&2
+    fi
+    security list-keychains -d user -s "$kc" >/dev/null 2>&1 || true
+    security default-keychain -d user -s "$kc" >/dev/null 2>&1 || true
+    security find-identity -v -p codesigning 2>/dev/null | head -n 20 || true
+}
+
+# IPA 归档必须用 Release：Profile 会触发
+# “Flutter archive not built in Release mode”，且 xcode_backend 签名易失败。
+# 测试服/正式服由 --dart-define=DEBUG_MODE 控制，不靠 Profile。
+# 流程：flutter build ios → xcodebuild archive(API Key) → export(API Key)
 build_archive() {
     local extra=()
-    if [ "$#" -gt 0 ]; then
-        extra=("$@")
-    fi
-    set +e
-    flutter build ipa "${extra[@]}"
-    local status=$?
-    set -e
+    local arg
+    for arg in "$@"; do
+        case "$arg" in
+            --release|--profile)
+                # 忽略调用方 mode；统一 Release 归档
+                ;;
+            *)
+                extra+=("$arg")
+                ;;
+        esac
+    done
+
     local archivePath="$projectPath/build/ios/archive/Runner.xcarchive"
+    local workspace="$projectPath/ios/Runner.xcworkspace"
+    rm -rf "$archivePath"
+
+    unlock_signing_keychain
+
+    echo "[DEBUG] $(date '+%Y-%m-%d %H:%M:%S') flutter build ios --release"
+    flutter build ios --release "${extra[@]}"
+
+    echo "[DEBUG] $(date '+%Y-%m-%d %H:%M:%S') xcodebuild archive (Release) with API key"
+    xcodebuild archive \
+        -workspace "$workspace" \
+        -scheme Runner \
+        -configuration Release \
+        -destination 'generic/platform=iOS' \
+        -archivePath "$archivePath" \
+        -allowProvisioningUpdates \
+        -authenticationKeyID "$apiKey" \
+        -authenticationKeyIssuerID "$apiIssuer" \
+        -authenticationKeyPath "$authKeyPath" \
+        DEVELOPMENT_TEAM=7FB5L562F4
+
     if [ ! -d "$archivePath" ]; then
-        echo "ERROR: flutter build ipa failed (exit $status) and no archive at $archivePath" >&2
-        exit "${status:-1}"
+        echo "ERROR: xcodebuild archive produced no archive at $archivePath" >&2
+        exit 1
     fi
-    if [ "$status" -ne 0 ]; then
-        echo "WARN: flutter IPA export failed (exit $status); archive exists, will export with API key."
-    fi
-    # 丢掉 Flutter 自带的未带 API Key 的导出，统一走 xcodebuild。
+    echo "[DEBUG] archive ok: $archivePath"
     rm -f "$projectPath/build/ios/ipa/"*.ipa 2>/dev/null || true
 }
 
@@ -143,11 +191,12 @@ function buildStore() {
 cd "$projectPath"
 require_plist "$adhocPlist"
 
-# 清理缓存后重装 Pods，避免 Info.plist / 签名变更被旧 DerivedData 卡住
+# 清理本工程缓存后重装 Pods（不要清空整机 DerivedData，会拖垮同机其它任务）
 echo "[DEBUG] $(date '+%Y-%m-%d %H:%M:%S') clean caches"
 flutter clean
 rm -rf "$projectPath/ios/Pods" "$projectPath/ios/Podfile.lock"
-rm -rf "$HOME/Library/Developer/Xcode/DerivedData"
+rm -rf "$HOME/Library/Developer/Xcode/DerivedData"/Runner-* \
+       "$HOME/Library/Developer/Xcode/DerivedData"/chimo-* 2>/dev/null || true
 flutter pub get
 echo "[DEBUG] $(date '+%Y-%m-%d %H:%M:%S') pod install"
 (
@@ -159,31 +208,11 @@ echo "[DEBUG] $(date '+%Y-%m-%d %H:%M:%S') pod install"
   fi
 )
 
-if [ "$buildType" == "debug" ] || [ "$buildType" == "profile" ]; then
+if [ "$buildType" == "debug" ] || [ "$buildType" == "profile" ] || [ "$buildType" == "release" ]; then
     if [ -d "$projectPath/build/ios" ]; then
         rm -rf "$projectPath/build/ios"
     fi
-    if [[ "$debugModel" == "enable" ]]; then
-        build_archive --profile \
-            --build-number "$versionCode" \
-            --build-name "$versionName" \
-            --dart-define=DEBUG_MODE=true \
-            --dart-define=CI_NUM="$ciNum" \
-            -v
-    else
-        build_archive --profile \
-            --build-number "$versionCode" \
-            --build-name "$versionName" \
-            --dart-define=DEBUG_MODE=false \
-            -v
-    fi
-    export_archive "$adhocPlist"
-
-elif [ "$buildType" == "release" ]; then
-    if [ -d "$projectPath/build/ios" ]; then
-        rm -rf "$projectPath/build/ios"
-    fi
-
+    # debug/profile/release 统一 Release 出 IPA；环境靠 DEBUG_MODE。
     if [[ "$debugModel" == "enable" ]]; then
         build_archive --release \
             --build-number "$versionCode" \

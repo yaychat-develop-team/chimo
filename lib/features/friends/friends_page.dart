@@ -68,15 +68,29 @@ class _FriendsPageState extends State<FriendsPage> {
       _error = null;
     });
     try {
-      final res = await AppApis.relation.friendsGraph(keyword: keyword);
+      // 对齐 forya：按 Tab 直拉对应接口，避免合并三张图时粉丝被滤空。
+      final res = switch (_tab) {
+        FriendsTab.friends => AppApis.relation.searchFriends(
+            keyword: keyword,
+          ),
+        FriendsTab.follow => AppApis.relation.searchFollowing(
+            keyword: keyword,
+          ),
+        FriendsTab.followers => AppApis.relation.searchFans(
+            keyword: keyword,
+          ),
+      };
+      final result = await res;
       if (!mounted) return;
 
       setState(() {
-        _users = res.data ?? const [];
+        _users = result.data ?? const [];
         _loading = false;
-        if (!res.ok && _users.isEmpty) {
-          _error =
-              res.message.isEmpty ? 'Failed to load contacts' : res.message;
+        // 对齐 forya FanModel：无关键字时接口失败按空列表，不展示 "System error."。
+        if (!result.ok && _users.isEmpty && keyword.trim().isNotEmpty) {
+          _error = result.message.isEmpty
+              ? 'Failed to load contacts'
+              : result.message;
         }
       });
     } catch (error) {
@@ -86,18 +100,6 @@ class _FriendsPageState extends State<FriendsPage> {
         _error = '$error';
       });
     }
-  }
-
-  bool _matchesTab(FriendUser user) {
-    return switch (_tab) {
-      FriendsTab.friends => user.relation == FriendRelation.mutual,
-      FriendsTab.follow =>
-        user.relation == FriendRelation.mutual ||
-            user.relation == FriendRelation.following,
-      FriendsTab.followers =>
-        user.relation == FriendRelation.mutual ||
-            user.relation == FriendRelation.follower,
-    };
   }
 
   String get _emptyTitle => switch (_tab) {
@@ -113,15 +115,20 @@ class _FriendsPageState extends State<FriendsPage> {
       };
 
   List<FriendUser> get _filtered {
-    final list = _users.where(_matchesTab).toList();
-    if (_query.isEmpty) return list;
-    return list
+    if (_query.isEmpty) return _users;
+    return _users
         .where(
           (u) =>
               u.nickname.toLowerCase().contains(_query) ||
               u.userId.contains(_query),
         )
         .toList(growable: false);
+  }
+
+  void _onTabChanged(FriendsTab tab) {
+    if (tab == _tab) return;
+    setState(() => _tab = tab);
+    unawaited(_loadRelations(keyword: _searchController.text.trim()));
   }
 
   Future<void> _followBack(FriendUser user) async {
@@ -180,8 +187,9 @@ class _FriendsPageState extends State<FriendsPage> {
   }
 
   void _openChat(FriendUser user) {
+    final em = user.emUsername.trim();
     final conversation = ChatConversation(
-      id: 'dm_${user.id}',
+      id: em.isNotEmpty ? 'dm_$em' : 'dm_${user.id}',
       title: user.nickname,
       avatarAsset: user.avatarAsset,
       lastMessage: '',
@@ -191,6 +199,8 @@ class _FriendsPageState extends State<FriendsPage> {
       zodiac: user.zodiac,
       isFollowing: true,
       momentAssets: user.momentAssets,
+      avatarUrl: user.avatarUrl,
+      emUserName: em,
     );
     Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -212,7 +222,7 @@ class _FriendsPageState extends State<FriendsPage> {
             _FriendsHeader(
               current: _tab,
               onBack: () => Navigator.of(context).pop(),
-              onTabChanged: (tab) => setState(() => _tab = tab),
+              onTabChanged: _onTabChanged,
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),

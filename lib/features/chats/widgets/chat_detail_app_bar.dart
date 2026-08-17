@@ -73,8 +73,8 @@ class _DmAppBar extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            // Expanded(tight)：长昵称强制截断，避免盖住 Follow。
-                            Expanded(
+                            // Flexible：昵称只占自身宽度，性别紧跟其后；过长再截断。
+                            Flexible(
                               child: Text(
                                 conversation.title,
                                 maxLines: 1,

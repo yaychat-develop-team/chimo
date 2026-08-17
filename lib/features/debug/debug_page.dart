@@ -57,6 +57,27 @@ class _DebugPageState extends State<DebugPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (!ApiConfig.isDebug) {
+      return AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle.dark,
+        child: AppPageScaffold(
+          title: 'Debug page',
+          backgroundColor: Colors.white,
+          titleStyle: const TextStyle(
+            color: Colors.black,
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+          ),
+          body: const Center(
+            child: Text(
+              'Not available in production build.',
+              style: TextStyle(color: Color(0xFF8E8E93), fontSize: 14),
+            ),
+          ),
+        ),
+      );
+    }
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.dark,
       child: AppPageScaffold(
@@ -76,24 +97,38 @@ class _DebugPageState extends State<DebugPage> {
               onAction: _saveAndRestart,
             ),
             const SizedBox(height: 8),
+            if (!ApiConfig.isDebug)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 8),
+                child: Text(
+                  'Official build: environment is locked to Production.',
+                  style: TextStyle(color: Color(0xFF8E8E93), fontSize: 13),
+                ),
+              ),
             _EnvOption(
               selected: _env == ApiEnvironment.production,
               title: 'Production',
               subtitle: 'api.echimo.com/api/v1',
-              onTap: () => setState(() => _env = ApiEnvironment.production),
+              onTap: ApiConfig.isDebug
+                  ? () => setState(() => _env = ApiEnvironment.production)
+                  : null,
             ),
             _EnvOption(
               selected: _env == ApiEnvironment.test,
               title: 'Test environment',
               subtitle: 'test-api.echimo.com/api/v1',
-              onTap: () => setState(() => _env = ApiEnvironment.test),
+              onTap: ApiConfig.isDebug
+                  ? () => setState(() => _env = ApiEnvironment.test)
+                  : null,
             ),
             _EnvOption(
               selected: _env == ApiEnvironment.local,
               title: 'Local host',
               subtitle: '127.0.0.1:8080/api/v1',
               subtitleMuted: true,
-              onTap: () => setState(() => _env = ApiEnvironment.local),
+              onTap: ApiConfig.isDebug
+                  ? () => setState(() => _env = ApiEnvironment.local)
+                  : null,
             ),
             const SizedBox(height: 6),
             _ToggleRow(
@@ -226,14 +261,14 @@ class _EnvOption extends StatelessWidget {
     required this.selected,
     required this.title,
     required this.subtitle,
-    required this.onTap,
+    this.onTap,
     this.subtitleMuted = false,
   });
 
   final bool selected;
   final String title;
   final String subtitle;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final bool subtitleMuted;
 
   @override

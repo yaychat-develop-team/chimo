@@ -448,8 +448,11 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
 
   void _openChat(_SearchUser user) {
     FocusScope.of(context).unfocus();
+    final em = user.emUsername.trim();
     final conversation = ChatConversation(
-      id: user.id,
+      id: em.isNotEmpty
+          ? 'dm_$em'
+          : (user.id.startsWith('dm_') ? user.id : 'dm_${user.id}'),
       title: user.nickname,
       avatarAsset: user.avatarAsset,
       avatarUrl: user.avatarUrl,
@@ -458,7 +461,7 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
       isMale: user.isMale,
       isFollowing: true,
       momentAssets: user.momentAssets,
-      emUserName: user.emUsername,
+      emUserName: em,
       signature: user.bio,
       zodiac: user.zodiac.isEmpty ? 'Capricorn' : user.zodiac,
     );

@@ -8,6 +8,7 @@ import '../../app/app_router.dart';
 import '../../core/auth/apple_sign_in.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/network/api_config.dart';
 import '../../core/widgets/app_webview_page.dart';
 import '../debug/debug_page.dart';
 
@@ -166,24 +167,25 @@ class _LoginPageState extends State<LoginPage> {
                         _openAgreement('Privacy Agreement'),
                   ),
                   const SizedBox(height: 20),
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const DebugPage(),
+                  if (ApiConfig.isDebug)
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const DebugPage(),
+                          ),
+                        );
+                      },
+                      child: const Text(
+                        'Debug Page',
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
                         ),
-                      );
-                    },
-                    child: const Text(
-                      'Debug Page',
-                      style: TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                  ),
-                  const Spacer(flex: 2),
+                  if (ApiConfig.isDebug) const Spacer(flex: 2) else const Spacer(flex: 3),
                   const _OrContinueDivider(),
                   const SizedBox(height: 20),
                   _PhoneLoginButton(onTap: _openPhoneLogin),
