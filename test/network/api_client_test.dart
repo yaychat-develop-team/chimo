@@ -114,5 +114,45 @@ void main() {
       );
       client.close();
     });
+
+    test('maps transport timeout to failed ApiResponse', () async {
+      final dio = Dio(
+        BaseOptions(
+          baseUrl: ApiConfig.baseUrl,
+          responseType: ResponseType.plain,
+        ),
+      );
+      dio.httpClientAdapter = _ThrowingAdapter(
+        DioException(
+          requestOptions: RequestOptions(path: '/user/info'),
+          type: DioExceptionType.receiveTimeout,
+          message: 'receive timeout',
+        ),
+      );
+
+      final client = ApiClient(dio: dio);
+      final response = await client.get('/user/info');
+      expect(response.success, isFalse);
+      expect(response.message, contains('Network timeout'));
+      client.close();
+    });
   });
+}
+
+class _ThrowingAdapter implements HttpClientAdapter {
+  _ThrowingAdapter(this.error);
+
+  final DioException error;
+
+  @override
+  void close({bool force = false}) {}
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) {
+    throw error.copyWith(requestOptions: options);
+  }
 }

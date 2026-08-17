@@ -57,6 +57,27 @@ class _DebugPageState extends State<DebugPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (!ApiConfig.isDebug) {
+      return AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle.dark,
+        child: AppPageScaffold(
+          title: 'Debug page',
+          backgroundColor: Colors.white,
+          titleStyle: const TextStyle(
+            color: Colors.black,
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+          ),
+          body: const Center(
+            child: Text(
+              'Not available in production build.',
+              style: TextStyle(color: Color(0xFF8E8E93), fontSize: 14),
+            ),
+          ),
+        ),
+      );
+    }
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.dark,
       child: AppPageScaffold(

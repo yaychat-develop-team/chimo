@@ -11,6 +11,14 @@ abstract final class FriendDto {
   }) {
     if (!response.success) return const [];
     final data = response.data;
+    // 兼容 `{ userList: [...] }` 与裸列表。
+    if (data is List) {
+      return [
+        for (final item in data)
+          if (item is Map)
+            fromUserMap(Map<String, dynamic>.from(item), relation: relation),
+      ];
+    }
     if (data is! Map) return const [];
     final list = data['userList'] ?? data['list'] ?? data['users'];
     if (list is! List) return const [];
@@ -77,20 +85,10 @@ abstract final class FriendDto {
         ? (ageFromField ?? _ageFromBirthday(birthday))
         : 0;
 
-    final relationRaw = '${json['relationType'] ?? ''}'.toUpperCase();
-    final followFlag = json['isFollow'] ?? json['follow'] ?? json['followed'];
-    final isFollow = followFlag == true ||
-        followFlag == 1 ||
-        '$followFlag'.toLowerCase() == 'true' ||
-        relationRaw.contains('FOLLOW') ||
-        relationRaw.contains('FRIEND') ||
-        relationRaw.contains('MUTUAL');
-    final resolved = switch (relation) {
-      FriendRelation.mutual => FriendRelation.mutual,
-      FriendRelation.following => FriendRelation.following,
-      FriendRelation.follower =>
-        isFollow ? FriendRelation.following : FriendRelation.follower,
-    };
+    // 对齐 forya RelationType：FOLLOW=1 / FAN=2 / FRIEND=3。
+    // 旧逻辑用 contains('FOLLOW') 会把 FAN/FOLLOWER 误判成「我已关注」，
+    // 粉丝被标成 following 后从 Followers Tab 滤掉，出现「外面 1、里面空」。
+    final resolved = _resolveRelation(json, fallback: relation);
 
     return FriendUser(
       id: id,
@@ -135,6 +133,60 @@ abstract final class FriendDto {
       }
     }
     return byId.values.toList(growable: false);
+  }
+
+  static FriendRelation _resolveRelation(
+    Map<String, dynamic> json, {
+    required FriendRelation fallback,
+  }) {
+    final raw = json['relationType'];
+    if (raw is int) {
+      return switch (raw) {
+        1 => FriendRelation.following,
+        2 => FriendRelation.follower,
+        3 => FriendRelation.mutual,
+        _ => fallback,
+      };
+    }
+    final name = '$raw'.toUpperCase().trim();
+    if (name.isEmpty || name == 'NULL' || name == 'NONE' || name == '0') {
+      return fallback;
+    }
+    // FRIEND / MUTUAL 优先于 FOLLOW 子串匹配。
+    if (name == '3' ||
+        name == 'FRIEND' ||
+        name.endsWith('.FRIEND') ||
+        name.contains('MUTUAL') ||
+        name.contains('FRIEND')) {
+      return FriendRelation.mutual;
+    }
+    // FAN 必须在 FOLLOW 之前：否则 "FOLLOWER"/"…FAN…" 会被误伤。
+    if (name == '2' ||
+        name == 'FAN' ||
+        name.endsWith('.FAN') ||
+        name == 'FOLLOWER' ||
+        name.endsWith('.FOLLOWER')) {
+      return FriendRelation.follower;
+    }
+    if (name == '1' ||
+        name == 'FOLLOW' ||
+        name.endsWith('.FOLLOW') ||
+        name == 'FOLLOWING' ||
+        name.endsWith('.FOLLOWING')) {
+      return FriendRelation.following;
+    }
+
+    final followFlag = json['isFollow'] ?? json['follow'] ?? json['followed'];
+    final iFollow = followFlag == true ||
+        followFlag == 1 ||
+        '$followFlag'.toLowerCase() == 'true';
+    if (fallback == FriendRelation.follower && iFollow) {
+      return FriendRelation.mutual;
+    }
+    if (fallback == FriendRelation.following && iFollow) {
+      return FriendRelation.following;
+    }
+    return fallback;
   }
 
   static int _ageFromBirthday(String birthday) {

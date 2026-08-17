@@ -587,27 +587,36 @@ class ChatsListController extends ChangeNotifier {
     if (index >= 0) {
       final prev = _conversations.removeAt(index);
       final mergedEm = em.isNotEmpty ? em : prev.emUserName;
+      final keepGroup = prev.badge == ChatBadgeType.group;
+      final placeholderTitle =
+          title.trim().isEmpty || title.trim() == 'Group';
       _conversations.insert(
         0,
         prev.copyWith(
           id: _canonicalDmId(id: canonicalId, emUserName: mergedEm),
-          title: title,
-          avatarAsset: avatarAsset,
-          avatarUrl: avatarUrl,
+          title: keepGroup && placeholderTitle && prev.title.trim().isNotEmpty
+              ? prev.title
+              : title,
+          avatarAsset: keepGroup &&
+                  avatarAsset == AppAssets.avatarPlace &&
+                  prev.avatarAsset.isNotEmpty
+              ? prev.avatarAsset
+              : avatarAsset,
+          avatarUrl: keepGroup ? (avatarUrl ?? prev.avatarUrl) : avatarUrl,
           lastMessage: lastMessage,
           timeLabel: timeLabel,
-          badge: badge,
+          badge: keepGroup ? ChatBadgeType.group : badge,
           unreadCount: prev.unreadCount + unreadDelta,
-          isMale: isMale,
-          signature: signature,
-          zodiac: zodiac,
-          isFollowing: isFollowing,
-          momentAssets: momentAssets,
-          groupDescription: groupDescription,
-          category: category,
-          memberCount: memberCount,
-          postCount: postCount,
-          level: level,
+          isMale: isMale ?? prev.isMale,
+          signature: signature ?? prev.signature,
+          zodiac: zodiac ?? prev.zodiac,
+          isFollowing: isFollowing ?? prev.isFollowing,
+          momentAssets: momentAssets ?? prev.momentAssets,
+          groupDescription: groupDescription ?? prev.groupDescription,
+          category: category ?? prev.category,
+          memberCount: memberCount ?? prev.memberCount,
+          postCount: postCount ?? prev.postCount,
+          level: level ?? prev.level,
           lastMsgAtMs: nowMs,
           emUserName: mergedEm,
           isSystem: isSystem ?? prev.isSystem,
@@ -705,15 +714,25 @@ class ChatsListController extends ChangeNotifier {
       // 不展示从未加入过的群组（本地 IM 幽灵会话）。
       if (!_joinedGroupIds.contains(emId) && !_isHidden(emId)) return;
       onNewMessage(
-        id: emId,
-        title: 'Group',
-        avatarAsset: AppAssets.avatarPlace,
+        id: existing?.id ?? emId,
+        title: existing?.title ?? 'Group',
+        avatarAsset: existing?.avatarAsset ?? AppAssets.avatarPlace,
+        avatarUrl: existing?.avatarUrl,
         lastMessage: preview,
         badge: ChatBadgeType.group,
         unreadDelta: unreadDelta,
         emUserName: emId,
+        groupDescription: existing?.groupDescription,
+        category: existing?.category,
+        memberCount: existing?.memberCount,
+        postCount: existing?.postCount,
+        level: existing?.level,
       );
-      unawaited(_enrichHiddenOrNewGroup(emId));
+      if (existing == null ||
+          existing.title == 'Group' ||
+          (existing.avatarUrl ?? '').isEmpty) {
+        unawaited(_enrichHiddenOrNewGroup(emId));
+      }
       return;
     }
 
