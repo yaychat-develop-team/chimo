@@ -64,28 +64,57 @@ require_plist() {
     fi
 }
 
-# flutter build ipa 会自己 export，且不带 API Key，Xcode Apple ID 过期就会失败。
-# 编译出 xcarchive 即可；真正导出用下面带 Key 的 xcodebuild。
+# flutter build ipa 的 archive/export 都不带 API Key；本机 Apple ID 过期时
+# archive 也会挂（~1 分钟就失败、无 xcarchive）。改为：
+# 1) flutter build ios --no-codesign 编译
+# 2) xcodebuild archive + API Key 签名/拉描述文件
+# 3) xcodebuild -exportArchive + API Key 导出 IPA
 build_archive() {
+    local config="Release"
+    local flutter_mode=(--release)
     local extra=()
-    if [ "$#" -gt 0 ]; then
-        extra=("$@")
-    fi
-    set +e
-    flutter build ipa "${extra[@]}"
-    local status=$?
-    set -e
+    local arg
+    for arg in "$@"; do
+        case "$arg" in
+            --release)
+                config="Release"
+                flutter_mode=(--release)
+                ;;
+            --profile)
+                config="Profile"
+                flutter_mode=(--profile)
+                ;;
+            *)
+                extra+=("$arg")
+                ;;
+        esac
+    done
+
     local archivePath="$projectPath/build/ios/archive/Runner.xcarchive"
+    local workspace="$projectPath/ios/Runner.xcworkspace"
+    rm -rf "$archivePath"
+
+    echo "[DEBUG] $(date '+%Y-%m-%d %H:%M:%S') flutter build ios ${flutter_mode[*]} (no-codesign)"
+    flutter build ios "${flutter_mode[@]}" "${extra[@]}" --no-codesign
+
+    echo "[DEBUG] $(date '+%Y-%m-%d %H:%M:%S') xcodebuild archive ($config) with API key"
+    xcodebuild archive \
+        -workspace "$workspace" \
+        -scheme Runner \
+        -configuration "$config" \
+        -destination 'generic/platform=iOS' \
+        -archivePath "$archivePath" \
+        -allowProvisioningUpdates \
+        -authenticationKeyID "$apiKey" \
+        -authenticationKeyIssuerID "$apiIssuer" \
+        -authenticationKeyPath "$authKeyPath" \
+        DEVELOPMENT_TEAM=7FB5L562F4
+
     if [ ! -d "$archivePath" ]; then
-        echo "ERROR: flutter build ipa failed (exit $status) and no archive at $archivePath" >&2
-        echo "HINT: archive 阶段失败（不是 export）。请在上方日志搜 'error:' / '❌' / 'CodeSign'。" >&2
-        echo "常见原因: Pod IPHONEOS_DEPLOYMENT_TARGET 过低、签名、编译错误。" >&2
-        exit "${status:-1}"
+        echo "ERROR: xcodebuild archive produced no archive at $archivePath" >&2
+        exit 1
     fi
-    if [ "$status" -ne 0 ]; then
-        echo "WARN: flutter IPA export failed (exit $status); archive exists, will export with API key."
-    fi
-    # 丢掉 Flutter 自带的未带 API Key 的导出，统一走 xcodebuild。
+    echo "[DEBUG] archive ok: $archivePath"
     rm -f "$projectPath/build/ios/ipa/"*.ipa 2>/dev/null || true
 }
 
@@ -145,11 +174,12 @@ function buildStore() {
 cd "$projectPath"
 require_plist "$adhocPlist"
 
-# 清理缓存后重装 Pods，避免 Info.plist / 签名变更被旧 DerivedData 卡住
+# 清理本工程缓存后重装 Pods（不要清空整机 DerivedData，会拖垮同机其它任务）
 echo "[DEBUG] $(date '+%Y-%m-%d %H:%M:%S') clean caches"
 flutter clean
 rm -rf "$projectPath/ios/Pods" "$projectPath/ios/Podfile.lock"
-rm -rf "$HOME/Library/Developer/Xcode/DerivedData"
+rm -rf "$HOME/Library/Developer/Xcode/DerivedData"/Runner-* \
+       "$HOME/Library/Developer/Xcode/DerivedData"/chimo-* 2>/dev/null || true
 flutter pub get
 echo "[DEBUG] $(date '+%Y-%m-%d %H:%M:%S') pod install"
 (
