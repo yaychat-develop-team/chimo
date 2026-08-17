@@ -97,6 +97,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   String get _peerUid {
     final id = _conversation.id;
     if (id.startsWith('dm_')) return id.substring(3);
+    if (id.startsWith('sys_')) return id.substring(4);
     return id;
   }
 

@@ -233,8 +233,9 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
   }
 
   void _openChat() {
+    final em = _profile.emUsername.trim();
     final conversation = ChatConversation(
-      id: 'dm_${_profile.id}',
+      id: em.isNotEmpty ? 'dm_$em' : 'dm_${_profile.id}',
       title: _profile.nickname,
       avatarAsset: _profile.avatarAsset,
       lastMessage: '',
@@ -245,7 +246,7 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
       isFollowing: _following,
       momentAssets: _profile.momentAssets,
       avatarUrl: _profile.avatarUrl,
-      emUserName: _profile.emUsername,
+      emUserName: em,
     );
     widget.chatsController?.upsertPrivateChat(conversation);
     Navigator.of(context).push(

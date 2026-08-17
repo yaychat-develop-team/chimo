@@ -180,8 +180,9 @@ class _FriendsPageState extends State<FriendsPage> {
   }
 
   void _openChat(FriendUser user) {
+    final em = user.emUsername.trim();
     final conversation = ChatConversation(
-      id: 'dm_${user.id}',
+      id: em.isNotEmpty ? 'dm_$em' : 'dm_${user.id}',
       title: user.nickname,
       avatarAsset: user.avatarAsset,
       lastMessage: '',
@@ -191,6 +192,8 @@ class _FriendsPageState extends State<FriendsPage> {
       zodiac: user.zodiac,
       isFollowing: true,
       momentAssets: user.momentAssets,
+      avatarUrl: user.avatarUrl,
+      emUserName: em,
     );
     Navigator.of(context).push(
       MaterialPageRoute<void>(
