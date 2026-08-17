@@ -58,6 +58,7 @@ abstract final class NetworkBootstrap {
   }
 
   static Future<ApiResponse> initialize({bool startHeartbeat = true}) async {
+    ApiConfig.bootstrapBuildFlags();
     await ApiConfigStore.load();
     await ProxyConfigStore.load();
     await AuthRequestHeaders.initialize();
@@ -65,7 +66,9 @@ abstract final class NetworkBootstrap {
     await rebuildHttpClient();
     authToken = await AuthSession.token();
     debugPrint(
-      'NetworkBootstrap baseUrl=${ApiConfig.baseUrl} hasToken=${authToken != null}'
+      'NetworkBootstrap baseUrl=${ApiConfig.baseUrl} '
+      'isDebug=${ApiConfig.isDebug} isOfficial=${ApiConfig.isOfficial} '
+      'hasToken=${authToken != null}'
       ' proxy=${ProxyConfigStore.isConfigured ? '${ProxyConfigStore.ip}:${ProxyConfigStore.port}' : 'off'}',
     );
 

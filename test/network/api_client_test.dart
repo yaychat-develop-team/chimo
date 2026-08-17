@@ -40,6 +40,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() {
+    ApiConfig.isDebug = true;
     ApiConfig.useEnvironment(ApiEnvironment.test);
   });
 

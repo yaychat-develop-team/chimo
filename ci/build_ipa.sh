@@ -78,6 +78,8 @@ build_archive() {
     local archivePath="$projectPath/build/ios/archive/Runner.xcarchive"
     if [ ! -d "$archivePath" ]; then
         echo "ERROR: flutter build ipa failed (exit $status) and no archive at $archivePath" >&2
+        echo "HINT: archive 阶段失败（不是 export）。请在上方日志搜 'error:' / '❌' / 'CodeSign'。" >&2
+        echo "常见原因: Pod IPHONEOS_DEPLOYMENT_TARGET 过低、签名、编译错误。" >&2
         exit "${status:-1}"
     fi
     if [ "$status" -ne 0 ]; then
