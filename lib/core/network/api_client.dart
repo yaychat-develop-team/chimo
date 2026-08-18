@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 
 import 'api_config.dart';
+import 'app_http_client.dart';
 import 'proto/relation_list_proto.dart';
 
 /// echimo / forya 通用响应信封（JSON 或 protobuf 解码后的字段）。
@@ -177,8 +178,16 @@ class ApiClient {
         return await call();
       } catch (error) {
         lastError = error;
+        final isTimeout = error is DioException &&
+            (error.type == DioExceptionType.connectionTimeout ||
+                error.type == DioExceptionType.receiveTimeout ||
+                error.type == DioExceptionType.sendTimeout);
+        if (isTimeout) {
+          AppHttpClient.quarantineLast();
+        }
         final text = '$error';
         final retryable =
+            isTimeout ||
             text.contains('HandshakeException') ||
             text.contains('Connection terminated') ||
             text.contains('Connection closed') ||
@@ -186,16 +195,13 @@ class ApiClient {
             text.contains('ClientException') ||
             text.contains('Connection reset') ||
             (error is DioException &&
-                (error.type == DioExceptionType.connectionError ||
-                    error.type == DioExceptionType.connectionTimeout ||
-                    error.type == DioExceptionType.receiveTimeout ||
-                    error.type == DioExceptionType.sendTimeout));
+                error.type == DioExceptionType.connectionError);
         // ignore: avoid_print
         print(
           'ApiClient transport error attempt=$attempt/$maxAttempts: $error',
         );
         if (!retryable || attempt == maxAttempts) rethrow;
-        await Future<void>.delayed(Duration(milliseconds: 350 * attempt));
+        await Future<void>.delayed(Duration(milliseconds: 200 * attempt));
       }
     }
     throw lastError ?? StateError('ApiClient send failed');

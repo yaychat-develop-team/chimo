@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:chimo/core/network/api_client.dart';
 import 'package:chimo/core/network/proto/relation_list_proto.dart';
+import 'package:chimo/features/me/data/user_dto.dart';
 
 class _MockAdapter implements HttpClientAdapter {
   _MockAdapter(this.onFetch);
@@ -95,6 +96,42 @@ void main() {
       final list = data['userList'] as List;
       expect(list, hasLength(1));
       expect(list.first['nickname'], 'Proto Fan');
+    });
+
+    test('decodes UserInfoRsp picList and FOLLOW relation', () {
+      final bytes = encodeUserInfoEnvelope(
+        user: {
+          'id': '1001727',
+          'nickname': '是',
+          'gender': 'female',
+          'personalSignature': 'hello',
+          'relationType': 1,
+          'picList': [
+            {'content': 'https://cdn.example/a.jpg', 'ok': true},
+            {'content': 'https://cdn.example/pending.jpg', 'ok': false},
+          ],
+        },
+      );
+
+      final parsed = RelationListProto.decode(bytes);
+      expect(parsed.success, isTrue);
+      final data = parsed.data! as Map;
+      final user = Map<String, dynamic>.from(data['user'] as Map);
+      expect(user['relationType'], 1);
+      expect(user['picList'], hasLength(2));
+
+      final profile = UserDto.chatFromUserMap(user);
+      expect(profile.isFollowing, isTrue);
+      expect(profile.momentUrls, ['https://cdn.example/a.jpg']);
+    });
+
+    test('FAN relationType is not treated as following', () {
+      final profile = UserDto.chatFromUserMap({
+        'id': '1',
+        'nickname': 'fan',
+        'relationType': 2,
+      });
+      expect(profile.isFollowing, isFalse);
     });
   });
 }

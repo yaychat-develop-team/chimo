@@ -190,7 +190,10 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
           setState(() {
             _profile = parsed.copyWith(
               emUsername: em,
-              // 仅当 API 未返回时保留种子 Moments/标签（少见）。
+              momentUrls: parsed.momentUrls.isNotEmpty
+                  ? parsed.momentUrls
+                  : _profile.momentUrls,
+              tags: parsed.tags.isNotEmpty ? parsed.tags : _profile.tags,
             );
             _following = parsed.isFollowing;
             _blocked = blocked;

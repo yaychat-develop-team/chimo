@@ -1,4 +1,4 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/painting.dart' show TextSpan;
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:chimo/core/theme/app_emoji.dart';
@@ -10,7 +10,7 @@ void main() {
   });
 
   test('toSpan forces Emoji fontFamily on PUA', () {
-    final span = AppEmoji.toSpan('\ue601');
+    final TextSpan span = AppEmoji.toSpan('\ue601');
     expect(span.style?.fontFamily, AppEmoji.fontFamily);
   });
 }

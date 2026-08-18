@@ -1,8 +1,7 @@
-import 'dart:io';
-
 import 'package:dio/dio.dart';
-import 'package:dio/io.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'app_http_client.dart';
 
 /// 调试代理（对齐 forya CacheUtil `ip` / `port` + `JRNetwork.updateProxy`）。
 abstract final class ProxyConfigStore {
@@ -49,28 +48,12 @@ abstract final class ProxyConfigStore {
     } catch (_) {}
   }
 
-  /// 给 [Dio] 挂上可选代理（Charles / Proxyman 等），对齐 forya `updateProxy`。
+  /// 给 [Dio] 挂上 HttpClient（IPv4 轮换 + 可选 Charles 代理）。
   static void configureDio(Dio dio) {
-    if (!isConfigured) return;
-    dio.httpClientAdapter = IOHttpClientAdapter(
-      createHttpClient: () {
-        final client = HttpClient();
-        if (isConfigured) {
-          final proxy = '${ip.trim()}:${port.trim()}';
-          client.findProxy = (url) {
-            return HttpClient.findProxyFromEnvironment(
-              url,
-              environment: {
-                'http_proxy': proxy,
-                'https_proxy': proxy,
-              },
-            );
-          };
-          // 抓包证书常为自签。
-          client.badCertificateCallback = (cert, host, port) => true;
-        }
-        return client;
-      },
+    AppHttpClient.attach(
+      dio,
+      proxyIp: isConfigured ? ip : '',
+      proxyPort: isConfigured ? port : '',
     );
   }
 }

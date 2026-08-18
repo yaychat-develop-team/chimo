@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/constants/app_assets.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/zodiac.dart';
 import '../../../core/widgets/center_toast.dart';
 import '../../../core/widgets/app_network_image.dart';
 import '../../../core/widgets/network_or_asset_avatar.dart';
@@ -51,6 +52,8 @@ class _ChatUserProfileSheetState extends State<ChatUserProfileSheet> {
   late bool _following = widget.profile.isFollowing;
 
   ChatUserProfile get _profile => widget.profile;
+
+  String get _zodiacLabel => zodiacChipLabel(_profile.zodiac);
 
   String get _bioDisplay {
     final bio = _profile.bio.trim();
@@ -243,11 +246,11 @@ class _ChatUserProfileSheetState extends State<ChatUserProfileSheet> {
                     runSpacing: 8,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      if (_profile.zodiac.trim().isNotEmpty)
+                      if (_zodiacLabel.isNotEmpty)
                         _TagChip(
-                          color: const Color(0xFF6B5CFF),
+                          color: Colors.white12,
                           child: Text(
-                            _profile.zodiac,
+                            _zodiacLabel,
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 12,
