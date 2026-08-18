@@ -57,8 +57,10 @@ class ChatsListController extends ChangeNotifier {
   bool isGroupJoined(String groupId) => _joinedGroupIds.contains(groupId);
 
   /// 底部导航角标用的未读总数。
-  int get totalUnread =>
-      _conversations.fold(0, (sum, c) => sum + c.unreadCount);
+  int get totalUnread => _conversations.fold(
+        0,
+        (sum, c) => _isSuppressedOfficial(c) ? sum : sum + c.unreadCount,
+      );
 
   /// 置顶优先，再按最近消息时间降序。
   List<ChatConversation> get visibleConversations {
@@ -66,15 +68,21 @@ class ChatsListController extends ChangeNotifier {
     final pinned = <ChatConversation>[];
     for (final id in _pinnedIds) {
       final item = byId[id];
-      if (item != null) pinned.add(item.copyWith(isPinned: true));
+      if (item == null || _isSuppressedOfficial(item)) continue;
+      pinned.add(item.copyWith(isPinned: true));
     }
     final pinnedSet = _pinnedIds.toSet();
     final unpinned = _conversations
-        .where((c) => !pinnedSet.contains(c.id))
+        .where((c) => !pinnedSet.contains(c.id) && !_isSuppressedOfficial(c))
         .map((c) => c.copyWith(isPinned: false))
         .toList()
       ..sort((a, b) => b.lastMsgAtMs.compareTo(a.lastMsgAtMs));
     return [...pinned, ...unpinned];
+  }
+
+  bool _isSuppressedOfficial(ChatConversation c) {
+    return ImSystemAccounts.isSuppressedOfficialChat(c.id) ||
+        ImSystemAccounts.isSuppressedOfficialChat(c.emUserName);
   }
 
   /// 登出 / 换号时清空内存会话，避免新账号看到上一账号群聊。
@@ -162,6 +170,7 @@ class ChatsListController extends ChangeNotifier {
         }
       }
 
+      next.removeWhere(_isSuppressedOfficial);
       _conversations
         ..clear()
         ..addAll(next);
@@ -202,6 +211,7 @@ class ChatsListController extends ChangeNotifier {
       for (final conv in all) {
         final emId = conv.id;
         if (emId.isEmpty) continue;
+        if (ImSystemAccounts.isSuppressedOfficialChat(emId)) continue;
 
         final preview = await ImService.previewFor(conv);
         final unread = await conv.unreadCount();
@@ -519,6 +529,7 @@ class ChatsListController extends ChangeNotifier {
   }
 
   void upsertPrivateChat(ChatConversation conversation) {
+    if (_isSuppressedOfficial(conversation)) return;
     final em = conversation.emUserName.trim();
     final canonicalId = _canonicalDmId(
       id: conversation.id,
@@ -579,6 +590,10 @@ class ChatsListController extends ChangeNotifier {
     Color? titleColor,
   }) {
     final em = (emUserName ?? '').trim();
+    if (ImSystemAccounts.isSuppressedOfficialChat(id) ||
+        ImSystemAccounts.isSuppressedOfficialChat(em)) {
+      return;
+    }
     final canonicalId = _canonicalDmId(id: id, emUserName: em);
     _unhide(canonicalId, emUserName: em);
     final nowMs = DateTime.now().millisecondsSinceEpoch;
@@ -671,6 +686,11 @@ class ChatsListController extends ChangeNotifier {
     if (boundEm.isNotEmpty && sdkEm.isNotEmpty && boundEm != sdkEm) return;
     final emId = m.conversationId.trim();
     if (emId.isEmpty) return;
+    if (ImSystemAccounts.isSuppressedOfficialChat(emId) ||
+        ImSystemAccounts.isSuppressedOfficialChat(m.from) ||
+        ImSystemAccounts.isSuppressedOfficialChat(m.to)) {
+      return;
+    }
 
     final preview = m.text.trim().isEmpty ? '[Message]' : m.text;
     final viewing = _isViewingConversation(emId);
