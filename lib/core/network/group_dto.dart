@@ -48,11 +48,32 @@ abstract final class GroupDto {
     final emId = '${json['emGroupId'] ?? ''}'.trim();
     final id = emId.isNotEmpty ? emId : '${json['id'] ?? ''}'.trim();
     final avatar = '${json['avatar'] ?? ''}';
+
+    // 兼容不同接口字段名：线上环境有时返回 `groupName/group_name/title` 等。
+    final name = (json['name'] ??
+            json['groupName'] ??
+            json['group_name'] ??
+            json['title'] ??
+            '')
+        .toString();
+
+    final category = (json['type'] ??
+            json['category'] ??
+            json['tag'] ??
+            '')
+        .toString();
+
+    final desc = (json['desc'] ??
+            json['description'] ??
+            json['groupDescription'] ??
+            json['bio'] ??
+            '')
+        .toString();
     return PopularGroupItem(
       id: id,
-      name: '${json['name'] ?? ''}',
-      category: '${json['type'] ?? ''}',
-      description: '${json['desc'] ?? ''}',
+      name: name,
+      category: category,
+      description: desc,
       avatarAsset: AppAssets.avatarPlace,
       avatarUrl: avatar.isEmpty ? null : avatar,
       memberCount: _asInt(json['memberCount']),

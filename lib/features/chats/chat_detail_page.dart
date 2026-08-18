@@ -6,6 +6,7 @@ import 'dart:ui';
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:im_flutter_sdk/im_flutter_sdk.dart';
 import 'package:image_picker/image_picker.dart';
@@ -59,6 +60,8 @@ class ChatDetailPage extends StatefulWidget {
   @override
   State<ChatDetailPage> createState() => _ChatDetailPageState();
 }
+
+enum _TextMessageAction { copy, replay, recall, delete }
 
 class _ChatDetailPageState extends State<ChatDetailPage>
     with SingleTickerProviderStateMixin {
@@ -593,6 +596,73 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     }
 
     await _resendFailedAt(index);
+  }
+
+  Future<void> _onTextMessageLongPress(_ChatLine line) async {
+    if (line.kind != _ChatLineKind.text) return;
+    if (line.msgId.isEmpty) return;
+
+    final isGroup = widget.conversation.badge == ChatBadgeType.group;
+
+    final action = await AppActionBottomSheet.show<_TextMessageAction>(
+      context: context,
+      buildItems: (sheetContext) => [
+        AppActionSheetItem(
+          label: 'Copy',
+          onTap: () => Navigator.of(sheetContext).pop(_TextMessageAction.copy),
+        ),
+        AppActionSheetItem(
+          label: 'Replay',
+          onTap: () =>
+              Navigator.of(sheetContext).pop(_TextMessageAction.replay),
+        ),
+        AppActionSheetItem(
+          label: 'Recall',
+          onTap: () =>
+              Navigator.of(sheetContext).pop(_TextMessageAction.recall),
+        ),
+        AppActionSheetItem(
+          label: 'Delete',
+          destructive: true,
+          onTap: () =>
+              Navigator.of(sheetContext).pop(_TextMessageAction.delete),
+        ),
+      ],
+    );
+    if (!mounted || action == null) return;
+
+    switch (action) {
+      case _TextMessageAction.copy:
+        await Clipboard.setData(ClipboardData(text: line.text));
+        showCenterToast(context, message: 'Saved to the clipboard');
+        return;
+      case _TextMessageAction.replay:
+        // 没有“回复/重发”专用 UI：将原文填回输入框，用户再点发送。
+        _inputController
+          ..text = line.text
+          ..selection = TextSelection.collapsed(offset: line.text.length);
+        _inputBarKey.currentState?.dismissComposer();
+        return;
+      case _TextMessageAction.recall:
+        try {
+          await ImService.recallMessage(line.msgId);
+          await _loadImHistory(_imConversationId);
+        } catch (_) {}
+        return;
+      case _TextMessageAction.delete:
+        try {
+          await ImService.deleteMessage(
+            conversationId: _imConversationId,
+            isGroup: isGroup,
+            messageId: line.msgId,
+          );
+          if (!mounted) return;
+          setState(() {
+            _messages.removeWhere((m) => m.msgId == line.msgId);
+          });
+        } catch (_) {}
+        return;
+    }
   }
 
   Future<void> _resendFailedAt(int index) async {
@@ -1290,6 +1360,8 @@ class _ChatDetailPageState extends State<ChatDetailPage>
               onHandleDragEnd: _onIntroDragEnd,
               onBlankTap: () => _inputBarKey.currentState?.dismissComposer(),
               onFailedTap: (index) => unawaited(_onFailedTap(index)),
+              onTextLongPress: (line) =>
+                  unawaited(_onTextMessageLongPress(line)),
             ),
           ),
           _DmInputBar(

@@ -1040,6 +1040,45 @@ abstract final class ImService {
     }
   }
 
+  /// 撤回发送成功的消息（支持私聊/群聊）。
+  static Future<void> recallMessage(
+    String messageId, {
+    String? ext,
+  }) async {
+    final id = messageId.trim();
+    if (id.isEmpty) return;
+    if (!_sdkInited) await connectFromServer();
+    try {
+      await EMClient.getInstance.chatManager.recallMessage(id, ext: ext);
+    } catch (error) {
+      debugPrint('ImService recallMessage failed: $error');
+    }
+  }
+
+  /// 删除单条消息（支持私聊/群聊本地+数据库）。
+  static Future<void> deleteMessage({
+    required String conversationId,
+    required bool isGroup,
+    required String messageId,
+  }) async {
+    final convId = conversationId.trim();
+    final msgId = messageId.trim();
+    if (convId.isEmpty || msgId.isEmpty) return;
+    if (!_sdkInited) await connectFromServer();
+
+    final type = isGroup ? EMConversationType.GroupChat : EMConversationType.Chat;
+    try {
+      final conv = await EMClient.getInstance.chatManager.getConversation(
+        convId,
+        type: type,
+        createIfNeed: false,
+      );
+      await conv?.deleteMessage(msgId);
+    } catch (error) {
+      debugPrint('ImService deleteMessage failed: $error');
+    }
+  }
+
   /// 删除本地（+ 远程）会话 — forya `ConversationController.removeItem`。
   static Future<void> deleteConversation(
     String conversationId, {
