@@ -165,11 +165,15 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
   Future<void> _loadFromApi() async {
     final rawId = _peerUid.trim();
-    final emHint = _peerEmUser.isNotEmpty
-        ? _peerEmUser
-        : (rawId.startsWith('yqdf-') || rawId.contains('yqdf')
-            ? rawId
-            : '');
+    final rawEm = _peerEmUser.trim().isNotEmpty
+        ? _peerEmUser.trim()
+        : _conversation.emUserName.trim();
+    var emHint = rawEm;
+    if (emHint.isEmpty &&
+        rawId.isNotEmpty &&
+        !RegExp(r'^\d+$').hasMatch(rawId)) {
+      emHint = rawId;
+    }
     if (rawId.isEmpty && emHint.isEmpty) {
       if (mounted) setState(() => _loadingPeer = false);
       return;
@@ -182,9 +186,12 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       if (emHint.isNotEmpty) {
         try {
           final msgRes = await AppApis.relation.msgUser(emHint);
-          final id = msgRes.data?.id.trim() ?? '';
+          final brief = msgRes.data;
+          final id = brief?.id.trim() ?? '';
           if (id.isNotEmpty) appUid = id;
-          blockedByPeer = msgRes.data?.isYourInBlackList ?? false;
+          final resolvedEm = brief?.emUsername.trim() ?? '';
+          if (resolvedEm.isNotEmpty) emHint = resolvedEm;
+          blockedByPeer = brief?.isYourInBlackList ?? false;
         } catch (_) {}
       }
       if (appUid.isEmpty && RegExp(r'^\d+$').hasMatch(rawId)) {
@@ -193,7 +200,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       // 该后端 user/info 接受数字 id 或 emUsername。
       final infoKey = appUid.isNotEmpty
           ? appUid
-          : (rawId.isNotEmpty ? rawId : emHint);
+          : (emHint.isNotEmpty ? emHint : rawId);
 
       final peerFuture = infoKey.isNotEmpty
           ? AppApis.user.profileByUidOrNull(infoKey)
@@ -256,10 +263,12 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           _blocked = blocked;
           _blockedByPeer = blockedByPeer;
           _selfAvatarUrl = self?.avatarUrl;
+          if (emHint.isNotEmpty) _peerEmUser = emHint;
           _loadingPeer = false;
         });
-        if (_peerEmUser.isNotEmpty) {
-          unawaited(_loadImHistory(_peerEmUser));
+        if (emHint.isNotEmpty) {
+          widget.chatsController?.setActiveConversation(emHint);
+          unawaited(_loadImHistory(emHint));
         }
       }
     } catch (error) {

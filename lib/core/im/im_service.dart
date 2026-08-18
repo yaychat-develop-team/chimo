@@ -1192,7 +1192,9 @@ abstract final class ImService {
     required EMMessage message,
   }) {
     final event = body.event;
-    if (event.isEmpty) return '[Message]';
+    final params = body.params;
+    final fallbackText = _customTextFromParams(params);
+    if (event.isEmpty) return fallbackText.isNotEmpty ? fallbackText : '[Message]';
     switch (event) {
       case 'SendGift':
         return '[Gift]';
@@ -1214,7 +1216,6 @@ abstract final class ImService {
         }
         return 'joined the community';
       case 'SystemNotify':
-        final params = body.params;
         if (params != null) {
           for (final key in ['text', 'content', 'title', 'body']) {
             final v = (params[key] ?? '').trim();
@@ -1227,10 +1228,43 @@ abstract final class ImService {
         if (ImSystemAccounts.isNewFriends(convId)) {
           return 'New friend activity';
         }
-        return '[Message]';
+        return fallbackText.isNotEmpty ? fallbackText : '[Message]';
       default:
-        return '[$event]';
+        return fallbackText.isNotEmpty ? fallbackText : '[$event]';
     }
+  }
+
+  static String _customTextFromParams(Map<String, String>? params) {
+    if (params == null || params.isEmpty) return '';
+    for (final key in const ['text', 'content', 'msg', 'message', 'body', 'title']) {
+      final raw = (params[key] ?? '').trim();
+      if (raw.isEmpty) continue;
+      if (!raw.startsWith('{') && !raw.startsWith('[')) {
+        return AppEmoji.normalize(raw);
+      }
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map) {
+          final map = Map<String, dynamic>.from(decoded);
+          for (final nestedKey in const [
+            'text',
+            'content',
+            'msg',
+            'message',
+            'body',
+            'title',
+            'desc',
+            'name',
+          ]) {
+            final value = '${map[nestedKey] ?? ''}'.trim();
+            if (value.isNotEmpty && !value.startsWith('{') && !value.startsWith('[')) {
+              return AppEmoji.normalize(value);
+            }
+          }
+        }
+      } catch (_) {}
+    }
+    return '';
   }
 
   static void _emitEmMessage(EMMessage message) {
