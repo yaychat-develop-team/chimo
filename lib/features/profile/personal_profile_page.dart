@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/network/app_apis.dart';
+import '../../core/network/flavor_label_store.dart';
 import '../../core/utils/personal_effect_card_cache.dart';
 import '../../core/utils/zodiac.dart';
 import '../../core/widgets/pag_network_overlay.dart';
@@ -40,7 +41,7 @@ class _PersonalProfilePageState extends State<PersonalProfilePage> {
   }
 
   int get _age {
-    final birth = DateTime.tryParse(_profile.birthday);
+    final birth = parseBirthday(_profile.birthday);
     if (birth == null) return 0;
     final now = DateTime.now();
     var age = now.year - birth.year;
@@ -75,7 +76,9 @@ class _PersonalProfilePageState extends State<PersonalProfilePage> {
   List<ProfileFlavorTag>? get _flavors {
     if (_profile.tags.isEmpty) return const [];
     return [
-      for (final tag in _profile.tags) ProfileFlavorTag(label: tag),
+      for (final tag in _profile.tags)
+        if (FlavorLabelStore.display(tag).isNotEmpty)
+          ProfileFlavorTag(label: FlavorLabelStore.display(tag)),
     ];
   }
 
@@ -90,6 +93,8 @@ class _PersonalProfilePageState extends State<PersonalProfilePage> {
       if (!mounted) return;
       final parsed = infoRes.data;
       if (parsed != null) {
+        await FlavorLabelStore.ensureLoaded();
+        if (!mounted) return;
         setState(() => _profile = parsed);
       }
     } catch (_) {

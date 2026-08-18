@@ -66,7 +66,10 @@ class _MyTagsPageState extends State<MyTagsPage> {
           .toSet();
       final selected = <int>{};
       for (final item in list) {
-        if (initNames.contains(item.name)) {
+        final keyId = _labelIdFromRaw(item.name);
+        if (initNames.contains(item.name) ||
+            (keyId != null && keyId == item.id) ||
+            initNames.any((name) => _labelIdFromRaw(name) == item.id)) {
           selected.add(item.id);
           if (selected.length >= maxTags) break;
         }
@@ -85,6 +88,11 @@ class _MyTagsPageState extends State<MyTagsPage> {
         _loadError = 'Load failed: $error';
       });
     }
+  }
+
+  static int? _labelIdFromRaw(String raw) {
+    final match = RegExp(r'tb_make_friends_label_name_(\d+)$').firstMatch(raw);
+    return int.tryParse(match?.group(1) ?? '');
   }
 
   void _toggle(MakeFriendLabelItem item) {

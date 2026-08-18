@@ -31,7 +31,7 @@ class ChatConversation {
     this.titleColor,
     this.isMale = true,
     this.signature = '',
-    this.zodiac = 'Capricorn',
+    this.zodiac = '',
     this.heightInches = 0,
     this.weightLb = 0,
     this.isFollowing = false,

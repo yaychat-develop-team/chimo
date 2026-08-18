@@ -120,7 +120,8 @@ abstract final class UserDto {
         ? ''
         : birthdayRaw;
     final ageFromField = int.tryParse('${json['age'] ?? ''}');
-    final age = ageFromField ?? _ageFromBirthday(birthday);
+    final ageFromBirthday = birthday.isEmpty ? 0 : _ageFromBirthday(birthday);
+    final age = ageFromBirthday > 0 ? ageFromBirthday : (ageFromField ?? 0);
     final signature =
         '${json['personalSignature'] ?? json['signature'] ?? ''}';
     final isFollowing = _parseIsFollowing(json);
@@ -137,11 +138,8 @@ abstract final class UserDto {
         json['isHidden'] == 1 ||
         '${json['isHidden'] ?? ''}' == 'true';
 
-    final constellation =
-        '${json['constellation'] ?? json['zodiac'] ?? ''}'.trim();
-    final zodiac = constellation.isNotEmpty
-        ? constellation
-        : (birthday.isEmpty ? '' : zodiacFromBirthday(birthday));
+    // 只信任生日算出的星座。服务端 constellation 在无生日时会给摩羯默认值。
+    final zodiac = birthday.isEmpty ? '' : zodiacFromBirthday(birthday);
 
     return ChatUserProfile(
       id: id,

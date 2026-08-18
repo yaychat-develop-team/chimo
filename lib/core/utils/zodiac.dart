@@ -12,7 +12,9 @@ DateTime? parseBirthday(String birthday) {
     );
   }
   final n = int.tryParse(raw);
-  if (n != null && n > 0) {
+  // Unix 秒是 10 位、毫秒 13 位。7 位用户 id（如 1011231）不能当成时间戳，
+  // 否则会落到 1970-01 被算成摩羯。
+  if (n != null && n >= 1000000000) {
     final ms = n > 9999999999 ? n : n * 1000;
     return DateTime.fromMillisecondsSinceEpoch(ms, isUtc: true).toLocal();
   }
@@ -54,7 +56,7 @@ String zodiacEmoji(String zodiac) {
     'capricorn' || 'capricornus' => '♑️',
     'aquarius' => '♒️',
     'pisces' => '♓️',
-    _ => '♑️',
+    _ => '',
   };
 }
 

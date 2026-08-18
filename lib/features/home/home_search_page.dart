@@ -463,7 +463,7 @@ class _HomeSearchPageState extends State<HomeSearchPage> {
       momentAssets: user.momentAssets,
       emUserName: em,
       signature: user.bio,
-      zodiac: user.zodiac.isEmpty ? 'Capricorn' : user.zodiac,
+      zodiac: user.zodiac,
     );
     widget.chatsController?.upsertPrivateChat(conversation);
     Navigator.of(context).push(

@@ -640,7 +640,7 @@ class ChatsListController extends ChangeNotifier {
           unreadCount: unreadDelta,
           isMale: isMale ?? true,
           signature: signature ?? '',
-          zodiac: zodiac ?? 'Capricorn',
+          zodiac: zodiac ?? '',
           isFollowing: isFollowing ?? false,
           momentAssets: momentAssets ?? const [],
           groupDescription: groupDescription ?? '',
