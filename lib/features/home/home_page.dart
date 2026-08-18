@@ -48,7 +48,11 @@ class _HomePageState extends State<HomePage> {
   List<PopularGroupItem> _joinedGroups = const [];
   List<HomeBannerItem> _banners = const [];
   bool _initialLoading = true;
+  bool _loadingMore = false;
+  bool _hasMore = true;
   String? _loadError;
+  int _pageNum = 1;
+  static const int _pageSize = 20;
 
   final ScrollController _scrollController = ScrollController();
 
@@ -64,6 +68,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     widget.chatsController.addListener(_syncMembershipFromController);
+    _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Banner 与小组列表独立加载，互不阻塞。
       unawaited(_loadBanners());
@@ -74,6 +79,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     widget.chatsController.removeListener(_syncMembershipFromController);
+    _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
   }
@@ -104,6 +110,15 @@ class _HomePageState extends State<HomePage> {
         _joinedGroups = [..._joinedGroups, g];
       }
     });
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    if (_initialLoading || _loadingMore || !_hasMore) return;
+    final position = _scrollController.position;
+    if (position.pixels >= position.maxScrollExtent - 240) {
+      unawaited(_loadGroups(loadMore: true));
+    }
   }
 
   List<MyGroupItem> get _myGroups => [
@@ -268,10 +283,24 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _loadGroups({bool showError = false}) async {
+  Future<void> _loadGroups({
+    bool showError = false,
+    bool loadMore = false,
+  }) async {
+    if (loadMore) {
+      if (_loadingMore || !_hasMore) return;
+      setState(() => _loadingMore = true);
+    } else {
+      _pageNum = 1;
+      _hasMore = true;
+    }
     try {
       await widget.chatsController.ensureBoundToCurrentUser();
-      final popularFuture = AppApis.group.list(pageNum: 1, pageSize: 20);
+      final requestPage = _pageNum;
+      final popularFuture = AppApis.group.list(
+        pageNum: requestPage,
+        pageSize: _pageSize,
+      );
       final mineFuture = AppApis.group.myGroups();
       final popularRes = await popularFuture;
       final mineRes = await mineFuture;
@@ -291,16 +320,23 @@ class _HomePageState extends State<HomePage> {
       final mineIds = {for (final g in mine) g.id};
       final optimisticIds = widget.chatsController.joinedGroupIds;
       final joinedFlagIds = {...mineIds, ...optimisticIds};
-      final mergedPopular = [
+      final mergedPopularPage = [
         for (final g in popular)
           g.copyWith(isJoined: g.isJoined || joinedFlagIds.contains(g.id)),
       ];
+      final mergedPopular = loadMore
+          ? [
+              ..._popularGroups,
+              for (final g in mergedPopularPage)
+                if (!_popularGroups.any((old) => old.id == g.id)) g,
+            ]
+          : mergedPopularPage;
 
       final joined = <PopularGroupItem>[
         for (final g in mine) g.copyWith(isJoined: true),
       ];
       // Popular 上服务端已标 isJoined 的，补进 My Groups。
-      for (final g in popular) {
+      for (final g in mergedPopular) {
         if (!g.isJoined) continue;
         if (joined.any((j) => j.id == g.id)) continue;
         joined.add(g.copyWith(isJoined: true));
@@ -308,15 +344,18 @@ class _HomePageState extends State<HomePage> {
       // 本会话刚加入、mine 尚未回写时，从 Popular 卡片乐观补一条。
       for (final id in optimisticIds) {
         if (joined.any((j) => j.id == id)) continue;
-        final index = popular.indexWhere((g) => g.id == id);
+        final index = mergedPopular.indexWhere((g) => g.id == id);
         if (index < 0) continue;
-        joined.add(popular[index].copyWith(isJoined: true));
+        joined.add(mergedPopular[index].copyWith(isJoined: true));
       }
 
       setState(() {
         _popularGroups = mergedPopular;
         _joinedGroups = joined;
         _initialLoading = false;
+        _loadingMore = false;
+        _hasMore = popular.length >= _pageSize;
+        _pageNum = requestPage + 1;
         _loadError = popularRes.ok
             ? null
             : (popularRes.message.isEmpty
@@ -333,6 +372,7 @@ class _HomePageState extends State<HomePage> {
       if (!mounted) return;
       setState(() {
         _initialLoading = false;
+        _loadingMore = false;
         _loadError = '$error';
       });
       if (showError) {
@@ -347,7 +387,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   /// 下拉刷新只刷新小组列表，不碰上方 Banner。
-  Future<void> _reloadData() => _loadGroups();
+  Future<void> _reloadData() => _loadGroups(loadMore: false);
 
   void _updatePull(double extent) {
     final next = extent.clamp(0.0, _maxPullExtent);
@@ -581,6 +621,22 @@ class _HomePageState extends State<HomePage> {
                               onMembersTap: _openMembersSheet,
                             ),
                           ),
+                          if (_loadingMore)
+                            const SliverToBoxAdapter(
+                              child: Padding(
+                                padding: EdgeInsets.fromLTRB(0, 8, 0, 20),
+                                child: Center(
+                                  child: SizedBox(
+                                    width: 22,
+                                    height: 22,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: AppColors.primaryBright,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                     ),
