@@ -123,10 +123,7 @@ abstract final class UserDto {
     final age = ageFromField ?? _ageFromBirthday(birthday);
     final signature =
         '${json['personalSignature'] ?? json['signature'] ?? ''}';
-    final relation = '${json['relationType'] ?? ''}'.toUpperCase();
-    final isFollowing = json['isFollow'] == true ||
-        relation.contains('FOLLOW') ||
-        relation.contains('FRIEND');
+    final isFollowing = _parseIsFollowing(json);
 
     String? inParty;
     final channel = json['currentChannel'];
@@ -237,6 +234,35 @@ abstract final class UserDto {
       for (final u in urls)
         if (seen.add(u)) u,
     ];
+  }
+
+  /// FOLLOW=1 / FAN=2 / FRIEND=3。protobuf 是整型，JSON 也可能是枚举名。
+  static bool _parseIsFollowing(Map<String, dynamic> json) {
+    final followFlag = json['isFollow'] ?? json['follow'] ?? json['followed'];
+    if (followFlag == true ||
+        followFlag == 1 ||
+        '$followFlag'.toLowerCase() == 'true') {
+      return true;
+    }
+    final raw = json['relationType'];
+    if (raw is int) return raw == 1 || raw == 3;
+    final relation = '$raw'.toUpperCase().trim();
+    if (relation.isEmpty ||
+        relation == 'NULL' ||
+        relation == 'NONE' ||
+        relation == '0') {
+      return false;
+    }
+    if (relation == '1' || relation == '3') return true;
+    if (relation == '2') return false;
+    if (relation.contains('FRIEND') || relation.contains('MUTUAL')) {
+      return true;
+    }
+    // FAN / FOLLOWER 必须在 FOLLOW 之前，否则 FOLLOWER 会被当成已关注。
+    if (relation.contains('FAN') || relation.contains('FOLLOWER')) {
+      return false;
+    }
+    return relation.contains('FOLLOW');
   }
 
   static int _asInt(Object? value, {int fallback = 0}) {

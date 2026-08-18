@@ -156,6 +156,88 @@ class _UserInfoRsp extends pb.GeneratedMessage {
 
   bool get hasUser => $_has(2);
   _RelationUser get user => $_getN(2);
+  set user(_RelationUser value) => $_setField(3, value);
+}
+
+class _AuditItem extends pb.GeneratedMessage {
+  _AuditItem._();
+
+  static final pb.BuilderInfo _i = pb.BuilderInfo(
+    'AuditItem',
+    package: const pb.PackageName('user'),
+    createEmptyInstance: create,
+  )
+    ..aOS(1, 'content')
+    ..aOB(2, 'ok')
+    ..hasRequiredFields = false;
+
+  @override
+  pb.BuilderInfo get info_ => _i;
+
+  static _AuditItem create() => _AuditItem._();
+
+  @override
+  _AuditItem createEmptyInstance() => create();
+
+  @override
+  _AuditItem clone() => deepCopy();
+
+  String get content => $_getSZ(0);
+  set content(String value) => $_setString(0, value);
+  bool get ok => $_getBF(1);
+  set ok(bool value) => $_setBool(1, value);
+}
+
+class _ChannelInfo extends pb.GeneratedMessage {
+  _ChannelInfo._();
+
+  static final pb.BuilderInfo _i = pb.BuilderInfo(
+    'ChannelInfo',
+    package: const pb.PackageName('user'),
+    createEmptyInstance: create,
+  )
+    ..aOS(6, 'title')
+    ..aOS(14, 'label')
+    ..hasRequiredFields = false;
+
+  @override
+  pb.BuilderInfo get info_ => _i;
+
+  static _ChannelInfo create() => _ChannelInfo._();
+
+  @override
+  _ChannelInfo createEmptyInstance() => create();
+
+  @override
+  _ChannelInfo clone() => deepCopy();
+
+  String get title => $_getSZ(0);
+  String get label => $_getSZ(1);
+}
+
+class _VipIcons extends pb.GeneratedMessage {
+  _VipIcons._();
+
+  static final pb.BuilderInfo _i = pb.BuilderInfo(
+    'UserVipLevelIcons',
+    package: const pb.PackageName('base'),
+    createEmptyInstance: create,
+  )
+    ..aOS(1, 'smallIcon', protoName: 'smallIcon')
+    ..hasRequiredFields = false;
+
+  @override
+  pb.BuilderInfo get info_ => _i;
+
+  static _VipIcons create() => _VipIcons._();
+
+  @override
+  _VipIcons createEmptyInstance() => create();
+
+  @override
+  _VipIcons clone() => deepCopy();
+
+  String get smallIcon => $_getSZ(0);
 }
 
 class _RelationUser extends pb.GeneratedMessage {
@@ -171,10 +253,23 @@ class _RelationUser extends pb.GeneratedMessage {
     ..aInt64(7, 'id')
     ..aOS(9, 'nickname')
     ..aOS(10, 'personalSignature')
+    ..pPM<_AuditItem>(11, 'picList', subBuilder: _AuditItem.create)
+    ..aI(13, 'vipLevel')
+    ..aOS(14, 'voice')
     ..aOS(15, 'avatar')
     ..aOS(16, 'emUsername')
     ..aI(18, 'relationType')
+    ..aI(20, 'weight')
+    ..aI(21, 'height')
+    ..aI(25, 'voiceDuration')
+    ..aI(26, 'onlineStatus')
+    ..aOM<_ChannelInfo>(27, 'currentChannel', subBuilder: _ChannelInfo.create)
+    ..aOM<_VipIcons>(33, 'icons', subBuilder: _VipIcons.create)
+    ..pPS(40, 'makeFriendsLabel')
     ..aI(44, 'age')
+    ..aOS(50, 'avatarAudit')
+    ..aOB(70, 'isHidden')
+    ..aOS(97, 'cardDynamicResource')
     ..hasRequiredFields = false;
 
   @override
@@ -193,12 +288,33 @@ class _RelationUser extends pb.GeneratedMessage {
       'id': hasId ? id.toString() : '',
       'nickname': nickname,
       'avatar': avatar,
+      'avatarAudit': avatarAudit,
       'emUsername': emUsername,
       'gender': gender,
       'birthday': birthday,
       'personalSignature': personalSignature,
       'relationType': relationType,
       'age': age,
+      'vipLevel': vipLevel,
+      'voice': voice,
+      'voiceDuration': voiceDuration,
+      'weight': weight,
+      'height': height,
+      'onlineStatus': onlineStatus,
+      'isHidden': isHidden,
+      'cardDynamicResource': cardDynamicResource,
+      'makeFriendsLabel': makeFriendsLabel.toList(growable: false),
+      'picList': [
+        for (final pic in picList)
+          {'content': pic.content, 'ok': pic.ok},
+      ],
+      if (hasCurrentChannel)
+        'currentChannel': {
+          'title': currentChannel.title,
+          'name': currentChannel.title,
+          'label': currentChannel.label,
+        },
+      if (hasIcons) 'icons': {'smallIcon': icons.smallIcon},
     };
   }
 
@@ -210,14 +326,56 @@ class _RelationUser extends pb.GeneratedMessage {
   String get nickname => $_getSZ(3);
   set nickname(String value) => $_setString(3, value);
   String get personalSignature => $_getSZ(4);
-  String get avatar => $_getSZ(5);
-  set avatar(String value) => $_setString(5, value);
-  String get emUsername => $_getSZ(6);
-  set emUsername(String value) => $_setString(6, value);
-  int get relationType => $_getIZ(7);
-  set relationType(int value) => $_setUnsignedInt32(7, value);
-  int get age => $_getIZ(8);
+  set personalSignature(String value) => $_setString(4, value);
+  List<_AuditItem> get picList => $_getList(5);
+  int get vipLevel => $_getIZ(6);
+  String get voice => $_getSZ(7);
+  String get avatar => $_getSZ(8);
+  set avatar(String value) => $_setString(8, value);
+  String get emUsername => $_getSZ(9);
+  set emUsername(String value) => $_setString(9, value);
+  int get relationType => $_getIZ(10);
+  set relationType(int value) => $_setUnsignedInt32(10, value);
+  int get weight => $_getIZ(11);
+  int get height => $_getIZ(12);
+  int get voiceDuration => $_getIZ(13);
+  int get onlineStatus => $_getIZ(14);
+  bool get hasCurrentChannel => $_has(15);
+  _ChannelInfo get currentChannel => $_getN(15);
+  bool get hasIcons => $_has(16);
+  _VipIcons get icons => $_getN(16);
+  List<String> get makeFriendsLabel => $_getList(17);
+  int get age => $_getIZ(18);
+  set age(int value) => $_setUnsignedInt32(18, value);
+  String get avatarAudit => $_getSZ(19);
+  bool get isHidden => $_getBF(20);
+  String get cardDynamicResource => $_getSZ(21);
   String get birthday => $_getSZ(0);
+  set birthday(String value) => $_setString(0, value);
+}
+
+_RelationUser _userFromMap(Map<String, dynamic> u) {
+  final user = _RelationUser.create();
+  final idRaw = '${u['id'] ?? ''}'.trim();
+  if (idRaw.isNotEmpty) user.id = Int64.parseInt(idRaw);
+  user.nickname = '${u['nickname'] ?? ''}';
+  user.avatar = '${u['avatar'] ?? ''}';
+  user.gender = '${u['gender'] ?? ''}';
+  user.emUsername = '${u['emUsername'] ?? ''}';
+  user.personalSignature = '${u['personalSignature'] ?? ''}';
+  user.birthday = '${u['birthday'] ?? ''}';
+  user.relationType = u['relationType'] as int? ?? 0;
+  final pics = u['picList'];
+  if (pics is List) {
+    for (final p in pics) {
+      if (p is! Map) continue;
+      final item = _AuditItem.create()
+        ..content = '${p['content'] ?? ''}'
+        ..ok = p['ok'] == true;
+      user.picList.add(item);
+    }
+  }
+  return user;
 }
 
 /// @visibleForTesting
@@ -228,19 +386,27 @@ List<int> encodeRelationListEnvelope({
 }) {
   final list = _UserListRsp.create();
   for (final u in users) {
-    final user = _RelationUser.create();
-    final idRaw = '${u['id'] ?? ''}'.trim();
-    if (idRaw.isNotEmpty) user.id = Int64.parseInt(idRaw);
-    user.nickname = '${u['nickname'] ?? ''}';
-    user.avatar = '${u['avatar'] ?? ''}';
-    user.gender = '${u['gender'] ?? ''}';
-    user.emUsername = '${u['emUsername'] ?? ''}';
-    user.relationType = u['relationType'] as int? ?? 0;
-    list.userList.add(user);
+    list.userList.add(_userFromMap(u));
   }
   final envelope = _BaseRsp.create()
     ..success = success
     ..code = code
     ..data = (Any()..value = list.writeToBuffer());
+  return envelope.writeToBuffer();
+}
+
+/// @visibleForTesting
+List<int> encodeUserInfoEnvelope({
+  required Map<String, dynamic> user,
+  bool success = true,
+  int code = 0,
+}) {
+  final info = _UserInfoRsp.create()..user = _userFromMap(user);
+  final envelope = _BaseRsp.create()
+    ..success = success
+    ..code = code
+    ..data = (Any()
+      ..typeUrl = 'type.googleapis.com/user.UserInfoRsp'
+      ..value = info.writeToBuffer());
   return envelope.writeToBuffer();
 }
