@@ -202,10 +202,10 @@ class _DmAppBar extends StatelessWidget {
                         spacing: 6,
                         runSpacing: 6,
                         children: [
-                          _ProfileTag(
-                            label:
-                                '${zodiacEmoji(conversation.zodiac)} ${conversation.zodiac}',
-                          ),
+                          if (zodiacChipLabel(conversation.zodiac).isNotEmpty)
+                            _ProfileTag(
+                              label: zodiacChipLabel(conversation.zodiac),
+                            ),
                           if (conversation.heightInches > 0)
                             _ProfileTag(
                               label: '${conversation.heightInches} Inch',

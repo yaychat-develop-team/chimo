@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/auth/auth_session.dart';
 import '../../core/network/app_apis.dart';
+import '../../core/network/flavor_label_store.dart';
 import '../../core/utils/personal_effect_card_cache.dart';
 import '../../core/utils/zodiac.dart';
 import '../../core/widgets/app_action_bottom_sheet.dart';
@@ -76,7 +77,9 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
   List<ProfileFlavorTag>? get _flavors {
     if (_profile.tags.isEmpty) return const [];
     return [
-      for (final tag in _profile.tags) ProfileFlavorTag(label: tag),
+      for (final tag in _profile.tags)
+        if (FlavorLabelStore.display(tag).isNotEmpty)
+          ProfileFlavorTag(label: FlavorLabelStore.display(tag)),
     ];
   }
 
@@ -100,11 +103,10 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
   /// 对齐 forya `showEffectIfNeed`：有 `cardDynamicResource` 且未在冷却内则播放。
   Future<void> _maybeShowCardEffect() async {
     final url = _profile.cardDynamicResource.trim();
-    final uid = _profile.userId.trim().isNotEmpty
-        ? _profile.userId.trim()
-        : _targetUid;
-    if (url.isEmpty || uid.isEmpty) return;
-    if (!PersonalEffectCardCache.shouldShow(uid)) return;
+    if (url.isEmpty) return;
+    final uid = await _resolveAppUid();
+    if (uid.isEmpty) return;
+    if (!PersonalEffectCardCache.requestShow(uid)) return;
     if (!mounted) return;
     setState(() => _showCardEffect = true);
   }
@@ -135,6 +137,8 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
         if (!mounted) return;
         final me = infoRes.data;
         if (me != null) {
+          await FlavorLabelStore.ensureLoaded();
+          if (!mounted) return;
           await AuthSession.markLoggedIn(
             userId: me.userId,
             nickname: me.displayName,
@@ -182,6 +186,8 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
         }
         if (!mounted) return;
         if (parsed != null) {
+          await FlavorLabelStore.ensureLoaded();
+          if (!mounted) return;
           final self = await AuthSession.isCurrentUser(parsed.userId) ||
               await AuthSession.isCurrentUser(parsed.id);
           final em = parsed.emUsername.isNotEmpty
@@ -211,7 +217,7 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
   }
 
   static int _ageFromBirthday(String birthday) {
-    final birth = DateTime.tryParse(birthday);
+    final birth = parseBirthday(birthday);
     if (birth == null) return 0;
     final now = DateTime.now();
     var age = now.year - birth.year;
@@ -529,12 +535,6 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
         if (_showCardEffect && _profile.cardDynamicResource.trim().isNotEmpty)
           PagNetworkOverlay(
             url: _profile.cardDynamicResource,
-            onAnimationStart: () {
-              final uid = _profile.userId.trim().isNotEmpty
-                  ? _profile.userId.trim()
-                  : _targetUid;
-              PersonalEffectCardCache.markShown(uid);
-            },
             onAnimationEnd: () {
               if (!mounted) return;
               setState(() => _showCardEffect = false);
