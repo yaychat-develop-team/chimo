@@ -110,7 +110,7 @@ class _PersonalProfilePageState extends State<PersonalProfilePage> {
     final url = _profile.cardDynamicResource.trim();
     final uid = _profile.userId.trim();
     if (url.isEmpty || uid.isEmpty) return;
-    if (!PersonalEffectCardCache.shouldShow(uid)) return;
+    if (!PersonalEffectCardCache.requestShow(uid)) return;
     if (!mounted) return;
     setState(() => _showCardEffect = true);
   }
@@ -169,9 +169,6 @@ class _PersonalProfilePageState extends State<PersonalProfilePage> {
           if (_showCardEffect && _profile.cardDynamicResource.trim().isNotEmpty)
             PagNetworkOverlay(
               url: _profile.cardDynamicResource,
-              onAnimationStart: () {
-                PersonalEffectCardCache.markShown(_profile.userId);
-              },
               onAnimationEnd: () {
                 if (!mounted) return;
                 setState(() => _showCardEffect = false);

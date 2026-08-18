@@ -103,11 +103,10 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
   /// 对齐 forya `showEffectIfNeed`：有 `cardDynamicResource` 且未在冷却内则播放。
   Future<void> _maybeShowCardEffect() async {
     final url = _profile.cardDynamicResource.trim();
-    final uid = _profile.userId.trim().isNotEmpty
-        ? _profile.userId.trim()
-        : _targetUid;
-    if (url.isEmpty || uid.isEmpty) return;
-    if (!PersonalEffectCardCache.shouldShow(uid)) return;
+    if (url.isEmpty) return;
+    final uid = await _resolveAppUid();
+    if (uid.isEmpty) return;
+    if (!PersonalEffectCardCache.requestShow(uid)) return;
     if (!mounted) return;
     setState(() => _showCardEffect = true);
   }
@@ -536,12 +535,6 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
         if (_showCardEffect && _profile.cardDynamicResource.trim().isNotEmpty)
           PagNetworkOverlay(
             url: _profile.cardDynamicResource,
-            onAnimationStart: () {
-              final uid = _profile.userId.trim().isNotEmpty
-                  ? _profile.userId.trim()
-                  : _targetUid;
-              PersonalEffectCardCache.markShown(uid);
-            },
             onAnimationEnd: () {
               if (!mounted) return;
               setState(() => _showCardEffect = false);
