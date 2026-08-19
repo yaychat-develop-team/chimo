@@ -26,6 +26,7 @@ import '../../core/widgets/app_asset_image.dart';
 import '../../core/widgets/app_network_image.dart';
 import '../../core/widgets/app_tip_dialog.dart';
 import '../../core/widgets/center_toast.dart';
+import '../../core/widgets/chat_message_action_popup.dart';
 import '../../core/widgets/network_or_asset_avatar.dart';
 import '../home/chat_user_profile_page.dart';
 import '../home/models/chat_user_profile.dart';
@@ -60,8 +61,6 @@ class ChatDetailPage extends StatefulWidget {
   @override
   State<ChatDetailPage> createState() => _ChatDetailPageState();
 }
-
-enum _TextMessageAction { copy, replay, recall, delete }
 
 class _ChatDetailPageState extends State<ChatDetailPage>
     with SingleTickerProviderStateMixin {
@@ -607,69 +606,61 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     await _resendFailedAt(index);
   }
 
-  Future<void> _onTextMessageLongPress(_ChatLine line) async {
+  Future<void> _onTextMessageLongPress(_ChatLine line, Rect anchor) async {
     if (line.kind != _ChatLineKind.text) return;
-    if (line.msgId.isEmpty) return;
 
     final isGroup = widget.conversation.badge == ChatBadgeType.group;
+    final actions = <ChatMessageAction>[
+      if (line.text.trim().isNotEmpty) ChatMessageAction.copy,
+      if (line.text.trim().isNotEmpty) ChatMessageAction.replay,
+      if (line.side == _ChatSide.self && line.msgId.isNotEmpty)
+        ChatMessageAction.recall,
+      if (line.msgId.isNotEmpty) ChatMessageAction.delete,
+    ];
+    if (actions.isEmpty) return;
 
-    final action = await AppActionBottomSheet.show<_TextMessageAction>(
+    final action = await ChatMessageActionPopup.show(
       context: context,
-      buildItems: (sheetContext) => [
-        AppActionSheetItem(
-          label: 'Copy',
-          onTap: () => Navigator.of(sheetContext).pop(_TextMessageAction.copy),
-        ),
-        AppActionSheetItem(
-          label: 'Replay',
-          onTap: () =>
-              Navigator.of(sheetContext).pop(_TextMessageAction.replay),
-        ),
-        AppActionSheetItem(
-          label: 'Recall',
-          onTap: () =>
-              Navigator.of(sheetContext).pop(_TextMessageAction.recall),
-        ),
-        AppActionSheetItem(
-          label: 'Delete',
-          destructive: true,
-          onTap: () =>
-              Navigator.of(sheetContext).pop(_TextMessageAction.delete),
-        ),
-      ],
+      anchor: anchor,
+      actions: actions,
     );
     if (!mounted || action == null) return;
 
     switch (action) {
-      case _TextMessageAction.copy:
+      case ChatMessageAction.copy:
         await Clipboard.setData(ClipboardData(text: line.text));
         showCenterToast(context, message: 'Saved to the clipboard');
         return;
-      case _TextMessageAction.replay:
-        // 没有“回复/重发”专用 UI：将原文填回输入框，用户再点发送。
+      case ChatMessageAction.replay:
         _inputController
           ..text = line.text
           ..selection = TextSelection.collapsed(offset: line.text.length);
         _inputBarKey.currentState?.dismissComposer();
         return;
-      case _TextMessageAction.recall:
-        try {
-          await ImService.recallMessage(line.msgId);
-          await _loadImHistory(_imConversationId);
-        } catch (_) {}
+      case ChatMessageAction.recall:
+        final ok = await ImService.recallMessage(line.msgId);
+        if (!mounted) return;
+        if (!ok) {
+          showCenterToast(context, message: 'Recall failed');
+          return;
+        }
+        setState(() {
+          _messages.removeWhere((m) => m.msgId == line.msgId);
+          _seenMsgIds.remove(line.msgId);
+        });
+        await _loadImHistory(_imConversationId);
         return;
-      case _TextMessageAction.delete:
-        try {
-          await ImService.deleteMessage(
-            conversationId: _imConversationId,
-            isGroup: isGroup,
-            messageId: line.msgId,
-          );
-          if (!mounted) return;
-          setState(() {
-            _messages.removeWhere((m) => m.msgId == line.msgId);
-          });
-        } catch (_) {}
+      case ChatMessageAction.delete:
+        await ImService.deleteMessage(
+          conversationId: _imConversationId,
+          isGroup: isGroup,
+          messageId: line.msgId,
+        );
+        if (!mounted) return;
+        setState(() {
+          _messages.removeWhere((m) => m.msgId == line.msgId);
+          _seenMsgIds.remove(line.msgId);
+        });
         return;
     }
   }
@@ -1369,8 +1360,8 @@ class _ChatDetailPageState extends State<ChatDetailPage>
               onHandleDragEnd: _onIntroDragEnd,
               onBlankTap: () => _inputBarKey.currentState?.dismissComposer(),
               onFailedTap: (index) => unawaited(_onFailedTap(index)),
-              onTextLongPress: (line) =>
-                  unawaited(_onTextMessageLongPress(line)),
+              onTextLongPress: (line, anchor) =>
+                  unawaited(_onTextMessageLongPress(line, anchor)),
             ),
           ),
           _DmInputBar(

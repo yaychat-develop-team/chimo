@@ -27,7 +27,7 @@ class _DmChatBody extends StatelessWidget {
   final bool historyHasMore;
   final VoidCallback? onBlankTap;
   final ValueChanged<int>? onFailedTap;
-  final ValueChanged<_ChatLine>? onTextLongPress;
+  final void Function(_ChatLine line, Rect anchor)? onTextLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -104,7 +104,7 @@ class _DmMessagesFeed extends StatelessWidget {
   final bool historyHasMore;
   final VoidCallback? onBlankTap;
   final ValueChanged<int>? onFailedTap;
-  final ValueChanged<_ChatLine>? onTextLongPress;
+  final void Function(_ChatLine line, Rect anchor)? onTextLongPress;
 
   bool _showAvatar(int index) {
     if (messages[index].kind == _ChatLineKind.tip) return false;
@@ -311,26 +311,35 @@ class _DmMessagesFeed extends StatelessWidget {
                 ),
               ),
             ),
-          _ChatLineKind.text => GestureDetector(
-              onLongPress: onTextLongPress == null || line.msgId.isEmpty
-                  ? null
-                  : () => onTextLongPress!.call(line),
-              child: line.side == _ChatSide.self
-                  ? _SelfBubble(
-                      text: line.text,
-                      showAvatar: showAvatar,
-                      avatarUrl: selfAvatarUrl,
-                      failed: line.failed,
-                      onFailedTap: line.failed
-                          ? () => onFailedTap?.call(msgIndex)
-                          : null,
-                    )
-                  : _PeerBubble(
-                      text: line.text,
-                      avatarAsset: peerAvatar,
-                      avatarUrl: peerAvatarUrl,
-                      showAvatar: showAvatar,
-                    ),
+          _ChatLineKind.text => Builder(
+              builder: (ctx) => GestureDetector(
+                onLongPress: onTextLongPress == null
+                    ? null
+                    : () {
+                        final box = ctx.findRenderObject() as RenderBox?;
+                        if (box == null || !box.hasSize) return;
+                        onTextLongPress!(
+                          line,
+                          box.localToGlobal(Offset.zero) & box.size,
+                        );
+                      },
+                child: line.side == _ChatSide.self
+                    ? _SelfBubble(
+                        text: line.text,
+                        showAvatar: showAvatar,
+                        avatarUrl: selfAvatarUrl,
+                        failed: line.failed,
+                        onFailedTap: line.failed
+                            ? () => onFailedTap?.call(msgIndex)
+                            : null,
+                      )
+                    : _PeerBubble(
+                        text: line.text,
+                        avatarAsset: peerAvatar,
+                        avatarUrl: peerAvatarUrl,
+                        showAvatar: showAvatar,
+                      ),
+              ),
             ),
         };
 

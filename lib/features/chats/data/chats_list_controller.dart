@@ -179,6 +179,7 @@ class ChatsListController extends ChangeNotifier {
         ..addAll(nextJoined);
       await _mergeImConversations();
       _dedupePrivateConversations();
+      _dedupeGroupConversations();
       _loading = false;
       if (!groupsRes.ok && next.isEmpty) {
         _loadError = groupsRes.message.isEmpty
@@ -221,11 +222,7 @@ class ChatsListController extends ChangeNotifier {
         if (conv.type == EMConversationType.GroupChat &&
             !ImSystemAccounts.isSystemAccount(emId)) {
           if (_isHidden(emId)) continue;
-          final index = _conversations.indexWhere(
-            (c) =>
-                c.badge == ChatBadgeType.group &&
-                (c.id == emId || c.emUserName == emId),
-          );
+          final index = _indexOfGroup(id: emId, emUserName: emId);
           if (index < 0) continue;
           final prev = _conversations[index];
           _conversations[index] = prev.copyWith(
@@ -347,6 +344,7 @@ class ChatsListController extends ChangeNotifier {
         );
       }
       _dedupePrivateConversations();
+      _dedupeGroupConversations();
     } catch (error) {
       debugPrint('ChatsListController IM merge: $error');
     }
@@ -385,6 +383,7 @@ class ChatsListController extends ChangeNotifier {
       memberCount: g.memberCount,
       postCount: g.postCount,
       level: g.level,
+      emUserName: g.id,
     );
   }
 
@@ -594,21 +593,28 @@ class ChatsListController extends ChangeNotifier {
         ImSystemAccounts.isSuppressedOfficialChat(em)) {
       return;
     }
-    final canonicalId = _canonicalDmId(id: id, emUserName: em);
-    _unhide(canonicalId, emUserName: em);
+    final isGroupMsg = badge == ChatBadgeType.group;
+    final listId = isGroupMsg
+        ? (em.isNotEmpty ? em : id.trim())
+        : _canonicalDmId(id: id, emUserName: em);
+    _unhide(listId, emUserName: em);
     final nowMs = DateTime.now().millisecondsSinceEpoch;
     final timeLabel = ChatTimeLabel.forList(nowMs);
-    final index = _indexOfPeer(id: canonicalId, emUserName: em);
+    final index = isGroupMsg
+        ? _indexOfGroup(id: listId, emUserName: em)
+        : _indexOfPeer(id: listId, emUserName: em);
     if (index >= 0) {
       final prev = _conversations.removeAt(index);
       final mergedEm = em.isNotEmpty ? em : prev.emUserName;
-      final keepGroup = prev.badge == ChatBadgeType.group;
+      final keepGroup = prev.badge == ChatBadgeType.group || isGroupMsg;
       final placeholderTitle =
           title.trim().isEmpty || title.trim() == 'Group';
       _conversations.insert(
         0,
         prev.copyWith(
-          id: _canonicalDmId(id: canonicalId, emUserName: mergedEm),
+          id: isGroupMsg
+              ? _canonicalGroupId(prev.id, listId, mergedEm)
+              : _canonicalDmId(id: listId, emUserName: mergedEm),
           title: keepGroup && placeholderTitle && prev.title.trim().isNotEmpty
               ? prev.title
               : title,
@@ -640,12 +646,16 @@ class ChatsListController extends ChangeNotifier {
               ImSystemAccounts.isOfficialAccount(mergedEm),
         ),
       );
-      _collapsePeerDuplicates(0);
+      if (isGroupMsg) {
+        _collapseGroupDuplicates(0);
+      } else {
+        _collapsePeerDuplicates(0);
+      }
     } else {
       _conversations.insert(
         0,
         ChatConversation(
-          id: canonicalId,
+          id: listId,
           title: title,
           avatarAsset: avatarAsset,
           avatarUrl: avatarUrl,
@@ -696,7 +706,12 @@ class ChatsListController extends ChangeNotifier {
     final viewing = _isViewingConversation(emId);
     final unreadDelta = (m.isSelf || viewing) ? 0 : 1;
 
-    final existing = _findByEmOrListId(emId);
+    final isSystem = ImSystemAccounts.isSystemAccount(emId);
+    final isGroupCandidate =
+        !isSystem && (m.isGroup || _joinedGroupIds.contains(emId));
+    final existing = isGroupCandidate
+        ? _findGroupByEmId(emId)
+        : _findByEmOrListId(emId);
     if (existing != null) {
       onNewMessage(
         id: existing.id,
@@ -726,10 +741,10 @@ class ChatsListController extends ChangeNotifier {
       return;
     }
 
-    final isSystem = ImSystemAccounts.isSystemAccount(emId);
+    final isSystemAccount = ImSystemAccounts.isSystemAccount(emId);
     // 官方 / 系统号永远走私聊，即使环信消息标成 GroupChat。
     final isGroup =
-        !isSystem && (m.isGroup || _joinedGroupIds.contains(emId));
+        !isSystemAccount && (m.isGroup || _joinedGroupIds.contains(emId));
     if (isGroup) {
       // 不展示从未加入过的群组（本地 IM 幽灵会话）。
       if (!_joinedGroupIds.contains(emId) && !_isHidden(emId)) return;
@@ -759,10 +774,10 @@ class ChatsListController extends ChangeNotifier {
     final isOfficial = ImSystemAccounts.isOfficialAccount(emId);
     final listId = isOfficial
         ? 'dm_$emId'
-        : isSystem
+        : isSystemAccount
             ? 'sys_$emId'
             : 'dm_$emId';
-    if (isSystem) {
+    if (isSystemAccount) {
       onNewMessage(
         id: listId,
         title: ImSystemAccounts.displayName(emId),
@@ -801,6 +816,135 @@ class ChatsListController extends ChangeNotifier {
     final index = _indexOfPeer(id: 'dm_$emId', emUserName: emId);
     if (index < 0) return null;
     return _conversations[index];
+  }
+
+  ChatConversation? _findGroupByEmId(String emId) {
+    final index = _indexOfGroup(id: emId, emUserName: emId);
+    if (index < 0) return null;
+    return _conversations[index];
+  }
+
+  Set<String> _groupMatchKeys({String? id, String? emUserName}) {
+    final keys = <String>{};
+    void add(String? value) {
+      final raw = (value ?? '').trim();
+      if (raw.isEmpty) return;
+      keys.add(raw);
+      if (raw.startsWith('dm_')) {
+        keys.add(raw.substring(3));
+      }
+    }
+
+    add(id);
+    add(emUserName);
+    return keys;
+  }
+
+  int _indexOfGroup({String? id, String? emUserName}) {
+    final keys = _groupMatchKeys(id: id, emUserName: emUserName);
+    if (keys.isEmpty) return -1;
+    return _conversations.indexWhere((c) {
+      if (c.badge != ChatBadgeType.group) return false;
+      final left = _groupMatchKeys(id: c.id, emUserName: c.emUserName);
+      return left.any(keys.contains);
+    });
+  }
+
+  String _canonicalGroupId(String idA, String idB, String em) {
+    if (em.isNotEmpty) return em;
+    for (final id in [idA, idB]) {
+      final bare = id.startsWith('dm_') ? id.substring(3) : id;
+      if (bare.isNotEmpty) return bare;
+    }
+    return idA;
+  }
+
+  bool _isSameGroup(
+    ChatConversation a, {
+    String? id,
+    String? emUserName,
+  }) {
+    if (a.badge != ChatBadgeType.group) return false;
+    final left = _groupMatchKeys(id: a.id, emUserName: a.emUserName);
+    final right = _groupMatchKeys(id: id, emUserName: emUserName);
+    return left.any(right.contains);
+  }
+
+  ChatConversation _mergeGroupRows(ChatConversation a, ChatConversation b) {
+    final preferA = a.lastMsgAtMs >= b.lastMsgAtMs;
+    final newer = preferA ? a : b;
+    final older = preferA ? b : a;
+    final em = a.emUserName.isNotEmpty ? a.emUserName : b.emUserName;
+    String pickTitle() {
+      for (final title in [newer.title, older.title]) {
+        final text = title.trim();
+        if (text.isNotEmpty && text != 'Group') return text;
+      }
+      return newer.title.trim().isNotEmpty ? newer.title : older.title;
+    }
+
+    return newer.copyWith(
+      id: _canonicalGroupId(a.id, b.id, em),
+      emUserName: em,
+      unreadCount: a.unreadCount + b.unreadCount,
+      isPinned: a.isPinned || b.isPinned,
+      title: pickTitle(),
+      avatarUrl: newer.avatarUrl ?? older.avatarUrl,
+      avatarAsset: newer.avatarAsset.isNotEmpty &&
+              newer.avatarAsset != AppAssets.avatarPlace
+          ? newer.avatarAsset
+          : older.avatarAsset,
+      lastMessage: newer.lastMessage.trim().isNotEmpty
+          ? newer.lastMessage
+          : older.lastMessage,
+      timeLabel: newer.lastMessage.trim().isNotEmpty
+          ? newer.timeLabel
+          : older.timeLabel,
+      lastMsgAtMs: newer.lastMsgAtMs > 0 ? newer.lastMsgAtMs : older.lastMsgAtMs,
+      groupDescription: newer.groupDescription.trim().isNotEmpty
+          ? newer.groupDescription
+          : older.groupDescription,
+      category:
+          newer.category.trim().isNotEmpty ? newer.category : older.category,
+      memberCount:
+          newer.memberCount > 0 ? newer.memberCount : older.memberCount,
+      postCount: newer.postCount > 0 ? newer.postCount : older.postCount,
+      level: newer.level > 0 ? newer.level : older.level,
+    );
+  }
+
+  void _collapseGroupDuplicates(int keepIndex) {
+    if (keepIndex < 0 || keepIndex >= _conversations.length) return;
+    final keep = _conversations[keepIndex];
+    if (keep.badge != ChatBadgeType.group) return;
+    for (var i = _conversations.length - 1; i >= 0; i--) {
+      if (i == keepIndex) continue;
+      final other = _conversations[i];
+      if (other.badge != ChatBadgeType.group) continue;
+      if (!_isSameGroup(keep, id: other.id, emUserName: other.emUserName)) {
+        continue;
+      }
+      final merged = _mergeGroupRows(keep, other);
+      _conversations.removeAt(i);
+      if (i < keepIndex) keepIndex -= 1;
+      _conversations[keepIndex] = merged;
+    }
+  }
+
+  void _dedupeGroupConversations() {
+    for (var i = 0; i < _conversations.length; i++) {
+      final row = _conversations[i];
+      if (row.badge != ChatBadgeType.group) continue;
+      for (var j = _conversations.length - 1; j > i; j--) {
+        final other = _conversations[j];
+        if (other.badge != ChatBadgeType.group) continue;
+        if (!_isSameGroup(row, id: other.id, emUserName: other.emUserName)) {
+          continue;
+        }
+        _conversations[i] = _mergeGroupRows(row, other);
+        _conversations.removeAt(j);
+      }
+    }
   }
 
   /// 私聊列表 id：有环信 id 时统一 `dm_/sys_<em>`，避免与 `dm_<数字uid>` 并存。
@@ -976,7 +1120,7 @@ class ChatsListController extends ChangeNotifier {
     final detail = await _fetchGroupDetail(groupId);
     if (detail == null) return;
     _joinedGroupIds.add(detail.id);
-    final index = _conversations.indexWhere((c) => c.id == groupId);
+    final index = _indexOfGroup(id: groupId, emUserName: groupId);
     if (index < 0) return;
     final prev = _conversations[index];
     _conversations[index] = _conversationFromGroup(detail, prev).copyWith(
@@ -984,17 +1128,19 @@ class ChatsListController extends ChangeNotifier {
       timeLabel: prev.timeLabel,
       unreadCount: prev.unreadCount,
       lastMsgAtMs: prev.lastMsgAtMs,
-      emUserName: groupId,
+      emUserName: detail.id,
     );
+    _collapseGroupDuplicates(index);
     notifyListeners();
   }
 
   void _upsertConversation(PopularGroupItem group) {
-    final index = _conversations.indexWhere((c) => c.id == group.id);
+    final index = _indexOfGroup(id: group.id, emUserName: group.id);
     final prev = index >= 0 ? _conversations[index] : null;
     final next = _conversationFromGroup(group, prev);
     if (index >= 0) {
       _conversations[index] = next;
+      _collapseGroupDuplicates(index);
     } else {
       _conversations.insert(0, next);
     }

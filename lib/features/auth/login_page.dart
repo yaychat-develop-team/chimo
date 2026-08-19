@@ -13,7 +13,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_webview_page.dart';
 import '../debug/debug_page.dart';
 
-/// 登录页：iOS 上 Apple + Email 主按钮（对齐 forya）；Android 为 Email + Phone。
+/// 登录页：正式环境写死 Apple + Email；测试环境可按 `/auth/login-platforms` 调整入口。
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -48,10 +48,12 @@ class _LoginPageState extends State<LoginPage> {
   void _applyProductionDefaults() {
     _showAppleEntry = AppleSignInAuth.isSupportedPlatform;
     _showEmailLogin = true;
-    _showPhoneLogin = ApiConfig.isDebug;
+    // 正式环境（正式包 / 切到正式服）不展示手机号登录。
+    _showPhoneLogin = ApiConfig.isDebug && !ApiConfig.isOfficial;
   }
 
   Future<void> _loadLoginPlatforms() async {
+    if (ApiConfig.isOfficial) return;
     try {
       final res = await AppApis.auth.loginPlatforms();
       if (!mounted || !res.ok || res.data == null) return;

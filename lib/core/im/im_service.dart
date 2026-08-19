@@ -487,6 +487,11 @@ abstract final class ImService {
             _emitEmMessage(m);
           }
         },
+        onMessagesRecalledInfo: (infos) {
+          for (final info in infos) {
+            _emitRecall(info);
+          }
+        },
       ),
     );
 
@@ -1041,17 +1046,19 @@ abstract final class ImService {
   }
 
   /// 撤回发送成功的消息（支持私聊/群聊）。
-  static Future<void> recallMessage(
+  static Future<bool> recallMessage(
     String messageId, {
     String? ext,
   }) async {
     final id = messageId.trim();
-    if (id.isEmpty) return;
+    if (id.isEmpty) return false;
     if (!_sdkInited) await connectFromServer();
     try {
       await EMClient.getInstance.chatManager.recallMessage(id, ext: ext);
+      return true;
     } catch (error) {
       debugPrint('ImService recallMessage failed: $error');
+      return false;
     }
   }
 
@@ -1273,6 +1280,32 @@ abstract final class ImService {
     if (!_messagesController.isClosed) {
       _messagesController.add(out);
     }
+  }
+
+  static void _emitRecall(RecallMessageInfo info) {
+    final id = info.recallMessageId.trim();
+    if (id.isEmpty) return;
+    final selfUser = _currentEmUser ?? '';
+    final isSelf = selfUser.isNotEmpty && info.recallBy == selfUser;
+    final convId = (info.conversationId ??
+            info.recallMessage?.conversationId ??
+            '')
+        .trim();
+    if (_messagesController.isClosed) return;
+    _messagesController.add(
+      ImChatMessage(
+        id: id,
+        conversationId: convId,
+        from: info.recallBy,
+        to: convId,
+        text: isSelf ? 'You recalled a message.' : 'A message was recalled.',
+        isSelf: isSelf,
+        serverTimeMs: info.recallMessage?.serverTime ??
+            DateTime.now().millisecondsSinceEpoch,
+        msgType: 'recall',
+        isGroup: info.recallMessage?.chatType == ChatType.GroupChat,
+      ),
+    );
   }
 
   static String _pickLocal(String? path) {

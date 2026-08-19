@@ -6,6 +6,7 @@ import 'dart:ui';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../core/audio/app_audio_playback.dart';
@@ -19,6 +20,7 @@ import '../../core/widgets/app_action_bottom_sheet.dart';
 import '../../core/widgets/app_network_image.dart';
 import '../../core/widgets/app_tip_dialog.dart';
 import '../../core/widgets/center_toast.dart';
+import '../../core/widgets/chat_message_action_popup.dart';
 import '../../core/widgets/network_or_asset_avatar.dart';
 import '../chats/data/chats_list_controller.dart';
 import '../chats/models/chat_conversation.dart';
@@ -289,6 +291,10 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
     final gid = _emGroupId;
     if (gid.isEmpty) return;
     if (m.conversationId != gid && m.to != gid) return;
+    if (m.msgType == 'recall') {
+      _applyRecall(m);
+      return;
+    }
     if (m.id.isNotEmpty && _seenMsgIds.contains(m.id)) return;
     final line = _lineFromIm(m);
     if (line == null) return;
@@ -326,6 +332,13 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
       isSelf: m.isSelf,
     );
     switch (m.msgType) {
+      case 'recall':
+        return _OutgoingMessage.recall(
+          at: at,
+          msgId: m.id,
+          isSelf: m.isSelf,
+          senderName: name,
+        );
       case 'join':
         return _OutgoingMessage.join(
           m.joinName.isEmpty ? 'Someone' : m.joinName,
@@ -547,6 +560,110 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
       lastMessage: preview,
       badge: ChatBadgeType.group,
     );
+  }
+
+  void _applyRecall(ImChatMessage m) {
+    if (!mounted) return;
+    final id = m.id.trim();
+    if (id.isEmpty) return;
+    final at = m.serverTimeMs > 0
+        ? DateTime.fromMillisecondsSinceEpoch(m.serverTimeMs)
+        : DateTime.now();
+    setState(() {
+      final index = _sentMessages.indexWhere((e) => e.msgId == id);
+      final recalled = _OutgoingMessage.recall(
+        at: at,
+        msgId: id,
+        isSelf: m.isSelf,
+        senderName: m.senderName,
+      );
+      if (index >= 0) {
+        _sentMessages[index] = recalled;
+      } else {
+        _seenMsgIds.add(id);
+        _sentMessages.add(recalled);
+        _sentMessages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
+      }
+    });
+    _notifyNewMessage(m.isSelf ? 'You recalled a message.' : 'A message was recalled.');
+  }
+
+  Future<void> _onMessageLongPress(
+    _OutgoingMessage message,
+    Rect anchor,
+  ) async {
+    if (!_isJoined) return;
+    if (message.kind == _OutgoingKind.join ||
+        message.kind == _OutgoingKind.recall) {
+      return;
+    }
+
+    final canCopy = message.kind == _OutgoingKind.text &&
+        (message.text ?? '').trim().isNotEmpty;
+    final actions = <ChatMessageAction>[
+      if (canCopy) ChatMessageAction.copy,
+      if (canCopy) ChatMessageAction.replay,
+      if (message.isSelf && message.msgId.isNotEmpty) ChatMessageAction.recall,
+      if (message.msgId.isNotEmpty) ChatMessageAction.delete,
+    ];
+    if (actions.isEmpty) return;
+
+    _inputBarKey.currentState?.dismissComposer();
+    final action = await ChatMessageActionPopup.show(
+      context: context,
+      anchor: anchor,
+      actions: actions,
+    );
+    if (!mounted || action == null) return;
+
+    switch (action) {
+      case ChatMessageAction.copy:
+        await Clipboard.setData(ClipboardData(text: message.text ?? ''));
+        if (!mounted) return;
+        showCenterToast(context, message: 'Saved to the clipboard');
+        return;
+      case ChatMessageAction.replay:
+        _inputController
+          ..text = message.text ?? ''
+          ..selection = TextSelection.collapsed(
+            offset: (message.text ?? '').length,
+          );
+        _inputBarKey.currentState?.dismissComposer();
+        return;
+      case ChatMessageAction.recall:
+        final ok = await ImService.recallMessage(message.msgId);
+        if (!mounted) return;
+        if (!ok) {
+          showCenterToast(context, message: 'Recall failed');
+          return;
+        }
+        _applyRecall(
+          ImChatMessage(
+            id: message.msgId,
+            conversationId: _emGroupId,
+            from: '',
+            to: _emGroupId,
+            text: 'You recalled a message.',
+            isSelf: true,
+            serverTimeMs: message.sentAt.millisecondsSinceEpoch,
+            msgType: 'recall',
+            isGroup: true,
+          ),
+        );
+        return;
+      case ChatMessageAction.delete:
+        await ImService.deleteMessage(
+          conversationId: _emGroupId,
+          isGroup: true,
+          messageId: message.msgId,
+        );
+        if (!mounted) return;
+        setState(() {
+          _sentMessages.removeWhere((m) => m.msgId == message.msgId);
+          _seenMsgIds.remove(message.msgId);
+        });
+        return;
+    }
   }
 
   Future<void> _sendMessage([String? raw]) async {
@@ -943,6 +1060,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
                           onSenderAvatarTap: _openSenderProfile,
                           onBlankTap: () =>
                               _inputBarKey.currentState?.dismissComposer(),
+                          onMessageLongPress: _onMessageLongPress,
                         ),
                       ),
                     ],
@@ -1247,6 +1365,7 @@ class _ChatBody extends StatelessWidget {
     required this.onPhotoTap,
     this.onSenderAvatarTap,
     this.onBlankTap,
+    this.onMessageLongPress,
   });
 
   final int tabIndex;
@@ -1258,6 +1377,7 @@ class _ChatBody extends StatelessWidget {
   final ValueChanged<int> onPhotoTap;
   final ValueChanged<_OutgoingMessage>? onSenderAvatarTap;
   final VoidCallback? onBlankTap;
+  final void Function(_OutgoingMessage message, Rect anchor)? onMessageLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -1298,6 +1418,7 @@ class _ChatBody extends StatelessWidget {
                     scrollController: messagesScroll,
                     onBlankTap: onBlankTap,
                     onSenderAvatarTap: onSenderAvatarTap,
+                    onMessageLongPress: onMessageLongPress,
                   )
                 : _PhotosGrid(
                     isJoined: isJoined,
@@ -1362,6 +1483,7 @@ class _MessagesFeed extends StatelessWidget {
     required this.scrollController,
     this.onBlankTap,
     this.onSenderAvatarTap,
+    this.onMessageLongPress,
   });
 
   final bool isJoined;
@@ -1369,6 +1491,7 @@ class _MessagesFeed extends StatelessWidget {
   final ScrollController scrollController;
   final VoidCallback? onBlankTap;
   final ValueChanged<_OutgoingMessage>? onSenderAvatarTap;
+  final void Function(_OutgoingMessage message, Rect anchor)? onMessageLongPress;
 
   bool _sameSender(_OutgoingMessage a, _OutgoingMessage b) {
     if (a.isSelf != b.isSelf) return false;
@@ -1430,6 +1553,8 @@ class _MessagesFeed extends StatelessWidget {
                     ? null
                     : () => onSenderAvatarTap!(sentMessages[i]),
               )
+            else if (sentMessages[i].kind == _OutgoingKind.recall)
+              _RecallTip(message: sentMessages[i])
             else
               _GroupChatBubble(
                 message: sentMessages[i],
@@ -1437,11 +1562,16 @@ class _MessagesFeed extends StatelessWidget {
                 showAvatar:
                     i == 0 ||
                     sentMessages[i - 1].kind == _OutgoingKind.join ||
+                    sentMessages[i - 1].kind == _OutgoingKind.recall ||
                     !_sameSender(sentMessages[i], sentMessages[i - 1]) ||
                     sentMessages[i].kind != sentMessages[i - 1].kind,
                 onAvatarTap: sentMessages[i].isSelf || onSenderAvatarTap == null
                     ? null
                     : () => onSenderAvatarTap!(sentMessages[i]),
+                onLongPress: onMessageLongPress == null
+                    ? null
+                    : (anchor) =>
+                        onMessageLongPress!(sentMessages[i], anchor),
                 onImageTap:
                     !isJoined || sentMessages[i].kind != _OutgoingKind.image
                     ? null
@@ -1497,6 +1627,7 @@ class _OutgoingKind {
   static const voice = 1;
   static const image = 2;
   static const join = 3;
+  static const recall = 4;
 }
 
 /// 首条消息或间隔 ≥ 5 分钟时显示时间分隔。
@@ -1642,6 +1773,20 @@ class _OutgoingMessage {
     senderGender: senderGender,
   );
 
+  factory _OutgoingMessage.recall({
+    DateTime? at,
+    String msgId = '',
+    bool isSelf = true,
+    String senderName = '',
+  }) => _OutgoingMessage._(
+    kind: _OutgoingKind.recall,
+    sentAt: at ?? DateTime.now(),
+    msgId: msgId,
+    isSelf: isSelf,
+    senderName: senderName,
+    text: isSelf ? 'You recalled a message.' : 'A message was recalled.',
+  );
+
   final int kind;
   final DateTime sentAt;
   final String? text;
@@ -1696,6 +1841,34 @@ class _OutgoingMessage {
   }
 
   bool get senderIsMale => normalizeGender(senderGender) == 'male';
+}
+
+class _RecallTip extends StatelessWidget {
+  const _RecallTip({required this.message});
+
+  final _OutgoingMessage message;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = message.isSelf
+        ? 'You recalled a message.'
+        : 'A message was recalled.';
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+        child: Text(
+          text,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: Color(0xFF00D68F),
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            height: 1.3,
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// Forya CustomGroupJoinItem：青绿昵称 + 灰色 "joined the community"。
@@ -1755,6 +1928,7 @@ class _GroupChatBubble extends StatelessWidget {
     this.isLocked = false,
     this.onImageTap,
     this.onAvatarTap,
+    this.onLongPress,
   });
 
   final _OutgoingMessage message;
@@ -1762,6 +1936,7 @@ class _GroupChatBubble extends StatelessWidget {
   final bool isLocked;
   final VoidCallback? onImageTap;
   final VoidCallback? onAvatarTap;
+  final ValueChanged<Rect>? onLongPress;
 
   static const double _avatar = 40;
   static const double _avatarGap = 10;
@@ -1824,6 +1999,19 @@ class _GroupChatBubble extends StatelessWidget {
       },
     );
 
+    final interactiveBubble = onLongPress == null
+        ? bubble
+        : Builder(
+            builder: (ctx) => GestureDetector(
+              onLongPress: () {
+                final box = ctx.findRenderObject() as RenderBox?;
+                if (box == null || !box.hasSize) return;
+                onLongPress!(box.localToGlobal(Offset.zero) & box.size);
+              },
+              child: bubble,
+            ),
+          );
+
     // 群聊对方：头像旁显示昵称 + 性别（未设置性别则只显示昵称）。
     final peerBody = !isSelf
         ? Column(
@@ -1834,17 +2022,17 @@ class _GroupChatBubble extends StatelessWidget {
                 _GroupSenderNameRow(message: message),
                 const SizedBox(height: 6),
               ],
-              bubble,
+              interactiveBubble,
             ],
           )
-        : bubble;
+        : interactiveBubble;
 
     if (isSelf) {
       return Row(
         mainAxisAlignment: MainAxisAlignment.end,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          bubble,
+          interactiveBubble,
           const SizedBox(width: _avatarGap),
           avatar,
         ],
