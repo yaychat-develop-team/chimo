@@ -17,7 +17,8 @@ apiKey="L234X7R275" #this private key is only developr role, move the priavte ke
 apiIssuer="e0eabb11-fcfd-43d1-8e83-21f3ce4995eb"
 
 # Jenkins 无 GUI 时 login keychain 常锁住 → codesign 报 errSecInternalComponent。
-# joyride 原脚本没有这段，是因为当时 Mac 已登录、钥匙串已开；无界面 CI 必须显式解锁。
+# joyride 原脚本没有这段：当时 Mac 桌面已登录，钥匙串天然开着，所以不需要密码。
+# 有 KEYCHAIN_PASSWORD 就主动解锁；没有则尽量沿用「已登录会话」行为（与 forya 一致）。
 unlock_signing_keychain() {
     local kc="${KEYCHAIN_PATH:-$HOME/Library/Keychains/login.keychain-db}"
     if [ ! -f "$kc" ] && [ -f "$HOME/Library/Keychains/login.keychain" ]; then
@@ -25,21 +26,21 @@ unlock_signing_keychain() {
     fi
     local pw="${KEYCHAIN_PASSWORD:-}"
     echo "[DEBUG] unlock keychain: $kc"
-    if [ -z "$pw" ]; then
-        echo "ERROR: KEYCHAIN_PASSWORD is not set." >&2
-        echo "  Fix: set Jenkins env KEYCHAIN_PASSWORD (Mac login password for user $(whoami))," >&2
-        echo "  or write it to ci/ci.env / ~/.jenkins/chimo-ci.env / ~/.chimo/ci.env" >&2
-        echo "  Without this, flutter build ipa fails with errSecInternalComponent / PhaseScriptExecution." >&2
-        exit 1
-    fi
     if [ ! -f "$kc" ]; then
-        echo "ERROR: keychain file not found: $kc" >&2
-        exit 1
+        echo "WARN: keychain file not found: $kc (continue like joyride)" >&2
+        return 0
     fi
-    security unlock-keychain -p "$pw" "$kc"
-    security set-keychain-settings -t 3600 -l "$kc" || true
-    # Allow codesign to use private keys without UI prompt
-    security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$pw" "$kc"
+    if [ -n "$pw" ]; then
+        security unlock-keychain -p "$pw" "$kc"
+        security set-keychain-settings -t 3600 -l "$kc" || true
+        # Allow codesign to use private keys without UI prompt
+        security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$pw" "$kc" || true
+    else
+        echo "WARN: KEYCHAIN_PASSWORD unset — relying on already-unlocked login keychain (same as joyride)." >&2
+        echo "  If codesign fails with errSecInternalComponent: log into Mac GUI as $(whoami), or ask admin for KEYCHAIN_PASSWORD." >&2
+        # Keep lock timeout longer if we can touch it without a password (no-op when locked).
+        security set-keychain-settings -t 3600 -l "$kc" 2>/dev/null || true
+    fi
     echo "[DEBUG] codesigning identities:"
     security find-identity -v -p codesigning || true
 }
