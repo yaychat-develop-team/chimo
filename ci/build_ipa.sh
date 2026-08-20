@@ -16,31 +16,24 @@ projectPath=$(dirname "$PWD")
 apiKey="L234X7R275" #this private key is only developr role, move the priavte keys to HOME
 apiIssuer="e0eabb11-fcfd-43d1-8e83-21f3ce4995eb"
 
-# Jenkins 无 GUI 时 login keychain 常锁住 → codesign 报 errSecInternalComponent。
-# joyride 原脚本没有这段：当时 Mac 桌面已登录，钥匙串天然开着，所以不需要密码。
-# 有 KEYCHAIN_PASSWORD 就主动解锁；没有则尽量沿用「已登录会话」行为（与 forya 一致）。
+# Jenkins 无 GUI：解锁 Keychain，避免 Failed to load credentials / missing Xcode-Token /
+# errSecInternalComponent。可用 KEYCHAIN_PASSWORD 覆盖默认密码。
 unlock_signing_keychain() {
     local kc="${KEYCHAIN_PATH:-$HOME/Library/Keychains/login.keychain-db}"
     if [ ! -f "$kc" ] && [ -f "$HOME/Library/Keychains/login.keychain" ]; then
         kc="$HOME/Library/Keychains/login.keychain"
     fi
-    local pw="${KEYCHAIN_PASSWORD:-}"
+    local pw="${KEYCHAIN_PASSWORD:-123456}"
     echo "[DEBUG] unlock keychain: $kc"
     if [ ! -f "$kc" ]; then
-        echo "WARN: keychain file not found: $kc (continue like joyride)" >&2
+        echo "WARN: keychain file not found: $kc" >&2
         return 0
     fi
-    if [ -n "$pw" ]; then
-        security unlock-keychain -p "$pw" "$kc"
-        security set-keychain-settings -t 3600 -l "$kc" || true
-        # Allow codesign to use private keys without UI prompt
-        security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$pw" "$kc" || true
-    else
-        echo "WARN: KEYCHAIN_PASSWORD unset — relying on already-unlocked login keychain (same as joyride)." >&2
-        echo "  If codesign fails with errSecInternalComponent: log into Mac GUI as $(whoami), or ask admin for KEYCHAIN_PASSWORD." >&2
-        # Keep lock timeout longer if we can touch it without a password (no-op when locked).
-        security set-keychain-settings -t 3600 -l "$kc" 2>/dev/null || true
-    fi
+    security unlock-keychain -p "$pw" "$kc"
+    security set-keychain-settings -lut 7200 "$kc"
+    security list-keychains -s "$kc"
+    # Allow codesign to use private keys without UI prompt
+    security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$pw" "$kc" || true
     echo "[DEBUG] codesigning identities:"
     security find-identity -v -p codesigning || true
 }
