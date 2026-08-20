@@ -130,10 +130,12 @@ build_archive() {
     local workspace="$projectPath/ios/Runner.xcworkspace"
     rm -rf "$archivePath"
 
-    unlock_signing_keychain
+    # Flutter 自身会先 codesign Framework，headless Jenkins 常因 keychain 失败。
+    # 跳过该阶段签名，统一交给后续 xcodebuild archive/export。
+    echo "[DEBUG] $(date '+%Y-%m-%d %H:%M:%S') flutter build ios --release --no-codesign"
+    flutter build ios --release --no-codesign "${extra[@]}"
 
-    echo "[DEBUG] $(date '+%Y-%m-%d %H:%M:%S') flutter build ios --release"
-    flutter build ios --release "${extra[@]}"
+    unlock_signing_keychain
 
     echo "[DEBUG] $(date '+%Y-%m-%d %H:%M:%S') xcodebuild archive (Release) with API key"
     xcodebuild archive \
@@ -243,6 +245,22 @@ echo "[DEBUG] $(date '+%Y-%m-%d %H:%M:%S') pod install"
     arch -x86_64 gem uninstall -aIx ffi >/dev/null 2>&1 || true
     arch -x86_64 gem install ffi -v 1.15.5 --no-document >/dev/null 2>&1 || arch -x86_64 gem install ffi --no-document >/dev/null 2>&1 || true
   }
+
+  ensure_ffi_for_ruby() {
+    if ruby -e "require 'ffi'" >/dev/null 2>&1; then
+      return 0
+    fi
+    local ruby_arch
+    ruby_arch="$(ruby -e 'print RUBY_PLATFORM' 2>/dev/null || echo unknown)"
+    echo "[WARN] ffi not loadable for ruby ($ruby_arch); reinstalling matching ffi"
+    if printf '%s' "$ruby_arch" | grep -q 'x86_64'; then
+      reinstall_ffi_x86
+    else
+      reinstall_ffi_native
+    fi
+  }
+
+  ensure_ffi_for_ruby
 
   if ! pod_install; then
     echo "[WARN] pod install failed on native arch; retry after reinstalling ffi (native)"
