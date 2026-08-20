@@ -65,7 +65,8 @@ require_plist() {
 }
 
 # Jenkins 无 GUI 时常锁住 login keychain → codesign 报 errSecInternalComponent。
-# 对 iPhone 真机归档，这里宁可尽早失败，也不要等到 Flutter.framework codesign 才崩。
+# 有 KEYCHAIN_PASSWORD 时主动解锁；没有时尝试无密码 unlock（已登录会话常已解锁，与改功能前行为一致）。
+# Flutter 阶段已用 --no-codesign，真正签名在 xcodebuild archive/export。
 unlock_signing_keychain() {
     local kc="${KEYCHAIN_PATH:-$HOME/Library/Keychains/login.keychain-db}"
     if [ ! -f "$kc" ] && [ -f "$HOME/Library/Keychains/login.keychain" ]; then
@@ -74,38 +75,28 @@ unlock_signing_keychain() {
     local pw="${KEYCHAIN_PASSWORD:-}"
     echo "[DEBUG] unlock keychain: $kc"
     if [ ! -f "$kc" ]; then
-        echo "ERROR: signing keychain not found: $kc" >&2
-        echo "Set KEYCHAIN_PATH to the keychain that contains the iOS signing certificate/private key." >&2
-        exit 1
+        echo "WARN: signing keychain not found: $kc (continue; xcodebuild may still work)" >&2
+        return 0
     fi
-    if [ -z "$pw" ]; then
-        echo "ERROR: KEYCHAIN_PASSWORD is not set." >&2
-        echo "CI iOS signing requires unlocking the macOS keychain in headless Jenkins." >&2
-        echo "Set KEYCHAIN_PASSWORD in Jenkins credentials or ci/ci.env." >&2
-        exit 1
+    if [ -n "$pw" ]; then
+        security unlock-keychain -p "$pw" "$kc" || \
+            echo "WARN: failed to unlock keychain with KEYCHAIN_PASSWORD" >&2
+        # 允许 codesign 在无 UI 下使用私钥（否则仍可能 errSecInternalComponent）
+        security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$pw" "$kc" >/dev/null 2>&1 || \
+            echo "WARN: set-key-partition-list failed for $kc" >&2
+        security set-keychain-settings -t 21600 -u "$kc" >/dev/null 2>&1 || true
+    else
+        # 已登录会话偶发可直接 unlock；失败只告警（不要因缺密码直接 exit）
+        if security unlock-keychain "$kc" 2>/dev/null; then
+            echo "[DEBUG] keychain unlocked without KEYCHAIN_PASSWORD (session already unlocked)"
+        else
+            echo "WARN: KEYCHAIN_PASSWORD unset; relying on already-unlocked keychain." >&2
+            echo "WARN: if xcodebuild fails with errSecInternalComponent, set KEYCHAIN_PASSWORD in Jenkins or ci/ci.env." >&2
+        fi
     fi
-    if ! security unlock-keychain -p "$pw" "$kc"; then
-        echo "ERROR: failed to unlock keychain: $kc" >&2
-        echo "Verify KEYCHAIN_PASSWORD and ensure Jenkins runs as the same macOS user that owns the signing keychain." >&2
-        exit 1
-    fi
-    # 允许 codesign 在无 UI 下使用私钥（否则仍可能 errSecInternalComponent）
-    if ! security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$pw" "$kc" >/dev/null 2>&1; then
-        echo "ERROR: failed to grant codesign key partition access for $kc" >&2
-        echo "The signing private key may be missing from this keychain or Jenkins lacks permission to use it." >&2
-        exit 1
-    fi
-    security set-keychain-settings -t 21600 -u "$kc" >/dev/null 2>&1 || true
     security list-keychains -d user -s "$kc" >/dev/null 2>&1 || true
     security default-keychain -d user -s "$kc" >/dev/null 2>&1 || true
-    local identities
-    identities="$(security find-identity -v -p codesigning "$kc" 2>/dev/null || true)"
-    if [ -z "$identities" ] || ! printf '%s\n' "$identities" | grep -qE '[0-9]+\) '; then
-        echo "ERROR: no codesigning identities found in keychain: $kc" >&2
-        echo "Import the iPhone certificate together with its private key into this keychain." >&2
-        exit 1
-    fi
-    printf '%s\n' "$identities" | head -n 20
+    security find-identity -v -p codesigning "$kc" 2>/dev/null | head -n 20 || true
 }
 
 # IPA 归档必须用 Release：Profile 会触发
