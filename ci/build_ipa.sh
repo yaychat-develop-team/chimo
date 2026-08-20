@@ -222,10 +222,40 @@ flutter pub get
 echo "[DEBUG] $(date '+%Y-%m-%d %H:%M:%S') pod install"
 (
   cd "$projectPath/ios"
-  if command -v arch >/dev/null 2>&1; then
-    arch -x86_64 pod install --repo-update || pod install --repo-update
-  else
+  echo "[DEBUG] build host: $(uname -m 2>/dev/null || echo unknown)"
+  echo "[DEBUG] ruby version: $(ruby -v 2>/dev/null || echo unknown)"
+  echo "[DEBUG] cocoapods version: $(pod --version 2>/dev/null || echo unknown)"
+
+  # 兼容 Apple Silicon / Intel 在不同 Ruby/gems 架构下经常出现的：
+  #   LoadError: ... ffi ... (mach-o file, but is an incompatible architecture ...)
+  # 这里策略：先原生 pod install；失败后重装 ffi（对应当前架构），再重试一次；
+  # 若仍失败且存在 arch，则用 x86_64 版本再重装 ffi 并重试。
+  pod_install() {
     pod install --repo-update
+  }
+
+  reinstall_ffi_native() {
+    gem uninstall -aIx ffi >/dev/null 2>&1 || true
+    gem install ffi -v 1.15.5 --no-document >/dev/null 2>&1 || gem install ffi --no-document >/dev/null 2>&1 || true
+  }
+
+  reinstall_ffi_x86() {
+    arch -x86_64 gem uninstall -aIx ffi >/dev/null 2>&1 || true
+    arch -x86_64 gem install ffi -v 1.15.5 --no-document >/dev/null 2>&1 || arch -x86_64 gem install ffi --no-document >/dev/null 2>&1 || true
+  }
+
+  if ! pod_install; then
+    echo "[WARN] pod install failed on native arch; retry after reinstalling ffi (native)"
+    reinstall_ffi_native
+    pod_install || {
+      if command -v arch >/dev/null 2>&1; then
+        echo "[WARN] retry pod install with arch -x86_64 after reinstalling ffi (x86_64)"
+        reinstall_ffi_x86
+        arch -x86_64 pod install --repo-update
+      else
+        exit 1
+      fi
+    }
   fi
 )
 
