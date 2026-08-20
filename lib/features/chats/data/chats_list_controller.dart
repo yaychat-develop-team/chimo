@@ -690,7 +690,7 @@ class ChatsListController extends ChangeNotifier {
   }
 
   void _onImMessage(ImChatMessage m) {
-    if (m.msgType == 'follow') return;
+    if (m.msgType == 'follow' || m.msgType == 'ignored' || m.isSdkRecall) return;
     final boundEm = _sessionEmUser?.trim() ?? '';
     final sdkEm = ImService.currentEmUser?.trim() ?? '';
     if (boundEm.isNotEmpty && sdkEm.isNotEmpty && boundEm != sdkEm) return;

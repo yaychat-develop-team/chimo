@@ -32,6 +32,86 @@ class ImPeerAttrs {
       gender.trim().isEmpty;
 }
 
+/// 对齐 forya `QuoteMsg`：引用回复元数据。
+class ImQuoteMsg {
+  const ImQuoteMsg({
+    this.msgId = '',
+    this.showText = '',
+    this.sendName = '',
+  });
+
+  final String msgId;
+  final String showText;
+  final String sendName;
+
+  /// 引用条内的预览文案（对齐 forya `[Smiley]` / `[Photo]` 等）。
+  static String quotePreviewLabel(String raw) {
+    var t = AppEmoji.normalize(raw).trim();
+    if (t.isEmpty) return '';
+    switch (t) {
+      case '[Sticker]':
+        return '[Smiley]';
+      case '[Smiley]':
+      case '[Photo]':
+      case '[Audio]':
+      case '[Image]':
+      case '[Voice]':
+        return t == '[Image]' ? '[Photo]' : (t == '[Voice]' ? '[Audio]' : t);
+      default:
+        break;
+    }
+    if (t.startsWith('[') && t.endsWith(']')) return t;
+
+    // forya 异常占位：`----------: 😊`
+    final colon = t.indexOf(':');
+    if (colon > 0) {
+      final head = t.substring(0, colon).trim();
+      if (RegExp(r'^[-_\s·.]+$').hasMatch(head)) {
+        t = t.substring(colon + 1).trim();
+      }
+    }
+    return t;
+  }
+
+  /// 引用条展示：优先用本地消息算出的 preview，避免服务端存错成 `[Smiley]`。
+  static String displayContent({
+    required String sendName,
+    required String showText,
+    String resolvedPreview = '',
+  }) {
+    final preview = quotePreviewLabel(
+      resolvedPreview.trim().isNotEmpty ? resolvedPreview : showText,
+    );
+    final name = sendName.trim();
+    if (name.isEmpty && preview.isEmpty) return '';
+    if (name.isEmpty) return 'Reply $preview';
+    if (preview.isEmpty) return 'Reply $name:';
+    return 'Reply $name:$preview';
+  }
+
+  String get showContent {
+    return displayContent(sendName: sendName, showText: showText);
+  }
+
+  static ImQuoteMsg? fromAttributes(Map<String, dynamic>? attributes) {
+    if (attributes == null || !attributes.containsKey('quoteMsg')) return null;
+    final raw = attributes['quoteMsg'];
+    if (raw is! Map) return null;
+    final map = Map<String, dynamic>.from(raw);
+    final msgId = '${map['msgId'] ?? ''}'.trim();
+    final showText = '${map['showText'] ?? ''}'.trim();
+    final sendName = '${map['sendName'] ?? ''}'.trim();
+    if (msgId.isEmpty && showText.isEmpty && sendName.isEmpty) return null;
+    return ImQuoteMsg(msgId: msgId, showText: showText, sendName: sendName);
+  }
+
+  Map<String, dynamic> toMap() => {
+        'msgId': msgId,
+        'showText': showText,
+        'sendName': sendName,
+      };
+}
+
 /// 供 UI 使用的轻量私聊消息事件（对端或自己）。
 class ImChatMessage {
   const ImChatMessage({
@@ -60,6 +140,9 @@ class ImChatMessage {
     this.senderAvatar = '',
     this.senderUid = '',
     this.senderGender = '',
+    this.quoteMsgId = '',
+    this.quoteShowText = '',
+    this.quoteSendName = '',
     this.isGroup = false,
     this.failed = false,
   });
@@ -75,8 +158,16 @@ class ImChatMessage {
   /// 本地发送失败（如被拉黑），对应环信 [MessageStatus.FAIL]。
   final bool failed;
 
-  /// 消息类型：`txt` | `image` | `voice` | `gift` | `follow` | `emote` | `join` | `custom`
+  /// 消息类型：`txt` | `image` | `voice` | `gift` | `follow` | `emote` | `join` | `custom` | `recall`
   final String msgType;
+
+  /// forya `im_recall_message` 提示（区别于 SDK `onMessagesRecalledInfo`）。
+  bool get isCustomRecall =>
+      msgType == 'recall' &&
+      (customEvent == 'im_recall_message' || customEvent == 'recallMessage');
+
+  /// 环信 SDK 撤回回调：只删原消息，提示由 `im_recall_message` 展示。
+  bool get isSdkRecall => msgType == 'recall' && !isCustomRecall;
 
   /// 可用时的本地文件路径（已发送 / 已下载）。
   final String mediaLocalPath;
@@ -112,6 +203,24 @@ class ImChatMessage {
   final String senderUid;
   /// 原始性别（`male` / `female` 等）；空表示未设置。
   final String senderGender;
+
+  /// 引用回复（attributes.quoteMsg）。
+  final String quoteMsgId;
+  final String quoteShowText;
+  final String quoteSendName;
+
+  ImQuoteMsg? get quote {
+    if (quoteMsgId.isEmpty && quoteShowText.isEmpty && quoteSendName.isEmpty) {
+      return null;
+    }
+    return ImQuoteMsg(
+      msgId: quoteMsgId,
+      showText: quoteShowText,
+      sendName: quoteSendName,
+    );
+  }
+
+  String get quoteContent => quote?.showContent ?? '';
 
   /// GroupChat 与 Chat（私聊 / 系统）。
   final bool isGroup;
@@ -575,6 +684,7 @@ abstract final class ImService {
     required String peerEmUsername,
     required String content,
     Map<String, dynamic>? extra,
+    ImQuoteMsg? quote,
     bool isGroup = false,
     ImPeerAttrs? peer,
   }) async {
@@ -588,12 +698,17 @@ abstract final class ImService {
     msg.chatType = isGroup ? ChatType.GroupChat : ChatType.Chat;
     try {
       await _applyCommonAttrs(msg, peer: peer);
+      final attrs = Map<String, dynamic>.from(msg.attributes ?? const {});
       if (extra != null && extra.isNotEmpty) {
-        final attrs = Map<String, dynamic>.from(msg.attributes ?? const {});
         attrs['extra'] = extra;
+      }
+      if (quote != null) {
+        attrs['quoteMsg'] = quote.toMap();
+      }
+      if (attrs.isNotEmpty) {
         msg.attributes = attrs;
       }
-      final sent = await EMClient.getInstance.chatManager.sendMessage(msg);
+      final sent = await _sendMessageAwaitSuccess(msg);
       return _emitAndReturn(sent, forceSelf: true);
     } on EMError catch (e) {
       debugPrint('ImService sendText failed ${e.code} ${e.description}');
@@ -756,7 +871,10 @@ abstract final class ImService {
       );
       final local = await conv?.loadMessage(id);
       if (local == null) return null;
-      final sent = await EMClient.getInstance.chatManager.resendMessage(local);
+      final sent = await _awaitMessageSendAck(
+        local,
+        () => EMClient.getInstance.chatManager.resendMessage(local),
+      );
       return _emitAndReturn(sent, forceSelf: true);
     } on EMError catch (e) {
       debugPrint('ImService resendFailed ${e.code} ${e.description}');
@@ -780,7 +898,7 @@ abstract final class ImService {
       );
       msg.chatType = ChatType.Chat;
       await _applyCommonAttrs(msg, peer: peer);
-      final sent = await EMClient.getInstance.chatManager.sendMessage(msg);
+      final sent = await _sendMessageAwaitSuccess(msg);
       return _emitAndReturn(sent, forceSelf: true);
     } on EMError catch (e) {
       debugPrint('ImService sendFollowTip failed ${e.code} ${e.description}');
@@ -819,7 +937,7 @@ abstract final class ImService {
     msg.chatType = isGroup ? ChatType.GroupChat : ChatType.Chat;
     try {
       await _applyCommonAttrs(msg, peer: peer);
-      final sent = await EMClient.getInstance.chatManager.sendMessage(msg);
+      final sent = await _sendMessageAwaitSuccess(msg);
       final out = _emitAndReturn(sent, forceSelf: true);
       if (out != null && out.id.isNotEmpty) {
         unawaited(_copyToVoiceCache(out.id, local));
@@ -861,7 +979,7 @@ abstract final class ImService {
     msg.chatType = isGroup ? ChatType.GroupChat : ChatType.Chat;
     try {
       await _applyCommonAttrs(msg, peer: peer);
-      final sent = await EMClient.getInstance.chatManager.sendMessage(msg);
+      final sent = await _sendMessageAwaitSuccess(msg);
       return _emitAndReturn(sent, forceSelf: true);
     } on EMError catch (e) {
       debugPrint('ImService sendImage failed ${e.code} ${e.description}');
@@ -921,6 +1039,52 @@ abstract final class ImService {
       _messagesController.add(out);
     }
     return out;
+  }
+
+  /// 环信 [sendMessage] 返回时 `_msgId` 可能尚未赋值（仍是本地 id），
+  /// 撤回/删除需等服务端 ack 后的 msgId。
+  static Future<EMMessage> _sendMessageAwaitSuccess(EMMessage message) {
+    return _awaitMessageSendAck(
+      message,
+      () => EMClient.getInstance.chatManager.sendMessage(message),
+    );
+  }
+
+  static Future<EMMessage> _awaitMessageSendAck(
+    EMMessage message,
+    Future<EMMessage> Function() send,
+  ) async {
+    final localId = message.msgId;
+    final eventId =
+        'chimo_send_${localId}_${DateTime.now().microsecondsSinceEpoch}';
+    final done = Completer<EMMessage>();
+
+    EMClient.getInstance.chatManager.addMessageEvent(
+      eventId,
+      ChatMessageEvent(
+        onSuccess: (mid, msg) {
+          if (mid != localId || done.isCompleted) return;
+          done.complete(msg);
+        },
+        onError: (mid, msg, error) {
+          if (mid != localId || done.isCompleted) return;
+          done.completeError(error);
+        },
+      ),
+    );
+
+    try {
+      final sent = await send();
+      return await done.future.timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          debugPrint('ImService send ack timeout localId=$localId');
+          return sent;
+        },
+      );
+    } finally {
+      EMClient.getInstance.chatManager.removeMessageEvent(eventId);
+    }
   }
 
   /// 某会话的本地 + 服务端历史分页。
@@ -1059,6 +1223,33 @@ abstract final class ImService {
     } catch (error) {
       debugPrint('ImService recallMessage failed: $error');
       return false;
+    }
+  }
+
+  /// 对齐 forya：SDK 撤回后追加 `im_recall_message`，对端渲染撤回提示。
+  static Future<ImChatMessage?> sendRecallNotice({
+    required String conversationId,
+    required bool isGroup,
+    ImPeerAttrs? peer,
+  }) async {
+    final target = conversationId.trim();
+    if (target.isEmpty) return null;
+    if (!_sdkInited) await connectFromServer();
+    try {
+      final msg = EMMessage.createCustomSendMessage(
+        targetId: target,
+        event: 'im_recall_message',
+      );
+      msg.chatType = isGroup ? ChatType.GroupChat : ChatType.Chat;
+      await _applyCommonAttrs(msg, peer: peer);
+      final sent = await _sendMessageAwaitSuccess(msg);
+      return _emitAndReturn(sent, forceSelf: true);
+    } on EMError catch (e) {
+      debugPrint('ImService sendRecallNotice failed ${e.code} ${e.description}');
+      return null;
+    } catch (error) {
+      debugPrint('ImService sendRecallNotice failed: $error');
+      return null;
     }
   }
 
@@ -1214,6 +1405,9 @@ abstract final class ImService {
         return '[Friend Referral]';
       case 'im_prick_message':
         return '[Poke]';
+      case 'im_recall_message':
+      case 'recallMessage':
+        return 'The sender recalled a message.';
       case 'im_follow_message':
         return 'Followed you';
       case 'JoinGroupMessage':
@@ -1298,11 +1492,12 @@ abstract final class ImService {
         conversationId: convId,
         from: info.recallBy,
         to: convId,
-        text: isSelf ? 'You recalled a message.' : 'A message was recalled.',
+        text: isSelf ? 'You recalled a message.' : 'The sender recalled a message.',
         isSelf: isSelf,
         serverTimeMs: info.recallMessage?.serverTime ??
             DateTime.now().millisecondsSinceEpoch,
         msgType: 'recall',
+        customEvent: 'sdk_recall',
         isGroup: info.recallMessage?.chatType == ChatType.GroupChat,
       ),
     );
@@ -1361,7 +1556,9 @@ abstract final class ImService {
       durationSecs = body.duration;
       text = durationSecs > 0 ? '[Voice] $durationSecs"' : '[Voice]';
     } else if (body is EMCustomMessageBody) {
-      return _mapCustomBody(body, message: message, forceSelf: forceSelf);
+      final mapped = _mapCustomBody(body, message: message, forceSelf: forceSelf);
+      if (mapped == null) return null;
+      return _attachQuote(mapped, message);
     } else {
       return null;
     }
@@ -1427,6 +1624,7 @@ abstract final class ImService {
         ? convIdRaw
         : (isSelf ? (message.to ?? '') : (message.from ?? ''));
     final sender = _senderFromAttributes(message.attributes);
+    final quote = ImQuoteMsg.fromAttributes(message.attributes);
 
     return ImChatMessage(
       id: message.msgId,
@@ -1452,8 +1650,48 @@ abstract final class ImService {
       senderAvatar: sender.avatar,
       senderUid: sender.uid,
       senderGender: sender.gender,
+      quoteMsgId: quote?.msgId ?? '',
+      quoteShowText: quote?.showText ?? '',
+      quoteSendName: quote?.sendName ?? '',
       isGroup: message.chatType == ChatType.GroupChat,
       failed: message.status == MessageStatus.FAIL,
+    );
+  }
+
+  static ImChatMessage _attachQuote(ImChatMessage msg, EMMessage message) {
+    final quote = ImQuoteMsg.fromAttributes(message.attributes);
+    if (quote == null) return msg;
+    return ImChatMessage(
+      id: msg.id,
+      conversationId: msg.conversationId,
+      from: msg.from,
+      to: msg.to,
+      text: msg.text,
+      isSelf: msg.isSelf,
+      serverTimeMs: msg.serverTimeMs,
+      msgType: msg.msgType,
+      mediaLocalPath: msg.mediaLocalPath,
+      mediaRemoteUrl: msg.mediaRemoteUrl,
+      thumbnailUrl: msg.thumbnailUrl,
+      durationSecs: msg.durationSecs,
+      customEvent: msg.customEvent,
+      giftId: msg.giftId,
+      giftQty: msg.giftQty,
+      giftName: msg.giftName,
+      giftIconUrl: msg.giftIconUrl,
+      emoteUrl: msg.emoteUrl,
+      emoteName: msg.emoteName,
+      joinName: msg.joinName,
+      joinUid: msg.joinUid,
+      senderName: msg.senderName,
+      senderAvatar: msg.senderAvatar,
+      senderUid: msg.senderUid,
+      senderGender: msg.senderGender,
+      quoteMsgId: quote.msgId,
+      quoteShowText: quote.showText,
+      quoteSendName: quote.sendName,
+      isGroup: msg.isGroup,
+      failed: msg.failed,
     );
   }
 
@@ -1558,6 +1796,29 @@ abstract final class ImService {
         senderGender: sender.gender,
         isGroup: isGroup,
         failed: message.status == MessageStatus.FAIL,
+      );
+    }
+
+    // 对齐 forya `CusTomMessage.recallMessage`：这条 CUSTOM 才是撤回提示文案。
+    if (event == 'im_recall_message' || event == 'recallMessage') {
+      return ImChatMessage(
+        id: message.msgId,
+        conversationId: conversationId,
+        from: message.from ?? '',
+        to: message.to ?? '',
+        text: isSelf
+            ? 'You recalled a message.'
+            : 'The sender recalled a message.',
+        isSelf: isSelf,
+        serverTimeMs: message.serverTime,
+        msgType: 'recall',
+        customEvent: event,
+        senderName: sender.name,
+        senderAvatar: sender.avatar,
+        senderUid: sender.uid,
+        senderGender: sender.gender,
+        isGroup: isGroup,
+        failed: false,
       );
     }
 

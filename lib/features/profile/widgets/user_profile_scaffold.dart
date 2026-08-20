@@ -259,17 +259,8 @@ class UserProfileScaffold extends StatelessWidget {
                                     ),
                                   ),
                                 ),
-                                if (inPartyName != null &&
-                                    inPartyName!.trim().isNotEmpty)
-                                  Positioned(
-                                    left: 52,
-                                    right: 0,
-                                    bottom: 5,
-                                    child: _InPartyBanner(
-                                      title: inPartyName!,
-                                      onTap: onInPartyTap,
-                                    ),
-                                  ),
+                                // 先移除“进房入口/房间相关”入口：
+                                // 任何 inPartyName 对应的胶囊都不再展示。
                               ],
                             ),
                           ),
@@ -640,70 +631,6 @@ class _TopCircleButton extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(18),
         child: SizedBox(width: 36, height: 36, child: Center(child: child)),
-      ),
-    );
-  }
-}
-
-class _InPartyBanner extends StatelessWidget {
-  const _InPartyBanner({required this.title, this.onTap});
-
-  final String title;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap ?? () {},
-        borderRadius: BorderRadius.circular(15),
-        child: Ink(
-          height: 30,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(15),
-            gradient: const LinearGradient(
-              colors: [Color(0xFF2A1F4D), Color(0xFF1A1430)],
-            ),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.12),
-            ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.graphic_eq_rounded,
-                  size: 12,
-                  color: AppColors.accentLime,
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    'In Party: $title',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-                SvgPicture.asset(
-                  AppAssets.mineArrow,
-                  width: 5,
-                  height: 8,
-                  colorFilter: ColorFilter.mode(
-                    Colors.white.withValues(alpha: 0.85),
-                    BlendMode.srcIn,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }

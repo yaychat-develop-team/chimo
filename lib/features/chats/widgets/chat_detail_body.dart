@@ -13,7 +13,9 @@ class _DmChatBody extends StatelessWidget {
     this.historyHasMore = false,
     this.onBlankTap,
     this.onFailedTap,
-    this.onTextLongPress,
+    this.onMessageLongPress,
+    this.onQuoteTap,
+    this.messageKeyFor,
   });
 
   final List<_ChatLine> messages;
@@ -27,7 +29,9 @@ class _DmChatBody extends StatelessWidget {
   final bool historyHasMore;
   final VoidCallback? onBlankTap;
   final ValueChanged<int>? onFailedTap;
-  final void Function(_ChatLine line, Rect anchor)? onTextLongPress;
+  final void Function(_ChatLine line, Rect anchor)? onMessageLongPress;
+  final ValueChanged<String>? onQuoteTap;
+  final GlobalKey Function(String msgId)? messageKeyFor;
 
   @override
   Widget build(BuildContext context) {
@@ -72,7 +76,9 @@ class _DmChatBody extends StatelessWidget {
               historyHasMore: historyHasMore,
               onBlankTap: onBlankTap,
               onFailedTap: onFailedTap,
-              onTextLongPress: onTextLongPress,
+              onMessageLongPress: onMessageLongPress,
+              onQuoteTap: onQuoteTap,
+              messageKeyFor: messageKeyFor,
             ),
           ),
         ],
@@ -92,7 +98,9 @@ class _DmMessagesFeed extends StatelessWidget {
     this.historyHasMore = false,
     this.onBlankTap,
     this.onFailedTap,
-    this.onTextLongPress,
+    this.onMessageLongPress,
+    this.onQuoteTap,
+    this.messageKeyFor,
   });
 
   final List<_ChatLine> messages;
@@ -104,7 +112,9 @@ class _DmMessagesFeed extends StatelessWidget {
   final bool historyHasMore;
   final VoidCallback? onBlankTap;
   final ValueChanged<int>? onFailedTap;
-  final void Function(_ChatLine line, Rect anchor)? onTextLongPress;
+  final void Function(_ChatLine line, Rect anchor)? onMessageLongPress;
+  final ValueChanged<String>? onQuoteTap;
+  final GlobalKey Function(String msgId)? messageKeyFor;
 
   bool _showAvatar(int index) {
     if (messages[index].kind == _ChatLineKind.tip) return false;
@@ -235,44 +245,68 @@ class _DmMessagesFeed extends StatelessWidget {
         final showAvatar = _showAvatar(msgIndex);
         final showTime = _showTimeLabel(msgIndex);
         final bubble = switch (line.kind) {
-          _ChatLineKind.voice => _VoiceBubble(
-            side: line.side,
-            seconds: line.voiceSeconds,
-            mediaSource: line.mediaSource,
-            msgId: line.msgId,
-            peerAvatar: peerAvatar,
-            peerAvatarUrl: peerAvatarUrl,
-            selfAvatarUrl: selfAvatarUrl,
-            showAvatar: showAvatar,
-            failed: line.failed,
-            onFailedTap: line.failed ? () => onFailedTap?.call(msgIndex) : null,
+          _ChatLineKind.voice => Builder(
+            builder: (ctx) => _VoiceBubble(
+              side: line.side,
+              seconds: line.voiceSeconds,
+              mediaSource: line.mediaSource,
+              msgId: line.msgId,
+              peerAvatar: peerAvatar,
+              peerAvatarUrl: peerAvatarUrl,
+              selfAvatarUrl: selfAvatarUrl,
+              showAvatar: showAvatar,
+              failed: line.failed,
+              onFailedTap: line.failed ? () => onFailedTap?.call(msgIndex) : null,
+              onLongPress: onMessageLongPress == null
+                  ? null
+                  : () {
+                      final box = ctx.findRenderObject() as RenderBox?;
+                      if (box == null || !box.hasSize) return;
+                      onMessageLongPress!(
+                        line,
+                        box.localToGlobal(Offset.zero) & box.size,
+                      );
+                    },
+            ),
           ),
-          _ChatLineKind.image => _ImageBubble(
-            side: line.side,
-            source: line.displayMedia,
-            locked: false,
-            peerAvatar: peerAvatar,
-            peerAvatarUrl: peerAvatarUrl,
-            selfAvatarUrl: selfAvatarUrl,
-            showAvatar: showAvatar,
-            failed: line.failed,
-            onFailedTap: line.failed ? () => onFailedTap?.call(msgIndex) : null,
-            onTap: () {
-              final paths = [
-                for (final m in messages)
-                  if (m.kind == _ChatLineKind.image &&
-                      m.displayMedia.trim().isNotEmpty)
-                    m.displayMedia.trim(),
-              ];
-              final src = line.displayMedia.trim();
-              final initial = paths.indexOf(src);
-              AlbumPhotoViewerPage.open(
-                context,
-                paths: paths,
-                initialIndex: initial < 0 ? 0 : initial,
-                showPageIndicator: false,
-              );
-            },
+          _ChatLineKind.image => Builder(
+            builder: (ctx) => _ImageBubble(
+              side: line.side,
+              source: line.displayMedia,
+              locked: false,
+              peerAvatar: peerAvatar,
+              peerAvatarUrl: peerAvatarUrl,
+              selfAvatarUrl: selfAvatarUrl,
+              showAvatar: showAvatar,
+              failed: line.failed,
+              onFailedTap: line.failed ? () => onFailedTap?.call(msgIndex) : null,
+              onLongPress: onMessageLongPress == null
+                  ? null
+                  : () {
+                      final box = ctx.findRenderObject() as RenderBox?;
+                      if (box == null || !box.hasSize) return;
+                      onMessageLongPress!(
+                        line,
+                        box.localToGlobal(Offset.zero) & box.size,
+                      );
+                    },
+              onTap: () {
+                final paths = [
+                  for (final m in messages)
+                    if (m.kind == _ChatLineKind.image &&
+                        m.displayMedia.trim().isNotEmpty)
+                      m.displayMedia.trim(),
+                ];
+                final src = line.displayMedia.trim();
+                final initial = paths.indexOf(src);
+                AlbumPhotoViewerPage.open(
+                  context,
+                  paths: paths,
+                  initialIndex: initial < 0 ? 0 : initial,
+                  showPageIndicator: false,
+                );
+              },
+            ),
           ),
           _ChatLineKind.gift => _GiftMessageCard(
             side: line.side,
@@ -313,12 +347,12 @@ class _DmMessagesFeed extends StatelessWidget {
             ),
           _ChatLineKind.text => Builder(
               builder: (ctx) => GestureDetector(
-                onLongPress: onTextLongPress == null
+                onLongPress: onMessageLongPress == null
                     ? null
                     : () {
                         final box = ctx.findRenderObject() as RenderBox?;
                         if (box == null || !box.hasSize) return;
-                        onTextLongPress!(
+                        onMessageLongPress!(
                           line,
                           box.localToGlobal(Offset.zero) & box.size,
                         );
@@ -326,6 +360,9 @@ class _DmMessagesFeed extends StatelessWidget {
                 child: line.side == _ChatSide.self
                     ? _SelfBubble(
                         text: line.text,
+                        quoteContent: line.quoteContentIn(messages),
+                        quoteMsgId: line.quoteMsgId,
+                        onQuoteTap: onQuoteTap,
                         showAvatar: showAvatar,
                         avatarUrl: selfAvatarUrl,
                         failed: line.failed,
@@ -335,6 +372,9 @@ class _DmMessagesFeed extends StatelessWidget {
                       )
                     : _PeerBubble(
                         text: line.text,
+                        quoteContent: line.quoteContentIn(messages),
+                        quoteMsgId: line.quoteMsgId,
+                        onQuoteTap: onQuoteTap,
                         avatarAsset: peerAvatar,
                         avatarUrl: peerAvatarUrl,
                         showAvatar: showAvatar,
@@ -343,7 +383,13 @@ class _DmMessagesFeed extends StatelessWidget {
             ),
         };
 
-        return Padding(
+        final itemKey = line.msgId.isNotEmpty
+            ? messageKeyFor?.call(line.msgId)
+            : null;
+
+        return KeyedSubtree(
+          key: itemKey,
+          child: Padding(
           padding: EdgeInsets.only(top: showTime ? 12 : _topGap(msgIndex)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -362,6 +408,7 @@ class _DmMessagesFeed extends StatelessWidget {
               bubble,
             ],
           ),
+        ),
         );
       },
       ),
@@ -480,12 +527,18 @@ class _PeerBubble extends StatelessWidget {
     required this.avatarAsset,
     required this.showAvatar,
     this.avatarUrl,
+    this.quoteContent = '',
+    this.quoteMsgId = '',
+    this.onQuoteTap,
   });
 
   final String text;
   final String avatarAsset;
   final String? avatarUrl;
   final bool showAvatar;
+  final String quoteContent;
+  final String quoteMsgId;
+  final ValueChanged<String>? onQuoteTap;
 
   @override
   Widget build(BuildContext context) {
@@ -514,7 +567,13 @@ class _PeerBubble extends StatelessWidget {
                 bottomRight: Radius.circular(18),
               ),
             ),
-            child: AppEmojiText(text, style: style),
+            child: _BubbleTextContent(
+              text: text,
+              quoteContent: quoteContent,
+              quoteMsgId: quoteMsgId,
+              onQuoteTap: onQuoteTap,
+              style: style,
+            ),
           );
     return _ChatRow(
       isSelf: false,
@@ -534,6 +593,9 @@ class _SelfBubble extends StatelessWidget {
     required this.text,
     required this.showAvatar,
     this.avatarUrl,
+    this.quoteContent = '',
+    this.quoteMsgId = '',
+    this.onQuoteTap,
     this.failed = false,
     this.onFailedTap,
   });
@@ -541,6 +603,9 @@ class _SelfBubble extends StatelessWidget {
   final String text;
   final bool showAvatar;
   final String? avatarUrl;
+  final String quoteContent;
+  final String quoteMsgId;
+  final ValueChanged<String>? onQuoteTap;
   final bool failed;
   final VoidCallback? onFailedTap;
 
@@ -571,7 +636,13 @@ class _SelfBubble extends StatelessWidget {
                 bottomRight: Radius.circular(18),
               ),
             ),
-            child: AppEmojiText(text, style: style),
+            child: _BubbleTextContent(
+              text: text,
+              quoteContent: quoteContent,
+              quoteMsgId: quoteMsgId,
+              onQuoteTap: onQuoteTap,
+              style: style,
+            ),
           );
     return _ChatRow(
       isSelf: true,
@@ -588,6 +659,73 @@ class _SelfBubble extends StatelessWidget {
   }
 }
 
+class _BubbleTextContent extends StatelessWidget {
+  const _BubbleTextContent({
+    required this.text,
+    required this.style,
+    this.quoteContent = '',
+    this.quoteMsgId = '',
+    this.onQuoteTap,
+  });
+
+  final String text;
+  final TextStyle style;
+  final String quoteContent;
+  final String quoteMsgId;
+  final ValueChanged<String>? onQuoteTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final quote = quoteContent.trim();
+    if (quote.isEmpty) {
+      return AppEmojiText(text, style: style);
+    }
+    final quotedId = quoteMsgId.trim();
+    final quoteRow = Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 1,
+          height: 12,
+          margin: const EdgeInsets.only(top: 3),
+          color: const Color(0xFF999999),
+        ),
+        const SizedBox(width: 2),
+        Flexible(
+          child: AppEmojiText(
+            quote,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xFF999999),
+              fontSize: 12,
+              fontWeight: FontWeight.w400,
+              height: 1.3,
+            ),
+          ),
+        ),
+      ],
+    );
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (quotedId.isNotEmpty && onQuoteTap != null)
+          GestureDetector(
+            onTap: () => onQuoteTap!(quotedId),
+            behavior: HitTestBehavior.opaque,
+            child: quoteRow,
+          )
+        else
+          quoteRow,
+        const SizedBox(height: 2),
+        AppEmojiText(text, style: style),
+      ],
+    );
+  }
+}
+
 class _VoiceBubble extends StatefulWidget {
   const _VoiceBubble({
     required this.side,
@@ -600,6 +738,7 @@ class _VoiceBubble extends StatefulWidget {
     this.selfAvatarUrl,
     this.failed = false,
     this.onFailedTap,
+    this.onLongPress,
   });
 
   final _ChatSide side;
@@ -612,6 +751,7 @@ class _VoiceBubble extends StatefulWidget {
   final bool showAvatar;
   final bool failed;
   final VoidCallback? onFailedTap;
+  final VoidCallback? onLongPress;
 
   @override
   State<_VoiceBubble> createState() => _VoiceBubbleState();
@@ -735,6 +875,7 @@ class _VoiceBubbleState extends State<_VoiceBubble>
 
     final bubble = GestureDetector(
       onTap: expired ? null : _togglePlay,
+      onLongPress: widget.onLongPress,
       behavior: HitTestBehavior.opaque,
       child: Container(
         width: expired
@@ -886,6 +1027,7 @@ class _ImageBubble extends StatelessWidget {
     this.peerAvatarUrl,
     this.selfAvatarUrl,
     this.onTap,
+    this.onLongPress,
     this.failed = false,
     this.onFailedTap,
   });
@@ -898,6 +1040,7 @@ class _ImageBubble extends StatelessWidget {
   final String? selfAvatarUrl;
   final bool showAvatar;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
   final bool failed;
   final VoidCallback? onFailedTap;
 
@@ -1043,6 +1186,15 @@ class _ImageBubble extends StatelessWidget {
       ),
     );
 
+    final wrapped = onTap == null && onLongPress == null
+        ? bubble
+        : GestureDetector(
+            onTap: locked ? null : onTap,
+            onLongPress: onLongPress,
+            behavior: HitTestBehavior.opaque,
+            child: bubble,
+          );
+
     return _ChatRow(
       isSelf: _isSelf,
       showAvatar: showAvatar,
@@ -1051,13 +1203,7 @@ class _ImageBubble extends StatelessWidget {
       selfAvatarUrl: selfAvatarUrl,
       failed: failed,
       onFailedTap: onFailedTap,
-      child: locked || onTap == null
-          ? bubble
-          : GestureDetector(
-              onTap: onTap,
-              behavior: HitTestBehavior.opaque,
-              child: bubble,
-            ),
+      child: wrapped,
     );
   }
 }

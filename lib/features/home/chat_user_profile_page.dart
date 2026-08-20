@@ -527,7 +527,8 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
           vipIconUrl: _profile.vipIconUrl,
           momentUrls: _momentUrls,
           flavors: _flavors,
-          inPartyName: _isSelf ? null : _profile.inPartyName,
+          // 移除房间相关入口：不展示 In Party。
+          inPartyName: null,
           showMore: !_isSelf,
           onMore: _isSelf ? null : _openMoreMenu,
           bottomBar: _buildBottomBar(),

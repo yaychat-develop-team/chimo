@@ -77,6 +77,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   /// 本地 + 环信 1v1 历史。
   final List<_ChatLine> _messages = [];
   final Set<String> _seenMsgIds = {};
+  final Map<String, GlobalKey> _messageItemKeys = {};
   StreamSubscription<ImChatMessage>? _imSub;
   bool _historyHasMore = true;
   bool _historyLoading = false;
@@ -301,7 +302,9 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
       final added = <_ChatLine>[];
       for (final m in page.messages) {
-        if (m.msgType == 'follow') continue;
+        if (m.msgType == 'follow' || m.msgType == 'ignored') continue;
+        if (m.isSdkRecall) continue;
+        if (m.msgType == 'txt' && m.text.trim().isEmpty) continue;
         if (m.id.isNotEmpty && !_seenMsgIds.add(m.id)) continue;
         added.add(_lineFromIm(m));
       }
@@ -354,6 +357,39 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     }
   }
 
+  void _backfillSelfLineFromIm(ImChatMessage m) {
+    if (!m.isSelf || m.id.isEmpty) return;
+    final next = _lineFromIm(m);
+    for (var i = _messages.length - 1; i >= 0; i--) {
+      final e = _messages[i];
+      if (e.side != _ChatSide.self || e.msgId.isNotEmpty || e.kind != next.kind) {
+        continue;
+      }
+      switch (next.kind) {
+        case _ChatLineKind.text:
+          if (e.text != next.text) continue;
+        case _ChatLineKind.voice:
+          if (e.voiceSeconds != next.voiceSeconds) continue;
+        case _ChatLineKind.image:
+        case _ChatLineKind.emote:
+          break;
+        default:
+          continue;
+      }
+      final effectiveMs = m.serverTimeMs > 0
+          ? m.serverTimeMs
+          : (e.serverTimeMs > 0
+              ? e.serverTimeMs
+              : DateTime.now().millisecondsSinceEpoch);
+      _messages[i] = e.copyWith(
+        msgId: m.id,
+        serverTimeMs: effectiveMs,
+        mediaSource: next.mediaSource.isNotEmpty ? next.mediaSource : e.mediaSource,
+      );
+      return;
+    }
+  }
+
   void _onImMessage(ImChatMessage m) {
     final convId = _imConversationId;
     if (convId.isEmpty) return;
@@ -362,11 +398,91 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         m.to == convId;
     if (!match) return;
     // 关注提示不在私聊消息流中展示。
-    if (m.msgType == 'follow') return;
+    if (m.msgType == 'follow' || m.msgType == 'ignored') return;
+
+    // SDK 撤回：只删掉原气泡。提示文案来自 forya 的 `im_recall_message`。
+    if (m.isSdkRecall) {
+      final recalledId = m.id.trim();
+      if (recalledId.isEmpty || !mounted) return;
+      setState(() {
+        _messages.removeWhere((e) => e.msgId == recalledId);
+        _seenMsgIds.remove(recalledId);
+      });
+      return;
+    }
+
+    if (m.msgType == 'recall') {
+      if (m.id.isNotEmpty && !_seenMsgIds.add(m.id)) return;
+      if (!mounted) return;
+      setState(() => _messages.add(_lineFromIm(m)));
+      _scrollToBottom();
+      return;
+    }
+
+    if (m.id.isNotEmpty && _seenMsgIds.contains(m.id)) {
+      if (!mounted) return;
+      setState(() {
+        final idx = _messages.indexWhere((e) => e.msgId == m.id);
+        if (idx >= 0 &&
+            m.serverTimeMs > 0 &&
+            _messages[idx].serverTimeMs == 0) {
+          _messages[idx] =
+              _messages[idx].copyWith(serverTimeMs: m.serverTimeMs);
+          return;
+        }
+        _backfillSelfLineFromIm(m);
+      });
+      return;
+    }
+
     if (m.id.isNotEmpty && !_seenMsgIds.add(m.id)) return;
     if (!mounted) return;
+    final nextLine = _lineFromIm(m);
     setState(() {
-      _messages.add(_lineFromIm(m));
+      // EaseMob 可能会发生 msgId 回填/替换（临时 id -> server id）。
+      if (nextLine.side == _ChatSide.self) {
+        final idx = _messages.lastIndexWhere((e) {
+          if (e.side != _ChatSide.self || e.kind != nextLine.kind) return false;
+          if (e.msgId.isNotEmpty && e.msgId == nextLine.msgId) return false;
+          switch (nextLine.kind) {
+            case _ChatLineKind.text:
+              return e.text == nextLine.text;
+            case _ChatLineKind.voice:
+              return e.voiceSeconds == nextLine.voiceSeconds &&
+                  e.msgId.isEmpty;
+            case _ChatLineKind.image:
+            case _ChatLineKind.emote:
+              return e.msgId.isEmpty;
+            default:
+              return false;
+          }
+        });
+        if (idx >= 0) {
+          final oldId = _messages[idx].msgId;
+          if (oldId.isNotEmpty) _seenMsgIds.remove(oldId);
+          if (nextLine.msgId.isNotEmpty) _seenMsgIds.add(nextLine.msgId);
+          final prev = _messages[idx];
+          final effectiveMs = nextLine.serverTimeMs > 0
+              ? nextLine.serverTimeMs
+              : (prev.serverTimeMs > 0
+                  ? prev.serverTimeMs
+                  : DateTime.now().millisecondsSinceEpoch);
+          final keepLocalMedia = nextLine.kind == _ChatLineKind.image ||
+              nextLine.kind == _ChatLineKind.emote;
+          _messages[idx] = nextLine.copyWith(
+            serverTimeMs: effectiveMs,
+            mediaSource: keepLocalMedia && prev.mediaSource.trim().isNotEmpty
+                ? prev.mediaSource
+                : nextLine.mediaSource,
+            imageAssets: keepLocalMedia && prev.imageAssets.isNotEmpty
+                ? prev.imageAssets
+                : nextLine.imageAssets,
+          );
+          _scrollToBottom();
+          return;
+        }
+      }
+      _messages.add(nextLine);
     });
     // 列表预览 / 未读：ChatsListController 监听 ImService.messages。
     _scrollToBottom();
@@ -423,6 +539,18 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           msgId: m.id,
           failed: m.failed,
         );
+      case 'recall':
+        return _ChatLine(
+          side: side,
+          kind: _ChatLineKind.tip,
+          text: m.text.trim().isNotEmpty
+              ? m.text
+              : (m.isSelf
+                  ? 'You recalled a message.'
+                  : 'The sender recalled a message.'),
+          serverTimeMs: m.serverTimeMs,
+          msgId: m.id,
+        );
       default:
         return _ChatLine(
           side: side,
@@ -430,6 +558,9 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           serverTimeMs: m.serverTimeMs,
           msgId: m.id,
           failed: m.failed,
+          quoteMsgId: m.quoteMsgId,
+          quoteShowText: m.quoteShowText,
+          quoteSendName: m.quoteSendName,
         );
     }
   }
@@ -606,16 +737,32 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     await _resendFailedAt(index);
   }
 
-  Future<void> _onTextMessageLongPress(_ChatLine line, Rect anchor) async {
-    if (line.kind != _ChatLineKind.text) return;
+  Future<void> _onMessageLongPress(_ChatLine line, Rect anchor) async {
+    if (line.kind == _ChatLineKind.gift || line.kind == _ChatLineKind.tip) {
+      return;
+    }
 
     final isGroup = widget.conversation.badge == ChatBadgeType.group;
+    // 对齐原版 forya：
+    //   Copy：仅文本；replay / recall / delete：文本、图片、语音
+    //   Recall：自己发的 + 距 serverTime < 60 秒 + 有 msgId
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    final withinRecallWindow =
+        line.serverTimeMs > 0 && nowMs - line.serverTimeMs < 60 * 1000;
+    final canCopy =
+        line.kind == _ChatLineKind.text && line.text.trim().isNotEmpty;
+    final canReplay = canCopy ||
+        line.kind == _ChatLineKind.voice ||
+        line.kind == _ChatLineKind.image ||
+        line.kind == _ChatLineKind.emote;
     final actions = <ChatMessageAction>[
-      if (line.text.trim().isNotEmpty) ChatMessageAction.copy,
-      if (line.text.trim().isNotEmpty) ChatMessageAction.replay,
-      if (line.side == _ChatSide.self && line.msgId.isNotEmpty)
+      if (canCopy) ChatMessageAction.copy,
+      if (canReplay) ChatMessageAction.replay,
+      if (line.side == _ChatSide.self &&
+          line.msgId.isNotEmpty &&
+          withinRecallWindow)
         ChatMessageAction.recall,
-      if (line.msgId.isNotEmpty) ChatMessageAction.delete,
+      ChatMessageAction.delete,
     ];
     if (actions.isEmpty) return;
 
@@ -632,34 +779,57 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         showCenterToast(context, message: 'Saved to the clipboard');
         return;
       case ChatMessageAction.replay:
-        _inputController
-          ..text = line.text
-          ..selection = TextSelection.collapsed(offset: line.text.length);
-        _inputBarKey.currentState?.dismissComposer();
+        final sendName = line.side == _ChatSide.self
+            ? 'You'
+            : widget.conversation.title.trim();
+        _inputBarKey.currentState?.setQuote(
+          ImQuoteMsg(
+            msgId: line.msgId,
+            showText: line.listPreview,
+            sendName: sendName.isEmpty ? 'User' : sendName,
+          ),
+        );
         return;
       case ChatMessageAction.recall:
-        final ok = await ImService.recallMessage(line.msgId);
+        final recallId = line.msgId.trim();
+        if (recallId.isEmpty) {
+          showCenterToast(context, message: 'Cannot recall: missing msgId');
+          return;
+        }
+        final ok = await ImService.recallMessage(recallId);
         if (!mounted) return;
         if (!ok) {
           showCenterToast(context, message: 'Recall failed');
           return;
         }
         setState(() {
-          _messages.removeWhere((m) => m.msgId == line.msgId);
-          _seenMsgIds.remove(line.msgId);
+          _messages.removeWhere((m) => m.msgId == recallId);
+          _seenMsgIds.remove(recallId);
         });
-        await _loadImHistory(_imConversationId);
+        unawaited(
+          ImService.sendRecallNotice(
+            conversationId: _imConversationId,
+            isGroup: isGroup,
+          ),
+        );
         return;
       case ChatMessageAction.delete:
+        final deleteId = line.msgId.trim();
+        if (deleteId.isEmpty) {
+          // 本地消息（尚无 msgId）直接从列表移除。
+          final idx = _messages.indexOf(line);
+          if (idx >= 0) setState(() => _messages.removeAt(idx));
+          return;
+        }
         await ImService.deleteMessage(
           conversationId: _imConversationId,
           isGroup: isGroup,
-          messageId: line.msgId,
+          messageId: deleteId,
         );
         if (!mounted) return;
         setState(() {
-          _messages.removeWhere((m) => m.msgId == line.msgId);
-          _seenMsgIds.remove(line.msgId);
+          _messages.removeWhere((m) => m.msgId == deleteId);
+          _seenMsgIds.remove(deleteId);
         });
         return;
     }
@@ -806,6 +976,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       return;
     }
     _inputController.clear();
+    final quote = _inputBarKey.currentState?.takeQuote();
 
     final peerEm = _imConversationId;
     if (peerEm.isNotEmpty) {
@@ -813,15 +984,38 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         final sent = await ImService.sendText(
           peerEmUsername: peerEm,
           content: text,
+          quote: quote,
           peer: _dmPeerAttrs,
         );
-        if (sent != null && sent.id.isNotEmpty) {
-          _seenMsgIds.add(sent.id);
-        }
-        // Stream 也可能再投递；先立即添加以保证 UI 跟手。
+        final sentId = sent?.id ?? '';
+        final sentAtMs = sent?.serverTimeMs ?? 0;
+        final effectiveAtMs =
+            sentAtMs > 0 ? sentAtMs : DateTime.now().millisecondsSinceEpoch;
+        if (sentId.isNotEmpty) _seenMsgIds.add(sentId);
         if (!mounted) return;
         setState(() {
-          _messages.add(_ChatLine(side: _ChatSide.self, text: text));
+          final existingIdx = sentId.isNotEmpty
+              ? _messages.indexWhere((e) => e.msgId == sentId)
+              : -1;
+          if (existingIdx >= 0) {
+            if (_messages[existingIdx].serverTimeMs == 0) {
+              _messages[existingIdx] = _messages[existingIdx].copyWith(
+                serverTimeMs: effectiveAtMs,
+              );
+            }
+            return;
+          }
+          _messages.add(
+            _ChatLine(
+              side: _ChatSide.self,
+              text: text,
+              msgId: sentId,
+              serverTimeMs: effectiveAtMs,
+              quoteMsgId: quote?.msgId ?? '',
+              quoteShowText: quote?.showText ?? '',
+              quoteSendName: quote?.sendName ?? '',
+            ),
+          );
         });
         _afterSend(text);
         return;
@@ -971,6 +1165,59 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     }
   }
 
+  void _applyImageSendAck(ImChatMessage sent, {required String localPath}) {
+    if (sent.id.isEmpty) return;
+    _seenMsgIds.add(sent.id);
+    final effectiveAtMs = sent.serverTimeMs > 0
+        ? sent.serverTimeMs
+        : DateTime.now().millisecondsSinceEpoch;
+    final remote = sent.playableOrDisplayUrl.trim();
+
+    setState(() {
+      final existingIdx = _messages.indexWhere((e) => e.msgId == sent.id);
+      if (existingIdx >= 0) {
+        if (_messages[existingIdx].serverTimeMs == 0) {
+          _messages[existingIdx] = _messages[existingIdx].copyWith(
+            serverTimeMs: effectiveAtMs,
+          );
+        }
+        return;
+      }
+
+      var targetIdx = -1;
+      for (var i = _messages.length - 1; i >= 0; i--) {
+        final m = _messages[i];
+        if (m.kind != _ChatLineKind.image ||
+            m.side != _ChatSide.self ||
+            m.msgId.isNotEmpty) {
+          continue;
+        }
+        final src = m.mediaSource.trim();
+        final asset =
+            m.imageAssets.isNotEmpty ? m.imageAssets.first.trim() : '';
+        if (src == localPath || asset == localPath) {
+          targetIdx = i;
+          break;
+        }
+      }
+      if (targetIdx < 0) {
+        targetIdx = _messages.lastIndexWhere(
+          (m) =>
+              m.kind == _ChatLineKind.image &&
+              m.side == _ChatSide.self &&
+              m.msgId.isEmpty,
+        );
+      }
+      if (targetIdx < 0) return;
+      final m = _messages[targetIdx];
+      _messages[targetIdx] = m.copyWith(
+        msgId: sent.id,
+        serverTimeMs: effectiveAtMs,
+        mediaSource: remote.isNotEmpty ? remote : m.mediaSource,
+      );
+    });
+  }
+
   Future<void> _sendImages(List<String> paths) async {
     if (paths.isEmpty) return;
     final peerEm = _imConversationId;
@@ -1026,7 +1273,8 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           peer: _dmPeerAttrs,
         );
         if (sent != null && sent.id.isNotEmpty) {
-          _seenMsgIds.add(sent.id);
+          if (!mounted) return;
+          _applyImageSendAck(sent, localPath: path);
         }
         failIndex++;
       } catch (error) {
@@ -1076,6 +1324,48 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       isFollowing: _following,
     );
     _scrollToBottom();
+  }
+
+  GlobalKey _messageKeyFor(String msgId) {
+    return _messageItemKeys.putIfAbsent(msgId, GlobalKey.new);
+  }
+
+  /// 对齐 forya `chatController.scrollToMsg`：点击引用条定位原消息。
+  void _scrollToQuotedMessage(String msgId) {
+    final id = msgId.trim();
+    if (id.isEmpty) return;
+    final index = _messages.indexWhere((e) => e.msgId == id);
+    if (index < 0) return;
+
+    bool ensureVisible() {
+      final key = _messageItemKeys[id];
+      final ctx = key?.currentContext;
+      if (ctx == null || !ctx.mounted) return false;
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+        alignment: 0.35,
+      );
+      return true;
+    }
+
+    if (ensureVisible()) return;
+    if (!_messagesScroll.hasClients) return;
+
+    final pos = _messagesScroll.position;
+    final ratio = (index + 1) / _messages.length;
+    _messagesScroll.jumpTo(
+      (ratio * pos.maxScrollExtent).clamp(0.0, pos.maxScrollExtent),
+    );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (ensureVisible()) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) ensureVisible();
+      });
+    });
   }
 
   void _scrollToBottom({bool force = false, bool animated = false}) {
@@ -1360,8 +1650,10 @@ class _ChatDetailPageState extends State<ChatDetailPage>
               onHandleDragEnd: _onIntroDragEnd,
               onBlankTap: () => _inputBarKey.currentState?.dismissComposer(),
               onFailedTap: (index) => unawaited(_onFailedTap(index)),
-              onTextLongPress: (line, anchor) =>
-                  unawaited(_onTextMessageLongPress(line, anchor)),
+              onMessageLongPress: (line, anchor) =>
+                  unawaited(_onMessageLongPress(line, anchor)),
+              onQuoteTap: _scrollToQuotedMessage,
+              messageKeyFor: _messageKeyFor,
             ),
           ),
           _DmInputBar(
