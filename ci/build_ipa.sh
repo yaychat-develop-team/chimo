@@ -65,33 +65,35 @@ require_plist() {
 }
 
 # Jenkins 无 GUI 时常锁住 login keychain → codesign 报 errSecInternalComponent。
-# 有 KEYCHAIN_PASSWORD 时主动解锁；没有时尝试无密码 unlock（已登录会话常已解锁，与改功能前行为一致）。
-# Flutter 阶段已用 --no-codesign，真正签名在 xcodebuild archive/export。
+# 兼容多种环境变量名；有密码则主动解锁并放开 codesign 分区。
+# 对齐 joyride：签名前先解锁，再用 flutter build ipa（同一台机以前能过的路径）。
 unlock_signing_keychain() {
     local kc="${KEYCHAIN_PATH:-$HOME/Library/Keychains/login.keychain-db}"
     if [ ! -f "$kc" ] && [ -f "$HOME/Library/Keychains/login.keychain" ]; then
         kc="$HOME/Library/Keychains/login.keychain"
     fi
-    local pw="${KEYCHAIN_PASSWORD:-}"
+    # 兼容 Jenkins 凭据里常见命名
+    local pw="${KEYCHAIN_PASSWORD:-${LOGIN_PASSWORD:-${MAC_PASSWORD:-${KEYCHAIN_PASS:-}}}}"
     echo "[DEBUG] unlock keychain: $kc"
     if [ ! -f "$kc" ]; then
-        echo "WARN: signing keychain not found: $kc (continue; xcodebuild may still work)" >&2
+        echo "WARN: signing keychain not found: $kc" >&2
         return 0
     fi
     if [ -n "$pw" ]; then
+        export KEYCHAIN_PASSWORD="$pw"
         security unlock-keychain -p "$pw" "$kc" || \
-            echo "WARN: failed to unlock keychain with KEYCHAIN_PASSWORD" >&2
-        # 允许 codesign 在无 UI 下使用私钥（否则仍可能 errSecInternalComponent）
+            echo "WARN: failed to unlock keychain with password" >&2
         security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$pw" "$kc" >/dev/null 2>&1 || \
             echo "WARN: set-key-partition-list failed for $kc" >&2
         security set-keychain-settings -t 21600 -u "$kc" >/dev/null 2>&1 || true
+        echo "[DEBUG] keychain unlock attempted with password env"
     else
-        # 已登录会话偶发可直接 unlock；失败只告警（不要因缺密码直接 exit）
         if security unlock-keychain "$kc" 2>/dev/null; then
-            echo "[DEBUG] keychain unlocked without KEYCHAIN_PASSWORD (session already unlocked)"
+            echo "[DEBUG] keychain unlocked without password (session already unlocked)"
         else
-            echo "WARN: KEYCHAIN_PASSWORD unset; relying on already-unlocked keychain." >&2
-            echo "WARN: if xcodebuild fails with errSecInternalComponent, set KEYCHAIN_PASSWORD in Jenkins or ci/ci.env." >&2
+            echo "WARN: KEYCHAIN_PASSWORD unset and keychain is locked." >&2
+            echo "WARN: iOS codesign will likely fail with errSecInternalComponent." >&2
+            echo "WARN: Ask Mac admin to set Jenkins env KEYCHAIN_PASSWORD = macOS login password for user doufeng." >&2
         fi
     fi
     security list-keychains -d user -s "$kc" >/dev/null 2>&1 || true
@@ -99,17 +101,30 @@ unlock_signing_keychain() {
     security find-identity -v -p codesigning "$kc" 2>/dev/null | head -n 20 || true
 }
 
-# IPA 归档必须用 Release：Profile 会触发
-# “Flutter archive not built in Release mode”，且 xcode_backend 签名易失败。
-# 测试服/正式服由 --dart-define=DEBUG_MODE 控制，不靠 Profile。
-# 流程：flutter build ios → xcodebuild archive(API Key) → export(API Key)
+print_codesign_help() {
+    cat >&2 <<'EOF'
+ERROR: iOS codesign failed (errSecInternalComponent).
+This is NOT caused by app feature code. The Jenkins Mac keychain is locked / private key inaccessible.
+
+Fix on the packaging Mac (user: doufeng), once:
+  1) Jenkins Job → Configure → Environment / Credentials Bindings
+     add: KEYCHAIN_PASSWORD = that Mac login password
+  2) Or create /Users/doufeng/.jenkins/chimo-ci.env with:
+       KEYCHAIN_PASSWORD=...
+  3) Or SSH/login to the Mac GUI once and unlock Keychain Access.
+
+Then rebuild. App runtime (test/prod) is unaffected.
+EOF
+}
+
+# IPA：对齐 joyride，优先 flutter build ipa；失败时打印签名指引。
+# 测试服/正式服由 --dart-define=DEBUG_MODE 控制。
 build_archive() {
     local extra=()
     local arg
     for arg in "$@"; do
         case "$arg" in
             --release|--profile)
-                # 忽略调用方 mode；统一 Release 归档
                 ;;
             *)
                 extra+=("$arg")
@@ -118,35 +133,51 @@ build_archive() {
     done
 
     local archivePath="$projectPath/build/ios/archive/Runner.xcarchive"
-    local workspace="$projectPath/ios/Runner.xcworkspace"
     rm -rf "$archivePath"
+    rm -f "$projectPath/build/ios/ipa/"*.ipa 2>/dev/null || true
 
-    # Flutter 自身会先 codesign Framework，headless Jenkins 常因 keychain 失败。
-    # 跳过该阶段签名，统一交给后续 xcodebuild archive/export。
-    echo "[DEBUG] $(date '+%Y-%m-%d %H:%M:%S') flutter build ios --release --no-codesign"
-    flutter build ios --release --no-codesign "${extra[@]}"
-
+    # 必须在任何 codesign 之前解锁（flutter build ipa 会签名）
     unlock_signing_keychain
 
-    echo "[DEBUG] $(date '+%Y-%m-%d %H:%M:%S') xcodebuild archive (Release) with API key"
-    xcodebuild archive \
-        -workspace "$workspace" \
-        -scheme Runner \
-        -configuration Release \
-        -destination 'generic/platform=iOS' \
-        -archivePath "$archivePath" \
-        -allowProvisioningUpdates \
-        -authenticationKeyID "$apiKey" \
-        -authenticationKeyIssuerID "$apiIssuer" \
-        -authenticationKeyPath "$authKeyPath" \
-        DEVELOPMENT_TEAM=7FB5L562F4
+    echo "[DEBUG] $(date '+%Y-%m-%d %H:%M:%S') flutter build ipa --release (joyride-compatible)"
+    set +e
+    # 不在这里 export；统一由后续 export_archive 用 adhoc/store plist 导出
+    flutter build ipa --release "${extra[@]}"
+    local flutter_rc=$?
+    set -e
+    if [ "$flutter_rc" -ne 0 ]; then
+        if [ ! -d "$archivePath" ]; then
+            print_codesign_help
+            exit "$flutter_rc"
+        fi
+        echo "WARN: flutter build ipa returned $flutter_rc but archive exists; continue export" >&2
+    fi
 
     if [ ! -d "$archivePath" ]; then
-        echo "ERROR: xcodebuild archive produced no archive at $archivePath" >&2
-        exit 1
+        # 回退：旧路径 flutter build ios --no-codesign + xcodebuild archive
+        echo "[WARN] archive missing after flutter build ipa; fallback to xcodebuild archive"
+        unlock_signing_keychain
+        set +e
+        flutter build ios --release --no-codesign "${extra[@]}"
+        xcodebuild archive \
+            -workspace "$projectPath/ios/Runner.xcworkspace" \
+            -scheme Runner \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$archivePath" \
+            -allowProvisioningUpdates \
+            -authenticationKeyID "$apiKey" \
+            -authenticationKeyIssuerID "$apiIssuer" \
+            -authenticationKeyPath "$authKeyPath" \
+            DEVELOPMENT_TEAM=7FB5L562F4
+        local archive_rc=$?
+        set -e
+        if [ "$archive_rc" -ne 0 ] || [ ! -d "$archivePath" ]; then
+            print_codesign_help
+            exit "${archive_rc:-1}"
+        fi
     fi
     echo "[DEBUG] archive ok: $archivePath"
-    rm -f "$projectPath/build/ios/ipa/"*.ipa 2>/dev/null || true
 }
 
 export_archive() {

@@ -122,8 +122,18 @@ fi
 if [ -z "${APP_STORE_API_KEY:-}" ] || [ -z "${APP_STORE_API_ISSUER:-}" ]; then
   _load_appstore_from_joyride || true
 fi
+if [ -z "${KEYCHAIN_PASSWORD:-}" ]; then
+  KEYCHAIN_PASSWORD="${LOGIN_PASSWORD:-${MAC_PASSWORD:-${KEYCHAIN_PASS:-}}}"
+  if [ -n "${KEYCHAIN_PASSWORD:-}" ]; then
+    export KEYCHAIN_PASSWORD
+    echo "Loaded KEYCHAIN_PASSWORD from alternate env name"
+  fi
+fi
 if [ -z "${KEYCHAIN_PASSWORD:-}" ] || [ -z "${KEYCHAIN_PATH:-}" ]; then
   _load_keychain_from_joyride_ci_env || true
+fi
+if [ -z "${KEYCHAIN_PASSWORD:-}" ]; then
+  echo "No KEYCHAIN_PASSWORD in env/ci.env yet (iOS codesign may fail with errSecInternalComponent until set)."
 fi
 if [ -z "${R2_ACCESS_KEY_ID:-}" ] || [ -z "${R2_SECRET_ACCESS_KEY:-}" ]; then
   echo "No R2 credentials in env/ci.env yet (upload will fail until configured)."
