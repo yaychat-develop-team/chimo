@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# 加载 CI 密钥（不入库）。按优先级依次 source 第一个存在的文件。
+# 加载 CI 密钥（不入库）。优先 source 第一个存在的文件，
+# 然后对缺失字段继续做迁移回退，便于复用 joyride 旧打包机配置。
 # 用法: source ./load_ci_env.sh
 
 _ci_env_candidates=(
@@ -10,6 +11,7 @@ _ci_env_candidates=(
   # 若打包机上仍保留 joyride 的密钥文件，可复用
   "/Users/doufeng/Documents/work/joyride_flutter/ci/ci.env"
 )
+_loaded_ci_env=""
 
 for _f in "${_ci_env_candidates[@]}"; do
   if [ -n "${_f}" ] && [ -f "${_f}" ]; then
@@ -19,8 +21,8 @@ for _f in "${_ci_env_candidates[@]}"; do
     source "${_f}"
     set +a
     echo "Loaded CI env from ${_f}"
-    unset _f _ci_env_candidates
-    return 0 2>/dev/null || exit 0
+    _loaded_ci_env="${_f}"
+    break
   fi
 done
 
@@ -84,15 +86,48 @@ _load_appstore_from_joyride() {
   return 1
 }
 
+_load_keychain_from_joyride_ci_env() {
+  local candidates=(
+    "/Users/doufeng/Documents/work/joyride_flutter/ci/ci.env"
+    "D:/forya/joyride_flutter/ci/ci.env"
+    "${HOME}/Documents/work/joyride_flutter/ci/ci.env"
+  )
+  local src="" f
+  for f in "${candidates[@]}"; do
+    if [ -f "$f" ]; then
+      src=$f
+      break
+    fi
+  done
+  [ -z "$src" ] && return 1
+
+  if [ -z "${KEYCHAIN_PASSWORD:-}" ]; then
+    KEYCHAIN_PASSWORD=$(sed -n 's/^KEYCHAIN_PASSWORD=\(.*\)$/\1/p' "$src" | head -n 1)
+    export KEYCHAIN_PASSWORD
+  fi
+  if [ -z "${KEYCHAIN_PATH:-}" ]; then
+    KEYCHAIN_PATH=$(sed -n 's/^KEYCHAIN_PATH=\(.*\)$/\1/p' "$src" | head -n 1)
+    export KEYCHAIN_PATH
+  fi
+  if [ -n "${KEYCHAIN_PASSWORD:-}" ] || [ -n "${KEYCHAIN_PATH:-}" ]; then
+    echo "Loaded keychain config from joyride ci.env (migration fallback)"
+    return 0
+  fi
+  return 1
+}
+
 if [ -z "${R2_ACCESS_KEY_ID:-}" ] || [ -z "${R2_SECRET_ACCESS_KEY:-}" ]; then
   _load_r2_from_joyride || true
 fi
 if [ -z "${APP_STORE_API_KEY:-}" ] || [ -z "${APP_STORE_API_ISSUER:-}" ]; then
   _load_appstore_from_joyride || true
 fi
+if [ -z "${KEYCHAIN_PASSWORD:-}" ] || [ -z "${KEYCHAIN_PATH:-}" ]; then
+  _load_keychain_from_joyride_ci_env || true
+fi
 if [ -z "${R2_ACCESS_KEY_ID:-}" ] || [ -z "${R2_SECRET_ACCESS_KEY:-}" ]; then
   echo "No R2 credentials in env/ci.env yet (upload will fail until configured)."
 fi
-unset _f _ci_env_candidates
-unset -f _load_r2_from_joyride _load_appstore_from_joyride 2>/dev/null || true
+unset _f _ci_env_candidates _loaded_ci_env
+unset -f _load_r2_from_joyride _load_appstore_from_joyride _load_keychain_from_joyride_ci_env 2>/dev/null || true
 return 0 2>/dev/null || true
