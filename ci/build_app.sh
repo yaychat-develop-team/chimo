@@ -94,11 +94,6 @@ if [ "$buildPlatform" == 'Android' ]; then
 
 elif [ "$buildPlatform" == 'iOS' ]; then
     echo "iOS开始打包"
-    if ! has_app_store_api; then
-        msg="**iOS 打包失败**：未配置 APP_STORE_API_KEY / APP_STORE_API_ISSUER"
-        python3 wechat_notify.py -1 "$msg" '' '' "" "" 0 "$buildUser" "$buildBranch"
-        exit 1
-    fi
     ./build_ipa.sh "$buildType" "$versionName" "$versionCode" "$debugModel" "" "$ciNum"
     ipaPath=$(find "$projectPath/build/ios/ipa/" -name "*.ipa")
     echo "iOS打包执行完成$ipaPath"
@@ -135,19 +130,15 @@ else
         upload_to_r2 "$apkPath" android
     fi
 
-    if has_app_store_api; then
-        ./build_ipa.sh "$buildType" "$versionName" "$versionCode" "$debugModel" "" "$ciNum"
-        ipaPath=$(find "$projectPath/build/ios/ipa/" -name "*.ipa")
-        if [[ ! -f "$ipaPath" ]]; then
-            msg="**iOS 打包失败**，[请检查](http://192.168.3.123:8080/job/Pack%20App/)"
-            python3 wechat_notify.py -1 "$msg" '' '' "" "" 0 "$buildUser" "$buildBranch"
-            errorCount=$((errorCount + 1))
-        fi
-        if [ -f "$ipaPath" ]; then
-            upload_to_r2 "$ipaPath" ios
-        fi
-    else
-        echo "WARN: skip iOS build — APP_STORE_API_KEY / APP_STORE_API_ISSUER not set"
+    ./build_ipa.sh "$buildType" "$versionName" "$versionCode" "$debugModel" "" "$ciNum"
+    ipaPath=$(find "$projectPath/build/ios/ipa/" -name "*.ipa")
+    if [[ ! -f "$ipaPath" ]]; then
+        msg="**iOS 打包失败**，[请检查](http://192.168.3.123:8080/job/Pack%20App/)"
+        python3 wechat_notify.py -1 "$msg" '' '' "" "" 0 "$buildUser" "$buildBranch"
+        errorCount=$((errorCount + 1))
+    fi
+    if [ -f "$ipaPath" ]; then
+        upload_to_r2 "$ipaPath" ios
     fi
     if [ $errorCount -ge 2 ];then
         exit 1

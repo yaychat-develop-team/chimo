@@ -24,6 +24,9 @@ class _ChatLine {
     this.serverTimeMs = 0,
     this.msgId = '',
     this.failed = false,
+    this.quoteMsgId = '',
+    this.quoteShowText = '',
+    this.quoteSendName = '',
   });
 
   final _ChatSide side;
@@ -47,14 +50,50 @@ class _ChatLine {
   /// 发送失败（如被对方拉黑），气泡旁显示红色感叹号。
   final bool failed;
 
-  _ChatLine copyWith({bool? failed, String? msgId, String? mediaSource}) {
+  /// 引用回复展示文案（Reply name:text）。
+  final String quoteMsgId;
+  final String quoteShowText;
+  final String quoteSendName;
+
+  String get quoteContent {
+    return ImQuoteMsg.displayContent(
+      sendName: quoteSendName,
+      showText: quoteShowText,
+    );
+  }
+
+  String quoteContentIn(List<_ChatLine> messages) {
+    final resolved = _resolvedQuotePreview(messages);
+    return ImQuoteMsg.displayContent(
+      sendName: quoteSendName,
+      showText: quoteShowText,
+      resolvedPreview: resolved,
+    );
+  }
+
+  String _resolvedQuotePreview(List<_ChatLine> messages) {
+    final qid = quoteMsgId.trim();
+    if (qid.isEmpty) return '';
+    for (final m in messages) {
+      if (m.msgId == qid) return m.listPreview;
+    }
+    return '';
+  }
+
+  _ChatLine copyWith({
+    bool? failed,
+    String? msgId,
+    String? mediaSource,
+    int? serverTimeMs,
+    List<String>? imageAssets,
+  }) {
     return _ChatLine(
       side: side,
       kind: kind,
       text: text,
       voiceSeconds: voiceSeconds,
       mediaSource: mediaSource ?? this.mediaSource,
-      imageAssets: imageAssets,
+      imageAssets: imageAssets ?? this.imageAssets,
       giftId: giftId,
       giftQty: giftQty,
       giftEmoji: giftEmoji,
@@ -62,9 +101,12 @@ class _ChatLine {
       giftIconUrl: giftIconUrl,
       emoteUrl: emoteUrl,
       emoteName: emoteName,
-      serverTimeMs: serverTimeMs,
+      serverTimeMs: serverTimeMs ?? this.serverTimeMs,
       msgId: msgId ?? this.msgId,
       failed: failed ?? this.failed,
+      quoteMsgId: quoteMsgId,
+      quoteShowText: quoteShowText,
+      quoteSendName: quoteSendName,
     );
   }
 
@@ -76,10 +118,10 @@ class _ChatLine {
   }
 
   String get listPreview {
-    if (kind == _ChatLineKind.voice) return '[Voice] $voiceSeconds"';
+    if (kind == _ChatLineKind.voice) return '[Audio]';
     if (kind == _ChatLineKind.image) {
       final n = imageAssets.length;
-      return n <= 1 ? '[Image]' : '[Image ×$n]';
+      return n <= 1 ? '[Photo]' : '[Photo ×$n]';
     }
     if (kind == _ChatLineKind.gift) {
       return giftName.isEmpty
@@ -87,10 +129,10 @@ class _ChatLine {
           : '[Gift] $giftName x$giftQty';
     }
     if (kind == _ChatLineKind.emote) {
-      return emoteName.isEmpty ? '[Sticker]' : '[$emoteName]';
+      return '[Smiley]';
     }
     if (kind == _ChatLineKind.tip) return text;
-    return text;
+    return AppEmoji.normalize(text);
   }
 }
 

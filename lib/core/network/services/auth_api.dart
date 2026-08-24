@@ -80,6 +80,20 @@ class AuthApi {
     );
   }
 
+  Future<ApiResult<LoginPlatformsConfig>> loginPlatforms() {
+    return ApiGateway.request(
+      () => NetworkBootstrap.api.loginPlatforms(),
+      map: (res) {
+        final config = LoginPlatformsConfig.fromResponse(res);
+        if (config == null) {
+          throw StateError('Login platforms missing');
+        }
+        return config;
+      },
+      clearSessionOnNotLogin: false,
+    );
+  }
+
   Future<ApiResult<void>> bindEmail({
     required String email,
     required String code,

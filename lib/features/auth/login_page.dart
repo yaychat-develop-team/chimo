@@ -7,12 +7,13 @@ import 'package:go_router/go_router.dart';
 import '../../app/app_router.dart';
 import '../../core/auth/apple_sign_in.dart';
 import '../../core/constants/app_assets.dart';
-import '../../core/theme/app_colors.dart';
+import '../../core/network/app_apis.dart';
 import '../../core/network/api_config.dart';
+import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_webview_page.dart';
 import '../debug/debug_page.dart';
 
-/// 登录页：iOS 上 Apple + Email 主按钮（对齐 forya）；Android 为 Email + Phone。
+/// 登录页：正式环境写死 Apple + Email；测试环境可按 `/auth/login-platforms` 调整入口。
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -28,8 +29,54 @@ class _LoginPageState extends State<LoginPage> {
 
   bool _agreed = false;
   bool _appleSigningIn = false;
+  bool _showAppleEntry = true;
+  bool _showEmailLogin = true;
+  bool _showPhoneLogin = false;
 
-  bool get _showAppleLogin => AppleSignInAuth.isSupportedPlatform;
+  bool get _showAppleLogin =>
+      AppleSignInAuth.isSupportedPlatform && _showAppleEntry;
+
+  @override
+  void initState() {
+    super.initState();
+    _applyProductionDefaults();
+    if (!ApiConfig.isOfficial) {
+      unawaited(_loadLoginPlatforms());
+    }
+  }
+
+  void _applyProductionDefaults() {
+    _showAppleEntry = AppleSignInAuth.isSupportedPlatform;
+    _showEmailLogin = true;
+    // 正式环境（正式包 / 切到正式服）不展示手机号登录。
+    _showPhoneLogin = ApiConfig.isDebug && !ApiConfig.isOfficial;
+  }
+
+  Future<void> _loadLoginPlatforms() async {
+    if (ApiConfig.isOfficial) return;
+    try {
+      final res = await AppApis.auth.loginPlatforms();
+      if (!mounted || !res.ok || res.data == null) return;
+      final config = res.data!;
+      final showApple =
+          config.supports('apple') ||
+          config.supports('appleid') ||
+          config.supports('apple_id');
+      setState(() {
+        _showAppleEntry = showApple;
+        _showEmailLogin = config.supports('email');
+        _showPhoneLogin =
+            config.supports('phone') ||
+            config.supports('sms') ||
+            config.supports('mobile');
+      });
+      if (!_showAppleEntry && !_showEmailLogin && !_showPhoneLogin) {
+        setState(_applyProductionDefaults);
+      }
+    } catch (_) {
+      // 非正式环境接口失败时保留本地默认入口。
+    }
+  }
 
   Future<void> _openAgreement(String title) {
     final url = title.contains('Privacy')
@@ -148,7 +195,7 @@ class _LoginPageState extends State<LoginPage> {
                     fit: BoxFit.contain,
                   ),
                   const Spacer(flex: 3),
-                  // iOS：Apple（白底）在上，Email（深色）在下 — 对齐 forya _defaultMainPlatforms。
+                  // 正式环境固定入口；非正式环境按登录平台接口控制显隐。
                   if (_showAppleLogin) ...[
                     _AppleLoginButton(
                       onTap: _openAppleLogin,
@@ -156,8 +203,8 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                     const SizedBox(height: 16),
                   ],
-                  _EmailLoginButton(onTap: _openEmailLogin),
-                  const SizedBox(height: 18),
+                  if (_showEmailLogin) _EmailLoginButton(onTap: _openEmailLogin),
+                  if (_showEmailLogin) const SizedBox(height: 18),
                   _AgreementRow(
                     agreed: _agreed,
                     onToggle: () => setState(() => _agreed = !_agreed),
@@ -186,10 +233,12 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     ),
                   if (ApiConfig.isDebug) const Spacer(flex: 2) else const Spacer(flex: 3),
-                  const _OrContinueDivider(),
-                  const SizedBox(height: 20),
-                  _PhoneLoginButton(onTap: _openPhoneLogin),
-                  const SizedBox(height: 8),
+                  if (_showPhoneLogin) ...[
+                    const _OrContinueDivider(),
+                    const SizedBox(height: 20),
+                    _PhoneLoginButton(onTap: _openPhoneLogin),
+                    const SizedBox(height: 8),
+                  ],
                 ],
               ),
             ),

@@ -9,11 +9,25 @@ abstract final class ImSystemAccounts {
   static const String newFriends = 'new-friends-system-account';
   static const String gameCenter = 'game-official-account';
 
+  static String _bareId(String? conversationId) {
+    final id = conversationId?.trim() ?? '';
+    if (id.startsWith('dm_')) return id.substring(3);
+    if (id.startsWith('sys_')) return id.substring(4);
+    return id;
+  }
+
   /// 官方号：环信侧始终为私聊（Chat），不得当群聊处理。
   static bool isOfficialAccount(String? conversationId) {
-    final id = conversationId?.trim() ?? '';
+    final id = _bareId(conversationId);
     if (id.isEmpty) return false;
     return id == official || id == officialCmd || id == gameCenter;
+  }
+
+  /// 暂时屏蔽的官方号（线上 / 测试都不进消息列表）。
+  static bool isSuppressedOfficialChat(String? conversationId) {
+    final id = _bareId(conversationId);
+    if (id.isEmpty) return false;
+    return id == official || id == officialCmd;
   }
 
   static bool isSystemAccount(String? conversationId) {

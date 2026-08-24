@@ -12,6 +12,7 @@ import 'package:record/record.dart';
 
 import '../../../core/audio/app_audio_playback.dart';
 import '../../../core/constants/app_assets.dart';
+import '../../../core/im/im_service.dart';
 import '../../../core/theme/app_emoji.dart';
 import '../../../core/widgets/center_toast.dart';
 import '../../chats/widgets/album_selection_preview_page.dart';
@@ -51,6 +52,26 @@ class GroupChatInputBarState extends State<GroupChatInputBar> {
 
   /// 与私聊相册 / 语音面板高度一致。
   static const double _panelHeight = 300;
+
+  ImQuoteMsg? _quoteMsg;
+
+  void setQuote(ImQuoteMsg quote) {
+    setState(() => _quoteMsg = quote);
+    _focus.requestFocus();
+  }
+
+  ImQuoteMsg? takeQuote() {
+    final quote = _quoteMsg;
+    if (quote != null) {
+      setState(() => _quoteMsg = null);
+    }
+    return quote;
+  }
+
+  void clearQuote() {
+    if (_quoteMsg == null) return;
+    setState(() => _quoteMsg = null);
+  }
 
   static const ColorFilter _iconFilter = ColorFilter.matrix(<double>[
     0, 0, 0, 0, 90,
@@ -662,6 +683,52 @@ class GroupChatInputBarState extends State<GroupChatInputBar> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (_quoteMsg != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0F0F0),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _quoteMsg!.showContent,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF999999),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w400,
+                          height: 1.3,
+                        ),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: clearQuote,
+                      child: Container(
+                        width: 16,
+                        height: 16,
+                        alignment: Alignment.center,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF999999),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.close_rounded,
+                          size: 12,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           Padding(
             padding: EdgeInsets.fromLTRB(12, 8, 12, showPanel ? 0 : 8 + bottomPad),
             child: Container(

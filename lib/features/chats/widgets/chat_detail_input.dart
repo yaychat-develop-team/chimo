@@ -35,6 +35,26 @@ class _DmInputBarState extends State<_DmInputBar> {
   static const int _maxVoiceSeconds = 60;
   static const int _albumPageSize = 80;
 
+  ImQuoteMsg? _quoteMsg;
+
+  void setQuote(ImQuoteMsg quote) {
+    setState(() => _quoteMsg = quote);
+    _inputFocus.requestFocus();
+  }
+
+  ImQuoteMsg? takeQuote() {
+    final quote = _quoteMsg;
+    if (quote != null) {
+      setState(() => _quoteMsg = null);
+    }
+    return quote;
+  }
+
+  void clearQuote() {
+    if (_quoteMsg == null) return;
+    setState(() => _quoteMsg = null);
+  }
+
   /// 语音 / 相册面板共用同一底部区域高度（不含安全区）。
   static const double _panelHeight = 300;
 
@@ -666,6 +686,54 @@ class _DmInputBarState extends State<_DmInputBar> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                if (_quoteMsg != null) ...[
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF5F5F5),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            _quoteMsg!.showContent,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Color(0xFF999999),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w400,
+                              height: 1.3,
+                            ),
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: clearQuote,
+                          child: Container(
+                            width: 16,
+                            height: 16,
+                            alignment: Alignment.center,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF999999),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.close_rounded,
+                              size: 12,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 Container(
                   height: 54,
                   padding: const EdgeInsets.symmetric(horizontal: 20),

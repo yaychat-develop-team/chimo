@@ -150,6 +150,52 @@ class AuthTokenPayload {
   }
 }
 
+/// 来自 `/auth/login-platforms` 的登录入口配置。
+class LoginPlatformsConfig {
+  const LoginPlatformsConfig({
+    this.mainPlatforms = const [],
+    this.subPlatforms = const [],
+    this.raw = const {},
+  });
+
+  final List<String> mainPlatforms;
+  final List<String> subPlatforms;
+  final Map<String, dynamic> raw;
+
+  static LoginPlatformsConfig? fromResponse(ApiResponse response) {
+    if (!response.success || response.data is! Map) return null;
+    final data = Map<String, dynamic>.from(response.data as Map);
+    final normalized = <String>{
+      ..._readPlatformList(data['mainPlatforms']),
+      ..._readPlatformList(data['main_platforms']),
+      ..._readPlatformList(data['platforms']),
+    }.toList();
+    final sub = <String>{
+      ..._readPlatformList(data['subPlatforms']),
+      ..._readPlatformList(data['sub_platforms']),
+      ..._readPlatformList(data['otherPlatforms']),
+    }.toList();
+    return LoginPlatformsConfig(
+      mainPlatforms: normalized,
+      subPlatforms: sub,
+      raw: data,
+    );
+  }
+
+  bool supports(String platform) {
+    final key = platform.trim().toLowerCase();
+    return mainPlatforms.contains(key) || subPlatforms.contains(key);
+  }
+
+  static List<String> _readPlatformList(Object? value) {
+    if (value is! List) return const [];
+    return [
+      for (final item in value)
+        if ('$item'.trim().isNotEmpty) '$item'.trim().toLowerCase(),
+    ];
+  }
+}
+
 /// 来自 `/user/msg-user` 的简要用户（EM → 应用 uid / 头像）。
 class MsgUserBrief {
   const MsgUserBrief({

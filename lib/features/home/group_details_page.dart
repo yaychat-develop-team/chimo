@@ -6,6 +6,7 @@ import 'dart:ui';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../core/audio/app_audio_playback.dart';
@@ -19,6 +20,7 @@ import '../../core/widgets/app_action_bottom_sheet.dart';
 import '../../core/widgets/app_network_image.dart';
 import '../../core/widgets/app_tip_dialog.dart';
 import '../../core/widgets/center_toast.dart';
+import '../../core/widgets/chat_message_action_popup.dart';
 import '../../core/widgets/network_or_asset_avatar.dart';
 import '../chats/data/chats_list_controller.dart';
 import '../chats/models/chat_conversation.dart';
@@ -65,6 +67,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
   List<GroupPhotoSection> _photoSections = const [];
   final GlobalKey<GroupChatInputBarState> _inputBarKey =
       GlobalKey<GroupChatInputBarState>();
+  final Map<String, GlobalKey> _messageItemKeys = {};
   String _selfAvatarUrl = '';
 
   /// 防止短时间连点头像叠多层资料弹窗。
@@ -126,6 +129,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
       if (!mounted) return;
       final added = <_OutgoingMessage>[];
       for (final m in page.messages) {
+        if (m.msgType == 'ignored' || m.isSdkRecall) continue;
         if (m.id.isNotEmpty && _seenMsgIds.contains(m.id)) continue;
         final line = _lineFromIm(m);
         if (line == null) continue;
@@ -289,12 +293,43 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
     final gid = _emGroupId;
     if (gid.isEmpty) return;
     if (m.conversationId != gid && m.to != gid) return;
-    if (m.id.isNotEmpty && _seenMsgIds.contains(m.id)) return;
+    if (m.msgType == 'ignored') return;
+    if (m.isSdkRecall) {
+      final id = m.id.trim();
+      if (id.isEmpty || !mounted) return;
+      setState(() {
+        _sentMessages.removeWhere((e) => e.msgId == id);
+        _seenMsgIds.remove(id);
+      });
+      return;
+    }
+    if (m.msgType == 'recall') {
+      _applyRecall(m);
+      return;
+    }
+    if (m.id.isNotEmpty && _seenMsgIds.contains(m.id)) {
+      if (!mounted) return;
+      setState(() => _backfillOutgoingFromIm(m));
+      return;
+    }
     final line = _lineFromIm(m);
-    if (line == null) return;
+    if (line == null) {
+      if (m.isSelf && m.id.isNotEmpty) {
+        if (!mounted) return;
+        setState(() => _backfillOutgoingFromIm(m));
+      }
+      return;
+    }
     if (m.id.isNotEmpty) _seenMsgIds.add(m.id);
     if (!mounted) return;
     setState(() {
+      if (_mergeOutgoingFromIm(line)) {
+        if (!_isJoined && _sentMessages.length > 10) {
+          final removed = _sentMessages.removeAt(0);
+          if (removed.msgId.isNotEmpty) _seenMsgIds.remove(removed.msgId);
+        }
+        return;
+      }
       _sentMessages.add(line);
       if (!_isJoined && _sentMessages.length > 10) {
         final removed = _sentMessages.removeAt(0);
@@ -307,6 +342,113 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
         (line.senderAvatar.trim().isEmpty || !line.hasSenderGender);
     if (needProfile) {
       unawaited(_hydrateMissingSenderProfiles());
+    }
+  }
+
+  bool _outgoingContentMatches(_OutgoingMessage local, _OutgoingMessage incoming) {
+    if (!local.isSelf || !incoming.isSelf || local.kind != incoming.kind) {
+      return false;
+    }
+    switch (incoming.kind) {
+      case _OutgoingKind.text:
+        return (local.text ?? '') == (incoming.text ?? '');
+      case _OutgoingKind.voice:
+        return local.voiceSeconds == incoming.voiceSeconds;
+      case _OutgoingKind.image:
+      case _OutgoingKind.emote:
+        // 乐观消息用本地路径，IM 回调用远程 URL，按「最后一条无 id 的自发送图」合并。
+        return local.msgId.isEmpty;
+      default:
+        return false;
+    }
+  }
+
+  /// IM 流先到达时，把服务端 msgId 回填到本地乐观消息。
+  bool _mergeOutgoingFromIm(_OutgoingMessage incoming) {
+    final idx = _sentMessages.lastIndexWhere(
+      (e) => e.msgId.isEmpty && _outgoingContentMatches(e, incoming),
+    );
+    if (idx < 0) return false;
+    final prev = _sentMessages[idx];
+    final keepLocalImage = incoming.kind == _OutgoingKind.image ||
+        incoming.kind == _OutgoingKind.emote;
+    _sentMessages[idx] = incoming.copyWith(
+      imagePath: keepLocalImage && (prev.imagePath ?? '').trim().isNotEmpty
+          ? prev.imagePath
+          : incoming.imagePath,
+      sentAt: incoming.sentAt.millisecondsSinceEpoch > 0
+          ? incoming.sentAt
+          : prev.sentAt,
+    );
+    return true;
+  }
+
+  int? _outgoingKindFromMsgType(String msgType) {
+    switch (msgType) {
+      case 'txt':
+        return _OutgoingKind.text;
+      case 'voice':
+        return _OutgoingKind.voice;
+      case 'image':
+        return _OutgoingKind.image;
+      case 'emote':
+        return _OutgoingKind.emote;
+      default:
+        return null;
+    }
+  }
+
+  void _backfillOutgoingFromIm(ImChatMessage m) {
+    final incoming = _lineFromIm(m);
+    if (incoming == null) {
+      if (!m.isSelf || m.id.isEmpty) return;
+      final kind = _outgoingKindFromMsgType(m.msgType);
+      if (kind == null) return;
+      for (var i = _sentMessages.length - 1; i >= 0; i--) {
+        final e = _sentMessages[i];
+        if (!e.isSelf || e.msgId.isNotEmpty || e.kind != kind) continue;
+        final sentAt = m.serverTimeMs > 0
+            ? DateTime.fromMillisecondsSinceEpoch(m.serverTimeMs)
+            : e.sentAt;
+        _sentMessages[i] = e.copyWith(msgId: m.id, sentAt: sentAt);
+        return;
+      }
+      return;
+    }
+    final idx = _sentMessages.indexWhere((e) => e.msgId == m.id);
+    if (idx >= 0) {
+      if (m.serverTimeMs > 0 &&
+          _sentMessages[idx].sentAt.millisecondsSinceEpoch == 0) {
+        _sentMessages[idx] = _sentMessages[idx].copyWith(
+          sentAt: DateTime.fromMillisecondsSinceEpoch(m.serverTimeMs),
+        );
+      }
+      return;
+    }
+    if (_mergeOutgoingFromIm(incoming)) return;
+    if (!m.isSelf || m.id.isEmpty) return;
+    for (var i = _sentMessages.length - 1; i >= 0; i--) {
+      final e = _sentMessages[i];
+      if (!e.isSelf || e.msgId.isNotEmpty || e.kind != incoming.kind) continue;
+      switch (incoming.kind) {
+        case _OutgoingKind.text:
+          if ((e.text ?? '') != (incoming.text ?? '')) continue;
+        case _OutgoingKind.voice:
+          if (e.voiceSeconds != incoming.voiceSeconds) continue;
+        case _OutgoingKind.image:
+        case _OutgoingKind.emote:
+          _sentMessages[i] = incoming.copyWith(
+            imagePath: (e.imagePath ?? '').trim().isNotEmpty
+                ? e.imagePath
+                : incoming.imagePath,
+            sentAt: incoming.sentAt.millisecondsSinceEpoch > 0
+                ? incoming.sentAt
+                : e.sentAt,
+          );
+          return;
+        default:
+          continue;
+      }
     }
   }
 
@@ -326,6 +468,13 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
       isSelf: m.isSelf,
     );
     switch (m.msgType) {
+      case 'recall':
+        return _OutgoingMessage.recall(
+          at: at,
+          msgId: m.id,
+          isSelf: m.isSelf,
+          senderName: name,
+        );
       case 'join':
         return _OutgoingMessage.join(
           m.joinName.isEmpty ? 'Someone' : m.joinName,
@@ -345,6 +494,9 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
           senderName: name,
           senderUid: uid,
           senderGender: gender,
+          quoteMsgId: m.quoteMsgId,
+          quoteShowText: m.quoteShowText,
+          quoteSendName: m.quoteSendName,
         );
       case 'image':
         // 预览优先用可下载的 http(s) 远程 / 缩略图，避免裸路径被当成本地文件。
@@ -359,9 +511,13 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
           }
           return m.playableOrDisplayUrl;
         }();
-        if (src.isEmpty) return null;
+        final local = ImService.stripFileUri(m.mediaLocalPath.trim());
+        final display = src.isNotEmpty
+            ? src
+            : (m.isSelf && local.isNotEmpty ? local : '');
+        if (display.isEmpty) return null;
         return _OutgoingMessage.image(
-          src,
+          display,
           at: at,
           msgId: m.id,
           isSelf: m.isSelf,
@@ -385,7 +541,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
       case 'emote':
         final src = m.emoteUrl.isNotEmpty ? m.emoteUrl : m.playableOrDisplayUrl;
         if (src.isEmpty) return null;
-        return _OutgoingMessage.image(
+        return _OutgoingMessage.emote(
           src,
           at: at,
           msgId: m.id,
@@ -539,6 +695,48 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
     });
   }
 
+  GlobalKey _messageKeyFor(String msgId) {
+    return _messageItemKeys.putIfAbsent(msgId, GlobalKey.new);
+  }
+
+  /// 对齐 forya `chatController.scrollToMsg`：点击引用条定位原消息。
+  void _scrollToQuotedMessage(String msgId) {
+    final id = msgId.trim();
+    if (id.isEmpty) return;
+    final index = _sentMessages.indexWhere((e) => e.msgId == id);
+    if (index < 0) return;
+
+    bool ensureVisible() {
+      final key = _messageItemKeys[id];
+      final ctx = key?.currentContext;
+      if (ctx == null || !ctx.mounted) return false;
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+        alignment: 0.35,
+      );
+      return true;
+    }
+
+    if (ensureVisible()) return;
+    if (!_messagesScroll.hasClients) return;
+
+    final pos = _messagesScroll.position;
+    final ratio = (index + 1) / _sentMessages.length;
+    _messagesScroll.jumpTo(
+      (ratio * pos.maxScrollExtent).clamp(0.0, pos.maxScrollExtent),
+    );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (ensureVisible()) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) ensureVisible();
+      });
+    });
+  }
+
   void _notifyNewMessage(String preview) {
     widget.chatsController?.onNewMessage(
       id: _group.id,
@@ -547,6 +745,124 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
       lastMessage: preview,
       badge: ChatBadgeType.group,
     );
+  }
+
+  void _applyRecall(ImChatMessage m) {
+    if (!mounted) return;
+    final id = m.id.trim();
+    if (id.isEmpty) return;
+    final at = m.serverTimeMs > 0
+        ? DateTime.fromMillisecondsSinceEpoch(m.serverTimeMs)
+        : DateTime.now();
+    setState(() {
+      final index = _sentMessages.indexWhere((e) => e.msgId == id);
+      final recalled = _OutgoingMessage.recall(
+        at: at,
+        msgId: id,
+        isSelf: m.isSelf,
+        senderName: m.senderName,
+      );
+      if (index >= 0) {
+        _sentMessages[index] = recalled;
+      } else {
+        _seenMsgIds.add(id);
+        _sentMessages.add(recalled);
+        _sentMessages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
+      }
+    });
+    _notifyNewMessage(
+      m.isSelf ? 'You recalled a message.' : 'The sender recalled a message.',
+    );
+  }
+
+  Future<void> _onMessageLongPress(
+    _OutgoingMessage message,
+    Rect anchor,
+  ) async {
+    if (!_isJoined) return;
+    if (message.kind == _OutgoingKind.join ||
+        message.kind == _OutgoingKind.recall) {
+      return;
+    }
+
+    final canCopy = message.kind == _OutgoingKind.text &&
+        (message.text ?? '').trim().isNotEmpty;
+    final canReplay = canCopy ||
+        message.kind == _OutgoingKind.voice ||
+        message.kind == _OutgoingKind.image ||
+        message.kind == _OutgoingKind.emote;
+    // 对齐原版 forya：Recall 自己发+60s内+有msgId；Delete 无条件显示。
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    final sentAtMs = message.sentAt.millisecondsSinceEpoch;
+    final withinRecallWindow = sentAtMs > 0 && nowMs - sentAtMs < 60 * 1000;
+    final actions = <ChatMessageAction>[
+      if (canCopy) ChatMessageAction.copy,
+      if (canReplay) ChatMessageAction.replay,
+      if (message.isSelf && message.msgId.isNotEmpty && withinRecallWindow)
+        ChatMessageAction.recall,
+      ChatMessageAction.delete,
+    ];
+    if (actions.isEmpty) return;
+
+    _inputBarKey.currentState?.dismissComposer();
+    final action = await ChatMessageActionPopup.show(
+      context: context,
+      anchor: anchor,
+      actions: actions,
+    );
+    if (!mounted || action == null) return;
+
+    switch (action) {
+      case ChatMessageAction.copy:
+        await Clipboard.setData(ClipboardData(text: message.text ?? ''));
+        if (!mounted) return;
+        showCenterToast(context, message: 'Saved to the clipboard');
+        return;
+      case ChatMessageAction.replay:
+        final sendName = message.isSelf
+            ? 'You'
+            : (message.senderName.trim().isEmpty
+                ? 'User'
+                : message.senderName.trim());
+        _inputBarKey.currentState?.setQuote(
+          ImQuoteMsg(
+            msgId: message.msgId,
+            showText: message.listPreview,
+            sendName: sendName,
+          ),
+        );
+        return;
+      case ChatMessageAction.recall:
+        final ok = await ImService.recallMessage(message.msgId);
+        if (!mounted) return;
+        if (!ok) {
+          showCenterToast(context, message: 'Recall failed');
+          return;
+        }
+        setState(() {
+          _sentMessages.removeWhere((m) => m.msgId == message.msgId);
+          _seenMsgIds.remove(message.msgId);
+        });
+        unawaited(
+          ImService.sendRecallNotice(
+            conversationId: _emGroupId,
+            isGroup: true,
+          ),
+        );
+        return;
+      case ChatMessageAction.delete:
+        await ImService.deleteMessage(
+          conversationId: _emGroupId,
+          isGroup: true,
+          messageId: message.msgId,
+        );
+        if (!mounted) return;
+        setState(() {
+          _sentMessages.removeWhere((m) => m.msgId == message.msgId);
+          _seenMsgIds.remove(message.msgId);
+        });
+        return;
+    }
   }
 
   Future<void> _sendMessage([String? raw]) async {
@@ -558,9 +874,18 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
       return;
     }
     _inputController.clear();
+    final quote = _inputBarKey.currentState?.takeQuote();
+    final now = DateTime.now();
     setState(() {
       _sentMessages.add(
-        _OutgoingMessage.text(text, senderAvatar: _selfAvatarUrl),
+        _OutgoingMessage.text(
+          text,
+          at: now,
+          senderAvatar: _selfAvatarUrl,
+          quoteMsgId: quote?.msgId ?? '',
+          quoteShowText: quote?.showText ?? '',
+          quoteSendName: quote?.sendName ?? '',
+        ),
       );
       _tabIndex = 0;
     });
@@ -573,11 +898,29 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
       final sent = await ImService.sendText(
         peerEmUsername: gid,
         content: text,
+        quote: quote,
         isGroup: true,
         peer: _groupPeerAttrs,
       );
       if (sent != null && sent.id.isNotEmpty) {
         _seenMsgIds.add(sent.id);
+        final sentAt = sent.serverTimeMs > 0
+            ? DateTime.fromMillisecondsSinceEpoch(sent.serverTimeMs)
+            : now;
+        if (!mounted) return;
+        setState(() {
+          for (var i = _sentMessages.length - 1; i >= 0; i--) {
+            final m = _sentMessages[i];
+            if (m.kind != _OutgoingKind.text ||
+                !m.isSelf ||
+                m.msgId.isNotEmpty ||
+                m.text != text) {
+              continue;
+            }
+            _sentMessages[i] = m.copyWith(msgId: sent.id, sentAt: sentAt);
+            break;
+          }
+        });
       }
     } catch (error) {
       if (!mounted) return;
@@ -648,6 +991,55 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
     }
   }
 
+  void _applyGroupImageSendAck(ImChatMessage sent, {required String localPath}) {
+    if (sent.id.isEmpty) return;
+    _seenMsgIds.add(sent.id);
+    final sentAt = sent.serverTimeMs > 0
+        ? DateTime.fromMillisecondsSinceEpoch(sent.serverTimeMs)
+        : DateTime.now();
+    final remote = sent.playableOrDisplayUrl.trim();
+
+    setState(() {
+      final existingIdx = _sentMessages.indexWhere((e) => e.msgId == sent.id);
+      if (existingIdx >= 0) {
+        if (_sentMessages[existingIdx].sentAt.millisecondsSinceEpoch == 0) {
+          _sentMessages[existingIdx] =
+              _sentMessages[existingIdx].copyWith(sentAt: sentAt);
+        }
+        return;
+      }
+
+      var targetIdx = -1;
+      for (var i = _sentMessages.length - 1; i >= 0; i--) {
+        final m = _sentMessages[i];
+        if (m.kind != _OutgoingKind.image ||
+            !m.isSelf ||
+            m.msgId.isNotEmpty) {
+          continue;
+        }
+        if ((m.imagePath ?? '').trim() == localPath) {
+          targetIdx = i;
+          break;
+        }
+      }
+      if (targetIdx < 0) {
+        targetIdx = _sentMessages.lastIndexWhere(
+          (m) =>
+              m.kind == _OutgoingKind.image &&
+              m.isSelf &&
+              m.msgId.isEmpty,
+        );
+      }
+      if (targetIdx < 0) return;
+      final m = _sentMessages[targetIdx];
+      _sentMessages[targetIdx] = m.copyWith(
+        msgId: sent.id,
+        sentAt: sentAt,
+        mediaSource: remote.isNotEmpty ? remote : m.mediaSource,
+      );
+    });
+  }
+
   Future<void> _sendImages(List<String> paths) async {
     if (!_isJoined || paths.isEmpty) return;
     final files = paths
@@ -691,7 +1083,8 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
           peer: _groupPeerAttrs,
         );
         if (sent != null && sent.id.isNotEmpty) {
-          _seenMsgIds.add(sent.id);
+          if (!mounted) return;
+          _applyGroupImageSendAck(sent, localPath: path);
         }
       } catch (error) {
         if (!mounted) return;
@@ -943,6 +1336,9 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
                           onSenderAvatarTap: _openSenderProfile,
                           onBlankTap: () =>
                               _inputBarKey.currentState?.dismissComposer(),
+                          onMessageLongPress: _onMessageLongPress,
+                          onQuoteTap: _scrollToQuotedMessage,
+                          messageKeyFor: _messageKeyFor,
                         ),
                       ),
                     ],
@@ -1245,8 +1641,11 @@ class _ChatBody extends StatelessWidget {
     required this.messagesScroll,
     required this.onTabChanged,
     required this.onPhotoTap,
+    required this.onQuoteTap,
+    required this.messageKeyFor,
     this.onSenderAvatarTap,
     this.onBlankTap,
+    this.onMessageLongPress,
   });
 
   final int tabIndex;
@@ -1256,8 +1655,11 @@ class _ChatBody extends StatelessWidget {
   final ScrollController messagesScroll;
   final ValueChanged<int> onTabChanged;
   final ValueChanged<int> onPhotoTap;
+  final ValueChanged<String> onQuoteTap;
+  final GlobalKey Function(String msgId) messageKeyFor;
   final ValueChanged<_OutgoingMessage>? onSenderAvatarTap;
   final VoidCallback? onBlankTap;
+  final void Function(_OutgoingMessage message, Rect anchor)? onMessageLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -1298,6 +1700,9 @@ class _ChatBody extends StatelessWidget {
                     scrollController: messagesScroll,
                     onBlankTap: onBlankTap,
                     onSenderAvatarTap: onSenderAvatarTap,
+                    onMessageLongPress: onMessageLongPress,
+                    onQuoteTap: onQuoteTap,
+                    messageKeyFor: messageKeyFor,
                   )
                 : _PhotosGrid(
                     isJoined: isJoined,
@@ -1360,15 +1765,21 @@ class _MessagesFeed extends StatelessWidget {
     required this.isJoined,
     required this.sentMessages,
     required this.scrollController,
+    required this.onQuoteTap,
+    required this.messageKeyFor,
     this.onBlankTap,
     this.onSenderAvatarTap,
+    this.onMessageLongPress,
   });
 
   final bool isJoined;
   final List<_OutgoingMessage> sentMessages;
   final ScrollController scrollController;
+  final ValueChanged<String> onQuoteTap;
+  final GlobalKey Function(String msgId) messageKeyFor;
   final VoidCallback? onBlankTap;
   final ValueChanged<_OutgoingMessage>? onSenderAvatarTap;
+  final void Function(_OutgoingMessage message, Rect anchor)? onMessageLongPress;
 
   bool _sameSender(_OutgoingMessage a, _OutgoingMessage b) {
     if (a.isSelf != b.isSelf) return false;
@@ -1423,45 +1834,60 @@ class _MessagesFeed extends StatelessWidget {
               const SizedBox(height: 10),
             ] else
               SizedBox(height: i == 0 ? 0 : 10),
-            if (sentMessages[i].kind == _OutgoingKind.join)
-              _JoinCommunityTip(
-                name: sentMessages[i].joinName ?? 'Someone',
-                onNameTap: onSenderAvatarTap == null
-                    ? null
-                    : () => onSenderAvatarTap!(sentMessages[i]),
-              )
-            else
-              _GroupChatBubble(
-                message: sentMessages[i],
-                isLocked: !isJoined,
-                showAvatar:
-                    i == 0 ||
-                    sentMessages[i - 1].kind == _OutgoingKind.join ||
-                    !_sameSender(sentMessages[i], sentMessages[i - 1]) ||
-                    sentMessages[i].kind != sentMessages[i - 1].kind,
-                onAvatarTap: sentMessages[i].isSelf || onSenderAvatarTap == null
-                    ? null
-                    : () => onSenderAvatarTap!(sentMessages[i]),
-                onImageTap:
-                    !isJoined || sentMessages[i].kind != _OutgoingKind.image
-                    ? null
-                    : () {
-                        final paths = [
-                          for (final m in sentMessages)
-                            if (m.kind == _OutgoingKind.image &&
-                                (m.imagePath ?? '').trim().isNotEmpty)
-                              m.imagePath!.trim(),
-                        ];
-                        final src = sentMessages[i].imagePath?.trim() ?? '';
-                        final initial = paths.indexOf(src);
-                        AlbumPhotoViewerPage.open(
-                          context,
-                          paths: paths,
-                          initialIndex: initial < 0 ? 0 : initial,
-                          showPageIndicator: false,
-                        );
-                      },
-              ),
+            KeyedSubtree(
+              key: sentMessages[i].msgId.isNotEmpty
+                  ? messageKeyFor(sentMessages[i].msgId)
+                  : null,
+              child: sentMessages[i].kind == _OutgoingKind.join
+                  ? _JoinCommunityTip(
+                      name: sentMessages[i].joinName ?? 'Someone',
+                      onNameTap: onSenderAvatarTap == null
+                          ? null
+                          : () => onSenderAvatarTap!(sentMessages[i]),
+                    )
+                  : sentMessages[i].kind == _OutgoingKind.recall
+                      ? _RecallTip(message: sentMessages[i])
+                      : _GroupChatBubble(
+                          message: sentMessages[i],
+                          allMessages: sentMessages,
+                          isLocked: !isJoined,
+                          showAvatar:
+                              i == 0 ||
+                              sentMessages[i - 1].kind == _OutgoingKind.join ||
+                              sentMessages[i - 1].kind == _OutgoingKind.recall ||
+                              !_sameSender(sentMessages[i], sentMessages[i - 1]) ||
+                              sentMessages[i].kind != sentMessages[i - 1].kind,
+                          onAvatarTap:
+                              sentMessages[i].isSelf || onSenderAvatarTap == null
+                                  ? null
+                                  : () => onSenderAvatarTap!(sentMessages[i]),
+                          onLongPress: onMessageLongPress == null
+                              ? null
+                              : (anchor) =>
+                                  onMessageLongPress!(sentMessages[i], anchor),
+                          onQuoteTap: onQuoteTap,
+                          onImageTap: !isJoined ||
+                                  sentMessages[i].kind != _OutgoingKind.image
+                              ? null
+                              : () {
+                                  final paths = [
+                                    for (final m in sentMessages)
+                                      if (m.kind == _OutgoingKind.image &&
+                                          (m.imagePath ?? '').trim().isNotEmpty)
+                                        m.imagePath!.trim(),
+                                  ];
+                                  final src =
+                                      sentMessages[i].imagePath?.trim() ?? '';
+                                  final initial = paths.indexOf(src);
+                                  AlbumPhotoViewerPage.open(
+                                    context,
+                                    paths: paths,
+                                    initialIndex: initial < 0 ? 0 : initial,
+                                    showPageIndicator: false,
+                                  );
+                                },
+                        ),
+            ),
           ],
         ],
       ),
@@ -1497,6 +1923,8 @@ class _OutgoingKind {
   static const voice = 1;
   static const image = 2;
   static const join = 3;
+  static const recall = 4;
+  static const emote = 5;
 }
 
 /// 首条消息或间隔 ≥ 5 分钟时显示时间分隔。
@@ -1555,6 +1983,9 @@ class _OutgoingMessage {
     this.senderName = '',
     this.senderUid = '',
     this.senderGender = '',
+    this.quoteMsgId = '',
+    this.quoteShowText = '',
+    this.quoteSendName = '',
   });
 
   factory _OutgoingMessage.text(
@@ -1566,6 +1997,9 @@ class _OutgoingMessage {
     String senderName = '',
     String senderUid = '',
     String senderGender = '',
+    String quoteMsgId = '',
+    String quoteShowText = '',
+    String quoteSendName = '',
   }) => _OutgoingMessage._(
     kind: _OutgoingKind.text,
     text: text,
@@ -1576,6 +2010,9 @@ class _OutgoingMessage {
     senderName: senderName,
     senderUid: senderUid,
     senderGender: senderGender,
+    quoteMsgId: quoteMsgId,
+    quoteShowText: quoteShowText,
+    quoteSendName: quoteSendName,
   );
 
   factory _OutgoingMessage.voice(
@@ -1622,6 +2059,27 @@ class _OutgoingMessage {
     senderGender: senderGender,
   );
 
+  factory _OutgoingMessage.emote(
+    String path, {
+    DateTime? at,
+    String msgId = '',
+    bool isSelf = true,
+    String senderAvatar = '',
+    String senderName = '',
+    String senderUid = '',
+    String senderGender = '',
+  }) => _OutgoingMessage._(
+    kind: _OutgoingKind.emote,
+    imagePath: path,
+    sentAt: at ?? DateTime.now(),
+    msgId: msgId,
+    isSelf: isSelf,
+    senderAvatar: senderAvatar,
+    senderName: senderName,
+    senderUid: senderUid,
+    senderGender: senderGender,
+  );
+
   factory _OutgoingMessage.join(
     String name, {
     String uid = '',
@@ -1642,6 +2100,20 @@ class _OutgoingMessage {
     senderGender: senderGender,
   );
 
+  factory _OutgoingMessage.recall({
+    DateTime? at,
+    String msgId = '',
+    bool isSelf = true,
+    String senderName = '',
+  }) => _OutgoingMessage._(
+    kind: _OutgoingKind.recall,
+    sentAt: at ?? DateTime.now(),
+    msgId: msgId,
+    isSelf: isSelf,
+    senderName: senderName,
+    text: isSelf ? 'You recalled a message.' : 'The sender recalled a message.',
+  );
+
   final int kind;
   final DateTime sentAt;
   final String? text;
@@ -1658,6 +2130,34 @@ class _OutgoingMessage {
   final String senderName;
   final String senderUid;
   final String senderGender;
+  final String quoteMsgId;
+  final String quoteShowText;
+  final String quoteSendName;
+
+  String quoteContentIn(List<_OutgoingMessage> messages) {
+    final resolved = _resolvedQuotePreview(messages);
+    return ImQuoteMsg.displayContent(
+      sendName: quoteSendName,
+      showText: quoteShowText,
+      resolvedPreview: resolved,
+    );
+  }
+
+  String _resolvedQuotePreview(List<_OutgoingMessage> messages) {
+    final qid = quoteMsgId.trim();
+    if (qid.isEmpty) return '';
+    for (final m in messages) {
+      if (m.msgId == qid) return m.listPreview;
+    }
+    return '';
+  }
+
+  String get listPreview {
+    if (kind == _OutgoingKind.voice) return '[Audio]';
+    if (kind == _OutgoingKind.image) return '[Photo]';
+    if (kind == _OutgoingKind.emote) return '[Smiley]';
+    return AppEmoji.normalize(text ?? '');
+  }
 
   bool get hasSenderGender => normalizeGender(senderGender) != null;
 
@@ -1675,14 +2175,19 @@ class _OutgoingMessage {
     String? senderUid,
     String? senderGender,
     String? msgId,
+    String? imagePath,
     String? mediaSource,
+    DateTime? sentAt,
+    String? quoteMsgId,
+    String? quoteShowText,
+    String? quoteSendName,
   }) {
     return _OutgoingMessage._(
       kind: kind,
-      sentAt: sentAt,
+      sentAt: sentAt ?? this.sentAt,
       text: text,
       voiceSeconds: voiceSeconds,
-      imagePath: imagePath,
+      imagePath: imagePath ?? this.imagePath,
       mediaSource: mediaSource ?? this.mediaSource,
       joinName: joinName,
       joinUid: joinUid,
@@ -1692,10 +2197,41 @@ class _OutgoingMessage {
       senderName: senderName ?? this.senderName,
       senderUid: senderUid ?? this.senderUid,
       senderGender: senderGender ?? this.senderGender,
+      quoteMsgId: quoteMsgId ?? this.quoteMsgId,
+      quoteShowText: quoteShowText ?? this.quoteShowText,
+      quoteSendName: quoteSendName ?? this.quoteSendName,
     );
   }
 
   bool get senderIsMale => normalizeGender(senderGender) == 'male';
+}
+
+class _RecallTip extends StatelessWidget {
+  const _RecallTip({required this.message});
+
+  final _OutgoingMessage message;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = message.isSelf
+        ? 'You recalled a message.'
+        : 'The sender recalled a message.';
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+        child: Text(
+          text,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: Color(0xFFAEAEAE),
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            height: 1.3,
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// Forya CustomGroupJoinItem：青绿昵称 + 灰色 "joined the community"。
@@ -1751,17 +2287,23 @@ class _JoinCommunityTip extends StatelessWidget {
 class _GroupChatBubble extends StatelessWidget {
   const _GroupChatBubble({
     required this.message,
+    required this.allMessages,
     this.showAvatar = true,
     this.isLocked = false,
     this.onImageTap,
     this.onAvatarTap,
+    this.onLongPress,
+    this.onQuoteTap,
   });
 
   final _OutgoingMessage message;
+  final List<_OutgoingMessage> allMessages;
   final bool showAvatar;
   final bool isLocked;
   final VoidCallback? onImageTap;
   final VoidCallback? onAvatarTap;
+  final ValueChanged<Rect>? onLongPress;
+  final ValueChanged<String>? onQuoteTap;
 
   static const double _avatar = 40;
   static const double _avatarGap = 10;
@@ -1820,9 +2362,31 @@ class _GroupChatBubble extends StatelessWidget {
                   behavior: HitTestBehavior.opaque,
                   child: imageBubble(),
                 ),
-        _ => _GroupTextBubble(text: message.text ?? '', isSelf: isSelf),
+        _OutgoingKind.emote => _GroupEmoteBubble(
+          path: message.imagePath ?? '',
+        ),
+        _ => _GroupTextBubble(
+          text: message.text ?? '',
+          isSelf: isSelf,
+          quoteContent: message.quoteContentIn(allMessages),
+          quoteMsgId: message.quoteMsgId,
+          onQuoteTap: onQuoteTap,
+        ),
       },
     );
+
+    final interactiveBubble = onLongPress == null
+        ? bubble
+        : Builder(
+            builder: (ctx) => GestureDetector(
+              onLongPress: () {
+                final box = ctx.findRenderObject() as RenderBox?;
+                if (box == null || !box.hasSize) return;
+                onLongPress!(box.localToGlobal(Offset.zero) & box.size);
+              },
+              child: bubble,
+            ),
+          );
 
     // 群聊对方：头像旁显示昵称 + 性别（未设置性别则只显示昵称）。
     final peerBody = !isSelf
@@ -1834,17 +2398,17 @@ class _GroupChatBubble extends StatelessWidget {
                 _GroupSenderNameRow(message: message),
                 const SizedBox(height: 6),
               ],
-              bubble,
+              interactiveBubble,
             ],
           )
-        : bubble;
+        : interactiveBubble;
 
     if (isSelf) {
       return Row(
         mainAxisAlignment: MainAxisAlignment.end,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          bubble,
+          interactiveBubble,
           const SizedBox(width: _avatarGap),
           avatar,
         ],
@@ -1903,10 +2467,69 @@ class _GroupSenderNameRow extends StatelessWidget {
 
 /// 文本 / forya 自定义表情（PUA）。纯表情时放大且不套灰气泡，对齐 forya。
 class _GroupTextBubble extends StatelessWidget {
-  const _GroupTextBubble({required this.text, required this.isSelf});
+  const _GroupTextBubble({
+    required this.text,
+    required this.isSelf,
+    this.quoteContent = '',
+    this.quoteMsgId = '',
+    this.onQuoteTap,
+  });
 
   final String text;
   final bool isSelf;
+  final String quoteContent;
+  final String quoteMsgId;
+  final ValueChanged<String>? onQuoteTap;
+
+  Widget _messageBody(TextStyle style) {
+    final quote = quoteContent.trim();
+    if (quote.isEmpty) {
+      return AppEmojiText(text, style: style);
+    }
+    final quotedId = quoteMsgId.trim();
+    final quoteRow = Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 1,
+          height: 12,
+          margin: const EdgeInsets.only(top: 3),
+          color: const Color(0xFF999999),
+        ),
+        const SizedBox(width: 2),
+        Flexible(
+          child: AppEmojiText(
+            quote,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xFF999999),
+              fontSize: 12,
+              fontWeight: FontWeight.w400,
+              height: 1.3,
+            ),
+          ),
+        ),
+      ],
+    );
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (quotedId.isNotEmpty && onQuoteTap != null)
+          GestureDetector(
+            onTap: () => onQuoteTap!(quotedId),
+            behavior: HitTestBehavior.opaque,
+            child: quoteRow,
+          )
+        else
+          quoteRow,
+        const SizedBox(height: 2),
+        AppEmojiText(text, style: style),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1927,7 +2550,7 @@ class _GroupTextBubble extends StatelessWidget {
                     height: 20 / 15,
                   ));
 
-    final child = AppEmojiText(text, style: style);
+    final child = _messageBody(style);
     if (pureEmoji) return child;
 
     return Container(
@@ -1942,6 +2565,81 @@ class _GroupTextBubble extends StatelessWidget {
         ),
       ),
       child: child,
+    );
+  }
+}
+
+/// 群聊贴纸：对齐私聊 `_EmoteBubble`（宽 65，fitWidth，不拉伸）。
+class _GroupEmoteBubble extends StatelessWidget {
+  const _GroupEmoteBubble({required this.path});
+
+  final String path;
+
+  static const double _size = 65;
+
+  @override
+  Widget build(BuildContext context) {
+    final src = path.trim();
+    if (src.isEmpty) {
+      return const SizedBox(
+        width: _size,
+        height: _size,
+        child: ColoredBox(
+          color: Color(0xFFF0F0F0),
+          child: Icon(Icons.broken_image_outlined, color: Color(0xFF999999)),
+        ),
+      );
+    }
+
+    if (src.startsWith('http://') || src.startsWith('https://')) {
+      return SizedBox(
+        width: _size,
+        child: AppNetworkImage(
+          src,
+          width: _size,
+          fit: BoxFit.fitWidth,
+          filterQuality: FilterQuality.medium,
+          placeholder: (_, _) => const SizedBox(
+            width: _size,
+            height: _size,
+            child: ColoredBox(
+              color: Color(0xFFF5F5F5),
+              child: Center(
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            ),
+          ),
+          errorWidget: (_, _, _) => const SizedBox(
+            width: _size,
+            height: _size,
+            child: ColoredBox(
+              color: Color(0xFFF0F0F0),
+              child: Icon(Icons.broken_image_outlined, color: Color(0xFF999999)),
+            ),
+          ),
+        ),
+      );
+    }
+
+    final file = File(src);
+    if (file.existsSync()) {
+      return SizedBox(
+        width: _size,
+        child: Image.file(file, width: _size, fit: BoxFit.fitWidth),
+      );
+    }
+
+    return const SizedBox(
+      width: _size,
+      height: _size,
+      child: ColoredBox(
+        color: Color(0xFFF0F0F0),
+        child: Icon(Icons.broken_image_outlined, color: Color(0xFF999999)),
+      ),
     );
   }
 }
