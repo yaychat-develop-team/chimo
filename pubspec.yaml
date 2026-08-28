@@ -42,6 +42,7 @@ dependencies:
     path: third_party/in_app_purchase_storekit-0.4.3
   protobuf: ^6.0.0
   fixnum: ^1.1.1
+  app_tracking_transparency: ^2.0.6
 
 dev_dependencies:
   flutter_test:
