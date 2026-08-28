@@ -47,7 +47,7 @@ Future<void> _requestTrackingAuthorization() async {
     if (status == TrackingStatus.notDetermined) {
       // 系统要求：必须在 runApp / UI 显示后才能弹窗，
       // 部分设备首次冷启动时平台通道尚未就绪，稍作延迟以确保可靠弹出。
-      await Future<void>.delayed(const Duration(milliseconds: 200));
+      await Future<void>.delayed(const Duration(milliseconds: 2000));
       final result =
           await AppTrackingTransparency.requestTrackingAuthorization();
       debugPrint('[ATT] user decision: $result');
