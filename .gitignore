@@ -51,3 +51,7 @@ app.*.map.json
 # CI secrets (never commit)
 /ci/ci.env
 **/.chimo/ci.env
+
+# Android Keystore
+key.properties
+*.jks

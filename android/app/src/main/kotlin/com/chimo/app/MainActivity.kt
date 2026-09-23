@@ -1,4 +1,4 @@
-﻿package com.example.chimo
+package com.chimo.app
 
 import io.flutter.embedding.android.FlutterActivity
 
