@@ -17,7 +17,7 @@ Future<void> main() async {
   ApiConfig.bootstrapBuildFlags();
   await IapService.init();
   try {
-    final ping = await NetworkBootstrap.initialize();
+    final ping = await NetworkBootstrap.initialize(startHeartbeat: false);
     logger.info('API ping success=${ping.success} code=${ping.code} message=${ping.message}');
   } catch (error, stack) {
     logger.error('API bootstrap failed', error, stack);
