@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 
 import 'api_config.dart';
@@ -127,13 +128,6 @@ class ApiClient {
     Object? data,
     String? accept,
   }) async {
-    // ignore: avoid_print
-    print(
-      'ApiClient $method $uri'
-      '${data == null ? '' : ' body=$data'}'
-      '${accept == null ? '' : ' accept=$accept'}',
-    );
-
     try {
       final response = await _send(
         () => _dio.requestUri(
@@ -150,13 +144,11 @@ class ApiClient {
           ),
         ),
       );
-      return _decode(response);
+      return await _decode(response);
     } on DioException catch (error) {
       if (error.response != null) {
-        return _decode(error.response!);
+        return await _decode(error.response!);
       }
-      // ignore: avoid_print
-      print('ApiClient transport failed: $error');
       return ApiResponse(
         success: false,
         code: null,
@@ -182,9 +174,6 @@ class ApiClient {
             (error.type == DioExceptionType.connectionTimeout ||
                 error.type == DioExceptionType.receiveTimeout ||
                 error.type == DioExceptionType.sendTimeout);
-        if (isTimeout) {
-          AppHttpClient.quarantineLast();
-        }
         final text = '$error';
         final retryable =
             isTimeout ||
@@ -196,33 +185,29 @@ class ApiClient {
             text.contains('Connection reset') ||
             (error is DioException &&
                 error.type == DioExceptionType.connectionError);
-        // ignore: avoid_print
-        print(
-          'ApiClient transport error attempt=$attempt/$maxAttempts: $error',
-        );
+
+        if (retryable) {
+          // 只要是传输层错误或超时，都尝试隔离当前 Cloudflare IP，下次更换
+          AppHttpClient.quarantineLast();
+        }
+
         if (!retryable || attempt == maxAttempts) rethrow;
+
         await Future<void>.delayed(Duration(milliseconds: 200 * attempt));
       }
     }
     throw lastError ?? StateError('ApiClient send failed');
   }
 
-  ApiResponse _decode(Response<dynamic> response) {
+  Future<ApiResponse> _decode(Response<dynamic> response) async {
     final contentType = response.headers.value(Headers.contentTypeHeader) ?? '';
     final status = response.statusCode;
     final data = response.data;
     if (_isProtoBody(contentType, data)) {
       try {
-        final parsed = RelationListProto.decode(_asBytes(data));
-        // ignore: avoid_print
-        print(
-          'ApiClient ← $status protobuf success=${parsed.success} '
-          'code=${parsed.code} message=${parsed.message}',
-        );
+        final parsed = await compute(_decodeProto, _asBytes(data));
         return parsed;
       } catch (error) {
-        // ignore: avoid_print
-        print('ApiClient protobuf decode failed: $error');
         return ApiResponse(
           success: false,
           code: status,
@@ -245,16 +230,8 @@ class ApiClient {
         httpStatus: status,
       );
     }
-    final preview = rawBody.length > 400
-        ? '${rawBody.substring(0, 400)}…'
-        : rawBody;
-    // ignore: avoid_print
-    print(
-      'ApiClient ← ${response.statusCode} content-type=$contentType $preview',
-    );
-
     try {
-      final decoded = rawBody.isEmpty ? null : jsonDecode(rawBody);
+      final decoded = rawBody.isEmpty ? null : await compute(jsonDecode, rawBody);
       if (decoded is Map<String, dynamic>) {
         return ApiResponse.fromJson(decoded, httpStatus: response.statusCode);
       }
@@ -265,9 +242,7 @@ class ApiClient {
         );
       }
     } catch (error) {
-      // ignore: avoid_print
-      print('ApiClient decode failed: $error');
-    }
+      }
     return ApiResponse(
       success: false,
       code: response.statusCode,
@@ -275,6 +250,10 @@ class ApiClient {
       raw: {'body': rawBody},
       httpStatus: response.statusCode,
     );
+  }
+
+    static ApiResponse _decodeProto(List<int> bytes) {
+    return RelationListProto.decode(bytes);
   }
 
   static bool _isProtoBody(String contentType, Object? data) {

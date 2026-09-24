@@ -1,6 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:talker_dio_logger/talker_dio_logger_interceptor.dart';
+import 'package:talker_dio_logger/talker_dio_logger_settings.dart';
+import '../utils/log.dart';
+
 
 import '../auth/auth_session.dart';
 import '../im/im_service.dart';
@@ -34,15 +38,20 @@ abstract final class NetworkBootstrap {
         // 仅观测业务未登录；真正清会话仍由 ApiGateway（retry 之后）负责。
         AuthResponseInterceptor(
           onNotLogin: (options, response) async {
-            debugPrint(
-              'AuthResponseInterceptor not-login '
-              '${options.uri.path} code=${response.code}',
-            );
+            logger.info('AuthResponseInterceptor not-login ${options.uri.path} code=${response.code}');
           },
         ),
       ],
     );
     ProxyConfigStore.configureDio(client.dio);
+    client.dio.interceptors.add(
+      TalkerDioLogger(
+        talker: logger,
+        settings: TalkerDioLoggerSettings(
+          enabled: ApiConfig.isDebug,
+        ),
+      ),
+    );
     return client;
   }
 
@@ -65,12 +74,7 @@ abstract final class NetworkBootstrap {
     // 确保首次请求使用已加载的代理配置。
     await rebuildHttpClient();
     authToken = await AuthSession.token();
-    debugPrint(
-      'NetworkBootstrap baseUrl=${ApiConfig.baseUrl} '
-      'isDebug=${ApiConfig.isDebug} isOfficial=${ApiConfig.isOfficial} '
-      'hasToken=${authToken != null}'
-      ' proxy=${ProxyConfigStore.isConfigured ? '${ProxyConfigStore.ip}:${ProxyConfigStore.port}' : 'off'}',
-    );
+    logger.info('NetworkBootstrap baseUrl=${ApiConfig.baseUrl} ' 'isDebug=${ApiConfig.isDebug} isOfficial=${ApiConfig.isOfficial} ' 'hasToken=${authToken != null}' ' proxy=${ProxyConfigStore.isConfigured ? '${ProxyConfigStore.ip}:${ProxyConfigStore.port}' : 'off'}');
 
     // 对齐 forya LoginManager 自动登录：冷启动时刷新 token。
     if (authToken != null && authToken!.isNotEmpty) {
@@ -114,7 +118,7 @@ abstract final class NetworkBootstrap {
         if (next != null) {
           await applySessionToken(next);
           await AuthSession.markLoggedIn(token: next);
-          debugPrint('NetworkBootstrap token refreshed');
+          logger.info('NetworkBootstrap token refreshed');
           return true;
         }
         // 刷新成功但无新 token —— 保留当前 token。
@@ -124,7 +128,7 @@ abstract final class NetworkBootstrap {
       // `unauthorized registration` 等并不总表示 JWT 已死；
       // 仅在明确 not-login 时清空。
       if (refresh.message == 'user.not.login') {
-        debugPrint('NetworkBootstrap refresh: user.not.login');
+        logger.warning('NetworkBootstrap refresh: user.not.login');
         if (clearOnFailure) await clearSession();
         return false;
       }
@@ -134,7 +138,7 @@ abstract final class NetworkBootstrap {
       );
       return authToken != null && authToken!.isNotEmpty;
     } catch (error, stack) {
-      debugPrint('NetworkBootstrap refresh error: $error\n$stack');
+      logger.error('NetworkBootstrap refresh error', error, stack);
       return authToken != null && authToken!.isNotEmpty;
     }
   }
@@ -201,7 +205,7 @@ abstract final class NetworkBootstrap {
     try {
       onSessionCleared?.call();
     } catch (error) {
-      debugPrint('NetworkBootstrap onSessionCleared: $error');
+      logger.error('NetworkBootstrap onSessionCleared error', error);
     }
   }
 

@@ -60,7 +60,7 @@ abstract final class AppHttpClient {
     dio.httpClientAdapter = IOHttpClientAdapter(
       createHttpClient: () {
         final client = HttpClient()
-          ..idleTimeout = Duration.zero
+          ..idleTimeout = const Duration(seconds: 15)
           ..connectionTimeout = const Duration(seconds: 10);
         if (proxy.isNotEmpty) {
           client.findProxy = (url) {
@@ -98,8 +98,6 @@ abstract final class AppHttpClient {
     ];
     final addrs = ipv4.isNotEmpty ? ipv4 : looked;
     final addr = pool.pick(host, addrs);
-    // ignore: avoid_print
-    print('AppHttpClient connect $host -> ${addr.address}:$port');
     final raw = await Socket.connect(
       addr,
       port,

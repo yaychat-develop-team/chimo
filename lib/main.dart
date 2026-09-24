@@ -7,20 +7,20 @@ import 'app/chimo_app.dart';
 import 'core/iap/iap_service.dart';
 import 'core/network/api_config.dart';
 import 'core/network/network_bootstrap.dart';
+import 'core/utils/log.dart';
 
 /// 应用入口：初始化 Flutter 绑定，然后运行 [ChimoApp]。
 Future<void> main() async {
   // 确保插件与平台通道在 runApp 之前就绪。
   WidgetsFlutterBinding.ensureInitialized();
+  initTalker();
   ApiConfig.bootstrapBuildFlags();
   await IapService.init();
   try {
     final ping = await NetworkBootstrap.initialize();
-    debugPrint(
-      'API ping success=${ping.success} code=${ping.code} message=${ping.message}',
-    );
+    logger.info('API ping success=${ping.success} code=${ping.code} message=${ping.message}');
   } catch (error, stack) {
-    debugPrint('API bootstrap failed: $error\n$stack');
+    logger.error('API bootstrap failed', error, stack);
   }
 
   // 请求 App Tracking Transparency 授权（仅 iOS 14.5+）。
@@ -42,7 +42,7 @@ Future<void> _requestTrackingAuthorization() async {
   try {
     final status =
         await AppTrackingTransparency.trackingAuthorizationStatus;
-    debugPrint('[ATT] current status: $status');
+    logger.info('[ATT] current status: $status');
 
     if (status == TrackingStatus.notDetermined) {
       // 系统要求：必须在 runApp / UI 显示后才能弹窗，
@@ -50,10 +50,10 @@ Future<void> _requestTrackingAuthorization() async {
       await Future<void>.delayed(const Duration(milliseconds: 2000));
       final result =
           await AppTrackingTransparency.requestTrackingAuthorization();
-      debugPrint('[ATT] user decision: $result');
+      logger.info('[ATT] user decision: $result');
     }
   } catch (e, stack) {
     // 非致命错误，不应阻塞启动。
-    debugPrint('[ATT] error: $e\n$stack');
+    logger.error('[ATT] error', e, stack);
   }
 }
