@@ -11,14 +11,15 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.8
   flutter_svg: ^2.2.0
-  cached_network_image: ^3.4.1
-  provider: ^6.1.5
-  go_router: ^16.0.0
+  # 图片：网络/本地/文件/内存统一走 AppImage（lib/core/utils/image/app_image.dart）
+  extended_image: 10.1.0
+  # 状态管理 + 路由 + DI（方案 3.1）。路由入口只允许 app_jumper / app_pages 用，
+  # 见 4.6 CI 卡口第 4 条。
+  get: ^4.7.3
   path_provider: ^2.1.5
   image_picker: ^1.2.3
   photo_manager: ^3.6.4
   http: ^1.6.0
-  shared_preferences: ^2.5.5
   audioplayers: ^6.4.0
   record: ^6.0.0
   webview_flutter: ^4.13.0
@@ -30,6 +31,7 @@ dependencies:
   forya_pag:
     path: third_party/pag-flutter
   visibility_detector: ^0.4.0+2
+  focus_on_it: any # 用于检测页面是否聚焦（对标 iOS 的 viewWillAppear，viewWillDisappear）
   # iOS Sign in with Apple（对齐 forya apple_login_platform）
   sign_in_with_apple: ^7.0.1
   crypto: ^3.0.6
@@ -43,6 +45,11 @@ dependencies:
   protobuf: ^6.0.0
   fixnum: ^1.1.1
   app_tracking_transparency: ^2.0.6
+  talker_flutter: ^5.1.20
+  talker_dio_logger: ^5.1.20
+  hive_ce: 2.19.3
+  hive_ce_flutter: 2.3.4
+  flutter_screenutil: any
 
 dev_dependencies:
   flutter_test:

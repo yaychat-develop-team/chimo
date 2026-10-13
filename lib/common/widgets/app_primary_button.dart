@@ -1,0 +1,71 @@
+import 'package:flutter/material.dart';
+
+import '../theme/app_colors.dart';
+
+/// 实心主色胶囊按钮（钱包 / 手机登录风格）。
+class AppPrimaryButton extends StatelessWidget {
+  const AppPrimaryButton({
+    super.key,
+    required this.label,
+    required this.onTap,
+    this.enabled = true,
+    this.loading = false,
+    this.height = 54,
+    this.borderRadius = 28,
+    this.color = AppColors.primaryBright,
+    this.disabledColor = AppColors.textGrayE8,
+    this.labelColor = Colors.black,
+    this.disabledLabelColor = AppColors.textGrayB0,
+    this.fontSize = 17,
+  });
+
+  final String label;
+  final VoidCallback? onTap;
+  final bool enabled;
+  final bool loading;
+  final double height;
+  final double borderRadius;
+  final Color color;
+  final Color disabledColor;
+  final Color labelColor;
+  final Color disabledLabelColor;
+  final double fontSize;
+
+  bool get _interactive => enabled && !loading && onTap != null;
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(borderRadius);
+    return Material(
+      color: enabled ? color : disabledColor,
+      borderRadius: radius,
+      child: InkWell(
+        onTap: _interactive ? onTap : null,
+        borderRadius: radius,
+        child: SizedBox(
+          height: height,
+          width: double.infinity,
+          child: Center(
+            child: loading
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.2,
+                      color: Colors.black54,
+                    ),
+                  )
+                : Text(
+                    label,
+                    style: TextStyle(
+                      color: enabled ? labelColor : disabledLabelColor,
+                      fontSize: fontSize,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+}

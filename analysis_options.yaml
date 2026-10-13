@@ -26,7 +26,13 @@ linter:
   # `// ignore_for_file: name_of_lint` syntax on the line or in the file
   # producing the lint.
   rules:
-    # avoid_print: false  # Uncomment to disable the `avoid_print` rule
+    # print / debugPrint 在 release 包里都不会被剥掉，内容会进 iOS os_log 与
+    # Android logcat（手机号、验证码、token、环信密码）。全项目唯一出口是
+    # lib/core/utils/app_log.dart 的 AppLog —— 它 release 默认关闭，且进 sink
+    # 的每一行都按字段名打过码。这条规则 flutter_lints 已经带上了，这里显式写
+    # 一遍：换 lint 包时不会被静默丢掉，也省得后人以为「没开」。
+    # 不要加 `// ignore: avoid_print` 绕过，CI 会卡（见 docs/优化步骤/S01）。
+    avoid_print: true
     # prefer_single_quotes: true  # Uncomment to enable the `prefer_single_quotes` rule
 
 # Additional information about this file can be found at

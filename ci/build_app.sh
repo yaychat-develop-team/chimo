@@ -15,6 +15,15 @@ abis=${10:-arm64-v8a}
 # shellcheck source=load_ci_env.sh
 source "$(dirname "$0")/load_ci_env.sh"
 
+# 日志出口卡口：print / debugPrint 在 release 包里不会被剥掉，会把手机号、
+# 验证码、token 写进 os_log / logcat。必须在出包之前卡住，出了包就晚了。
+# 详见 docs/优化步骤/S01-日志脱敏与AppLog.md。
+if ! "$(dirname "$0")/check_logging.sh"; then
+    msg="**日志卡口未通过**（lib 下有 print / debugPrint），已中止打包，[请检查](http://192.168.3.123:8080/job/Pack%20App/)"
+    python3 wechat_notify.py -1 "$msg" '' '' "" "" 0 "$buildUser" "$buildBranch"
+    exit 1
+fi
+
 function currentTimeStamp(){
     cs=`date '+%s'`
     cms=`expr $cs \* 1000`

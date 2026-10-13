@@ -1,0 +1,6 @@
+# 卡口 3 的棘轮白名单。现在没有例外：View 里出现 AppApis / ImService /
+# AuthSession / AppStorage / Hive / SharedPreferences 就会红。
+#
+# 下面不要再加行。新代码的取数放进 controllers/。
+# 格式如果以后不得不临时钉一处：<处数> <文件>，按路径排序。
+# 生成方式见 ci/check_layers.sh 的 scan_direct。

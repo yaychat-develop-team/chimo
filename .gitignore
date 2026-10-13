@@ -48,6 +48,15 @@ app.*.map.json
 /build_apk_log.txt
 *.apk
 
+/docs
+
 # CI secrets (never commit)
 /ci/ci.env
 **/.chimo/ci.env
+
+# Android Keystore
+key.properties
+*.jks
+
+
+/proto/
