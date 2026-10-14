@@ -56,7 +56,7 @@ class _ChimoAppState extends State<ChimoApp> {
       return Column(
         children: [
           // Logo 与字标已在资源内；按宽度适配以保持在屏幕上方。
-          AppImage(AppAssets.launchBg, width: Get.width, fit: BoxFit.fitWidth),
+          AppImage(AppAssets.launchBg, width: MediaQuery.sizeOf(context).width, fit: BoxFit.fitWidth),
           const Spacer(),
           AppImage(AppAssets.splashSlogan, height: 15, fit: BoxFit.contain),
           SizedBox(height: 54 + bottom),
