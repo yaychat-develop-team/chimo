@@ -22,6 +22,7 @@ import '../modules/auth/page/profile_setup_page.dart';
 import '../modules/auth/page/verification_code_page.dart';
 import '../modules/auth/page/welcome_brand_page.dart';
 import '../modules/chat/page/chat_detail_page.dart';
+import '../modules/chat/page/chats_page.dart';
 import '../modules/chat/page/group_details_page.dart';
 import '../modules/chat/page/joined_groups_page.dart';
 import '../modules/chat/page/widgets/group/group_members_sheet.dart';
@@ -29,6 +30,9 @@ import '../modules/chat/logic/chats_list_logic.dart';
 import '../modules/chat/page/im_search_page.dart';
 import '../modules/chat/page/album_selection_preview_page.dart';
 import '../modules/debug/page/debug_page.dart';
+import '../modules/room/logic/room_logic.dart';
+import '../modules/room/page/room_page.dart';
+import '../modules/room/service/room_service.dart';
 import '../modules/debug/page/proxy_config_page.dart';
 import '../modules/friends/page/add_user_page.dart';
 import '../modules/friends/page/friends_page.dart';
@@ -346,6 +350,24 @@ abstract class AppJumper {
       default:
         return false;
     }
+  }
+
+  static Future<void> toChats() async {
+    if (!_requireAuth()) return;
+    await Get.to(() => const ChatsPage());
+  }
+
+  static Future<void> toRoom(int rid) async {
+    if (!_requireAuth() || rid <= 0) return;
+    final service = RoomService.findOrNull();
+    final showing =
+        Get.isRegistered<RoomLogic>() && Get.find<RoomLogic>().pageMounted && Get.find<RoomLogic>().rid == rid;
+    if (service != null && service.inRoom.value && service.rid == rid) {
+      service.restore();
+      if (showing) return;
+    }
+    if (Get.isRegistered<RoomLogic>() && !showing) RoomLogic.release();
+    await Get.to(() => RoomPage(rid: rid));
   }
 
   static Future toDebug() async => await Get.to(() => const DebugPage());

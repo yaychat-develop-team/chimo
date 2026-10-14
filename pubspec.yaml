@@ -51,6 +51,8 @@ dependencies:
   hive_ce_flutter: 2.3.4
   flutter_screenutil: any
   shared_preferences: ^2.5.6
+  tencent_rtc_sdk: 12.3.2
+  permission_handler: ^11.3.1
 
 dev_dependencies:
   flutter_test:
@@ -62,6 +64,7 @@ flutter:
   assets:
     - assets/images/
     - assets/images/forya/
+    - assets/images/room/common/
     - assets/json/
   fonts:
     - family: Emoji

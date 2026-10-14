@@ -24,11 +24,13 @@ class _DebugPageState extends State<DebugPage> {
   bool _saving = false;
   final TextEditingController _midDomainController = TextEditingController();
   final TextEditingController _h5Controller = TextEditingController();
+  final TextEditingController _roomIdController = TextEditingController();
 
   @override
   void dispose() {
     _midDomainController.dispose();
     _h5Controller.dispose();
+    _roomIdController.dispose();
     super.dispose();
   }
 
@@ -129,6 +131,21 @@ class _DebugPageState extends State<DebugPage> {
               label: 'H5 jump',
               controller: _h5Controller,
               action: _GreenCircleButton(label: 'Jump', onTap: () => _toast('H5 jump')),
+            ),
+            _InputActionRow(
+              label: 'Voice room',
+              controller: _roomIdController,
+              action: _GreenCircleButton(
+                label: 'Enter',
+                onTap: () {
+                  final rid = int.tryParse(_roomIdController.text.trim()) ?? 0;
+                  if (rid <= 0) {
+                    _toast('Enter a room id');
+                    return;
+                  }
+                  AppJumper.toRoom(rid);
+                },
+              ),
             ),
             _NavRow(
               label: 'Ping test API',

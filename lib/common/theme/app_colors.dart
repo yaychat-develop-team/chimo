@@ -414,4 +414,223 @@ abstract final class AppColors {
     end: Alignment.bottomRight,
     colors: [Color(0xFF1A221C), Color(0xFF101210)],
   );
+
+  // ===========================================================================
+  // 语音房
+  // ===========================================================================
+
+  /// 礼物航道底。公屏气泡用 [roomBarFill]（白 10%）。
+  static const Color roomBubble = Color.fromRGBO(223, 214, 255, 0.09);
+
+  /// 公屏次级字（白 70%）。
+  static const Color roomMsgSub = Color(0xB3FFFFFF);
+
+  /// 进房公屏昵称。
+  static const Color roomJoinHere = Color(0xFFFDE42B);
+
+  /// 问答气泡（白 8%）。
+  static const Color roomQaFill = Color(0x14FFFFFF);
+
+  /// 礼物数量强调色。
+  static const Color roomGiftCount = Color(0xFFFFFC80);
+
+  /// 宠物标签底（黄 16%）。
+  static const Color roomPetTag = Color(0x29FDF652);
+
+  /// 心动卡片角标。
+  static const Color roomHeartStart = Color(0xFFBF3AFC);
+
+  /// 心动卡片角标终点。
+  static const Color roomHeartEnd = Color(0xFF7713FC);
+
+  /// 心动卡片锁定字。
+  static const Color roomHeartLock = Color(0xFFFFE24B);
+
+  /// 活动分享气泡。
+  static const Color roomActivityStart = Color(0x2EFF41FF);
+
+  /// 活动分享气泡终点。
+  static const Color roomActivityEnd = Color(0x2E6922FF);
+
+  /// 活动分享图标底。
+  static const Color roomActivityIconStart = Color(0xFF5128AE);
+
+  /// 活动分享图标底终点。
+  static const Color roomActivityIconEnd = Color(0xFF27115C);
+
+  /// 冠名条昵称。
+  static const Color roomNamedNick = Color(0xFFFFFC52);
+
+  /// 冠名头像描边。
+  static const Color roomNamedRing = Color(0xFFD9CE7C);
+
+  /// 推荐房间卡片。
+  static const LinearGradient roomCardBanner = LinearGradient(
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+    colors: [Color(0xFF537BFE), Color(0xFF666FF4), Color(0xFF9A4BE6)],
+  );
+
+  /// 心动卡片角标渐变。
+  static const LinearGradient roomHeartBadge = LinearGradient(
+    colors: [roomHeartStart, roomHeartEnd],
+  );
+
+  /// 活动分享气泡渐变。
+  static const LinearGradient roomActivityFill = LinearGradient(
+    colors: [roomActivityStart, roomActivityEnd],
+  );
+
+  /// 活动分享图标底渐变。
+  static const LinearGradient roomActivityIcon = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [roomActivityIconStart, roomActivityIconEnd],
+  );
+
+  /// 冠名标题渐变。
+  static const LinearGradient roomNamedTitle = LinearGradient(
+    colors: [
+      Color(0xFFE050F2),
+      Color(0xFFEC1CDD),
+      Color(0xFFF62BC1),
+      Color(0xFFFC8A90),
+      Color(0xFFFDBB83),
+      Color(0xFFD9F578),
+      Color(0xFF7CFD86),
+      Color(0xFF4AFCBC),
+    ],
+  );
+
+  /// 进房提示。
+  static const Color roomNotice = Color(0xFF29EEAA);
+
+  /// 礼物名、收礼人。
+  static const Color giftGold = Color(0xFFFFD400);
+
+  /// 座驾进场昵称。
+  static const Color joinName = Color(0xFFFDF652);
+
+  /// 排行半屏底色。
+  static const Color rankSheet = Color(0xFF1D1D26);
+
+  /// 性别标：男。
+  static const Color roomMale = Color(0xFF1698FA);
+
+  /// 性别标：女。
+  static const Color roomFemale = Color(0xFFFF3568);
+
+  /// 文字身份标底。
+  static const Color roomTag = Color(0x33FFFFFF);
+
+  /// 歌词当前行以外的字（白 50%）。
+  static const Color roomLyricDim = Color(0x80FFFFFF);
+
+  /// 歌词卡片上沿。
+  static const Color lyricTop = Color(0x995B30D3);
+
+  /// 歌词卡片下沿。
+  static const Color lyricBottom = Color(0x994724A5);
+
+  /// 房间页底色。没有背景图时用。
+  static const Color roomBackdrop = Color(0xFF14081F);
+
+  /// 顶栏、公告、输入条的半透明底。
+  static const Color roomGlass = Color(0x4D000000);
+
+  /// 房间顶栏胶囊。深色半透明，盖在背景上仍能读清。
+  static const Color roomChip = Color(0xA61C1C38);
+
+  /// 公屏文字气泡。
+  static const Color roomChatBubble = Color(0x73000000);
+
+  /// 进房提示底。
+  static const Color roomJoinPill = Color(0xCC12382C);
+
+  /// Oumi 进房条渐变。
+  static const Color roomJoinStart = Color(0xFFDF27FE);
+  static const Color roomJoinEnd = Color(0xE6880EFF);
+
+  static const LinearGradient roomJoinBanner = LinearGradient(colors: [roomJoinStart, roomJoinEnd]);
+
+  /// Oumi 底栏输入条：白 10%。
+  static const Color roomBarFill = Color(0x1AFFFFFF);
+
+  /// Save / Join Mic。取自设计图按钮实色。
+  static const Color roomSave = Color(0xFF0BEE8A);
+
+  /// 底部输入条胶囊。
+  static const Color roomInput = Color(0x59000000);
+
+  /// 输入提示。
+  static const Color roomHint = Color(0xFF8E8C9A);
+
+  /// 麦位热度爱心。
+  static const Color roomHeart = Color(0xFFFF4B8B);
+
+  /// 老板位金圈。
+  static const Color roomBossGold = Color(0xFFFFC83D);
+
+  /// 空麦位圆底。
+  static const Color roomEmptySeat = Color(0x2EFFFFFF);
+
+  /// 房间 ID、次要字。
+  static const Color roomId = Color(0x99FFFFFF);
+
+  /// 公屏「新消息」胶囊。
+  static const Color roomNewMsg = Color(0xFFFFFFFF);
+
+  /// 「新消息」字色。
+  static const Color roomNewMsgText = Color(0xFF1C1C1E);
+
+  /// 盖在房间背景上，保证顶栏和底栏能读清。
+  static const LinearGradient roomBackdropScrim = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [Color(0x6614081F), Color(0x0014081F), Color(0xCC14081F)],
+    stops: [0, 0.35, 1],
+  );
+
+  /// 歌词卡片渐变。
+  static const LinearGradient roomLyricGradient = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [lyricTop, lyricBottom],
+  );
+
+  /// 座驾进场横幅。等级未知时用 B 档。
+  static LinearGradient roomCarGradient(String level) {
+    switch (level) {
+      case 'SSS':
+        return const LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [Color(0xFF6B4E16), Color(0xFFD4AF37)],
+        );
+      case 'SS':
+        return const LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [Color(0xFF3A2060), Color(0xFF7A4CC2)],
+        );
+      case 'S':
+        return const LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [Color(0xFF163A6B), Color(0xFF3D8BFF)],
+        );
+      case 'A':
+        return const LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [Color(0xFF0E4A45), Color(0xFF2ED3C6)],
+        );
+      default:
+        return const LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [Color(0xFF2A3140), Color(0xFF66758A)],
+        );
+    }
+  }
 }

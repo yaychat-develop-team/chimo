@@ -51,6 +51,11 @@ post_install do |installer|
       # Force above Xcode floor (12.0+); pods like HyphenateChat still declare 10.0.
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
       config.build_settings['ENABLE_BITCODE'] = 'NO'
+      # permission_handler 默认不编译任何权限。不开这一项，麦克风 request() 会直接返回拒绝。
+      definitions = config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] || ['$(inherited)']
+      definitions = [definitions] unless definitions.is_a?(Array)
+      definitions << 'PERMISSION_MICROPHONE=1' unless definitions.include?('PERMISSION_MICROPHONE=1')
+      config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] = definitions
       if config.base_configuration_reference.is_a? Xcodeproj::Project::Object::PBXFileReference
         xcconfig_path = config.base_configuration_reference.real_path
         IO.write(xcconfig_path, IO.read(xcconfig_path).gsub('DT_TOOLCHAIN_DIR', 'TOOLCHAIN_DIR'))

@@ -70,19 +70,37 @@ class GiftSheetStyle {
 }
 
 /// 资料 / 浮层礼物弹层 — 与聊天礼物弹层共用 `/cash/item` 目录。
-Future<void> showGiftBottomSheet(BuildContext context, {required String receiverUid}) {
+Future<void> showGiftBottomSheet(
+  BuildContext context, {
+  required String receiverUid,
+  String channelId = '',
+  int rid = 0,
+}) {
   return AppBottomSheet.show<void>(
     isScrollControlled: true,
-    child: GiftSheet(style: GiftSheetStyle.profile, receiverUid: receiverUid),
+    child: GiftSheet(
+      style: GiftSheetStyle.profile,
+      receiverUid: receiverUid,
+      channelId: channelId,
+      rid: rid,
+    ),
   );
 }
 
 /// 礼物弹层：礼物目录 + 余额 + 数量 + 送出。
 class GiftSheet extends StatefulWidget {
-  const GiftSheet({super.key, required this.style, this.receiverUid = ''});
+  const GiftSheet({
+    super.key,
+    required this.style,
+    this.receiverUid = '',
+    this.channelId = '',
+    this.rid = 0,
+  });
 
   final GiftSheetStyle style;
   final String receiverUid;
+  final String channelId;
+  final int rid;
 
   @override
   State<GiftSheet> createState() => _GiftSheetState();
@@ -108,7 +126,7 @@ class _GiftSheetState extends State<GiftSheet> {
   void initState() {
     super.initState();
     _tag = 'gift-$hashCode';
-    logic = Get.put(GiftSheetLogic(), tag: _tag);
+    logic = Get.put(GiftSheetLogic(rid: widget.rid, channelId: widget.channelId), tag: _tag);
   }
 
   @override

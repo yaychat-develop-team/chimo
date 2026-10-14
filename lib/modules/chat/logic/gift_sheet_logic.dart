@@ -19,7 +19,12 @@ class GiftDispatch {
 
 /// 礼物目录、余额、选中项和数量。数量菜单的定位留在弹层。
 class GiftSheetLogic extends GetxController {
+  GiftSheetLogic({this.rid = 0, this.channelId = ''});
+
   static const qtyOptions = [1, 3, 10, 40, 100, 999];
+
+  final int rid;
+  final String channelId;
 
   final RxList<ItemInfo> gifts = <ItemInfo>[].obs;
   final RxInt balance = 0.obs;
@@ -40,7 +45,7 @@ class GiftSheetLogic extends GetxController {
     loading.value = true;
     loadError.value = null;
     try {
-      final itemsFuture = ChimoApis.cash.giftItems();
+      final itemsFuture = ChimoApis.cash.giftItems(rid: rid);
       final balanceFuture = ChimoApis.cash.balance();
       final itemsRes = await itemsFuture;
       final balanceRes = await balanceFuture;
@@ -77,6 +82,7 @@ class GiftSheetLogic extends GetxController {
         receiverIds: [receiverUid],
         itemId: item.id.toString(),
         count: count,
+        channelId: channelId,
       );
       if (!res.ok) {
         idle();

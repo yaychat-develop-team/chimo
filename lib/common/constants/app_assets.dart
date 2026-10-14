@@ -251,4 +251,46 @@ abstract final class AppAssets {
 
   /// 资源是否为 SVG。
   static bool isSvg(String asset) => asset.toLowerCase().endsWith('.svg');
+
+  // ---------- 语音房底部栏 ----------
+  static const String _room = 'assets/images/room/common';
+
+  /// 输入框内表情。
+  static const String roomEmojiMenu = '$_room/emoji_menu.webp';
+
+  /// 礼物。
+  static const String roomGiftMenu = '$_room/gift_menu.webp';
+
+  /// 房间消息铃铛。
+  static const String roomMsgMenu = '$_room/msg_menu.webp';
+
+  /// 更多功能。
+  static const String roomFuncMenu = '$_room/func_menu.webp';
+
+  /// 更多房间箭头。
+  static const String roomArrowRight = '$_room/icon_arrow_right.webp';
+
+  /// 房间公告。
+  static const String roomBulletin = '$_room/icon_bulletin.webp';
+
+  /// 房间热度。
+  static const String roomFire = '$_room/icon_fire.webp';
+
+  /// 老板位标识。
+  static const String roomKing = '$_room/icon_king.webp';
+
+  /// 麦位贡献。
+  static const String roomLove = '$_room/icon_love.webp';
+
+  /// 麦位闭麦。
+  static const String roomMicOff = '$_room/icon_mic_off.webp';
+
+  /// 缩小房间。
+  static const String roomScale = '$_room/icon_scale.webp';
+
+  /// 老板空位。
+  static const String roomSeatBoss = '$_room/seat_boss.webp';
+
+  /// 普通空位。
+  static const String roomSeatEmpty = '$_room/seat_empty.webp';
 }
