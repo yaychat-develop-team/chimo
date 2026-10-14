@@ -60,3 +60,7 @@ key.properties
 
 /proto/
 .claude/settings.json
+
+# Dependency locks stay local
+/pubspec.lock
+/ios/Podfile.lock

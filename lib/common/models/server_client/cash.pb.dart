@@ -2397,6 +2397,7 @@ class CashChargeProductListRsp extends $pb.GeneratedMessage {
     $fixnum.Int64? diffCoin,
     $fixnum.Int64? walletCoin,
     $core.Iterable<$0.PayItemType>? supportedPayTypes,
+    $core.Iterable<KmaxCoupon>? kmaxCoupons,
   }) {
     final result = create();
     if (product != null) result.product.addAll(product);
@@ -2404,6 +2405,7 @@ class CashChargeProductListRsp extends $pb.GeneratedMessage {
     if (walletCoin != null) result.walletCoin = walletCoin;
     if (supportedPayTypes != null)
       result.supportedPayTypes.addAll(supportedPayTypes);
+    if (kmaxCoupons != null) result.kmaxCoupons.addAll(kmaxCoupons);
     return result;
   }
 
@@ -2429,6 +2431,8 @@ class CashChargeProductListRsp extends $pb.GeneratedMessage {
         valueOf: $0.PayItemType.valueOf,
         enumValues: $0.PayItemType.values,
         defaultEnumValue: $0.PayItemType.PayItemType_UNKNOWN)
+    ..pPM<KmaxCoupon>(7, _omitFieldNames ? '' : 'KmaxCoupons',
+        protoName: 'KmaxCoupons', subBuilder: KmaxCoupon.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2474,6 +2478,122 @@ class CashChargeProductListRsp extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(6)
   $pb.PbList<$0.PayItemType> get supportedPayTypes => $_getList(3);
+
+  @$pb.TagNumber(7)
+  $pb.PbList<KmaxCoupon> get kmaxCoupons => $_getList(4);
+}
+
+class KmaxCoupon extends $pb.GeneratedMessage {
+  factory KmaxCoupon({
+    $fixnum.Int64? amount,
+    $core.String? currency,
+    $core.String? issuedAt,
+    $core.String? expiresAt,
+    $core.String? text,
+    $core.String? currencyKind,
+  }) {
+    final result = create();
+    if (amount != null) result.amount = amount;
+    if (currency != null) result.currency = currency;
+    if (issuedAt != null) result.issuedAt = issuedAt;
+    if (expiresAt != null) result.expiresAt = expiresAt;
+    if (text != null) result.text = text;
+    if (currencyKind != null) result.currencyKind = currencyKind;
+    return result;
+  }
+
+  KmaxCoupon._();
+
+  factory KmaxCoupon.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory KmaxCoupon.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'KmaxCoupon',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'cash'),
+      createEmptyInstance: create)
+    ..aInt64(1, _omitFieldNames ? '' : 'amount')
+    ..aOS(2, _omitFieldNames ? '' : 'currency')
+    ..aOS(3, _omitFieldNames ? '' : 'issuedAt')
+    ..aOS(4, _omitFieldNames ? '' : 'expiresAt')
+    ..aOS(5, _omitFieldNames ? '' : 'text')
+    ..aOS(6, _omitFieldNames ? '' : 'currencyKind')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  KmaxCoupon clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  KmaxCoupon copyWith(void Function(KmaxCoupon) updates) =>
+      super.copyWith((message) => updates(message as KmaxCoupon)) as KmaxCoupon;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static KmaxCoupon create() => KmaxCoupon._();
+  @$core.override
+  KmaxCoupon createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static KmaxCoupon getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<KmaxCoupon>(create);
+  static KmaxCoupon? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get amount => $_getI64(0);
+  @$pb.TagNumber(1)
+  set amount($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasAmount() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearAmount() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get currency => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set currency($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasCurrency() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearCurrency() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get issuedAt => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set issuedAt($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasIssuedAt() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearIssuedAt() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get expiresAt => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set expiresAt($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasExpiresAt() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearExpiresAt() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get text => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set text($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasText() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearText() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get currencyKind => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set currencyKind($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasCurrencyKind() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearCurrencyKind() => $_clearField(6);
 }
 
 class CashChargeCreateReq extends $pb.GeneratedMessage {

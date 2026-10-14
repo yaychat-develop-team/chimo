@@ -27,6 +27,86 @@ export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
 export 'rtc.pbenum.dart';
 
+/// GET /api/v1/rtc/lucky-game/access
+class LuckyGameRoomAccessRsp extends $pb.GeneratedMessage {
+  factory LuckyGameRoomAccessRsp({
+    $core.bool? visible,
+    $fixnum.Int64? ownedRoomId,
+    $core.bool? canCreate,
+  }) {
+    final result = create();
+    if (visible != null) result.visible = visible;
+    if (ownedRoomId != null) result.ownedRoomId = ownedRoomId;
+    if (canCreate != null) result.canCreate = canCreate;
+    return result;
+  }
+
+  LuckyGameRoomAccessRsp._();
+
+  factory LuckyGameRoomAccessRsp.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory LuckyGameRoomAccessRsp.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'LuckyGameRoomAccessRsp',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'rtc'),
+      createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'visible')
+    ..aInt64(2, _omitFieldNames ? '' : 'ownedRoomId')
+    ..aOB(3, _omitFieldNames ? '' : 'canCreate')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LuckyGameRoomAccessRsp clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LuckyGameRoomAccessRsp copyWith(
+          void Function(LuckyGameRoomAccessRsp) updates) =>
+      super.copyWith((message) => updates(message as LuckyGameRoomAccessRsp))
+          as LuckyGameRoomAccessRsp;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static LuckyGameRoomAccessRsp create() => LuckyGameRoomAccessRsp._();
+  @$core.override
+  LuckyGameRoomAccessRsp createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static LuckyGameRoomAccessRsp getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<LuckyGameRoomAccessRsp>(create);
+  static LuckyGameRoomAccessRsp? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get visible => $_getBF(0);
+  @$pb.TagNumber(1)
+  set visible($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasVisible() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearVisible() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $fixnum.Int64 get ownedRoomId => $_getI64(1);
+  @$pb.TagNumber(2)
+  set ownedRoomId($fixnum.Int64 value) => $_setInt64(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasOwnedRoomId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearOwnedRoomId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.bool get canCreate => $_getBF(2);
+  @$pb.TagNumber(3)
+  set canCreate($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasCanCreate() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearCanCreate() => $_clearField(3);
+}
+
 class RoomInteractionDetailRsp extends $pb.GeneratedMessage {
   factory RoomInteractionDetailRsp({
     $fixnum.Int64? id,

@@ -23,6 +23,19 @@ class HomeLogic extends GetxController {
   final RxList<GroupInfo> joinedGroups = <GroupInfo>[].obs;
   final RxList<HomeBannerItem> banners = <HomeBannerItem>[].obs;
 
+  /// 0 是群组，后面每一项对应 [roomTabs] 里的一个房间 Tab。
+  final RxInt feedIndex = 0.obs;
+  final RxList<HomeTabItem> roomTabs = <HomeTabItem>[].obs;
+  final RxList<HomeRoomItem> rooms = <HomeRoomItem>[].obs;
+  final RxBool roomsInitialLoading = false.obs;
+  final RxBool roomsLoadingMore = false.obs;
+  final RxnString roomsError = RxnString();
+
+  bool roomsHasMore = true;
+  int roomsPage = 1;
+  String? _roomsSnapshot;
+  String? _loadedRoomTabId;
+
   final RxBool initialLoading = true.obs;
   final RxBool loadingMore = false.obs;
   final RxnString loadError = RxnString();
@@ -31,6 +44,7 @@ class HomeLogic extends GetxController {
   bool hasMore = true;
   int pageNum = 1;
   static const int pageSize = 20;
+  static const int roomPageSize = 8;
 
   @override
   void onInit() {
@@ -67,6 +81,38 @@ class HomeLogic extends GetxController {
     if (isClosed) return;
     popularGroups.assignAll(nextPopular);
     joinedGroups.assignAll(nextJoined);
+  }
+
+  bool get showingGroups => feedIndex.value == 0;
+
+  HomeTabItem? get selectedRoomTab {
+    final index = feedIndex.value - 1;
+    if (index < 0 || index >= roomTabs.length) return null;
+    return roomTabs[index];
+  }
+
+  List<String> get feedLabels => [
+    'Groups',
+    if (roomTabs.isEmpty) 'Rooms',
+    for (final tab in roomTabs) tab.name.trim().isEmpty ? 'Rooms' : tab.name.trim(),
+  ];
+
+  void selectFeed(int index) {
+    if (index == feedIndex.value || index < 0 || index >= feedLabels.length) return;
+    feedIndex.value = index;
+    final tab = selectedRoomTab;
+    if (tab == null) return;
+    if (tab.id != _loadedRoomTabId) {
+      rooms.clear();
+      roomsPage = 1;
+      roomsHasMore = true;
+      _roomsSnapshot = null;
+      roomsError.value = null;
+      _loadedRoomTabId = null;
+    }
+    if (rooms.isEmpty) {
+      loadRooms();
+    }
   }
 
   /// 取当前列表里最新的那份（乐观加入后 `isJoin` 已经变了，别用旧闭包里的）。
@@ -132,11 +178,79 @@ class HomeLogic extends GetxController {
 
   Future<void> loadBanners() async {
     try {
-      final homeRes = await ChimoApis.app.homeBanners();
+      final homeRes = await ChimoApis.home.homeMain();
       if (isClosed || !homeRes.ok) return;
-      banners.assignAll(homeRes.data ?? const []);
+      final data = homeRes.data;
+      if (data == null) return;
+      banners.assignAll([
+        for (final banner in data.banners)
+          if (banner.type == HomeBannerItem_Type.image || banner.type == HomeBannerItem_Type.unknown)
+            banner,
+      ]);
+      final nextTabs = [
+        for (final tab in data.tabs)
+          if (tab.type == HomeTabItem_Type.room && tab.id.isNotEmpty) tab,
+      ];
+      roomTabs.assignAll(nextTabs);
+      if (feedIndex.value > feedLabels.length - 1) feedIndex.value = 0;
+      if (!showingGroups && rooms.isEmpty && selectedRoomTab != null) {
+        loadRooms();
+      }
     } catch (_) {
       // Banner 失败不影响下方小组列表。
+    }
+  }
+
+  Future<String?> loadRooms({bool loadMore = false}) async {
+    final tab = selectedRoomTab;
+    if (tab == null) return null;
+    if (loadMore) {
+      if (roomsLoadingMore.value || !roomsHasMore) return null;
+      roomsLoadingMore.value = true;
+    } else {
+      roomsPage = 1;
+      roomsHasMore = true;
+      _roomsSnapshot = null;
+      if (rooms.isEmpty) roomsInitialLoading.value = true;
+    }
+    try {
+      final requestPage = roomsPage;
+      final res = await ChimoApis.home.homeTabList(
+        tabId: tab.id,
+        pageNum: requestPage,
+        pageSize: roomPageSize,
+        snapshotId: _roomsSnapshot,
+      );
+      if (isClosed) return null;
+      if (!res.ok && res.isNotLogin) {
+        AppJumper.toLoginAndClear();
+        return null;
+      }
+      final data = res.data;
+      final page = [
+        for (final item in data?.items ?? const <HomeListItem>[])
+          if (item.hasRoom() && item.room.rid.toInt() > 0) item.room,
+      ];
+      if (loadMore) {
+        final seen = {for (final room in rooms) room.rid.toInt()};
+        rooms.addAll([for (final room in page) if (seen.add(room.rid.toInt())) room]);
+      } else {
+        rooms.assignAll(page);
+      }
+      _loadedRoomTabId = tab.id;
+      _roomsSnapshot = data?.snapshotId;
+      roomsHasMore = page.length >= roomPageSize;
+      roomsPage = requestPage + 1;
+      roomsInitialLoading.value = false;
+      roomsLoadingMore.value = false;
+      roomsError.value = res.ok ? null : (res.message.isEmpty ? 'Failed to load rooms' : res.message);
+      return null;
+    } catch (failure) {
+      if (isClosed) return null;
+      roomsInitialLoading.value = false;
+      roomsLoadingMore.value = false;
+      roomsError.value = '$failure';
+      return 'Failed to load rooms: $failure';
     }
   }
 

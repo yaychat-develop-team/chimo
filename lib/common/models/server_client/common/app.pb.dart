@@ -1273,10 +1273,12 @@ class SearchResp extends $pb.GeneratedMessage {
   factory SearchResp({
     $core.Iterable<$2.MsgListUserItem>? users,
     $core.Iterable<$3.Channel>? channels,
+    $core.Iterable<KmaxVanityNo>? kmaxVanityNo,
   }) {
     final result = create();
     if (users != null) result.users.addAll(users);
     if (channels != null) result.channels.addAll(channels);
+    if (kmaxVanityNo != null) result.kmaxVanityNo.addAll(kmaxVanityNo);
     return result;
   }
 
@@ -1297,6 +1299,8 @@ class SearchResp extends $pb.GeneratedMessage {
         subBuilder: $2.MsgListUserItem.create)
     ..pPM<$3.Channel>(2, _omitFieldNames ? '' : 'channels',
         subBuilder: $3.Channel.create)
+    ..pPM<KmaxVanityNo>(3, _omitFieldNames ? '' : 'kmaxVanityNo',
+        subBuilder: KmaxVanityNo.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1322,6 +1326,147 @@ class SearchResp extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(2)
   $pb.PbList<$3.Channel> get channels => $_getList(1);
+
+  @$pb.TagNumber(3)
+  $pb.PbList<KmaxVanityNo> get kmaxVanityNo => $_getList(2);
+}
+
+class KmaxVanityNo extends $pb.GeneratedMessage {
+  factory KmaxVanityNo({
+    $core.String? vanityNo,
+    $core.String? familyName,
+    $core.String? avatarUrl,
+    $core.String? coverUrl,
+    $core.String? slug,
+    $core.String? launchUrl,
+    $core.int? age,
+    $core.String? gender,
+  }) {
+    final result = create();
+    if (vanityNo != null) result.vanityNo = vanityNo;
+    if (familyName != null) result.familyName = familyName;
+    if (avatarUrl != null) result.avatarUrl = avatarUrl;
+    if (coverUrl != null) result.coverUrl = coverUrl;
+    if (slug != null) result.slug = slug;
+    if (launchUrl != null) result.launchUrl = launchUrl;
+    if (age != null) result.age = age;
+    if (gender != null) result.gender = gender;
+    return result;
+  }
+
+  KmaxVanityNo._();
+
+  factory KmaxVanityNo.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory KmaxVanityNo.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'KmaxVanityNo',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'commonApp'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'vanityNo')
+    ..aOS(2, _omitFieldNames ? '' : 'familyName')
+    ..aOS(3, _omitFieldNames ? '' : 'avatarUrl')
+    ..aOS(4, _omitFieldNames ? '' : 'coverUrl')
+    ..aOS(5, _omitFieldNames ? '' : 'slug')
+    ..aOS(6, _omitFieldNames ? '' : 'launchUrl')
+    ..aI(7, _omitFieldNames ? '' : 'age', fieldType: $pb.PbFieldType.OU3)
+    ..aOS(8, _omitFieldNames ? '' : 'gender')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  KmaxVanityNo clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  KmaxVanityNo copyWith(void Function(KmaxVanityNo) updates) =>
+      super.copyWith((message) => updates(message as KmaxVanityNo))
+          as KmaxVanityNo;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static KmaxVanityNo create() => KmaxVanityNo._();
+  @$core.override
+  KmaxVanityNo createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static KmaxVanityNo getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<KmaxVanityNo>(create);
+  static KmaxVanityNo? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get vanityNo => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set vanityNo($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasVanityNo() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearVanityNo() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get familyName => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set familyName($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasFamilyName() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearFamilyName() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get avatarUrl => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set avatarUrl($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasAvatarUrl() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearAvatarUrl() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get coverUrl => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set coverUrl($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasCoverUrl() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearCoverUrl() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get slug => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set slug($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasSlug() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearSlug() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get launchUrl => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set launchUrl($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasLaunchUrl() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearLaunchUrl() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.int get age => $_getIZ(6);
+  @$pb.TagNumber(7)
+  set age($core.int value) => $_setUnsignedInt32(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasAge() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearAge() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.String get gender => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set gender($core.String value) => $_setString(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasGender() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearGender() => $_clearField(8);
 }
 
 class SetRvConfReq extends $pb.GeneratedMessage {

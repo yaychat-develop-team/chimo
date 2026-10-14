@@ -11,7 +11,9 @@ import '../logic/home_logic.dart';
 import '../../../common/extensions/wire_view.dart';
 import '../../../common/models/server_client/group/group.pb.dart';
 import 'widgets/home_app_bar.dart';
+import 'widgets/home_feed_tabs.dart';
 import 'widgets/home_hero_banner.dart';
+import 'widgets/home_room_card.dart';
 import 'widgets/my_groups_section.dart';
 import 'widgets/popular_groups_section.dart';
 import '../../../common/widgets/app_image.dart';
@@ -73,11 +75,17 @@ class _HomePageState extends State<HomePage> {
 
   void _onScroll() {
     if (!_scrollController.hasClients) return;
-    if (logic.initialLoading.value || logic.loadingMore.value || !logic.hasMore) return;
     final position = _scrollController.position;
-    if (position.pixels >= position.maxScrollExtent - 240) {
+    if (position.pixels < position.maxScrollExtent - 240) return;
+    if (logic.showingGroups) {
+      if (logic.initialLoading.value || logic.loadingMore.value || !logic.hasMore) return;
       unawaited(logic.loadGroups(loadMore: true));
+      return;
     }
+    if (logic.roomsInitialLoading.value || logic.roomsLoadingMore.value || !logic.roomsHasMore) {
+      return;
+    }
+    unawaited(logic.loadRooms(loadMore: true));
   }
 
   String get _refreshHint => switch (_phase) {
@@ -124,8 +132,11 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  /// 下拉刷新只刷新小组列表，不碰上方 Banner；失败静默（同原版 showError: false）。
-  Future<void> _reloadData() => logic.loadGroups();
+  /// 下拉刷新只刷新当前 Tab。失败静默（同原版 showError: false）。
+  Future<void> _reloadData() {
+    if (logic.showingGroups) return logic.loadGroups();
+    return logic.loadRooms();
+  }
 
   void _updatePull(double extent) {
     final next = extent.clamp(0.0, _maxPullExtent);
@@ -227,6 +238,16 @@ class _HomePageState extends State<HomePage> {
                         },
                       ),
                     ),
+                    Obx(
+                      () => HomeFeedTabs(
+                        labels: logic.feedLabels,
+                        index: logic.feedIndex.value,
+                        onSelected: (index) {
+                          logic.selectFeed(index);
+                          if (_scrollController.hasClients) _scrollController.jumpTo(0);
+                        },
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -266,6 +287,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildList(bool lockListScroll) {
+    if (!logic.showingGroups) return _buildRooms(lockListScroll);
     if (logic.initialLoading.value) {
       return const Center(child: CircularProgressIndicator(color: AppColors.primaryBright));
     }
@@ -342,6 +364,78 @@ class _HomePageState extends State<HomePage> {
                       strokeWidth: 2,
                       color: AppColors.primaryBright,
                     ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRooms(bool lockListScroll) {
+    if (logic.roomsInitialLoading.value && logic.rooms.isEmpty) {
+      return const Center(child: CircularProgressIndicator(color: AppColors.primaryBright));
+    }
+    final rooms = logic.rooms.toList();
+    final error = logic.roomsError.value;
+    return Listener(
+      onPointerMove: _onPointerMove,
+      onPointerUp: _onPointerUp,
+      onPointerCancel: _onPointerUp,
+      child: CustomScrollView(
+        controller: _scrollController,
+        physics: lockListScroll ? const NeverScrollableScrollPhysics() : const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          if (error != null && rooms.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        error,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
+                      ),
+                      const SizedBox(height: 16),
+                      TextButton(
+                        onPressed: () => unawaited(logic.loadRooms()),
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          if (rooms.isEmpty && error == null)
+            const SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: Text('No rooms yet', style: TextStyle(color: AppColors.textSecondary, fontSize: 14)),
+              ),
+            ),
+          SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) => HomeRoomCard(
+                room: rooms[index],
+                onTap: () => AppJumper.toRoom(rooms[index].rid.toInt()),
+              ),
+              childCount: rooms.length,
+            ),
+          ),
+          if (logic.roomsLoadingMore.value)
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(0, 8, 0, 20),
+                child: Center(
+                  child: SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primaryBright),
                   ),
                 ),
               ),

@@ -121,6 +121,8 @@ class MicLayoutEnum extends $pb.ProtobufEnum {
       MicLayoutEnum._(7, _omitEnumNames ? '' : 'TILED_1_1_3_3');
   static const MicLayoutEnum TILED_3_3 =
       MicLayoutEnum._(8, _omitEnumNames ? '' : 'TILED_3_3');
+  static const MicLayoutEnum LUCKY_GAME_6 =
+      MicLayoutEnum._(9, _omitEnumNames ? '' : 'LUCKY_GAME_6');
 
   static const $core.List<MicLayoutEnum> values = <MicLayoutEnum>[
     ROUND_TABLE_6,
@@ -132,10 +134,11 @@ class MicLayoutEnum extends $pb.ProtobufEnum {
     ROUND_TABLE_7,
     TILED_1_1_3_3,
     TILED_3_3,
+    LUCKY_GAME_6,
   ];
 
   static final $core.List<MicLayoutEnum?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 8);
+      $pb.ProtobufEnum.$_initByValueList(values, 9);
   static MicLayoutEnum? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
@@ -389,6 +392,8 @@ class RoomType extends $pb.ProtobufEnum {
       RoomType._(8, _omitEnumNames ? '' : 'AUCTION');
   static const RoomType STORY = RoomType._(9, _omitEnumNames ? '' : 'STORY');
   static const RoomType NEWBIE = RoomType._(10, _omitEnumNames ? '' : 'NEWBIE');
+  static const RoomType LUCKY_GAME =
+      RoomType._(11, _omitEnumNames ? '' : 'LUCKY_GAME');
 
   static const $core.List<RoomType> values = <RoomType>[
     HOT_HALL,
@@ -402,10 +407,11 @@ class RoomType extends $pb.ProtobufEnum {
     AUCTION,
     STORY,
     NEWBIE,
+    LUCKY_GAME,
   ];
 
   static final $core.List<RoomType?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 10);
+      $pb.ProtobufEnum.$_initByValueList(values, 11);
   static RoomType? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
@@ -443,6 +449,8 @@ class RoomUsage extends $pb.ProtobufEnum {
       RoomUsage._(3, _omitEnumNames ? '' : 'BUSINESS');
   static const RoomUsage GS_TRAIN =
       RoomUsage._(4, _omitEnumNames ? '' : 'GS_TRAIN');
+  static const RoomUsage LUCKY_GAME_ROOM =
+      RoomUsage._(5, _omitEnumNames ? '' : 'LUCKY_GAME_ROOM');
 
   static const $core.List<RoomUsage> values = <RoomUsage>[
     UNKNOWN,
@@ -450,10 +458,11 @@ class RoomUsage extends $pb.ProtobufEnum {
     COMMON,
     BUSINESS,
     GS_TRAIN,
+    LUCKY_GAME_ROOM,
   ];
 
   static final $core.List<RoomUsage?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 4);
+      $pb.ProtobufEnum.$_initByValueList(values, 5);
   static RoomUsage? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
