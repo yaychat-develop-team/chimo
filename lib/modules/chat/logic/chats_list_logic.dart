@@ -1,11 +1,11 @@
 import 'dart:async';
 import 'dart:ui' show Color;
 
+import 'package:chimo/app/session_info.dart';
 import 'package:fixnum/fixnum.dart';
 import 'package:get/get.dart';
 import 'package:im_flutter_sdk/im_flutter_sdk.dart';
 
-import '../../../app/storage/user_store.dart';
 import '../../../common/constants/app_assets.dart';
 import '../../../app/service/im_service.dart';
 import '../../../common/im/im_system_accounts.dart';
@@ -127,8 +127,8 @@ class ChatsListLogic extends GetxController {
 
   /// 绑定当前登录用户；uid 变化时清空上一账号残留。
   Future<void> ensureBoundToCurrentUser() async {
-    final uid = UserStore.currentUser.userId?.trim() ?? '';
-    final em = UserStore.currentUser.emUsername?.trim() ?? '';
+    final uid = SessionInfo.uid.toString().trim();
+    final em = SessionInfo.currentUser?.emUsername.trim() ?? '';
     if (uid == (_sessionUserId ?? '') && em == (_sessionEmUser ?? '')) return;
     clearLocalState(notify: true);
     _sessionUserId = uid.isEmpty ? null : uid;
@@ -137,7 +137,7 @@ class ChatsListLogic extends GetxController {
 
   Future<void> _onImConnectionChanged() async {
     if (!ImService.isConnected) return;
-    final em = UserStore.currentUser.emUsername?.trim() ?? '';
+    final em = SessionInfo.currentUser?.emUsername.trim() ?? '';
     final sdk = (await ImService.sdkUserId())?.trim() ?? '';
     if (em.isEmpty || sdk.isEmpty || em != sdk) return;
     if (_conversations.isEmpty && _joinedGroupIds.isEmpty) {
@@ -220,7 +220,7 @@ class ChatsListLogic extends GetxController {
 
   Future<void> _mergeImConversations() async {
     try {
-      final sessionEm = UserStore.currentUser.emUsername?.trim() ?? '';
+      final sessionEm = SessionInfo.currentUser?.emUsername.trim() ?? '';
       if (sessionEm.isEmpty) return;
       if (!ImService.isConnected) {
         await ImService.connectFromServer();
@@ -1109,8 +1109,8 @@ class ChatsListLogic extends GetxController {
   /// 会话页推广条进编辑资料时的预填。失败就给一份空资料，不打断跳转。
   Future<User> loadOwnProfile() async {
     try {
-      final res = await ChimoApis.user.profileOrNull();
-      return res.data ?? User();
+      final res = await ChimoApis.user.profile();
+      return res.data?.user ?? User();
     } catch (_) {
       return User();
     }

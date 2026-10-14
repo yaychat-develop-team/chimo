@@ -1,5 +1,6 @@
 import '../../storage/app_storage.dart';
 import '../../app_config.dart';
+import '../http/http.dart';
 
 /// 通过 [AppStorage.settings] 持久化 [AppConfig.environment]。
 ///
@@ -9,7 +10,6 @@ abstract final class ApiStore {
 
   /// 同步：box 已在 `main()` 里打开，取值命中内存。
   static void load() {
-    AppConfig.init();
     if (!AppConfig.isDebug) {
       AppConfig.useEnvironment(ApiEnvironment.production);
       return;
@@ -31,9 +31,11 @@ abstract final class ApiStore {
   static Future<void> save(ApiEnvironment env) async {
     if (!AppConfig.isDebug) {
       AppConfig.useEnvironment(ApiEnvironment.production);
+      Http.ins.updateBaseUrl();
       return;
     }
     AppConfig.useEnvironment(env);
+    Http.ins.updateBaseUrl();
     await AppStorage.settings?.put(_key, switch (env) {
       ApiEnvironment.production => 'production',
       ApiEnvironment.test => 'test',

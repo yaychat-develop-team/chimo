@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:chimo/app/session_info.dart';
+import 'package:chimo/common/utils/event_center.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -9,6 +11,8 @@ import '../../../app/auth/apple_auth_state.dart';
 import '../../../common/constants/app_assets.dart';
 import '../../../common/constants/app_links.dart';
 import '../../../app/app_config.dart';
+import '../../../common/models/server_client/login.pb.dart';
+import '../../../common/utils/event_constant.dart';
 import '../logic/login_logic.dart';
 import '../../../common/theme/app_colors.dart';
 import '../../../common/widgets/app_webview_page.dart';
@@ -26,17 +30,30 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   late final LoginLogic logic;
+  StreamSubscription? _eventSub;
 
   @override
   void initState() {
     super.initState();
     logic = Get.put(LoginLogic());
+    _eventSub = eventCenter.subscribe(EventConstant.loginGetAuthRsp).listen((event) {
+      _loginSuccess(event.data);
+    });
   }
+
 
   @override
   void dispose() {
     Get.delete<LoginLogic>();
+    _eventSub?.cancel();
     super.dispose();
+  }
+
+  Future _loginSuccess(AuthRsp? authRsp) async{
+    bool result = await SessionInfo.loginSuccessUpdateInfo(authRsp);
+    if(result) {
+      AppJumper.toAfterAuth(goHome: SessionInfo.currentUser?.isRegister == true);
+    }
   }
 
   Future<void> _openAgreement(String title) {

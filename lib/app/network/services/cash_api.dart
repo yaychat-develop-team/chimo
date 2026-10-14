@@ -1,55 +1,29 @@
 import '../../../common/models/server_client/cash.pb.dart';
-import '../http/api_gateway.dart';
 import '../http/api_result.dart';
-import '../http/pb_specs.dart';
-import '../network_bootstrap.dart';
+import '../http/http.dart';
 
 /// 钱包 / 礼物现金相关接口。
 class CashApi {
   const CashApi();
 
   Future<ApiResult<UserCash>> balance() {
-    return ApiGateway.request(
-      () => NetworkBootstrap.client.get(
-        '/cash/current',
-        unpack: PbSpecs.userCash,
-      ),
-      map: (res) {
-        final data = res.data;
-        if (data is! UserCash) return UserCash();
-        return data;
-      },
+    return Http.ins.getAndParse<UserCash>('/cash/current');
+  }
+
+  Future<ApiResult<List<CashChargeProductListItem>>> chargeProducts() async {
+    final res = await Http.ins.getAndParse<CashChargeProductListRsp>('/cash/charge/product');
+    return res.map(
+      (data) => [
+        for (final item in data.product)
+          if (!item.isCustomPay && item.coin > 0) item,
+      ],
     );
   }
 
-  Future<ApiResult<List<CashChargeProductListItem>>> chargeProducts() {
-    return ApiGateway.request(
-      () => NetworkBootstrap.client.get(
-        '/cash/charge/product',
-        unpack: PbSpecs.chargeProducts,
-      ),
-      map: (res) {
-        final data = res.data;
-        if (data is! CashChargeProductListRsp) return const [];
-        return [
-          for (final item in data.product)
-            if (!item.isCustomPay && item.coin > 0) item,
-        ];
-      },
-    );
-  }
-
-  Future<ApiResult<List<CashGoodsItem>>> goods() {
-    return ApiGateway.request(
-      () => NetworkBootstrap.client.get(
-        '/cash/goods',
-        unpack: PbSpecs.cashGoods,
-      ),
-      map: (res) {
-        final data = res.data;
-        if (data is! CashGoodsRsp) return const [];
-        return [for (final item in data.goodsList) if (item.coin > 0) item];
-      },
+  Future<ApiResult<List<CashGoodsItem>>> goods() async {
+    final res = await Http.ins.getAndParse<CashGoodsRsp>('/cash/goods');
+    return res.map(
+      (data) => [for (final item in data.goodsList) if (item.coin > 0) item],
     );
   }
 
@@ -73,22 +47,17 @@ class CashApi {
     ]);
   }
 
-  Future<ApiResult<List<ItemInfo>>> giftItems({int version = 1, int rid = 0}) {
-    return ApiGateway.request(
-      () => NetworkBootstrap.client.get(
-        '/cash/item',
-        query: {'version': '$version', 'rid': '$rid'},
-        unpack: PbSpecs.cashItem,
-      ),
-      map: (res) {
-        final data = res.data;
-        if (data is! ItemInfoRsp) return const [];
-        return [
-          for (final tab in data.itemTab)
-            for (final item in tab.item)
-              if (item.canBuy) item,
-        ];
-      },
+  Future<ApiResult<List<ItemInfo>>> giftItems({int version = 1, int rid = 0}) async {
+    final res = await Http.ins.getAndParse<ItemInfoRsp>(
+      '/cash/item',
+      query: {'version': '$version', 'rid': '$rid'},
+    );
+    return res.map(
+      (data) => [
+        for (final tab in data.itemTab)
+          for (final item in tab.item)
+            if (item.canBuy) item,
+      ],
     );
   }
 
@@ -98,16 +67,14 @@ class CashApi {
     required int count,
     String? channelId,
   }) {
-    return ApiGateway.action(
-      () => NetworkBootstrap.client.post(
-        '/cash/gift',
-        bizParam: {
-          'receiverId': receiverIds,
-          'itemId': itemId,
-          'count': count,
-          if (channelId != null && channelId.isNotEmpty) 'channel': channelId,
-        },
-      ),
+    return Http.ins.postAndParse(
+      '/cash/gift',
+      data: {
+        'receiverId': receiverIds,
+        'itemId': itemId,
+        'count': count,
+        if (channelId != null && channelId.isNotEmpty) 'channel': channelId,
+      },
     );
   }
 
@@ -115,20 +82,12 @@ class CashApi {
     required String productId,
     required int payItemType,
   }) {
-    return ApiGateway.request(
-      () => NetworkBootstrap.client.post(
-        '/cash/charge/create',
-        unpack: PbSpecs.chargeCreate,
-        bizParam: {
-          'productId': int.tryParse(productId) ?? productId,
-          'payItemType': payItemType,
-          'v2': true,
-        },
-      ),
-      map: (res) {
-        final data = res.data;
-        if (data is! CashChargeCreateRsp) return CashChargeCreateRsp();
-        return data;
+    return Http.ins.postAndParse<CashChargeCreateRsp>(
+      '/cash/charge/create',
+      data: {
+        'productId': int.tryParse(productId) ?? productId,
+        'payItemType': payItemType,
+        'v2': true,
       },
     );
   }
@@ -138,20 +97,12 @@ class CashApi {
     required String userId,
     required String extraJson,
   }) {
-    return ApiGateway.request(
-      () => NetworkBootstrap.client.post(
-        '/cash/charge/verify_receipt',
-        unpack: PbSpecs.chargeCheck,
-        bizParam: {
-          'orderId': orderId,
-          'userId': userId,
-          'extraJson': extraJson,
-        },
-      ),
-      map: (res) {
-        final data = res.data;
-        if (data is! CashChargeCheckRsp) return CashChargeCheckRsp();
-        return data;
+    return Http.ins.postAndParse<CashChargeCheckRsp>(
+      '/cash/charge/verify_receipt',
+      data: {
+        'orderId': orderId,
+        'userId': userId,
+        'extraJson': extraJson,
       },
     );
   }
@@ -160,23 +111,17 @@ class CashApi {
   Future<ApiResult<List<CashOpHistoryItem>>> opHistory({
     required int pageNum,
     int pageSize = 20,
-  }) {
-    return ApiGateway.request(() {
-      final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-      return NetworkBootstrap.client.post(
-        '/cash/op-history',
-        unpack: PbSpecs.cashHistory,
-        bizParam: {
-          'beginTimestamp': nowSec - 60 * 60 * 24 * 30,
-          'endTimestamp': nowSec,
-          'pageNum': pageNum,
-          'pageSize': pageSize,
-        },
-      );
-    }, map: (res) {
-      final data = res.data;
-      if (data is! CashOpHistoryRsp) return const [];
-      return data.items;
-    });
+  }) async {
+    final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    final res = await Http.ins.postAndParse<CashOpHistoryRsp>(
+      '/cash/op-history',
+      data: {
+        'beginTimestamp': nowSec - 60 * 60 * 24 * 30,
+        'endTimestamp': nowSec,
+        'pageNum': pageNum,
+        'pageSize': pageSize,
+      },
+    );
+    return res.map((data) => data.items);
   }
 }

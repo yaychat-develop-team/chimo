@@ -1,97 +1,76 @@
 import '../../../common/models/server_client/base.pbenum.dart';
 import '../../../common/models/server_client/common/app.pb.dart';
 import '../../../common/models/server_client/user.pb.dart';
-import '../http/api_gateway.dart';
 import '../http/api_result.dart';
-import '../http/pb_specs.dart';
-import '../network_bootstrap.dart';
+import '../http/http.dart';
 
 /// 关注 / 搜索 / 黑名单 / 访客。
 class RelationApi {
   const RelationApi();
 
-  Future<ApiResult<List<User>>> searchUsers(String key) {
-    return ApiGateway.request(
-      () => NetworkBootstrap.client.get(
-        '/user-relation/searchUser',
-        query: {'key': key},
-        unpack: PbSpecs.userList,
-      ),
-      map: (res) => _users(res.data, RelationType.FAN),
+  Future<ApiResult<List<User>>> searchUsers(String key) async {
+    final res = await Http.ins.getAndParse<UserListRsp>(
+      '/user-relation/searchUser',
+      query: {'key': key},
     );
+    return res.map((data) => _users(data, RelationType.FAN));
   }
 
   /// 首页 ID 搜索（`GET /search?no=`）。命中项是 [MsgListUserItem]。
-  Future<ApiResult<List<MsgListUserItem>>> homeSearch(String no) {
-    return ApiGateway.request(
-      () => NetworkBootstrap.client.get(
-        '/search',
-        query: {'no': no},
-        unpack: PbSpecs.search,
-      ),
-      map: (res) {
-        final data = res.data;
-        if (data is! SearchResp) return const [];
-        return data.users;
-      },
+  Future<ApiResult<List<MsgListUserItem>>> homeSearch(String no) async {
+    final res = await Http.ins.getAndParse<SearchResp>(
+      '/search',
+      query: {'no': no},
     );
+    return res.map((data) => data.users);
   }
 
   Future<ApiResult<List<User>>> searchFollowing({
     int pageNum = 1,
     int pageSize = 20,
     String keyword = '',
-  }) {
-    return ApiGateway.request(
-      () => NetworkBootstrap.client.get(
-        '/user-relation/search-followers',
-        query: {
-          'pageNum': '$pageNum',
-          'pageSize': '$pageSize',
-          'keyword': keyword,
-        },
-        unpack: PbSpecs.userList,
-      ),
-      map: (res) => _users(res.data, RelationType.FOLLOW),
+  }) async {
+    final res = await Http.ins.getAndParse<UserListRsp>(
+      '/user-relation/search-followers',
+      query: {
+        'pageNum': '$pageNum',
+        'pageSize': '$pageSize',
+        'keyword': keyword,
+      },
     );
+    return res.map((data) => _users(data, RelationType.FOLLOW));
   }
 
   Future<ApiResult<List<User>>> searchFans({
     int pageNum = 1,
     int pageSize = 20,
     String keyword = '',
-  }) {
-    return ApiGateway.request(
-      () => NetworkBootstrap.client.get(
-        '/user-relation/search-fans',
-        query: {
-          'pageNum': '$pageNum',
-          'pageSize': '$pageSize',
-          'keyword': keyword,
-        },
-        unpack: PbSpecs.userList,
-      ),
-      map: (res) => _users(res.data, RelationType.FAN),
+  }) async {
+    final res = await Http.ins.getAndParse<UserListRsp>(
+      '/user-relation/search-fans',
+      query: {
+        'pageNum': '$pageNum',
+        'pageSize': '$pageSize',
+        'keyword': keyword,
+      },
     );
+    return res.map((data) => _users(data, RelationType.FAN));
   }
 
   Future<ApiResult<List<User>>> searchFriends({
     int pageNum = 1,
     int pageSize = 20,
     String keyword = '',
-  }) {
-    return ApiGateway.request(
-      () => NetworkBootstrap.client.get(
-        '/user-relation/search-friends',
-        query: {
-          'pageNum': '$pageNum',
-          'pageSize': '$pageSize',
-          'keyword': keyword,
-        },
-        unpack: PbSpecs.userList,
-      ),
-      map: (res) => _users(res.data, RelationType.FRIEND),
+  }) async {
+    final res = await Http.ins.getAndParse<UserListRsp>(
+      '/user-relation/search-friends',
+      query: {
+        'pageNum': '$pageNum',
+        'pageSize': '$pageSize',
+        'keyword': keyword,
+      },
     );
+    return res.map((data) => _users(data, RelationType.FRIEND));
   }
 
   Future<ApiResult<List<User>>> friendsGraph({
@@ -119,100 +98,67 @@ class RelationApi {
   }
 
   Future<ApiResult<void>> follow(String uid) {
-    return ApiGateway.action(
-      () => NetworkBootstrap.client.get('/user-relation/follow/$uid'),
-    );
+    return Http.ins.getAndParse('/user-relation/follow/$uid');
   }
 
   Future<ApiResult<void>> unfollow(String uid) {
-    return ApiGateway.action(
-      () => NetworkBootstrap.client.post('/user-relation/unfollow/$uid'),
-    );
+    return Http.ins.postAndParse('/user-relation/unfollow/$uid');
   }
 
   Future<ApiResult<void>> setBlackList({
     required String userId,
     required bool isCancel,
   }) {
-    return ApiGateway.action(
-      () => NetworkBootstrap.client.post(
-        '/user-relation/set-black-list',
-        bizParam: {'userId': userId, 'isCancel': isCancel},
-      ),
+    return Http.ins.postAndParse(
+      '/user-relation/set-black-list',
+      data: {'userId': userId, 'isCancel': isCancel},
     );
   }
 
-  Future<ApiResult<List<SimpleUser>>> blackList() {
-    return ApiGateway.request(
-      () => NetworkBootstrap.client.get(
-        '/user-relation/get-black-list',
-        unpack: PbSpecs.blackList,
-      ),
-      map: (res) {
-        final data = res.data;
-        if (data is! GetBlackListResp) return const [];
-        return data.users;
-      },
+  Future<ApiResult<List<SimpleUser>>> blackList() async {
+    final res = await Http.ins.getAndParse<GetBlackListResp>(
+      '/user-relation/get-black-list',
     );
+    return res.map((data) => data.users);
   }
 
-  Future<ApiResult<bool>> isBlocked(String uid) {
-    return ApiGateway.request(
-      () => NetworkBootstrap.client.get(
-        '/user-relation/get-black-list',
-        unpack: PbSpecs.blackList,
-      ),
-      map: (res) {
-        final data = res.data;
-        if (uid.isEmpty || data is! GetBlackListResp) return false;
-        return data.users.any((user) => user.id.toString() == uid);
-      },
+  Future<ApiResult<bool>> isBlocked(String uid) async {
+    final res = await Http.ins.getAndParse<GetBlackListResp>(
+      '/user-relation/get-black-list',
     );
+    return res.map((data) {
+      if (uid.isEmpty) return false;
+      return data.users.any((user) => user.id.toString() == uid);
+    });
   }
 
-  Future<ApiResult<List<ViewedByItem>>> viewedBy() {
-    return ApiGateway.request(
-      () => NetworkBootstrap.client.get(
-        '/user-relation/viewedBy',
-        unpack: PbSpecs.viewedBy,
-      ),
-      map: (res) {
-        final data = res.data;
-        if (data is! ViewedByRsp) return const [];
-        return data.viewedByList;
-      },
-    );
+  Future<ApiResult<List<ViewedByItem>>> viewedBy() async {
+    final res = await Http.ins.getAndParse<ViewedByRsp>('/user-relation/viewedBy');
+    return res.map((data) => data.viewedByList);
   }
 
   Future<ApiResult<void>> deleteVisitRecord(String visitorId) {
-    return ApiGateway.action(
-      () => NetworkBootstrap.client.post(
-        '/user-relation/delete-visit-record',
-        bizParam: {'visitorId': visitorId},
-      ),
+    return Http.ins.postAndParse(
+      '/user-relation/delete-visit-record',
+      data: {'visitorId': visitorId},
     );
   }
 
-  Future<ApiResult<MsgListUserItem>> msgUser(String emUserName) {
-    return ApiGateway.request(
-      () => NetworkBootstrap.client.get(
-        '/user/msg-user',
-        query: {'emUserName': emUserName},
-        unpack: PbSpecs.msgUser,
-      ),
-      map: (res) {
-        final data = res.data;
-        if (data is! MsgListUserItem || data.id.toString() == '0') {
-          throw StateError('msg-user empty');
-        }
-        return data;
-      },
+  Future<ApiResult<MsgListUserItem>> msgUser(String emUserName) async {
+    final res = await Http.ins.getAndParse<MsgListUserItem>(
+      '/user/msg-user',
+      query: {'emUserName': emUserName},
     );
+    return res.map((data) {
+      if (data.id.toString() == '0') {
+        throw StateError('msg-user empty');
+      }
+      return data;
+    });
   }
 }
 
-List<User> _users(Object? data, RelationType fallback) {
-  if (data is! UserListRsp) return const [];
+List<User> _users(UserListRsp data, RelationType fallback) {
   return [
     for (final user in data.userList)
       user.relationType == RelationType.NONE

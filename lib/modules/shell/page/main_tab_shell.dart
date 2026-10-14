@@ -36,6 +36,7 @@ class _MainTabShellState extends State<MainTabShell> {
   @override
   void initState() {
     super.initState();
+    Get.put(ChatsListLogic(), permanent: true);
     logic = Get.put(ShellLogic());
     Get.put(HomeLogic());
     Get.put(MeLogic());

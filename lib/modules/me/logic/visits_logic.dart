@@ -48,8 +48,8 @@ class VisitsLogic extends AsyncListLogic<ViewedByItem> {
 
   /// 点一行要开的资料。接口没给就拿列表里已有的字段兜底。
   Future<User> profileFor(ViewedByItem item) async {
-    final res = await ChimoApis.user.profileByUidOrNull(item.uid.toString());
-    return res.data ??
+    final res = await ChimoApis.user.profileByUid(item.uid.toString());
+    return res.data?.user ??
         (User()
           ..id = item.uid
           ..nickname = item.nickname.isEmpty ? 'User' : item.nickname

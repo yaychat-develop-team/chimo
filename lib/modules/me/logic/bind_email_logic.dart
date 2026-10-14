@@ -1,13 +1,14 @@
 import 'dart:async';
 
+import 'package:chimo/app/session_info.dart';
 import 'package:get/get.dart';
 
 import '../../../app/app_jumper.dart';
 import '../../../app/auth/onboarding_state.dart';
-import '../../../app/storage/user_store.dart';
 import '../../../app/chimo_api.dart';
-import '../../../app/network/network_bootstrap.dart';
 import '../../../common/utils/app_toast.dart';
+import '../../../common/utils/event_center.dart';
+import '../../../common/utils/event_constant.dart';
 
 /// 邮箱登录结果。成功时 [goHome] 决定进壳层还是完善资料。
 class EmailLoginResult {
@@ -31,11 +32,9 @@ class BindEmailLogic extends GetxController {
   late final String? savedEmail = _readEmail();
 
   static String? _readEmail() {
-    final last = UserStore.currentUser.email?.trim() ?? '';
+    final last = SessionInfo.currentUser?.email.trim() ?? '';
     return last.isEmpty ? null : last;
   }
-
-  Future<void> rememberEmail(String email) => UserStore.rememberEmail(email);
 
   void idle() {
     if (!isClosed) sending.value = false;
@@ -106,14 +105,13 @@ class EmailCodeLogic extends GetxController {
   }) async {
     if (!canVerify(code)) return;
     if (forLogin) {
-      final result = await signIn(email: email, code: code);
+      final rsp = await ChimoApis.auth.emailAuth(email: email, code: code);
       if (isClosed) return;
-      if (!result.ok) {
-        AppToast.info(result.message ?? 'Verification failed');
-        return;
+      if (rsp.ok) {
+        eventCenter.emit(Event(EventConstant.loginGetAuthRsp,data: rsp.data));
+      } else {
+        AppToast.info(rsp.message);
       }
-      AppJumper.toAfterAuth(goHome: result.goHome);
-      idle();
       return;
     }
 
@@ -145,66 +143,6 @@ class EmailCodeLogic extends GetxController {
     }
   }
 
-  Future<EmailLoginResult> signIn({required String email, required String code}) async {
-    if (verifying.value) {
-      return const EmailLoginResult.failure('Verification failed');
-    }
-    verifying.value = true;
-    try {
-      final res = await ChimoApis.auth.emailAuth(email: email, code: code);
-      if (!res.ok || res.data == null) {
-        idle();
-        return EmailLoginResult.failure(
-          EmailAuthTips.friendly(res.message, fallback: 'Verification failed'),
-        );
-      }
-      final payload = res.data!;
-      var token = payload.token;
-      await UserStore.update(
-        (cache) => cache.patch(
-          method: 'email',
-          email: email,
-          token: token,
-          nickname: payload.nickName,
-          avatarUrl: payload.avatar,
-          emUsername: payload.emUsername,
-          emPassword: payload.emPwd,
-        ),
-      );
-      await NetworkBootstrap.applySessionToken(token);
-
-      final refresh = await NetworkBootstrap.client.get('/auth/refresh-token');
-      if (refresh.success && refresh.data is Map) {
-        final next = '${(refresh.data as Map)['token'] ?? ''}'.trim();
-        if (next.isNotEmpty && next != token) {
-          token = next;
-          await NetworkBootstrap.applySessionToken(token);
-          await UserStore.update(
-            (cache) => cache.patch(
-              method: 'email',
-              email: email,
-              token: token,
-              nickname: payload.nickName,
-              avatarUrl: payload.avatar,
-              emUsername: payload.emUsername,
-              emPassword: payload.emPwd,
-            ),
-          );
-        }
-      }
-
-      unawaited(NetworkBootstrap.connectImAfterLogin());
-      final goHome = await OnboardingState.shouldEnterHome(
-        newUser: payload.newUser,
-        email: email,
-      );
-      return EmailLoginResult.success(goHome);
-    } catch (error) {
-      idle();
-      return EmailLoginResult.failure('Verification failed: $error');
-    }
-  }
-
   /// 返回 `null` 表示已绑定。成功时 [verifying] 保持 true，等页面返回再 [idle]。
   Future<String?> bind({required String email, required String code}) async {
     if (verifying.value) return null;
@@ -218,7 +156,6 @@ class EmailCodeLogic extends GetxController {
           fallback: 'Unable to bind email. Please try again.',
         );
       }
-      await UserStore.update((cache) => cache.patch(email: email));
       return null;
     } catch (error) {
       idle();

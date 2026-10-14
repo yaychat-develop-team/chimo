@@ -1,10 +1,10 @@
 import 'dart:async';
 
+import 'package:chimo/app/session_info.dart';
 import 'package:fixnum/fixnum.dart';
 import 'package:get/get.dart';
 
 import '../../../app/app_jumper.dart';
-import '../../../app/storage/user_store.dart';
 import '../../../app/chimo_api.dart';
 import '../../../common/constants/app_assets.dart';
 import '../../../common/extensions/wire_view.dart';
@@ -69,9 +69,7 @@ class ChatUserProfileLogic extends GetxController {
   Future<void> bootstrap() async {
     final seedUid = targetUid;
     final self =
-        seedUid.isNotEmpty &&
-        (UserStore.currentUser.isCurrentUser(seedUid) ||
-            UserStore.currentUser.isCurrentUser(emHint));
+        seedUid.isNotEmpty && seedUid == SessionInfo.uid.toString();
     if (isClosed) return;
     isSelf.value = self;
     await loadProfile();
@@ -119,29 +117,19 @@ class ChatUserProfileLogic extends GetxController {
     }
     try {
       if (isSelf.value) {
-        final infoRes = await ChimoApis.user.profileOrNull();
+        await SessionInfo.refreshUserInfo();
         if (isClosed) return;
-        final me = infoRes.data;
-        if (me != null) {
+        if (SessionInfo.currentUser != null) {
           await FlavorLabelStore.ensureLoaded();
           if (isClosed) return;
-          final avatar = me.avatar.trim();
-          await UserStore.update(
-            (cache) => cache.patch(
-              userId: me.uid,
-              nickname: me.nickname,
-              avatarUrl: avatar.isEmpty ? null : avatar,
-            ),
-          );
-          final em = p.emUsername;
-          profile.value = me.emUsername.isNotEmpty ? me : (me.deepCopy()..emUsername = em);
+          profile.value = SessionInfo.currentUser!;
         }
       } else {
         final appUid = await resolveAppUid();
         if (isClosed) return;
-        final infoRes = await ChimoApis.user.profileByUidOrNull(appUid);
+        final infoRes = await ChimoApis.user.profileByUid(appUid);
         if (isClosed) return;
-        final parsed = infoRes.data;
+        final parsed = infoRes.data?.user;
         var isBlocked = false;
         final blockUid = (parsed != null && parsed.id > Int64.ZERO) ? parsed.uid : appUid;
         if (blockUid.isNotEmpty && RegExp(r'^\d+$').hasMatch(blockUid) && blockUid != '0') {
@@ -156,9 +144,7 @@ class ChatUserProfileLogic extends GetxController {
         if (parsed != null) {
           await FlavorLabelStore.ensureLoaded();
           if (isClosed) return;
-          final self =
-              UserStore.currentUser.isCurrentUser(parsed.uid) ||
-              UserStore.currentUser.isCurrentUser(parsed.emUsername);
+          final self = SessionInfo.uid.toString() == parsed.uid;
           final em = parsed.emUsername.isNotEmpty
               ? parsed.emUsername
               : (emHint.isNotEmpty ? emHint : p.emUsername);
@@ -209,8 +195,7 @@ class ChatUserProfileLogic extends GetxController {
 
   Future<void> openEditProfile() async {
     try {
-      final res = await ChimoApis.user.profileOrNull();
-      final me = res.data;
+      final me = SessionInfo.currentUser;
       if (isClosed) return;
       final seed = me ?? p;
       final updated = await AppJumper.toEditProfile(profile: seed);

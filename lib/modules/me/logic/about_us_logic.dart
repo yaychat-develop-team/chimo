@@ -1,7 +1,7 @@
+import 'package:chimo/app/session_info.dart';
 import 'package:get/get.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
-import '../../../app/storage/user_store.dart';
 import '../../../app/chimo_api.dart';
 import '../../../common/extensions/wire_view.dart';
 
@@ -57,7 +57,7 @@ class AboutUsLogic extends GetxController {
   /// 官网地址附上当前用户 id，方便网页侧识别。
   String websiteUrl(String base) {
     final raw = base.trim().isEmpty ? fallbackWebsite : base.trim();
-    final uid = UserStore.currentUser.userId ?? '';
+    final uid = SessionInfo.currentUser?.id.toString() ?? '';
     final uri = Uri.tryParse(raw);
     if (uri == null) return raw;
     return uri

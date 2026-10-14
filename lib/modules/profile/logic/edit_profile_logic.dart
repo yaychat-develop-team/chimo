@@ -1,11 +1,11 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:chimo/app/session_info.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../app/app_jumper.dart';
-import '../../../app/storage/user_store.dart';
 import '../../../app/chimo_api.dart';
 import '../../../app/network/http/media_upload.dart';
 import '../../../common/utils/media_picker.dart';
@@ -122,8 +122,8 @@ class EditProfileLogic extends GetxController {
 
   Future<void> loadFromApi() async {
     try {
-      final res = await ChimoApis.user.profileOrNull();
-      final parsed = res.data;
+      final res = await ChimoApis.user.profile();
+      final parsed = res.data?.user;
       if (parsed != null) applyProfile(parsed);
     } catch (_) {
       // 刷新失败就保留首帧那份资料。
@@ -229,13 +229,7 @@ class EditProfileLogic extends GetxController {
       if (!res.ok) {
         return (saved: false, message: res.message.isEmpty ? 'Save failed' : res.message);
       }
-      await UserStore.update(
-        (cache) => cache.patch(
-          nickname: nick.isEmpty ? null : nick,
-          avatarUrl: profile.value.avatar.trim().isEmpty ? null : profile.value.avatar,
-          gender: gender.value,
-        ),
-      );
+      SessionInfo.refreshUserInfo();
       return (saved: true, message: null);
     } catch (error) {
       return (saved: false, message: 'Save failed: $error');

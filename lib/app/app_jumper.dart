@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:chimo/app/session_info.dart';
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -9,7 +10,6 @@ import 'package:photo_manager/photo_manager.dart' show AssetEntity;
 import '../common/models/server_client/group/group.pb.dart';
 import '../common/models/server_client/user.pb.dart';
 
-import 'storage/user_store.dart';
 import '../common/constants/app_assets.dart';
 import '../common/theme/app_colors.dart';
 import '../common/utils/app_toast.dart';
@@ -302,15 +302,12 @@ abstract class AppJumper {
         final cb = params['cb']?.trim() ?? '';
         if (cb.isEmpty) return true;
         final payload = <String, dynamic>{
-          'name': UserStore.currentUser.nickname ?? '',
-          'uid':
-              int.tryParse(UserStore.currentUser.userId ?? '') ??
-              UserStore.currentUser.userId ??
-              '',
-          'token': UserStore.currentUser.token ?? '',
-          'emUser': UserStore.currentUser.emUsername ?? '',
-          'emPwd': UserStore.currentUser.emPassword ?? '',
-          'avatar': UserStore.currentUser.avatarUrl ?? '',
+          'name': SessionInfo.currentUser?.nickname ?? '',
+          'uid': SessionInfo.currentUser?.id.toString() ?? '',
+          'token': SessionInfo.token ?? '',
+          'emUser': SessionInfo.currentUser?.emUsername ?? '',
+          'emPwd': SessionInfo.currentUser?.emPwd ?? '',
+          'avatar': SessionInfo.currentUser?.avatar ?? '',
           'isLeader': false,
           'groupType': '',
           'version': '1.0.0',
@@ -496,9 +493,8 @@ abstract class AppJumper {
   }
 
   /// 未登录时清栈回登录页并返回 `false`，调用方直接 return。
-  /// 登录态必须同步可读 —— [UserStore.read] 读的是已打开的 Hive box。
   static bool _requireAuth() {
-    if (UserStore.currentUser.isLoggedIn) return true;
+    if (SessionInfo.hasLogin) return true;
     toLoginAndClear();
     return false;
   }

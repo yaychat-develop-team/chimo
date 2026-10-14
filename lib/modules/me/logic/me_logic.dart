@@ -1,11 +1,10 @@
 import 'dart:async';
 
+import 'package:chimo/app/session_info.dart';
 import 'package:get/get.dart';
 
 import '../../../app/app_jumper.dart';
-import '../../../app/storage/user_store.dart';
 import '../../../app/chimo_api.dart';
-import '../../../app/network/network_bootstrap.dart';
 import '../../../common/models/server_client/user.pb.dart';
 import '../../friends/model/friends_tab.dart';
 import '../model/me_menu_data.dart';
@@ -69,7 +68,7 @@ class MeLogic extends GetxController {
   /// 拉资料 + 访客数。返回 `null` = 没什么要提示的，非 `null` = 要 toast 的文案。
   Future<String?> load() async {
     try {
-      final profileFuture = ChimoApis.user.profileOrNull();
+      final profileFuture = ChimoApis.user.profile();
       // Me「Visitors」= Visits 列表中的去重人数（不是 viewNum 总次数）。
       final visitsFuture = ChimoApis.relation.viewedBy();
       final res = await profileFuture;
@@ -81,30 +80,10 @@ class MeLogic extends GetxController {
         if (res.isNotLogin) AppJumper.toLoginAndClear();
         return null;
       }
-      final parsed = res.data!;
-      final sessionEmail = UserStore.currentUser.email?.trim() ?? '';
-      final loginMethod = UserStore.currentUser.method;
-      final email = parsed.email.trim().isNotEmpty ? parsed.email.trim() : sessionEmail;
-      final next = parsed.deepCopy();
-      if (email.isNotEmpty && email != parsed.email) next.email = email;
-      if (visitsRes.ok && visitsRes.data != null) {
-        next.viewNum = visitsRes.data!.length;
-      }
-      profile.value = next;
-      hasBoundEmail.value = email.isNotEmpty || loginMethod == 'email';
+
+      profile.value = res.data!.user;
+      hasBoundEmail.value = profile.value.email.isNotEmpty;
       loading.value = false;
-      final avatar = next.avatar.trim();
-      await UserStore.update(
-        (cache) => cache.patch(
-          nickname: next.nickname,
-          avatarUrl: avatar.isEmpty ? null : avatar,
-          userId: next.id.toString(),
-          email: email.isEmpty ? null : email,
-          gender: next.gender,
-        ),
-      );
-      // 应用 token 刷新路径后保持 IM 在线。
-      unawaited(NetworkBootstrap.connectImAfterLogin());
       return null;
     } catch (failure) {
       if (isClosed) return null;

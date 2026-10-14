@@ -1,6 +1,5 @@
-import '../http/api_gateway.dart';
 import '../http/api_result.dart';
-import '../network_bootstrap.dart';
+import '../http/http.dart';
 
 /// 举报（用户 / 群聊）。
 class ReportApi {
@@ -15,18 +14,16 @@ class ReportApi {
     List<String> evidenceImages = const [],
     List<String> evidenceVideos = const [],
   }) {
-    return ApiGateway.action(
-      () => NetworkBootstrap.client.post(
-        '/report',
-        bizParam: {
-          'reportedId': reportedId,
-          'type': type,
-          'reason': reason,
-          'description': description,
-          'evidenceImages': evidenceImages,
-          'evidenceVideos': evidenceVideos,
-        },
-      ),
+    return Http.ins.postAndParse(
+      '/report',
+      data: {
+        'reportedId': reportedId,
+        'type': type,
+        'reason': reason,
+        'description': description,
+        'evidenceImages': evidenceImages,
+        'evidenceVideos': evidenceVideos,
+      },
     );
   }
 }

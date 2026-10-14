@@ -1,11 +1,11 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:chimo/app/session_info.dart';
 import 'package:flutter/foundation.dart';
 import 'package:im_flutter_sdk/im_flutter_sdk.dart';
 import 'package:path_provider/path_provider.dart';
 
-import '../storage/user_store.dart';
 import '../chimo_api.dart';
 import '../../common/utils/app_log.dart';
 import '../../common/im/im_models.dart';
@@ -229,26 +229,9 @@ abstract final class ImService {
   }
 
   static Future<(String, String)?> _loadCredentials() async {
-    var emUser = UserStore.currentUser.emUsername;
-    var emPwd = UserStore.currentUser.emPassword;
-    if (emUser != null && emUser.isNotEmpty && emPwd != null && emPwd.isNotEmpty) {
-      return (emUser, emPwd);
-    }
-
-    final info = await ChimoApis.user.imCredentials();
-    if (!info.ok || info.data == null) return null;
-    final creds = info.data!;
-    await UserStore.update(
-      (cache) => cache.patch(
-        userId: creds.profile.id.toString() == '0' ? null : creds.profile.id.toString(),
-        nickname: creds.profile.nickname.isEmpty ? null : creds.profile.nickname,
-        avatarUrl: creds.profile.avatar.isEmpty ? null : creds.profile.avatar,
-        gender: creds.profile.gender,
-        emUsername: creds.emUser,
-        emPassword: creds.emPwd,
-      ),
-    );
-    return (creds.emUser, creds.emPwd);
+    var emUser = SessionInfo.currentUser?.emUsername;
+    var emPwd = SessionInfo.currentUser?.emPwd;
+    return (emUser??'', emPwd??'');
   }
 
   static Future<void> _initSdk() async {
@@ -695,14 +678,14 @@ abstract final class ImService {
   /// `name` / `avatar` / `userid` / `gender` / `emID` /
   /// `toName` / `toAvatar` / `toUserid` / `toGender` / `category`。
   static Future<void> _applyCommonAttrs(EMMessage msg, {ImPeerAttrs? peer}) async {
-    final self = _currentEmUser ?? UserStore.currentUser.emUsername ?? '';
+    final self = _currentEmUser ?? SessionInfo.currentUser?.emUsername ?? '';
     if (self.isEmpty) return;
     final attrs = Map<String, dynamic>.from(msg.attributes ?? const {});
     attrs['emID'] = self;
-    attrs['name'] = UserStore.currentUser.nickname ?? '';
-    attrs['userid'] = _attrIdValue(UserStore.currentUser.userId ?? '');
-    attrs['avatar'] = UserStore.currentUser.avatarUrl ?? '';
-    final gender = UserStore.currentUser.gender?.trim() ?? '';
+    attrs['name'] = SessionInfo.currentUser?.nickname ?? '';
+    attrs['userid'] = _attrIdValue(SessionInfo.currentUser?.id.toString() ?? '');
+    attrs['avatar'] = SessionInfo.currentUser?.avatar ?? '';
+    final gender = SessionInfo.currentUser?.gender.trim() ?? '';
     attrs['gender'] = gender;
 
     final to = peer;

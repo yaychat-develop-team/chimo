@@ -79,10 +79,10 @@ class LevelLogic extends GetxController {
   Future<void> load() async {
     loading.value = true;
     try {
-      final res = await ChimoApis.user.profileOrNull();
+      final res = await ChimoApis.user.profile();
       if (isClosed) return;
       // 拿不到就保留预填值 —— 别把已经画出来的等级清成 0。
-      final next = res.data;
+      final next = res.data?.user;
       if (next != null) profile.value = next;
     } catch (_) {
       // 见类注释：等级页取数失败不打扰用户。

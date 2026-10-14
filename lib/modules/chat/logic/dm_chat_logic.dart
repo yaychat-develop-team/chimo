@@ -180,16 +180,16 @@ class DmChatLogic extends ChatBaseLogic {
       final infoKey = appUid.isNotEmpty ? appUid : (emHint.isNotEmpty ? emHint : rawId);
 
       final peerFuture = infoKey.isNotEmpty
-          ? ChimoApis.user.profileByUidOrNull(infoKey)
-          : Future.value(ApiResult<User?>.ok(null));
-      final selfFuture = ChimoApis.user.profileOrNull();
+          ? ChimoApis.user.profileByUid(infoKey)
+          : Future.value(ApiResult<UserInfoRsp?>.ok(null));
+      final selfFuture = ChimoApis.user.profile();
       final peerRes = await peerFuture;
       final selfRes = await selfFuture;
       await ImService.connectFromServer();
       if (isClosed) return;
 
-      final peer = peerRes.data;
-      final self = selfRes.data;
+      final peer = peerRes.data?.user;
+      final self = selfRes.data?.user;
       if (peer != null && peer.id > Int64.ZERO) {
         appUid = peer.uid;
       }

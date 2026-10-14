@@ -66,7 +66,6 @@ class _BindEmailPageState extends State<BindEmailPage> {
     logic.sending.value = true;
     try {
       // 对齐 forya：仅缓存邮箱并跳转；验证码页再请求 OTP。
-      await logic.rememberEmail(_email);
       if (!mounted) return;
       // 所以这一处还是 MaterialPageRoute。它内部的返回已在 换成
       // `AppJumper.back(result:)` —— 全项目只有一个 navigator，Get 与 Navigator

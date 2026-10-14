@@ -15,8 +15,8 @@ class PersonalProfileLogic extends GetxController {
   Future<void> refreshProfile() async {
     loading.value = true;
     try {
-      final res = await ChimoApis.user.profileOrNull();
-      final parsed = res.data;
+      final res = await ChimoApis.user.profile();
+      final parsed = res.data?.user;
       if (parsed == null || isClosed) return;
       await FlavorLabelStore.ensureLoaded();
       if (!isClosed) profile.value = parsed;

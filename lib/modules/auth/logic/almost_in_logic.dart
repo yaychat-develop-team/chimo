@@ -1,11 +1,11 @@
 import 'dart:math';
 
+import 'package:chimo/app/session_info.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../app/app_jumper.dart';
 import '../../../app/auth/onboarding_state.dart';
-import '../../../app/storage/user_store.dart';
 import '../../../app/chimo_api.dart';
 import '../../../app/network/http/media_upload.dart';
 import '../../../common/utils/app_toast.dart';
@@ -29,9 +29,7 @@ class AlmostInLogic extends GetxController {
       savedNickname ?? 'S·${1000000 + Random().nextInt(9000000)}';
 
   static String? _readNickname() {
-    final nick = (UserStore.currentUser.nickname ?? '').trim();
-    if (nick.isEmpty || nick.contains('@')) return null;
-    return nick;
+    return SessionInfo.currentUser?.nickname;
   }
 
   bool get busy => submitting.value || uploadingAvatar.value;
@@ -110,7 +108,6 @@ class AlmostInLogic extends GetxController {
     if (!res.ok) {
       return res.message.isEmpty ? 'Unable to update avatar' : res.message;
     }
-    await UserStore.update((cache) => cache.patch(avatarUrl: remote));
     if (isClosed) return null;
     remoteAvatarUrl.value = remote;
     localAvatarPath.value = null;
@@ -145,9 +142,7 @@ class AlmostInLogic extends GetxController {
         idle();
         return res.message.isEmpty ? 'Unable to update profile' : res.message;
       }
-      await UserStore.update(
-        (cache) => cache.patch(nickname: nick, avatarUrl: avatar.isEmpty ? null : avatar),
-      );
+      SessionInfo.refreshUserInfo();
       return null;
     } catch (error) {
       idle();

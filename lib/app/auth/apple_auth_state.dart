@@ -7,12 +7,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
+import '../../common/utils/event_center.dart';
+import '../../common/utils/event_constant.dart';
 import '../app_jumper.dart';
 import '../chimo_api.dart';
-import '../network/network_bootstrap.dart';
 import '../../common/utils/app_log.dart';
 import 'onboarding_state.dart';
-import '../storage/user_store.dart';
 import '../../common/utils/app_toast.dart';
 
 /// iOS Sign in with Apple，对齐 forya [AppleLoginPlatform]。
@@ -85,45 +85,11 @@ abstract final class AppleAuthState {
       AppToast.info(res.message.isEmpty ? 'Apple Sign-In failed' : res.message);
       return;
     }
-
-    final payload = res.data!;
-    var token = payload.token;
-
-    await UserStore.update(
-      (cache) => cache.patch(
-        method: 'apple',
-        token: token,
-        nickname: payload.nickName.isNotEmpty ? payload.nickName : nickname,
-        avatarUrl: payload.avatar,
-        emUsername: payload.emUsername,
-        emPassword: payload.emPwd,
-      ),
-    );
-    await NetworkBootstrap.applySessionToken(token);
-
-    final refresh = await NetworkBootstrap.client.get('/auth/refresh-token');
-    if (refresh.success && refresh.data is Map) {
-      final next = '${(refresh.data as Map)['token'] ?? ''}'.trim();
-      if (next.isNotEmpty && next != token) {
-        token = next;
-        await NetworkBootstrap.applySessionToken(token);
-        await UserStore.update(
-          (cache) => cache.patch(
-            method: 'apple',
-            token: token,
-            nickname: payload.nickName.isNotEmpty ? payload.nickName : nickname,
-            avatarUrl: payload.avatar,
-            emUsername: payload.emUsername,
-            emPassword: payload.emPwd,
-          ),
-        );
-      }
+    if(res.ok) {
+      eventCenter.emit(Event(EventConstant.loginGetAuthRsp,data: res.data));
+    } else {
+      AppToast.success(res.message);
     }
-
-    unawaited(NetworkBootstrap.connectImAfterLogin());
-    final goHome = await OnboardingState.shouldEnterHome(newUser: payload.newUser);
-    if (!context.mounted) return;
-    AppJumper.toAfterAuth(goHome: goHome);
   }
 
   static String _generateNonce([int length = 32]) {

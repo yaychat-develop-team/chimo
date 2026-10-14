@@ -1,7 +1,7 @@
+import 'package:chimo/app/session_info.dart';
 import 'package:flutter/material.dart';
 
 import '../../../app/app_jumper.dart';
-import '../../../app/network/network_bootstrap.dart';
 import '../../../common/widgets/app_scaffold.dart';
 import '../../../common/widgets/app_settings_tile.dart';
 import '../../../common/theme/app_colors.dart';
@@ -48,7 +48,7 @@ class _SettingsPageState extends State<SettingsPage> {
     setState(() => _loggingOut = true);
     AppDialog.blockingProgress();
     try {
-      await NetworkBootstrap.clearSession();
+      await SessionInfo.logout(false);
     } catch (_) {
       // 仍退出应用；本地会话清理在内部尽力而为。
     }

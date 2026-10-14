@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/app_config.dart';
+import '../../../app/chimo_api.dart';
 import '../../../app/network/config/api_store.dart';
-import '../../../app/network/http/api_probe_suite.dart';
-import '../../../app/network/network_bootstrap.dart';
 import '../../../common/widgets/app_scaffold.dart';
 import '../../../common/theme/app_colors.dart';
 import '../../../common/theme/app_input.dart';
@@ -42,7 +41,7 @@ class _DebugPageState extends State<DebugPage> {
     setState(() => _saving = true);
     try {
       await ApiStore.save(_env);
-      final ping = await NetworkBootstrap.client.pingUserOpen(open: false);
+      final ping = await ChimoApis.user.pingOpen(open: false);
       if (!mounted) return;
       _toast(
         'Saved → ${AppConfig.baseUrl}\n'
@@ -135,30 +134,13 @@ class _DebugPageState extends State<DebugPage> {
               label: 'Ping test API',
               onTap: () async {
                 try {
-                  final ping = await NetworkBootstrap.client.pingUserOpen();
+                  final ping = await ChimoApis.user.pingOpen();
                   _toast(
                     '${AppConfig.baseUrl}\n'
                     '${ping.success ? 'OK' : ping.message} (${ping.code})',
                   );
                 } catch (error) {
                   _toast('Ping failed: $error');
-                }
-              },
-            ),
-            _NavRow(
-              label: 'Run D:\\forya API suite',
-              onTap: () async {
-                _toast('Probing…');
-                try {
-                  final results = await ApiProbeSuite(NetworkBootstrap.client).run();
-                  final ok = results.where((e) => e.ok).length;
-                  final lines = results
-                      .take(6)
-                      .map((e) => '${e.ok ? '✓' : '✗'} ${e.name} ${e.response.message}')
-                      .join('\n');
-                  _toast('$ok/${results.length} reachable\n$lines');
-                } catch (error) {
-                  _toast('Suite failed: $error');
                 }
               },
             ),

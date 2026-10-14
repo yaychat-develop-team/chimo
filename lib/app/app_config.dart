@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-/// [ApiClient] 使用的后端环境。
+/// [Http] 使用的后端环境。
 enum ApiEnvironment { production, test, local }
 
 /// Chimo 后端 API 主机配置。

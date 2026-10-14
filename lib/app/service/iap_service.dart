@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:chimo/app/session_info.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
@@ -9,7 +10,6 @@ import 'package:in_app_purchase_android/in_app_purchase_android.dart';
 import 'package:in_app_purchase_storekit/in_app_purchase_storekit.dart';
 import 'package:in_app_purchase_storekit/store_kit_wrappers.dart';
 
-import '../storage/user_store.dart';
 import '../chimo_api.dart';
 import '../../common/models/server_client/cash.pb.dart';
 import '../../common/models/server_client/common/pay.pbenum.dart';
@@ -143,11 +143,10 @@ abstract final class IapService {
       _orderBySku[sku] = orderId;
       _products[sku] = details;
       AppLog.i('IapService buyConsumable orderId=$orderId');
-      final uid = UserStore.currentUser.userId?.trim();
       final started = await InAppPurchase.instance.buyConsumable(
         purchaseParam: PurchaseParam(
           productDetails: details,
-          applicationUserName: (uid == null || uid.isEmpty) ? null : uid,
+          applicationUserName: SessionInfo.uid.toString(),
         ),
       );
       if (!started) {
@@ -222,7 +221,7 @@ abstract final class IapService {
   static Future<void> _verifyOnce(PurchaseDetails purchase, String orderId) async {
     _paying = true;
     _toast('Verifying...');
-    final uid = UserStore.currentUser.userId?.trim() ?? '';
+    final uid = SessionInfo.currentUser?.id.toString().trim() ?? '';
     final extra = <String, dynamic>{
       'packageName': AuthRequestHeaders.commonParam['package_name'] ?? '',
       'productId': purchase.productID,

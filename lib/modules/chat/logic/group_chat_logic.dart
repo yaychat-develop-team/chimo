@@ -1,10 +1,10 @@
 import 'dart:async';
 
+import 'package:chimo/app/session_info.dart';
 import 'package:fixnum/fixnum.dart';
 import 'package:get/get.dart';
 
 import '../../../app/app_jumper.dart';
-import '../../../app/storage/user_store.dart';
 import '../../../app/service/im_service.dart';
 import '../../../app/chimo_api.dart';
 import '../../../common/constants/app_assets.dart';
@@ -112,7 +112,7 @@ class GroupChatLogic extends ChatBaseLogic {
   void notifyNewMessage(String preview) => syncListPreview(group.gid, preview);
 
   Future<void> loadSelfAvatar() async {
-    final url = UserStore.currentUser.avatarUrl?.trim() ?? '';
+    final url = SessionInfo.currentUser?.avatar.trim() ?? '';
     if (isClosed || url.isEmpty) return;
     selfAvatarUrl.value = url;
   }
@@ -239,9 +239,9 @@ class GroupChatLogic extends ChatBaseLogic {
     for (final uid in need) {
       _profileFetchInFlight.add(uid);
       try {
-        final res = await ChimoApis.user.profileByUidOrNull(uid);
+        final res = await ChimoApis.user.profileByUid(uid);
         if (res.ok && res.data != null) {
-          _rememberSenderProfile(res.data!);
+          _rememberSenderProfile(res.data!.user);
         } else {
           _senderProfileLookupDone.add(uid);
         }
@@ -541,7 +541,7 @@ class GroupChatLogic extends ChatBaseLogic {
         return;
       }
       // 服务端会推送 JoinGroupMessage；同时立即展示本地提示。
-      final nick = UserStore.currentUser.nickname?.trim();
+      final nick = SessionInfo.currentUser?.nickname.trim();
       final name = (nick == null || nick.isEmpty) ? 'You' : nick;
       if (isClosed) return;
       messages.add(ChatLine.join(name));
@@ -786,9 +786,9 @@ class GroupChatLogic extends ChatBaseLogic {
       ..avatar = message.senderAvatar.trim();
     if (uid.isEmpty) return profile;
     try {
-      final res = await ChimoApis.user.profileByUidOrNull(uid);
+      final res = await ChimoApis.user.profileByUid(uid);
       if (res.ok && res.data != null) {
-        profile = res.data!;
+        profile = res.data!.user;
         _rememberSenderProfile(profile);
         final apiAvatar = profile.avatar.trim();
         final msgAvatar = message.senderAvatar.trim();

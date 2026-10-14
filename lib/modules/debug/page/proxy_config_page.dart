@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../app/network/network_bootstrap.dart';
+import '../../../app/network/http/http.dart';
 import '../../../app/network/config/proxy_store.dart';
 import '../../../common/theme/app_colors.dart';
 import '../../../common/widgets/app_scaffold.dart';
@@ -39,7 +39,7 @@ class _ProxyConfigPageState extends State<ProxyConfigPage> {
     setState(() => _busy = true);
     try {
       await ProxyStore.save(ip: _ipController.text, port: _portController.text);
-      await NetworkBootstrap.rebuildHttpClient();
+      await rebuildHttpClient();
       if (!mounted) return;
       AppToast.info('Proxy saved');
       AppJumper.back();
@@ -51,12 +51,17 @@ class _ProxyConfigPageState extends State<ProxyConfigPage> {
     }
   }
 
+  Future<void> rebuildHttpClient() async {
+    ProxyStore.load();
+    Http.ins.updateProxy();
+  }
+
   Future<void> _clear() async {
     if (_busy) return;
     setState(() => _busy = true);
     try {
       await ProxyStore.clear();
-      await NetworkBootstrap.rebuildHttpClient();
+      await rebuildHttpClient();
       if (!mounted) return;
       AppToast.info('Proxy cleared');
       AppJumper.back();

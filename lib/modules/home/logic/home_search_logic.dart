@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:chimo/app/session_info.dart';
 import 'package:get/get.dart';
 
 import 'package:fixnum/fixnum.dart';
@@ -29,7 +30,7 @@ class HomeSearchLogic extends GetxController {
   final RxBool hasSearched = false.obs;
   final RxBool searching = false.obs;
 
-  String? selfUserId;
+  String? get selfUserId => SessionInfo.uid.toString();
   Timer? _searchDebounce;
   int _searchSeq = 0;
 
@@ -43,7 +44,6 @@ class HomeSearchLogic extends GetxController {
   @override
   void onReady() {
     super.onReady();
-    unawaited(loadSelfId());
     loadHistory();
   }
 
@@ -73,17 +73,6 @@ class HomeSearchLogic extends GetxController {
     unawaited(persistHistory());
   }
 
-  Future<void> loadSelfId() async {
-    try {
-      final res = await ChimoApis.user.profileOrNull();
-      final profile = res.data;
-      if (isClosed || profile == null) return;
-      if (profile.id <= Int64.ZERO) return;
-      selfUserId = profile.uid;
-    } catch (_) {
-      // 拿不到自己的 uid 只影响「搜到自己时不显示关注按钮」这一个细节。
-    }
-  }
 
   /// 输入框内容变化（View 的 listener 里调）。
   void onInputChanged(String text) {
@@ -278,12 +267,6 @@ class HomeSearchLogic extends GetxController {
         }
       }
 
-      // 搜自己的 ID：接口无命中时用本人资料兜底。
-      if (hit == null && selfUserId != null && query == selfUserId) {
-        hit = await selfAsSearchUser();
-        if (isClosed || seq != _searchSeq) return;
-      }
-
       if (hit != null && selfUserId != null && hit.userId == selfUserId) {
         hit = hit.copyWith(relation: SearchRelation.self);
       }
@@ -302,16 +285,6 @@ class HomeSearchLogic extends GetxController {
     }
   }
 
-  Future<SearchUser?> selfAsSearchUser() async {
-    try {
-      final res = await ChimoApis.user.profileByUidOrNull(selfUserId ?? '');
-      final p = res.data;
-      if (p == null || p.id <= Int64.ZERO) return null;
-      return fromUser(p).copyWith(relation: SearchRelation.self);
-    } catch (_) {
-      return null;
-    }
-  }
 
   /// 点历史词。View 已把输入框文本改成 [item]（会触发 listener 的防抖），
   /// 所以这里要再取消一次再立即搜 —— 原版两次 `cancel()` 就是这个意思。
