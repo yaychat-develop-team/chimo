@@ -10,28 +10,28 @@ abstract final class AppTheme {
     final base = ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
-      scaffoldBackgroundColor: AppColors.background,
+      scaffoldBackgroundColor: AppColors.black,
       // 不要全局挂 Emoji 字体：其字距/行高会把普通文字撑出大间隔。
       // 自定义表情仅在聊天气泡/输入框用 TextStyle.withAppEmoji。
       colorScheme: const ColorScheme.dark(
-        primary: AppColors.primary,
-        surface: AppColors.surface,
+        primary: AppColors.green1BBA77,
+        surface: AppColors.black111111,
         onPrimary: Colors.black,
-        onSurface: AppColors.textPrimary,
+        onSurface: AppColors.white,
       ),
     );
 
     return base.copyWith(
       appBarTheme: const AppBarTheme(
-        backgroundColor: AppColors.background,
+        backgroundColor: AppColors.black,
         elevation: 0,
         scrolledUnderElevation: 0,
         // 深色背景上使用浅色系统状态栏。
         systemOverlayStyle: SystemUiOverlayStyle.light,
       ),
       textTheme: base.textTheme.apply(
-        bodyColor: AppColors.textPrimary,
-        displayColor: AppColors.textPrimary,
+        bodyColor: AppColors.white,
+        displayColor: AppColors.white,
       ),
     );
   }

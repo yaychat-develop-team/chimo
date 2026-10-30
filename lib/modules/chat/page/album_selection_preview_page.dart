@@ -4,26 +4,21 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:photo_manager/photo_manager.dart';
-import '../../../common/widgets/app_image.dart';
 import '../../../common/widgets/app_scaffold.dart';
 import '../../../app/app_jumper.dart';
 import '../../../common/utils/text_fmt.dart';
 import '../../../common/utils/time_fmt.dart';
+import 'package:chimo/common/widgets/app_image.dart';
 
 /// 相册所选照片的全屏滑动预览，含基础照片信息。
 class AlbumSelectionPreviewPage extends StatefulWidget {
-  const AlbumSelectionPreviewPage({
-    super.key,
-    required this.entities,
-    this.initialIndex = 0,
-  });
+  const AlbumSelectionPreviewPage({super.key, required this.entities, this.initialIndex = 0});
 
   final List<AssetEntity> entities;
   final int initialIndex;
 
   @override
-  State<AlbumSelectionPreviewPage> createState() =>
-      _AlbumSelectionPreviewPageState();
+  State<AlbumSelectionPreviewPage> createState() => _AlbumSelectionPreviewPageState();
 }
 
 class _AlbumSelectionPreviewPageState extends State<AlbumSelectionPreviewPage> {
@@ -76,9 +71,7 @@ class _AlbumSelectionPreviewPageState extends State<AlbumSelectionPreviewPage> {
     final total = widget.entities.length;
     final top = MediaQuery.paddingOf(context).top;
     final bottom = MediaQuery.paddingOf(context).bottom;
-    final entity = total == 0
-        ? null
-        : widget.entities[_index.clamp(0, total - 1)];
+    final entity = total == 0 ? null : widget.entities[_index.clamp(0, total - 1)];
     final file = entity == null ? null : _files[entity.id];
     final title = entity == null ? null : (_titles[entity.id] ?? entity.title);
     final sizeLabel = file != null && file.existsSync()
@@ -91,18 +84,13 @@ class _AlbumSelectionPreviewPageState extends State<AlbumSelectionPreviewPage> {
       if (entity != null) _formatDate(entity.createDateTime),
     ].where((s) => s.trim().isNotEmpty).toList();
 
-    return ChimoScaffold(
-      showNav: false,
-      safeArea: false,
+    return AppScaffold(
       backgroundColor: Colors.black,
       body: Stack(
         children: [
           if (total == 0)
             const Center(
-              child: Text(
-                'No photos selected',
-                style: TextStyle(color: Colors.white70),
-              ),
+              child: Text('No photos selected', style: TextStyle(color: Colors.white70)),
             )
           else
             PageView.builder(
@@ -128,11 +116,7 @@ class _AlbumSelectionPreviewPageState extends State<AlbumSelectionPreviewPage> {
                 children: [
                   IconButton(
                     onPressed: () => AppJumper.back(),
-                    icon: const Icon(
-                      Icons.close_rounded,
-                      color: Colors.white,
-                      size: 26,
-                    ),
+                    icon: const Icon(Icons.close_rounded, color: Colors.white, size: 26),
                   ),
                   Expanded(
                     child: Text(
@@ -160,10 +144,7 @@ class _AlbumSelectionPreviewPageState extends State<AlbumSelectionPreviewPage> {
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.transparent,
-                      Colors.black.withValues(alpha: 0.75),
-                    ],
+                    colors: [Colors.transparent, Colors.black.withValues(alpha: 0.75)],
                   ),
                 ),
                 child: Padding(
@@ -210,20 +191,14 @@ class _AlbumSelectionPreviewPageState extends State<AlbumSelectionPreviewPage> {
       return AppImage.file(file.path, fit: BoxFit.contain, error: _broken);
     }
     return FutureBuilder<Uint8List?>(
-      future: entity.thumbnailDataWithSize(
-        const ThumbnailSize(1080, 1080),
-        quality: 90,
-      ),
+      future: entity.thumbnailDataWithSize(const ThumbnailSize(1080, 1080), quality: 90),
       builder: (context, snapshot) {
         final bytes = snapshot.data;
         if (bytes == null || bytes.isEmpty) {
           return const SizedBox(
             width: 32,
             height: 32,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: Colors.white54,
-            ),
+            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54),
           );
         }
         return AppImage.bytes(bytes, fit: BoxFit.contain);
@@ -231,9 +206,5 @@ class _AlbumSelectionPreviewPageState extends State<AlbumSelectionPreviewPage> {
     );
   }
 
-  static const _broken = Icon(
-    Icons.broken_image_outlined,
-    color: Colors.white54,
-    size: 48,
-  );
+  static const _broken = Icon(Icons.broken_image_outlined, color: Colors.white54, size: 48);
 }

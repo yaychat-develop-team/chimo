@@ -5,6 +5,7 @@ import '../../../../common/theme/app_colors.dart';
 import '../../../../common/widgets/app_image.dart';
 import '../../logic/room_effect_logic.dart';
 import '../../model/room_fx.dart';
+import 'package:chimo/common/utils/chimo.dart';
 
 /// 座驾从右侧滑入，停留后滑出。时长 2500ms。
 class RoomJoinLayer extends StatefulWidget {
@@ -101,11 +102,7 @@ class _RoomJoinLayerState extends State<RoomJoinLayer> with SingleTickerProvider
       decoration: BoxDecoration(gradient: AppColors.roomCarGradient(item.level)),
       child: Row(
         children: [
-          ClipOval(
-            child: item.avatar.isEmpty
-                ? const ColoredBox(color: AppColors.surfaceField, child: SizedBox(width: 36, height: 36))
-                : AppImage(item.avatar, width: 36, height: 36, fit: BoxFit.cover),
-          ),
+          AppImage.avatar(item.avatar, size: 36),
           const SizedBox(width: 8),
           Expanded(
             child: Column(
@@ -116,15 +113,22 @@ class _RoomJoinLayerState extends State<RoomJoinLayer> with SingleTickerProvider
                   item.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: AppColors.joinName, fontSize: 13, fontWeight: FontWeight.w600),
+                  style: const TextStyle(
+                    color: AppColors.green29EEAA,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Text.rich(
                   TextSpan(
-                    style: const TextStyle(color: AppColors.textPreview, fontSize: 12),
+                    style: const TextStyle(color: AppColors.white70, fontSize: 12),
                     children: [
                       const TextSpan(text: 'entered in '),
-                      TextSpan(text: item.carName, style: const TextStyle(color: AppColors.giftGold)),
+                      TextSpan(
+                        text: item.carName,
+                        style: const TextStyle(color: AppColors.yellowFFD400),
+                      ),
                     ],
                   ),
                   maxLines: 1,
@@ -133,7 +137,8 @@ class _RoomJoinLayerState extends State<RoomJoinLayer> with SingleTickerProvider
               ],
             ),
           ),
-          if (item.carImage.isNotEmpty) AppImage(item.carImage, width: 88, height: 48, fit: BoxFit.contain),
+          if (item.carImage.isNotEmpty)
+            Chimo.image(item.carImage, width: 88, height: 48, fit: BoxFit.contain),
         ],
       ),
     );

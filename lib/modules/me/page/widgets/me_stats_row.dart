@@ -25,7 +25,7 @@ class MeStatsRow extends StatelessWidget {
                 Text(
                   item.label,
                   style: const TextStyle(
-                    color: AppColors.textSecondary,
+                    color: AppColors.gray9A9A9A,
                     fontSize: 12,
                     fontWeight: FontWeight.w400,
                     height: 1.2,

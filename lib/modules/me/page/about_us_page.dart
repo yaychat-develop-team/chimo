@@ -6,7 +6,7 @@ import '../logic/about_us_logic.dart';
 import '../../../common/theme/app_colors.dart';
 import '../../../common/widgets/app_scaffold.dart';
 import '../../../common/widgets/app_webview_page.dart';
-import '../../../common/widgets/app_image.dart';
+import 'package:chimo/common/utils/chimo.dart';
 import '../../../common/utils/app_toast.dart';
 
 /// About Us — layout/behavior aligned with forya [AboutPage].
@@ -28,7 +28,7 @@ class _AboutUsPageState extends State<AboutUsPage> {
   late final AboutUsLogic logic;
   late final String _websiteUrl;
 
-  static const _websiteGreen = AppColors.accentLimeDim;
+  static const _websiteGreen = AppColors.greenC7EF4C;
 
   @override
   void initState() {
@@ -71,28 +71,24 @@ class _AboutUsPageState extends State<AboutUsPage> {
   @override
   Widget build(BuildContext context) {
     return Obx(
-      () => ChimoScaffold(
-        title: 'About Us',
+      () => AppScaffold(
+        appBar: AppNavBar(title: 'About Us'),
         body: Column(
           children: [
-            const SizedBox(height: 103),
-            AppImage(AppAssets.aboutLogo, width: 72, height: 72, fit: BoxFit.contain),
-            const SizedBox(height: 14),
-            AppImage(
+            Chimo.gap(height: 103),
+            Chimo.image(AppAssets.aboutLogo, width: 72, height: 72, fit: BoxFit.contain),
+            Chimo.gap(height: 14),
+            Chimo.image(
               AppAssets.titleLogo,
               width: 82,
               height: 20,
               fit: BoxFit.contain,
               error: const Text(
                 'Chimo',
-                style: TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: TextStyle(color: AppColors.white, fontSize: 18, fontWeight: FontWeight.w700),
               ),
             ),
-            const SizedBox(height: 10),
+            Chimo.gap(height: 10),
             if (logic.version.value.isNotEmpty)
               GestureDetector(
                 onTap: _checkUpdate,
@@ -106,7 +102,7 @@ class _AboutUsPageState extends State<AboutUsPage> {
                   ),
                 ),
               ),
-            const SizedBox(height: 36),
+            Chimo.gap(height: 36),
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 16),
               padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
@@ -137,7 +133,7 @@ class _AboutUsPageState extends State<AboutUsPage> {
                 ],
               ),
             ),
-            const SizedBox(height: 36),
+            Chimo.gap(height: 36),
             Text(
               'Copyright ©2025 All rights reserved for Chimo',
               textAlign: TextAlign.center,
@@ -180,15 +176,15 @@ class _AboutItem extends StatelessWidget {
                   title,
                   softWrap: true,
                   style: const TextStyle(
-                    color: AppColors.textPrimary,
+                    color: AppColors.white,
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              Chimo.gap(width: 8),
               if (!hasLink)
-                AppImage(
+                Chimo.image(
                   AppAssets.mineArrow,
                   width: 7,
                   height: 12,
@@ -201,7 +197,7 @@ class _AboutItem extends StatelessWidget {
                   maxLines: 1,
                   textAlign: TextAlign.right,
                   style: TextStyle(
-                    color: subDescColor ?? AppColors.primaryBright,
+                    color: subDescColor ?? AppColors.green1BBA77,
                     fontSize: 14,
                     fontWeight: FontWeight.w400,
                   ),

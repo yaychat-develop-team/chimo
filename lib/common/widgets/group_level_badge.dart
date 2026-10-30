@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../constants/app_assets.dart';
-import 'app_image.dart';
+import 'package:chimo/common/utils/chimo.dart';
 
 /// 群组贵族等级徽章（资源 `group_level_1`…`group_level_6`）。
 class GroupLevelBadge extends StatelessWidget {
@@ -15,7 +15,7 @@ class GroupLevelBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppImage(
+    return Chimo.image(
       AppAssets.groupLevel(level),
       height: badgeHeight,
       fit: BoxFit.contain,

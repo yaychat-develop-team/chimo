@@ -17,12 +17,12 @@ import '../../../../common/theme/app_emoji.dart';
 import '../../../../app/service/im_service.dart';
 import '../../../../common/utils/app_log.dart';
 import '../../../../common/utils/app_toast.dart';
-import '../../../../common/widgets/app_image.dart';
 import '../../../../common/utils/media_picker.dart';
 import '../../../../common/utils/time_fmt.dart';
 import 'panels/emoji_panel.dart';
 import 'panels/photo_panel.dart';
 import 'panels/voice_panel.dart';
+import 'package:chimo/common/utils/chimo.dart';
 
 /// 私聊页要构造 [ChatStickerSource]（贴纸包的取数与发送），从这里转出去 ——
 /// 和 `core/network/app_apis.dart` 一样的做法：调用方 import 输入栏一个文件就够。
@@ -173,15 +173,15 @@ class ChatInputBarStyle {
     outerPadding: EdgeInsets.fromLTRB(16, 10, 16, 0),
     quoteAboveOuterPadding: false,
     quotePadding: EdgeInsets.only(bottom: 8),
-    quoteColor: AppColors.textGrayF5,
+    quoteColor: AppColors.grayF0F0F0,
     pillHeight: 54,
     pillMinHeight: null,
     pillPadding: EdgeInsets.symmetric(horizontal: 20),
-    pillColor: AppColors.textGrayF5,
+    pillColor: AppColors.grayF0F0F0,
     pillRadius: 27,
-    textStyle: TextStyle(color: AppColors.surfaceDark, fontSize: 14, fontWeight: FontWeight.w400),
+    textStyle: TextStyle(color: AppColors.black111111, fontSize: 14, fontWeight: FontWeight.w400),
     hintText: 'Send message...',
-    hintStyle: TextStyle(color: AppColors.textGrayAE, fontSize: 14, fontWeight: FontWeight.w300),
+    hintStyle: TextStyle(color: AppColors.grayB0B0B0, fontSize: 14, fontWeight: FontWeight.w300),
     contentPadding: EdgeInsets.symmetric(vertical: 16),
     toolAssets: {
       ChatInputTool.voice: AppAssets.chatVoice,
@@ -203,9 +203,9 @@ class ChatInputBarStyle {
     iconFilter: null,
     iconTapPadding: EdgeInsets.zero,
     sendButtonSize: 30,
-    sendButtonGradient: AppColors.promoBannerGradient,
+    sendButtonGradient: AppColors.primaryGradient,
     sendButtonColor: null,
-    sendIconColor: AppColors.promoText,
+    sendIconColor: AppColors.black1C1C1E,
     emojiIconWinsOverSend: true,
     voicePanel: ChatVoicePanelStyle.dm,
     emojiPanel: ChatEmojiPanelStyle.dm,
@@ -215,15 +215,15 @@ class ChatInputBarStyle {
     outerPadding: EdgeInsets.fromLTRB(12, 8, 12, 0),
     quoteAboveOuterPadding: true,
     quotePadding: EdgeInsets.fromLTRB(12, 0, 12, 8),
-    quoteColor: AppColors.textGrayF0,
+    quoteColor: AppColors.grayF0F0F0,
     pillHeight: null,
     pillMinHeight: 48,
     pillPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-    pillColor: AppColors.textGrayF0,
+    pillColor: AppColors.grayF0F0F0,
     pillRadius: 24,
-    textStyle: TextStyle(color: AppColors.surfaceDark, fontSize: 15, fontWeight: FontWeight.w500),
+    textStyle: TextStyle(color: AppColors.black111111, fontSize: 15, fontWeight: FontWeight.w500),
     hintText: 'Please type here...',
-    hintStyle: TextStyle(color: AppColors.textSecondary, fontSize: 15, fontWeight: FontWeight.w400),
+    hintStyle: TextStyle(color: AppColors.gray9A9A9A, fontSize: 15, fontWeight: FontWeight.w400),
     contentPadding: EdgeInsets.symmetric(vertical: 10),
     toolAssets: {
       ChatInputTool.voice: AppAssets.inputVoice,
@@ -250,7 +250,7 @@ class ChatInputBarStyle {
     iconTapPadding: EdgeInsets.all(4),
     sendButtonSize: 32,
     sendButtonGradient: null,
-    sendButtonColor: AppColors.accentNeon,
+    sendButtonColor: AppColors.green1CFF8A,
     sendIconColor: Colors.black,
     emojiIconWinsOverSend: false,
     voicePanel: ChatVoicePanelStyle.group,
@@ -888,7 +888,7 @@ class ChatInputBarState extends State<ChatInputBar> {
     // 某一边没有这个图标（比如群聊没有礼物）就画不出来 —— 但 style 的三个
     // 列表本来就不该出现没配资源的工具，所以这里只是兜底。
     if (asset == null) return const SizedBox.shrink();
-    Widget child = AppImage(asset, width: size, height: size, fit: BoxFit.contain);
+    Widget child = Chimo.image(asset, width: size, height: size, fit: BoxFit.contain);
     final filter = widget.style.iconFilter;
     if (filter != null) {
       child = ColorFiltered(colorFilter: filter, child: child);
@@ -906,14 +906,13 @@ class ChatInputBarState extends State<ChatInputBar> {
 
   /// 图标之间垫 [ChatInputBarStyle.iconGap]。
   List<Widget> _iconRun(List<ChatInputTool> tools, {required double size}) {
-    final out = <Widget>[];
-    for (final tool in tools) {
-      if (out.isNotEmpty && widget.style.iconGap > 0) {
-        out.add(SizedBox(width: widget.style.iconGap));
-      }
-      out.add(_toolIcon(tool, size: size));
-    }
-    return out;
+    return tools.indexed.expand((entry) {
+      final (index, tool) = entry;
+      return [
+        if (index > 0 && widget.style.iconGap > 0) SizedBox(width: widget.style.iconGap),
+        _toolIcon(tool, size: size),
+      ];
+    }).toList();
   }
 
   Widget _quoteCard(ImQuoteMsg quote) {
@@ -932,7 +931,7 @@ class ChatInputBarState extends State<ChatInputBar> {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                color: AppColors.textGray99,
+                color: AppColors.gray9A9A9A,
                 fontSize: 12,
                 fontWeight: FontWeight.w400,
                 height: 1.3,
@@ -945,7 +944,7 @@ class ChatInputBarState extends State<ChatInputBar> {
               width: 16,
               height: 16,
               alignment: Alignment.center,
-              decoration: const BoxDecoration(color: AppColors.textGray99, shape: BoxShape.circle),
+              decoration: const BoxDecoration(color: AppColors.gray9A9A9A, shape: BoxShape.circle),
               child: const Icon(Icons.close_rounded, size: 12, color: Colors.white),
             ),
           ),

@@ -5,6 +5,8 @@ import 'package:im_flutter_sdk/im_flutter_sdk.dart';
 import '../theme/app_emoji.dart';
 import '../utils/app_log.dart';
 import '../utils/json_read.dart';
+import 'im_custom_events.dart';
+import 'im_custom_payload.dart';
 import 'im_models.dart';
 import 'im_system_accounts.dart';
 
@@ -44,23 +46,23 @@ abstract final class ImMessageCodec {
       return fallbackText.isNotEmpty ? fallbackText : '[Message]';
     }
     switch (event) {
-      case 'SendGift':
+      case ImCustomEvents.sendGift:
         return '[Gift]';
       case 'im_ride_invite_message':
         return '[Ride Invitation]';
-      case 'im_room_invite_message':
-      case 'RoomInvite':
+      case ImCustomEvents.roomInvite:
+      case ImCustomEvents.roomInviteV2:
         return '[Room Invitation]';
       case 'share_user_msg':
         return '[Friend Referral]';
       case 'im_prick_message':
         return '[Poke]';
-      case 'im_recall_message':
-      case 'recallMessage':
+      case ImCustomEvents.recall:
+      case ImCustomEvents.recallAlt:
         return 'The sender recalled a message.';
-      case 'im_follow_message':
+      case ImCustomEvents.follow:
         return 'Followed you';
-      case 'JoinGroupMessage':
+      case ImCustomEvents.joinGroup:
         final join = _parseJoinGroupParams(body.params);
         if (join.name.isNotEmpty) {
           return '${join.name} joined the community';
@@ -246,6 +248,7 @@ abstract final class ImMessageCodec {
     String emoteUrl = '',
     String emoteName = '',
     String customEvent = '',
+    Map<String, dynamic> customPayload = const {},
     int giftId = 0,
     int giftQty = 1,
     String giftName = '',
@@ -278,6 +281,7 @@ abstract final class ImMessageCodec {
       thumbnailUrl: thumb,
       durationSecs: durationSecs,
       customEvent: customEvent,
+      customPayload: customPayload,
       giftId: giftId,
       giftQty: giftQty,
       giftName: giftName,
@@ -313,6 +317,7 @@ abstract final class ImMessageCodec {
       thumbnailUrl: msg.thumbnailUrl,
       durationSecs: msg.durationSecs,
       customEvent: msg.customEvent,
+      customPayload: msg.customPayload,
       giftId: msg.giftId,
       giftQty: msg.giftQty,
       giftName: msg.giftName,
@@ -380,7 +385,7 @@ abstract final class ImMessageCodec {
     final isGroup = message.chatType == ChatType.GroupChat;
     final sender = _senderFromAttributes(message.attributes);
 
-    if (event == 'SendGift') {
+    if (event == ImCustomEvents.sendGift) {
       final gift = _parseGiftParams(params);
       final name = gift.name;
       final qty = gift.qty;
@@ -408,7 +413,7 @@ abstract final class ImMessageCodec {
       );
     }
 
-    if (event == 'im_follow_message') {
+    if (event == ImCustomEvents.follow) {
       final followed = (int.tryParse(params['follow'] ?? '1') ?? 1) > 0;
       final text = isSelf
           ? (followed
@@ -437,7 +442,7 @@ abstract final class ImMessageCodec {
     }
 
     // 对齐 forya `CusTomMessage.recallMessage`：这条 CUSTOM 才是撤回提示文案。
-    if (event == 'im_recall_message' || event == 'recallMessage') {
+    if (event == ImCustomEvents.recall || event == ImCustomEvents.recallAlt) {
       return ImChatMessage(
         id: message.msgId,
         conversationId: conversationId,
@@ -459,7 +464,7 @@ abstract final class ImMessageCodec {
       );
     }
 
-    if (event == 'JoinGroupMessage') {
+    if (event == ImCustomEvents.joinGroup) {
       final join = _parseJoinGroupParams(params);
       final name = join.name.isEmpty ? 'Someone' : join.name;
       return ImChatMessage(
@@ -477,6 +482,34 @@ abstract final class ImMessageCodec {
         senderName: sender.name.isNotEmpty ? sender.name : name,
         senderAvatar: sender.avatar,
         senderUid: sender.uid.isNotEmpty ? sender.uid : join.uid,
+        senderGender: sender.gender,
+        isGroup: isGroup,
+        failed: message.status == MessageStatus.FAIL,
+      );
+    }
+
+    // 可识别的自定义卡片（房间邀请等）：统一 msgType=custom + payload。
+    final payload = ImCustomPayload.parse(
+      event: event,
+      params: params,
+      attributes: message.attributes,
+    );
+    if (payload != null) {
+      final preview = _customPreview(body, message: message);
+      return ImChatMessage(
+        id: message.msgId,
+        conversationId: conversationId,
+        from: message.from ?? '',
+        to: message.to ?? '',
+        text: preview,
+        isSelf: isSelf,
+        serverTimeMs: message.serverTime,
+        msgType: 'custom',
+        customEvent: event,
+        customPayload: payload,
+        senderName: sender.name,
+        senderAvatar: sender.avatar,
+        senderUid: sender.uid,
         senderGender: sender.gender,
         isGroup: isGroup,
         failed: message.status == MessageStatus.FAIL,

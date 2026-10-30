@@ -47,7 +47,8 @@ class _RoomLyricLayerState extends State<RoomLyricLayer> {
           .map((line) => line.trim())
           .where((line) => line.isNotEmpty)
           .toList();
-      if (lines.isEmpty) return const IgnorePointer(child: SizedBox.expand());
+      // 空态必须 shrink：全屏 expand 会盖住下层 RoomGiftPag，PAG VisibilityDetector 判定不可见并 pause。
+      if (lines.isEmpty) return const SizedBox.shrink();
       return Stack(
         children: [
           Positioned(
@@ -73,7 +74,7 @@ class _RoomLyricLayerState extends State<RoomLyricLayer> {
           height: 124,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.textPrimary.withValues(alpha: 0.1)),
+            border: Border.all(color: AppColors.white.withValues(alpha: 0.1)),
             gradient: AppColors.roomLyricGradient,
           ),
           child: Stack(
@@ -82,22 +83,21 @@ class _RoomLyricLayerState extends State<RoomLyricLayer> {
                 padding: const EdgeInsets.fromLTRB(16, 28, 16, 12),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    for (var i = 0; i < lines.length && i < 3; i++)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 2),
-                        child: Text(
-                          lines[i],
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: i == 0 ? AppColors.textPrimary : AppColors.roomLyricDim,
-                            fontSize: i == 0 ? 16 : 14,
-                          ),
+                  children: List.generate(lines.length < 3 ? lines.length : 3, (i) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Text(
+                        lines[i],
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: i == 0 ? AppColors.white : AppColors.white50,
+                          fontSize: i == 0 ? 16 : 14,
                         ),
                       ),
-                  ],
+                    );
+                  }),
                 ),
               ),
               PositionedDirectional(
@@ -105,7 +105,7 @@ class _RoomLyricLayerState extends State<RoomLyricLayer> {
                 end: 0,
                 child: IconButton(
                   onPressed: onClose,
-                  icon: const Icon(Icons.close_rounded, size: 16, color: AppColors.textPrimary),
+                  icon: const Icon(Icons.close_rounded, size: 16, color: AppColors.white),
                 ),
               ),
             ],

@@ -48,32 +48,60 @@ class CashApi {
   }
 
   Future<ApiResult<List<ItemInfo>>> giftItems({int version = 1, int rid = 0}) async {
-    final res = await Http.ins.getAndParse<ItemInfoRsp>(
-      '/cash/item',
-      query: {'version': '$version', 'rid': '$rid'},
-    );
-    return res.map(
+    final tabs = await giftTabs(version: version, rid: rid);
+    return tabs.map(
       (data) => [
-        for (final tab in data.itemTab)
-          for (final item in tab.item)
-            if (item.canBuy) item,
+        for (final tab in data)
+          if (tab.tabType.trim() != 'bag')
+            for (final item in tab.item) item,
       ],
     );
   }
 
+  /// 礼物目录按 Tab 返回。背包（bag）内容走 `/commodity/mine/bag`，这里只占位。
+  Future<ApiResult<List<ItemTab>>> giftTabs({int version = 1, int rid = 0}) async {
+    final res = await Http.ins.getAndParse<ItemInfoRsp>(
+      '/cash/item',
+      query: {'version': '$version', 'rid': '$rid'},
+    );
+    return res.map((data) {
+      final tabs = <ItemTab>[];
+      for (final tab in data.itemTab) {
+        final type = tab.tabType.trim();
+        final items = type == 'bag'
+            ? const <ItemInfo>[]
+            : [for (final item in tab.item) if (item.canBuy) item];
+        if (items.isEmpty && type != 'bag') continue;
+        tabs.add(
+          ItemTab(
+            id: tab.id,
+            name: tab.name,
+            description: tab.description,
+            tabType: tab.tabType,
+            item: items,
+          ),
+        );
+      }
+      return tabs;
+    });
+  }
+
+  /// 房间送礼请带 [channelId]（rid 数字）。`channel` 必须是 int：
+  /// 字符串时服务端可能不广播 `SEND_GIFT`，麦位动画不会来。
   Future<ApiResult<void>> sendGift({
     required List<String> receiverIds,
     required String itemId,
     required int count,
     String? channelId,
   }) {
+    final channel = int.tryParse(channelId?.trim() ?? '') ?? 0;
     return Http.ins.postAndParse(
       '/cash/gift',
       data: {
         'receiverId': receiverIds,
         'itemId': itemId,
         'count': count,
-        if (channelId != null && channelId.isNotEmpty) 'channel': channelId,
+        if (channel > 0) 'channel': channel,
       },
     );
   }

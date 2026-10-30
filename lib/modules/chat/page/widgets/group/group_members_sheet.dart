@@ -10,8 +10,8 @@ import '../../../../../common/theme/app_colors.dart';
 import '../../../../../common/theme/app_input.dart';
 import '../../../../../common/extensions/wire_view.dart';
 import '../../../../../common/models/server_client/user.pb.dart';
-import '../../../../../common/widgets/app_image.dart';
 import '../../../../../common/theme/app_bottom_sheet.dart';
+import 'package:chimo/common/utils/chimo.dart';
 
 /// 群成员底部弹层，支持昵称搜索（接口驱动）。
 class GroupMembersSheet extends StatefulWidget {
@@ -92,7 +92,7 @@ class _GroupMembersSheetState extends State<GroupMembersSheet> {
                 height: height,
                 child: DecoratedBox(
                   decoration: const BoxDecoration(
-                    color: AppColors.surfaceSheet,
+                    color: AppColors.black1C1C1E,
                     borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
                   ),
                   child: Column(
@@ -103,7 +103,7 @@ class _GroupMembersSheetState extends State<GroupMembersSheet> {
                         'Group Members',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: AppColors.textPrimary,
+                          color: AppColors.white,
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
                         ),
@@ -115,16 +115,16 @@ class _GroupMembersSheetState extends State<GroupMembersSheet> {
                           height: 44,
                           padding: const EdgeInsets.symmetric(horizontal: 14),
                           decoration: BoxDecoration(
-                            color: AppColors.surfaceField,
+                            color: AppColors.black2A2A2A,
                             borderRadius: BorderRadius.circular(22),
                           ),
                           child: Row(
                             children: [
-                              const AppImage(
+                              Chimo.image(
                                 AppAssets.msgSearch,
                                 width: 18,
                                 height: 18,
-                                color: AppColors.textTertiary,
+                                color: AppColors.gray6E6E6E,
                                 fit: BoxFit.contain,
                               ),
                               const SizedBox(width: 10),
@@ -133,16 +133,16 @@ class _GroupMembersSheetState extends State<GroupMembersSheet> {
                                   controller: _searchController,
                                   onChanged: _onQueryChanged,
                                   style: const TextStyle(
-                                    color: AppColors.textPrimary,
+                                    color: AppColors.white,
                                     fontSize: 15,
                                     fontWeight: FontWeight.w500,
                                   ),
-                                  cursorColor: AppColors.primaryBright,
+                                  cursorColor: AppColors.green1BBA77,
                                   decoration: const AppInputDecoration(
                                     isDense: true,
                                     hintText: 'Enter a nickname to search',
                                     hintStyle: TextStyle(
-                                      color: AppColors.textTertiary,
+                                      color: AppColors.gray6E6E6E,
                                       fontSize: 15,
                                       fontWeight: FontWeight.w400,
                                     ),
@@ -182,7 +182,7 @@ class _GroupMembersSheetState extends State<GroupMembersSheet> {
               Text(
                 _error!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.textTertiary, fontSize: 14),
+                style: const TextStyle(color: AppColors.gray6E6E6E, fontSize: 14),
               ),
               const SizedBox(height: 16),
               if (_needsLogin)
@@ -201,7 +201,7 @@ class _GroupMembersSheetState extends State<GroupMembersSheet> {
       return Center(
         child: Text(
           _query.trim().isEmpty ? 'No members' : 'No members found',
-          style: const TextStyle(color: AppColors.textTertiary, fontSize: 14),
+          style: const TextStyle(color: AppColors.gray6E6E6E, fontSize: 14),
         ),
       );
     }
@@ -234,7 +234,7 @@ class _MemberRow extends StatelessWidget {
       child: Row(
         children: [
           ClipOval(
-            child: AppImage(
+            child: Chimo.image(
               member.avatar,
               fallbackAsset: AppAssets.avatarPlace,
               width: 48,
@@ -250,7 +250,7 @@ class _MemberRow extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                color: AppColors.textPrimary,
+                color: AppColors.white,
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
               ),
@@ -258,7 +258,7 @@ class _MemberRow extends StatelessWidget {
           ),
           if (member.genderKnown) ...[
             const SizedBox(width: 8),
-            AppImage(
+            Chimo.image(
               member.male ? AppAssets.genderMan : AppAssets.genderWoman,
               width: 18,
               height: 18,

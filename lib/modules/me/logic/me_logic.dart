@@ -1,20 +1,14 @@
 import 'dart:async';
 
-import 'package:chimo/app/session_info.dart';
 import 'package:get/get.dart';
 
 import '../../../app/app_jumper.dart';
 import '../../../app/chimo_api.dart';
 import '../../../common/models/server_client/user.pb.dart';
-import '../../friends/model/friends_tab.dart';
+import '../../../common/utils/app_toast.dart';
 import '../model/me_menu_data.dart';
 
 /// Me 页的资料、社交计数与快捷入口。
-///
-/// 由 [MainTabShell] 自持：`MePage` 是 `IndexedStack` 里的 `const` 子节点，
-/// 加不了参数也不该自己管生命周期（见 `MainTabShell` 那段注释）。
-///
-/// 约定：一次性的 toast 文案由方法 `return` 给 View（Controller 不 import
 class MeLogic extends GetxController {
   final Rx<User> profile = User().obs;
 
@@ -65,30 +59,26 @@ class MeLogic extends GetxController {
     return MeMenuData.quickAccess;
   }
 
-  /// 拉资料 + 访客数。返回 `null` = 没什么要提示的，非 `null` = 要 toast 的文案。
-  Future<String?> load() async {
+  /// 拉资料 + 访客数。失败 toast。
+  Future<void> load() async {
     try {
       final profileFuture = ChimoApis.user.profile();
       // Me「Visitors」= Visits 列表中的去重人数（不是 viewNum 总次数）。
       final visitsFuture = ChimoApis.relation.viewedBy();
       final res = await profileFuture;
-      final visitsRes = await visitsFuture;
-      if (isClosed) return null;
+      await visitsFuture;
       if (!res.ok || res.data == null) {
         loading.value = false;
-        // 掉登录态就踢回登录页，这时候不要再 toast。
         if (res.isNotLogin) AppJumper.toLoginAndClear();
-        return null;
+        return;
       }
 
       profile.value = res.data!.user;
       hasBoundEmail.value = profile.value.email.isNotEmpty;
       loading.value = false;
-      return null;
     } catch (failure) {
-      if (isClosed) return null;
       loading.value = false;
-      return 'Failed to load profile: $failure';
+      AppToast.error('Failed to load profile: $failure');
     }
   }
 
@@ -106,33 +96,31 @@ class MeLogic extends GetxController {
     profile.value = updated;
   }
 
-  /// 点社交计数：Visitors 进访客页（回来要刷新计数），其余进好友页对应 Tab。
-  Future<String?> openStat(MeStatItem item) async {
+  Future<void> openStat(MeStatItem item) async {
     if (item.label == 'Visitors') {
       await AppJumper.toVisits();
-      if (isClosed) return null;
-      return await load();
+      await load();
+      return;
     }
     final tab = switch (item.label) {
-      'Friends' => FriendsTab.friends,
-      'Fans' => FriendsTab.followers,
-      'Follows' => FriendsTab.follow,
+      'Friends' => 0,
+      'Fans' => 2,
+      'Follows' => 1,
       _ => null,
     };
-    if (tab == null) return null;
+    if (tab == null) return;
     await AppJumper.toFriends(initialTab: tab);
-    return null;
   }
 
-  Future<String?> onQuickAccess(String id) async {
+  Future<void> onQuickAccess(String id) async {
     switch (id) {
       case 'debug':
         await AppJumper.toDebug();
+      case 'honor':
+        await AppJumper.toMyHonor();
       case 'bind_email':
         final bound = await AppJumper.toBindEmail();
-        // 绑定成功后要重新拉一次：邮箱变了，Bind Email 入口也该消失。
-        if (isClosed || bound != true) return null;
-        return await load();
+        if (bound == true) await load();
       case 'about':
         await AppJumper.toAboutUs();
       case 'information':
@@ -142,7 +130,6 @@ class MeLogic extends GetxController {
       case 'settings':
         await AppJumper.toSettings();
     }
-    return null;
   }
 
   /// 等级页要带四个初始值过去（首帧预填）。

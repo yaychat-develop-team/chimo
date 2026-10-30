@@ -63,7 +63,7 @@ class DmChatBody extends StatelessWidget {
                   height: 4,
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      color: AppColors.textGrayD8,
+                      color: AppColors.grayD5D5D5,
                       borderRadius: BorderRadius.all(Radius.circular(2)),
                     ),
                   ),

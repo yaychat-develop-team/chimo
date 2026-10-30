@@ -10,7 +10,6 @@ import 'package:talker_dio_logger/talker_dio_logger.dart';
 import '../../../common/models/any_parser.dart';
 import '../../../common/models/server_client/base.pb.dart';
 import '../../../common/utils/app_log.dart';
-import '../../../common/utils/log.dart';
 import '../../app_config.dart';
 import '../config/proxy_store.dart';
 import 'api_result.dart';
@@ -52,7 +51,7 @@ class Http {
       ),
     );
 
-    final talker = loggerOrNull;
+    final talker = AppLog.talker;
     if (talker != null) {
       _dio.interceptors.add(
         TalkerDioLogger(

@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../../../../common/constants/app_assets.dart';
 import '../../../../common/theme/app_colors.dart';
-import '../../../../common/widgets/app_image.dart';
 import '../../../profile/page/album_photo_viewer_page.dart';
 import '../../model/chat_line.dart';
 import 'chat_bubble.dart';
+import 'chat_custom_bubble.dart';
 import 'chat_emote_bubble.dart';
 import 'chat_gift_card.dart';
 import 'chat_image_bubble.dart';
@@ -13,6 +13,7 @@ import 'chat_join_tip.dart';
 import 'chat_recall_tip.dart';
 import 'chat_timestamp_label.dart';
 import 'chat_voice_bubble.dart';
+import 'package:chimo/common/utils/chimo.dart';
 
 /// 头像从哪儿取。
 enum ChatAvatarSource {
@@ -180,7 +181,7 @@ class ChatMessageListStyle {
   static final ChatMessageListStyle dm = ChatMessageListStyle(
     padding: const EdgeInsets.fromLTRB(14, 8, 14, 24),
     emptyTextStyle: const TextStyle(
-      color: AppColors.textGrayC9,
+      color: AppColors.grayC8C8C8,
       fontSize: 14,
       fontWeight: FontWeight.w500,
     ),
@@ -204,7 +205,7 @@ class ChatMessageListStyle {
     padding: EdgeInsets.fromLTRB(16, 12, 16, 20),
     emptyPadding: EdgeInsets.fromLTRB(16, 48, 16, 20),
     emptyTextStyle: TextStyle(
-      color: AppColors.textGrayAE,
+      color: AppColors.grayB0B0B0,
       fontSize: 14,
       fontWeight: FontWeight.w500,
       height: 1.4,
@@ -378,7 +379,7 @@ class ChatMessageList extends StatelessWidget {
       child: SizedBox(
         width: 22,
         height: 22,
-        child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.textGrayB0),
+        child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.grayB0B0B0),
       ),
     ),
   );
@@ -439,6 +440,7 @@ class ChatMessageList extends StatelessWidget {
       case ChatLineKind.voice:
       case ChatLineKind.image:
       case ChatLineKind.emote:
+      case ChatLineKind.custom:
         break;
     }
 
@@ -457,6 +459,7 @@ class ChatMessageList extends StatelessWidget {
         locked: locked,
       ),
       ChatLineKind.emote => ChatEmoteBubble(source: line.displayMedia),
+      ChatLineKind.custom => ChatCustomBubble(line: line),
       // 上面的 switch 已经把 join / tip / recall / gift 挡在外面，这里只剩 text。
       _ => ChatBubble(
         isSelf: isSelf,
@@ -492,7 +495,7 @@ class ChatMessageList extends StatelessWidget {
               behavior: HitTestBehavior.opaque,
               child: const Padding(
                 padding: EdgeInsets.all(4),
-                child: Icon(Icons.error, color: AppColors.dangerBright, size: 20),
+                child: Icon(Icons.error, color: AppColors.redFF3B30, size: 20),
               ),
             ),
             const SizedBox(width: 2),
@@ -625,7 +628,7 @@ class _ChatAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final image = AppImage(
+    final image = Chimo.image(
       url,
       fallbackAsset: asset,
       width: ChatMessageList.avatarSize,
@@ -658,7 +661,7 @@ class _SenderNameRow extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              color: AppColors.textGrayAE,
+              color: AppColors.grayB0B0B0,
               fontSize: 12,
               fontWeight: FontWeight.w500,
               height: 1.2,
@@ -667,7 +670,7 @@ class _SenderNameRow extends StatelessWidget {
         ),
         if (line.hasSenderGender) ...[
           const SizedBox(width: 2),
-          AppImage(
+          Chimo.image(
             line.senderIsMale ? AppAssets.genderMan : AppAssets.genderWoman,
             width: 16,
             height: 16,

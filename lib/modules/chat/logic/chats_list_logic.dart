@@ -6,16 +6,20 @@ import 'package:fixnum/fixnum.dart';
 import 'package:get/get.dart';
 import 'package:im_flutter_sdk/im_flutter_sdk.dart';
 
+import '../../../app/app_jumper.dart';
 import '../../../common/constants/app_assets.dart';
 import '../../../app/service/im_service.dart';
 import '../../../common/im/im_system_accounts.dart';
 import '../../../app/chimo_api.dart';
+import '../../../common/models/server_client/base.pbenum.dart';
 import '../../../common/theme/app_colors.dart';
+import '../../../common/theme/app_dialog.dart';
 import '../../../common/utils/app_log.dart';
 import '../../../common/utils/time_fmt.dart';
 import '../../../common/extensions/wire_view.dart';
 import '../../../common/models/server_client/group/group.pb.dart';
 import '../../../common/models/server_client/user.pb.dart';
+import '../../friends/logic/friends_logic.dart';
 import '../model/chat_conversation.dart';
 
 /// 会话页与底部导航未读角标共用的会话列表状态。
@@ -34,12 +38,18 @@ import '../model/chat_conversation.dart';
 /// `Get.put(..., permanent: true)` 保证，效果与 `GetxService` 一致。
 ///
 /// `dispose` → `onClose`），业务逻辑与所有 getter 一行未改。
-class ChatsListLogic extends GetxController {
-  ChatsListLogic() {
+class ConversationListLogic extends GetxController {
+  ConversationListLogic() {
     _imSub = ImService.messages.listen(_onImMessage);
     _imConnSub = ImService.connectionChanges.listen((_) {
       unawaited(_onImConnectionChanged());
     });
+  }
+
+  @override
+  void onReady() {
+    super.onReady();
+    unawaited(refreshFromApi());
   }
 
   /// 全量通知 + 未读角标（`'unread'` 分组）通知。
@@ -70,6 +80,7 @@ class ChatsListLogic extends GetxController {
   StreamSubscription<void>? _imConnSub;
   bool _loading = false;
   String? _loadError;
+  bool _promoOpening = false;
 
   bool get loading => _loading;
   String? get loadError => _loadError;
@@ -283,7 +294,7 @@ class ChatsListLogic extends GetxController {
             lastMsgAtMs: atMs > 0 ? atMs : prev.lastMsgAtMs,
             isSystem: isSystem || prev.isSystem,
             badge: isOfficial ? ChatBadgeType.verified : prev.badge,
-            titleColor: isOfficial ? null : (isSystem ? AppColors.primaryBright : prev.titleColor),
+            titleColor: isOfficial ? null : (isSystem ? AppColors.green1BBA77 : prev.titleColor),
             clearTitleColor: isOfficial,
           );
           _collapsePeerDuplicates(index);
@@ -295,6 +306,7 @@ class ChatsListLogic extends GetxController {
         String? avatarUrl;
         Color? titleColor;
         var badge = ChatBadgeType.none;
+        var resolvedAppUid = '';
 
         if (isSystem) {
           title = ImSystemAccounts.displayName(emId);
@@ -302,7 +314,7 @@ class ChatsListLogic extends GetxController {
           if (isOfficial) {
             badge = ChatBadgeType.verified;
           } else {
-            titleColor = AppColors.primaryBright;
+            titleColor = AppColors.green1BBA77;
           }
         } else {
           try {
@@ -313,6 +325,7 @@ class ChatsListLogic extends GetxController {
               if (brief.avatar.isNotEmpty) avatarUrl = brief.avatar;
               // 插入前先吃掉资料页留下的 `dm_<数字uid>` 行。
               final appId = _appUid(brief);
+              resolvedAppUid = appId;
               if (appId.isNotEmpty) {
                 final existingIdx = _indexOfPeer(id: 'dm_$appId', emUserName: emId);
                 if (existingIdx >= 0) {
@@ -325,6 +338,7 @@ class ChatsListLogic extends GetxController {
                     timeLabel: timeLabel.isNotEmpty ? timeLabel : prev.timeLabel,
                     unreadCount: unread > 0 ? unread : prev.unreadCount,
                     emUserName: emId,
+                    appUid: appId,
                     lastMsgAtMs: atMs > 0 ? atMs : prev.lastMsgAtMs,
                   );
                   _collapsePeerDuplicates(existingIdx);
@@ -350,6 +364,7 @@ class ChatsListLogic extends GetxController {
             timeLabel: timeLabel,
             unreadCount: unread,
             emUserName: emId,
+            appUid: resolvedAppUid,
             lastMsgAtMs: atMs,
             isSystem: isSystem,
             titleColor: titleColor,
@@ -365,6 +380,19 @@ class ChatsListLogic extends GetxController {
   }
 
   String _appUid(MsgListUserItem brief) => brief.id <= Int64.ZERO ? '' : brief.id.toString();
+
+  /// 分享等场景解析出业务 uid 后回写，避免下次再打 msgUser。
+  void rememberPeerAppUid({required String emUserName, required String appUid}) {
+    final em = emUserName.trim();
+    final uid = appUid.trim();
+    if (em.isEmpty || uid.isEmpty) return;
+    final index = _indexOfPeer(emUserName: em);
+    if (index < 0) return;
+    final prev = _conversations[index];
+    if (prev.appUid == uid) return;
+    _conversations[index] = prev.copyWith(appUid: uid);
+    _notify();
+  }
 
   Future<GroupInfo?> _fetchGroupDetail(String gid) async {
     try {
@@ -539,10 +567,14 @@ class ChatsListLogic extends GetxController {
     if (_isSuppressedOfficial(conversation)) return;
     final em = conversation.emUserName.trim();
     final canonicalId = _canonicalDmId(id: conversation.id, emUserName: em);
+    final fromId = conversation.parsedAppUid;
     final dm = conversation.copyWith(
       id: canonicalId,
       badge: conversation.badge == ChatBadgeType.group ? ChatBadgeType.none : conversation.badge,
       emUserName: em,
+      appUid: conversation.appUid.trim().isNotEmpty
+          ? conversation.appUid
+          : (fromId > 0 ? '$fromId' : ''),
     );
     _unhide(dm.id, emUserName: dm.emUserName);
     final index = _indexOfPeer(id: dm.id, emUserName: dm.emUserName);
@@ -778,7 +810,7 @@ class ChatsListLogic extends GetxController {
         emUserName: emId,
         isSystem: true,
         badge: isOfficial ? ChatBadgeType.verified : ChatBadgeType.none,
-        titleColor: isOfficial ? null : AppColors.primaryBright,
+        titleColor: isOfficial ? null : AppColors.green1BBA77,
       );
       return;
     }
@@ -987,9 +1019,11 @@ class ChatsListLogic extends GetxController {
     final preferA = a.lastMsgAtMs >= b.lastMsgAtMs;
     final newer = preferA ? a : b;
     final older = preferA ? b : a;
+    final mergedAppUid = newer.appUid.trim().isNotEmpty ? newer.appUid : older.appUid;
     return newer.copyWith(
       id: _canonicalDmId(id: newer.id, emUserName: em),
       emUserName: em,
+      appUid: mergedAppUid,
       unreadCount: a.unreadCount + b.unreadCount,
       isPinned: a.isPinned || b.isPinned,
       title: newer.title.trim().isNotEmpty ? newer.title : older.title,
@@ -1067,6 +1101,7 @@ class ChatsListLogic extends GetxController {
         title: brief.nickname.isNotEmpty ? brief.nickname : prev.title,
         avatarUrl: brief.avatar.isNotEmpty ? brief.avatar : prev.avatarUrl,
         emUserName: emId,
+        appUid: appId.isNotEmpty ? appId : prev.appUid,
       );
       _collapsePeerDuplicates(keep);
       _notify();
@@ -1104,6 +1139,110 @@ class ChatsListLogic extends GetxController {
     } else {
       _conversations.insert(0, next);
     }
+  }
+
+  /// 左滑删除前先确认。取消或已关闭则不删。
+  Future<void> confirmDelete(ChatConversation item) async {
+    final confirmed =
+        await AppDialog.show(
+          title: 'Tip',
+          content: 'Are you sure you want to delete this conversation?',
+          buttons: DialogLoyoutStyle.horizontal,
+        ) ??
+        false;
+    if (!confirmed || isClosed) return;
+    delete(item.id);
+  }
+
+  /// 打开会话：群详情、新朋友通讯录，或私聊。
+  void openConversation(ChatConversation item) {
+    markRead(item.id);
+
+    if (item.badge == ChatBadgeType.group) {
+      final stillJoined = isGroupJoined(item.id);
+      AppJumper.toGroup(
+        item.id,
+        preview: GroupInfo(
+          emGroupId: item.id,
+          name: item.title,
+          type: item.category.isEmpty ? 'Community' : item.category,
+          desc: item.groupDescription,
+          avatar: item.avatarUrl ?? '',
+          memberCount: Int64(item.memberCount),
+          picCount: Int64(item.postCount),
+          level: item.level,
+          isJoin: stillJoined,
+        ),
+      );
+      return;
+    }
+
+    // 「新朋友」系统账号 → 通讯录（粉丝），不是空白私聊。
+    final em = item.emUserName.isNotEmpty
+        ? item.emUserName
+        : (item.id.startsWith('sys_')
+              ? item.id.substring(4)
+              : item.id.startsWith('dm_')
+              ? item.id.substring(3)
+              : '');
+    if (item.isSystem && ImSystemAccounts.isNewFriends(em)) {
+      AppJumper.toFriends(initialTab: 2);
+      return;
+    }
+
+    AppJumper.toChat(item.id, preview: item);
+  }
+
+  /// 头像：普通私聊进资料，其余走 [openConversation]。
+  void openAvatar(ChatConversation item) {
+    if (!_isPeerConversation(item)) {
+      openConversation(item);
+      return;
+    }
+
+    final uid = item.id.startsWith('dm_') ? item.id.substring(3) : item.id;
+    final em = item.emUserName.isNotEmpty
+        ? item.emUserName
+        : (uid.startsWith('yqdf-') || uid.contains('yqdf') ? uid : '');
+    final numeric = int.tryParse(uid);
+    final profile = User()
+      ..nickname = item.title
+      ..avatar = item.avatarUrl ?? ''
+      ..gender = item.isMale ? 'male' : 'female'
+      ..personalSignature = item.signature
+      ..emUsername = em.isNotEmpty ? em : (numeric == null ? uid : '')
+      ..relationType = item.isFollowing ? RelationType.FOLLOW : RelationType.NONE;
+    if (numeric != null && numeric > 0) profile.id = Int64(numeric);
+
+    AppJumper.toProfile(
+      numeric != null && numeric > 0 ? numeric.toString() : uid,
+      preview: profile,
+    );
+  }
+
+  /// 推广条进编辑资料。进行中再点一次会忽略。
+  Future<void> openPromoProfile() async {
+    if (_promoOpening || isClosed) return;
+    _promoOpening = true;
+    try {
+      final profile = await loadOwnProfile();
+      if (isClosed) return;
+      await AppJumper.toEditProfile(profile: profile);
+    } finally {
+      _promoOpening = false;
+    }
+  }
+
+  bool _isPeerConversation(ChatConversation item) {
+    if (item.badge == ChatBadgeType.group) return false;
+    if (item.badge == ChatBadgeType.verified) return false;
+    if (item.isSystem) return false;
+    if (item.id.startsWith('system_') ||
+        item.id.startsWith('official_') ||
+        item.id.startsWith('sys_')) {
+      return false;
+    }
+    return true;
   }
 
   /// 会话页推广条进编辑资料时的预填。失败就给一份空资料，不打断跳转。

@@ -3,27 +3,24 @@ import 'dart:io';
 
 import 'package:app_tracking_transparency/app_tracking_transparency.dart';
 import 'package:chimo/common/utils/cache_util.dart';
+import 'package:chimo/common/widgets/app_image.dart';
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
 
 import '../app/network/config/api_store.dart';
 import '../app/network/config/proxy_store.dart';
 import '../app/network/http/auth_request_headers.dart';
 import 'chimo_app.dart';
-import '../modules/chat/logic/chats_list_logic.dart';
 import '../app/service/iap_service.dart';
 import '../app/app_config.dart';
 import '../app/network/http/media_upload.dart';
 import '../app/storage/app_storage.dart';
 import '../common/utils/app_log.dart';
-import '../common/utils/log.dart';
-import '../common/widgets/app_image.dart';
 
 /// 应用入口：初始化 Flutter 绑定，然后运行 [ChimoApp]。
 Future<void> main() async {
   // 确保插件与平台通道在 runApp 之前就绪。
   final binding = WidgetsFlutterBinding.ensureInitialized();
-  initTalker();
+  AppLog.init();
   AppConfig.init();
   ApiStore.load();
   ProxyStore.load();
@@ -33,7 +30,7 @@ Future<void> main() async {
   await AppStorage.init();
   // 接口返回的图片多为不带域名的相对 key，注入 CDN 域名后
   // AppImage 拿到 `/upload/xxx.jpg` 也能直接加载。
-  AppImage.configure(cdnBase: MediaUpload.cdnDomain);
+  AppImage.cdnBase = MediaUpload.cdnDomain;
   await IapService.init();
   await CacheUtil.init();
   binding.addPostFrameCallback((_) {
@@ -60,7 +57,8 @@ Future<void> _requestTrackingAuthorization() async {
       // 系统要求：必须在 UI 显示后才能弹窗。首帧回调已满足这一点，
       // 但部分设备首次冷启动时平台通道仍未就绪，稍作延迟以确保可靠弹出。
       await Future<void>.delayed(const Duration(milliseconds: 2000));
-      final result = await AppTrackingTransparency.requestTrackingAuthorization();
+      final result =
+          await AppTrackingTransparency.requestTrackingAuthorization();
       AppLog.i('main ATT user decision=$result');
     }
   } catch (e, stack) {

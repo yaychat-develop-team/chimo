@@ -2,6 +2,7 @@ import 'package:get/get.dart';
 
 import '../../../app/chimo_api.dart';
 import '../../../common/models/server_client/user.pb.dart';
+import '../../../common/utils/app_toast.dart';
 
 /// 黑名单列表与取消拉黑。
 class BlacklistLogic extends GetxController {
@@ -27,11 +28,13 @@ class BlacklistLogic extends GetxController {
     }
   }
 
-  /// 返回 `null` 表示已取消拉黑，否则是失败文案。
-  Future<String?> unblock(String userId) async {
+  /// 取消拉黑。失败 toast。
+  Future<void> unblock(String userId) async {
     final res = await ChimoApis.relation.setBlackList(userId: userId, isCancel: true);
-    if (!res.ok) return res.message.isEmpty ? 'Failed' : res.message;
-    if (!isClosed) users.removeWhere((user) => user.id.toString() == userId);
-    return null;
+    if (!res.ok) {
+      AppToast.error(res.message.isEmpty ? 'Failed' : res.message);
+      return;
+    }
+    users.removeWhere((user) => user.id.toString() == userId);
   }
 }

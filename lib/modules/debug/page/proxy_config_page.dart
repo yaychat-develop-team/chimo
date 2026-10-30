@@ -75,7 +75,7 @@ class _ProxyConfigPageState extends State<ProxyConfigPage> {
 
   @override
   Widget build(BuildContext context) {
-    return ChimoScaffold(
+    return AppScaffold(
       backgroundColor: Colors.white,
       body: ListView(
         padding: const EdgeInsets.fromLTRB(48, 24, 48, 24),
@@ -130,9 +130,9 @@ class _Field extends StatelessWidget {
       style: const TextStyle(color: Colors.black, fontSize: 16),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: AppColors.textGrayB0),
+        hintStyle: const TextStyle(color: AppColors.grayB0B0B0),
         filled: true,
-        fillColor: AppColors.textGrayF2,
+        fillColor: AppColors.grayF0F0F0,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -155,7 +155,7 @@ class _ActionButton extends StatelessWidget {
       height: 48,
       width: double.infinity,
       child: Material(
-        color: AppColors.accentNeon,
+        color: AppColors.green1CFF8A,
         borderRadius: BorderRadius.circular(24),
         child: InkWell(
           onTap: onTap,

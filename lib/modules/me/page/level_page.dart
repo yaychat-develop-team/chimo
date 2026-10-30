@@ -4,9 +4,11 @@ import 'package:get/get.dart';
 import '../../../app/app_jumper.dart';
 import '../../../common/constants/app_assets.dart';
 import '../../../common/theme/app_colors.dart';
-import '../../../common/widgets/app_image.dart';
+import 'package:chimo/common/utils/chimo.dart';
+import '../../../common/widgets/app_pull_refresh.dart';
 import '../../../common/widgets/app_scaffold.dart';
 import 'logic/level_logic.dart';
+import 'package:chimo/common/widgets/app_image.dart';
 
 /// 我的等级 — 对齐 forya `MineLevelPage` / `MineLevelModel`。
 class LevelPage extends StatefulWidget {
@@ -52,74 +54,77 @@ class _LevelPageState extends State<LevelPage> {
   }
 
   static const _mainColors = [
-    AppColors.levelTier1,
-    AppColors.levelTier2,
-    AppColors.levelTier3,
-    AppColors.levelTier4,
-    AppColors.levelTier5,
-    AppColors.levelTier6,
+    AppColors.gray4E566B,
+    AppColors.blue1587F2,
+    AppColors.purple6A39F5,
+    AppColors.orangeE97B15,
+    AppColors.redE7425F,
+    AppColors.redAE1817,
   ];
 
   @override
   Widget build(BuildContext context) {
-    return Obx(
-      () => ChimoScaffold(
+    return AppScaffold(
+      appBar: AppNavBar(
         title: 'My Level',
-        backgroundColor: AppColors.levelBackground,
-        loading: logic.loading.value,
         titleStyle: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600),
         trailing: IconButton(
           onPressed: AppJumper.toLevelsHelp,
           icon: const Icon(Icons.help_outline, color: Colors.white, size: 24),
         ),
-        backdrop: AppImage(
-          AppAssets.levelBg,
-          width: MediaQuery.sizeOf(context).width,
-          fit: BoxFit.fitWidth,
-          alignment: Alignment.topCenter,
-        ),
-        body: RefreshIndicator(
-          color: AppColors.warningAmberSoft,
-          onRefresh: logic.load,
-          child: ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(12, 16, 12, 24),
-            children: [
-              // 卡片这一块跟着 profile 重建；下面的特权卡是常量，别一起包。
-              Obx(() {
-                final profile = logic.profile.value;
-                final mainColor = _mainColors[logic.levelIndex];
-                return _CurrentLevelCard(
-                  level: profile.vipLevel,
-                  levelIndex: logic.levelIndex,
-                  mainColor: mainColor,
-                  progressColors: [mainColor.withValues(alpha: 0.5), mainColor],
-                  experienceText: logic.experienceText,
-                  levelUpText: logic.levelUpText,
-                  percent: logic.percent,
-                );
-              }),
-              const SizedBox(height: 24),
-              const _SectionTitle(),
-              const SizedBox(height: 16),
-              const _PrivilegeCard(
-                iconAsset: AppAssets.levelPrivilegeBadge,
-                title: 'Level Badge',
-                activationLabel: 'Activation Level: 1',
-                description:
-                    'Your personal homepage display your level badges. The higher your level is, the more splendid the badge becomes.',
-              ),
-              const SizedBox(height: 12),
-              const _PrivilegeCard(
-                iconAsset: AppAssets.levelPrivilegeAssist,
-                title: 'Exclusive Assistance',
-                activationLabel: 'Activation Level: 1',
-                description:
-                    'Own exclusive assistance, 1-on-1 problem-solving, priority registration for activities.',
-              ),
-            ],
+      ),
+      backgroundColor: AppColors.purple0C052A,
+      backdrop: Chimo.image(
+        AppAssets.levelBg,
+        width: MediaQuery.sizeOf(context).width,
+        fit: BoxFit.fitWidth,
+        alignment: Alignment.topCenter,
+      ),
+      body: AppPullRefresh(
+        onRefresh: logic.load,
+        accentColor: AppColors.yellowFFD54F,
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+        slivers: [
+          SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // 卡片这一块跟着 profile 重建；下面的特权卡是常量，别一起包。
+                Obx(() {
+                  final profile = logic.profile.value;
+                  final mainColor = _mainColors[logic.levelIndex];
+                  return _CurrentLevelCard(
+                    level: profile.vipLevel,
+                    levelIndex: logic.levelIndex,
+                    mainColor: mainColor,
+                    progressColors: [mainColor.withValues(alpha: 0.5), mainColor],
+                    experienceText: logic.experienceText,
+                    levelUpText: logic.levelUpText,
+                    percent: logic.percent,
+                  );
+                }),
+                const SizedBox(height: 24),
+                const _SectionTitle(),
+                const SizedBox(height: 16),
+                const _PrivilegeCard(
+                  iconAsset: AppAssets.levelPrivilegeBadge,
+                  title: 'Level Badge',
+                  activationLabel: 'Activation Level: 1',
+                  description:
+                      'Your personal homepage display your level badges. The higher your level is, the more splendid the badge becomes.',
+                ),
+                const SizedBox(height: 12),
+                const _PrivilegeCard(
+                  iconAsset: AppAssets.levelPrivilegeAssist,
+                  title: 'Exclusive Assistance',
+                  activationLabel: 'Activation Level: 1',
+                  description:
+                      'Own exclusive assistance, 1-on-1 problem-solving, priority registration for activities.',
+                ),
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -233,7 +238,7 @@ class _CurrentLevelCard extends StatelessWidget {
         Positioned(
           right: 0,
           top: 0,
-          child: AppImage(
+          child: Chimo.image(
             AppAssets.levelBadgeHero(levelIndex),
             width: 142,
             height: 124,
@@ -254,7 +259,7 @@ class _SectionTitle extends StatelessWidget {
       child: Stack(
         alignment: Alignment.bottomLeft,
         children: [
-          AppImage(AppAssets.levelPrivilegeAccent, width: 39, height: 15, fit: BoxFit.contain),
+          Chimo.image(AppAssets.levelPrivilegeAccent, width: 39, height: 15, fit: BoxFit.contain),
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 6),
             child: Text(
@@ -285,13 +290,13 @@ class _PrivilegeCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        color: AppColors.levelPanel,
+        color: AppColors.purple272048,
         borderRadius: BorderRadius.all(Radius.circular(12)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          AppImage(iconAsset, width: 92, height: 92, fit: BoxFit.contain),
+          Chimo.image(iconAsset, width: 92, height: 92, fit: BoxFit.contain),
           Expanded(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -305,7 +310,7 @@ class _PrivilegeCard extends StatelessWidget {
                       height: 18,
                       alignment: Alignment.center,
                       decoration: const BoxDecoration(
-                        color: AppColors.levelPanelLight,
+                        color: AppColors.purple504970,
                         borderRadius: BorderRadius.only(
                           topRight: Radius.circular(12),
                           bottomLeft: Radius.circular(12),

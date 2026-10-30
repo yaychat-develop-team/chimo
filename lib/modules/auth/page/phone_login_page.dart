@@ -8,8 +8,7 @@ import '../../../common/theme/app_input.dart';
 import '../../../common/theme/app_text.dart';
 import '../logic/phone_login_logic.dart';
 import '../../../common/widgets/app_scaffold.dart';
-import '../../../common/widgets/app_primary_button.dart';
-import '../../../common/widgets/app_image.dart';
+import 'package:chimo/common/utils/chimo.dart';
 
 /// 手机登录页（与邮箱登录同款背景）。
 class PhoneLoginPage extends StatefulWidget {
@@ -38,9 +37,10 @@ class _PhoneLoginPageState extends State<PhoneLoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    return ChimoScaffold(
-      backgroundColor: AppColors.surface,
-      backdrop: AppImage(
+    return AppScaffold(
+      backgroundColor: AppColors.black111111,
+      appBar: AppNavBar(),
+      backdrop: Chimo.image(
         AppAssets.homeTopBg,
         width: double.infinity,
         fit: BoxFit.fitWidth,
@@ -65,7 +65,7 @@ class _PhoneLoginPageState extends State<PhoneLoginPage> {
             const Text(
               'Enter your phone number to begin your journey.',
               style: TextStyle(
-                color: AppColors.textGrayB0,
+                color: AppColors.grayB0B0B0,
                 fontSize: 15,
                 fontWeight: FontWeight.w400,
               ),
@@ -78,13 +78,13 @@ class _PhoneLoginPageState extends State<PhoneLoginPage> {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: AppColors.tagBackground,
+                    color: AppColors.black2A2A2A,
                     borderRadius: BorderRadius.circular(27),
                   ),
                   child: const Text(
                     '+86',
                     style: TextStyle(
-                      color: AppColors.textGray8A,
+                      color: AppColors.gray8A8A8A,
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
                     ),
@@ -97,7 +97,7 @@ class _PhoneLoginPageState extends State<PhoneLoginPage> {
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     alignment: Alignment.centerLeft,
                     decoration: BoxDecoration(
-                      color: AppColors.tagBackground,
+                      color: AppColors.black2A2A2A,
                       borderRadius: BorderRadius.circular(27),
                     ),
                     child: TextField(
@@ -109,12 +109,12 @@ class _PhoneLoginPageState extends State<PhoneLoginPage> {
                       ],
                       onChanged: (value) => logic.phone.value = value,
                       style: AppText.field,
-                      cursorColor: AppColors.accentNeon,
+                      cursorColor: AppColors.green1CFF8A,
                       decoration: const AppInputDecoration(
                         isDense: true,
                         hintText: 'Please enter your phone number.',
                         hintStyle: TextStyle(
-                          color: AppColors.textGray8A,
+                          color: AppColors.gray8A8A8A,
                           fontSize: 16,
                           fontWeight: FontWeight.w500,
                         ),
@@ -134,20 +134,20 @@ class _PhoneLoginPageState extends State<PhoneLoginPage> {
                     Text(
                       errorText,
                       style: const TextStyle(
-                        color: AppColors.danger,
+                        color: AppColors.redE44E50,
                         fontSize: 13,
                         fontWeight: FontWeight.w400,
                       ),
                     ),
                   ],
                   const SizedBox(height: 20),
-                  AppPrimaryButton(
+                  Chimo.s.primaryButton(
                     label: 'Get Verification Code',
                     onTap: logic.login,
                     enabled: logic.canLogin,
-                    color: AppColors.accentNeon,
-                    disabledColor: AppColors.outlineBright,
-                    disabledLabelColor: AppColors.textGray8A,
+                    color: AppColors.green1CFF8A,
+                    disabledColor: AppColors.gray333333,
+                    disabledLabelColor: AppColors.gray8A8A8A,
                     borderRadius: 27,
                   ),
                 ],

@@ -23,8 +23,8 @@ class LevelsHelpPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChimoScaffold(
-      title: 'Level Introduction',
+    return AppScaffold(
+      appBar: AppNavBar(title: 'Level Introduction'),
       body: ListView.separated(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
         itemCount: _faqs.length,
@@ -39,7 +39,7 @@ class LevelsHelpPage extends StatelessWidget {
               Text(
                 faq.answer,
                 style: const TextStyle(
-                  color: AppColors.textPrimary,
+                  color: AppColors.white,
                   fontSize: 14,
                   fontWeight: FontWeight.w400,
                   height: 1.45,

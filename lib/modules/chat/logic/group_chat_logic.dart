@@ -506,6 +506,21 @@ class GroupChatLogic extends ChatBaseLogic {
           senderUid: uid,
           senderGender: gender,
         );
+      case 'custom':
+        return ChatLine(
+          side: m.isSelf ? ChatSide.self : ChatSide.peer,
+          kind: ChatLineKind.custom,
+          text: m.text,
+          serverTimeMs: m.serverTimeMs > 0 ? m.serverTimeMs : at.millisecondsSinceEpoch,
+          msgId: m.id,
+          failed: m.failed,
+          senderAvatar: avatar,
+          senderName: name,
+          senderUid: uid,
+          senderGender: gender,
+          customEvent: m.customEvent,
+          customPayload: m.customPayload,
+        );
       default:
         return null;
     }

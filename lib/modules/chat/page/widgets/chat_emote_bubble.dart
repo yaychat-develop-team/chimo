@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../common/theme/app_colors.dart';
 import '../../../../common/widgets/app_image.dart';
+import 'package:chimo/common/utils/chimo.dart';
 
 /// 贴纸气泡（forya `_EmoteItem`：固定宽 65、`fitWidth`，不像照片那样 cover 裁切）。
 ///
@@ -21,8 +22,8 @@ class ChatEmoteBubble extends StatelessWidget {
     width: size,
     height: size,
     child: ColoredBox(
-      color: AppColors.textGrayF0,
-      child: Icon(Icons.broken_image_outlined, color: AppColors.textGray99),
+      color: AppColors.grayF0F0F0,
+      child: Icon(Icons.broken_image_outlined, color: AppColors.gray9A9A9A),
     ),
   );
 
@@ -30,7 +31,7 @@ class ChatEmoteBubble extends StatelessWidget {
     width: size,
     height: size,
     child: ColoredBox(
-      color: AppColors.textGrayF5,
+      color: AppColors.grayF0F0F0,
       child: Center(
         child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
       ),
@@ -45,7 +46,7 @@ class ChatEmoteBubble extends StatelessWidget {
     if (src.startsWith('http://') || src.startsWith('https://')) {
       return SizedBox(
         width: size,
-        child: AppImage(
+        child: Chimo.image(
           src,
           width: size,
           fit: BoxFit.fitWidth,

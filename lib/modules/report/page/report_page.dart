@@ -10,9 +10,10 @@ import '../../../common/theme/app_text.dart';
 import '../../../common/widgets/app_scaffold.dart';
 import '../model/report_target.dart';
 import '../../profile/page/widgets/photo_pick_sheet.dart';
-import '../../../common/widgets/app_image.dart';
+import 'package:chimo/common/utils/chimo.dart';
 import '../../../app/app_jumper.dart';
 import '../../../common/utils/app_toast.dart';
+import 'package:chimo/common/widgets/app_image.dart';
 
 /// 举报页：选择类型、上传凭证图、填写反馈。
 class ReportPage extends StatefulWidget {
@@ -76,8 +77,8 @@ class _ReportPageState extends State<ReportPage> {
       final selectedType = logic.selectedType.value;
       final feedbackLen = logic.feedbackLength.value;
       final busy = submitting || picking;
-      return ChimoScaffold(
-        title: 'Report',
+      return AppScaffold(
+        appBar: AppNavBar(title: 'Report'),
         body: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -139,7 +140,7 @@ class _ReportPageState extends State<ReportPage> {
               child: SizedBox(
                 height: 52,
                 child: Material(
-                  color: AppColors.primaryBright,
+                  color: AppColors.green1BBA77,
                   borderRadius: BorderRadius.circular(26),
                   child: InkWell(
                     onTap: busy ? null : () => unawaited(_submit()),
@@ -179,13 +180,13 @@ class _TypeChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: selected ? Colors.white : AppColors.surfaceField,
+          color: selected ? Colors.white : AppColors.black2A2A2A,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: selected ? Colors.black : AppColors.textSecondary,
+            color: selected ? Colors.black : AppColors.gray9A9A9A,
             fontSize: 14,
             fontWeight: FontWeight.w500,
           ),
@@ -211,7 +212,7 @@ class _AddImageButton extends StatelessWidget {
         width: size,
         height: size,
         decoration: BoxDecoration(
-          color: AppColors.surfaceField,
+          color: AppColors.black2A2A2A,
           borderRadius: BorderRadius.circular(14),
         ),
         child: loading
@@ -222,7 +223,7 @@ class _AddImageButton extends StatelessWidget {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 ),
               )
-            : const Icon(Icons.add_rounded, color: AppColors.textPrimary, size: 32),
+            : const Icon(Icons.add_rounded, color: AppColors.white, size: 32),
       ),
     );
   }
@@ -247,23 +248,23 @@ class _ImageThumb extends StatelessWidget {
         height: _AddImageButton.size,
         fit: BoxFit.cover,
         error: const ColoredBox(
-          color: AppColors.outlineField,
+          color: AppColors.gray333333,
           child: Icon(Icons.broken_image_outlined, color: Colors.white54),
         ),
       );
     } else if (remote.isNotEmpty) {
-      image = AppImage(
+      image = Chimo.image(
         remote,
         width: _AddImageButton.size,
         height: _AddImageButton.size,
         fit: BoxFit.cover,
         error: const ColoredBox(
-          color: AppColors.outlineField,
+          color: AppColors.gray333333,
           child: Icon(Icons.broken_image_outlined, color: Colors.white54),
         ),
       );
     } else {
-      image = const ColoredBox(color: AppColors.outlineField);
+      image = const ColoredBox(color: AppColors.gray333333);
     }
 
     return Stack(
@@ -328,7 +329,7 @@ class _FeedbackField extends StatelessWidget {
       height: 160,
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
       decoration: BoxDecoration(
-        color: AppColors.surfaceField,
+        color: AppColors.black2A2A2A,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Stack(
@@ -341,13 +342,13 @@ class _FeedbackField extends StatelessWidget {
             maxLines: null,
             expands: true,
             textAlignVertical: TextAlignVertical.top,
-            style: const TextStyle(color: AppColors.textPrimary, fontSize: 15, height: 1.4),
-            cursorColor: AppColors.primaryBright,
+            style: const TextStyle(color: AppColors.white, fontSize: 15, height: 1.4),
+            cursorColor: AppColors.green1BBA77,
             decoration: const AppInputDecoration(
               isCollapsed: true,
               counterText: '',
               hintText: 'Please enter here',
-              hintStyle: TextStyle(color: AppColors.textTertiary, fontSize: 15),
+              hintStyle: TextStyle(color: AppColors.gray6E6E6E, fontSize: 15),
             ),
           ),
           Positioned(
@@ -355,7 +356,7 @@ class _FeedbackField extends StatelessWidget {
             bottom: 0,
             child: Text(
               '$length/$maxLength',
-              style: const TextStyle(color: AppColors.textTertiary, fontSize: 12),
+              style: const TextStyle(color: AppColors.gray6E6E6E, fontSize: 12),
             ),
           ),
         ],

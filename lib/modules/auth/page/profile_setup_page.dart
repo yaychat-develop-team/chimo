@@ -7,10 +7,8 @@ import '../../../common/constants/app_assets.dart';
 import '../../../common/theme/app_colors.dart';
 import '../../../common/theme/app_text.dart';
 import '../logic/profile_setup_logic.dart';
-import '../../../common/widgets/app_gradient_button.dart';
-import '../../../common/widgets/skip_button.dart';
 import '../../../common/widgets/app_scaffold.dart';
-import '../../../common/widgets/app_image.dart';
+import 'package:chimo/common/utils/chimo.dart';
 import '../../../common/theme/app_bottom_sheet.dart';
 
 /// 注册后资料完善：性别 + 生日（Figma 完善资料）。
@@ -42,7 +40,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
   Future<void> _pickBirthday() async {
     var temp = logic.pickerInitial;
     final picked = await AppBottomSheet.show<DateTime>(
-      backgroundColor: AppColors.surfaceSheet,
+      backgroundColor: AppColors.black1C1C1E,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -61,7 +59,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                           onPressed: () => AppJumper.back(),
                           child: const Text(
                             'Cancel',
-                            style: TextStyle(color: AppColors.textSecondary),
+                            style: TextStyle(color: AppColors.gray9A9A9A),
                           ),
                         ),
                         const Spacer(),
@@ -70,7 +68,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                           child: const Text(
                             'Done',
                             style: TextStyle(
-                              color: AppColors.accentLime,
+                              color: AppColors.green00F875,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -110,10 +108,13 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
     final bottom = MediaQuery.paddingOf(context).bottom;
 
     return Obx(
-      () => ChimoScaffold(
-        backgroundColor: AppColors.backgroundDeep,
-        circledBack: true,
-        trailing: SkipButton(enabled: !logic.saving.value, onPressed: logic.skip),
+      () => AppScaffold(
+        backgroundColor: AppColors.black111111,
+        appBar: AppNavBar(
+          title: "Spice up your profile!",
+          onBack: () => Get.back(),
+          trailing: Chimo.s.skipButton(enabled: !logic.saving.value, onPressed: logic.skip),
+        ),
         body: Padding(
           padding: EdgeInsets.fromLTRB(30, 16, 30, 16 + bottom),
           child: Column(
@@ -133,22 +134,32 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
               const SizedBox(height: 12),
               Row(
                 children: [
-                  _GenderCard(
-                    label: "I'm male",
-                    selected: logic.gender.value == ProfileGender.male,
-                    image: logic.gender.value == ProfileGender.male
-                        ? AppAssets.genderMaleSelected
-                        : AppAssets.genderMaleImg,
-                    onTap: () => logic.selectGender(ProfileGender.male),
+                  Expanded(
+                    child: AspectRatio(
+                      aspectRatio: 1,
+                      child: _GenderCard(
+                        label: "I'm male",
+                        selected: logic.gender.value == ProfileGender.male,
+                        image: logic.gender.value == ProfileGender.male
+                            ? AppAssets.genderMaleSelected
+                            : AppAssets.genderMaleImg,
+                        onTap: () => logic.selectGender(ProfileGender.male),
+                      ),
+                    ),
                   ),
                   const SizedBox(width: 18),
-                  _GenderCard(
-                    label: "I'm female",
-                    selected: logic.gender.value == ProfileGender.female,
-                    image: logic.gender.value == ProfileGender.female
-                        ? AppAssets.genderFemaleSelected
-                        : AppAssets.genderFemaleImg,
-                    onTap: () => logic.selectGender(ProfileGender.female),
+                  Expanded(
+                    child: AspectRatio(
+                      aspectRatio: 1,
+                      child: _GenderCard(
+                        label: "I'm female",
+                        selected: logic.gender.value == ProfileGender.female,
+                        image: logic.gender.value == ProfileGender.female
+                            ? AppAssets.genderFemaleSelected
+                            : AppAssets.genderFemaleImg,
+                        onTap: () => logic.selectGender(ProfileGender.female),
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -156,7 +167,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
               const Text("When's your birthday?", style: AppText.label),
               const SizedBox(height: 12),
               Material(
-                color: AppColors.tagBackground,
+                color: AppColors.black2A2A2A,
                 borderRadius: BorderRadius.circular(27),
                 child: InkWell(
                   onTap: _pickBirthday,
@@ -171,7 +182,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                           logic.birthdayLabel,
                           style: TextStyle(
                             color: logic.birthday.value == null
-                                ? AppColors.textGray8A
+                                ? AppColors.gray8A8A8A
                                 : Colors.white,
                             fontSize: 14,
                             fontWeight: FontWeight.w400,
@@ -184,7 +195,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
               ),
               const SizedBox(height: 60),
               Center(
-                child: AppGradientButton(
+                child: Chimo.s.gradientButton(
                   label: logic.saving.value ? 'Saving…' : 'Next',
                   onTap: logic.canNext ? logic.next : null,
                   enabled: logic.canNext,
@@ -221,12 +232,12 @@ class _GenderCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: SizedBox(
-          width: 148,
-          height: 148,
+          // width: 148,
+          // height: 148,
           child: Stack(
-            fit: StackFit.expand,
+            // fit: StackFit.expand,
             children: [
-              AppImage(image, fit: BoxFit.contain),
+              Positioned.fill(child: Chimo.image(image, fit: BoxFit.contain)),
               Positioned(
                 top: 6,
                 left: 0,
@@ -235,7 +246,7 @@ class _GenderCard extends StatelessWidget {
                   label,
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: selected ? AppColors.accentLime : AppColors.textGrayB0,
+                    color: selected ? AppColors.green00F875 : AppColors.grayB0B0B0,
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                   ),

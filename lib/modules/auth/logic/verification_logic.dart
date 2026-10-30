@@ -1,32 +1,15 @@
 import 'dart:async';
 
-import 'package:chimo/common/utils/event_center.dart';
-import 'package:chimo/common/utils/event_constant.dart';
+import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 
-import '../../../app/app_jumper.dart';
-import '../../../app/auth/onboarding_state.dart';
 import '../../../app/chimo_api.dart';
 import '../../../common/utils/app_toast.dart';
 import '../../../common/utils/phone_utils.dart';
-
-/// 短信验证结果。成功时 [goHome] 决定进壳层还是完善资料。
-class PhoneVerifyResult {
-  const PhoneVerifyResult._({this.message, required this.goHome});
-
-  const PhoneVerifyResult.failure(String message) : this._(message: message, goHome: false);
-
-  const PhoneVerifyResult.success(bool goHome) : this._(goHome: goHome, message: null);
-
-  final String? message;
-  final bool goHome;
-
-  bool get ok => message == null;
-}
+import 'package:chimo/common/utils/event_center.dart';
+import 'package:chimo/common/utils/event_constant.dart';
 
 /// 短信验证码：发送、倒计时、校验、写会话。
-///
-/// 焦点和输入框留在页面。输入同步到 [code]，页面在它被清空时清掉输入框。
 class VerificationLogic extends GetxController {
   VerificationLogic({required this.phone});
 
@@ -34,6 +17,8 @@ class VerificationLogic extends GetxController {
   static const int resendSeconds = 60;
 
   final String phone;
+  final TextEditingController input = TextEditingController();
+  final FocusNode focusNode = FocusNode();
   final RxString code = ''.obs;
   final RxBool submitting = false.obs;
   final RxInt resendLeft = 0.obs;
@@ -49,48 +34,69 @@ class VerificationLogic extends GetxController {
   }
 
   @override
+  void onInit() {
+    super.onInit();
+    input.addListener(_onInputChanged);
+  }
+
+  @override
+  void onReady() {
+    super.onReady();
+    focusNode.requestFocus();
+    unawaited(send(initial: true));
+  }
+
+  @override
   void onClose() {
     _resendTimer?.cancel();
+    input.removeListener(_onInputChanged);
+    input.dispose();
+    focusNode.dispose();
     super.onClose();
   }
 
-  void onInput(String value) {
+  void _onInputChanged() {
+    final value = input.text;
     code.value = value;
-    if (value.length == codeLength) {
-      submitCode(value);
-    }
+    if (value.length == codeLength) unawaited(submitCode(value));
   }
 
   Future<void> send({bool initial = false}) async {
     if (resending.value) return;
+    if (!initial && !canResend) return;
     resending.value = true;
-    final failure = await sendCode(PhoneUtils.toApiPhone(phone));
-    if (isClosed) return;
-    resending.value = false;
-    if (failure != null) {
-      AppToast.error(failure);
+    try {
+      final res = await ChimoApis.auth.sendSms(
+        phone: PhoneUtils.toApiPhone(phone),
+      );
+      resending.value = false;
+      if (!res.ok) {
+        AppToast.error(res.message.isEmpty ? 'SMS send failed' : res.message);
+        if (initial) resendLeft.value = 0;
+        return;
+      }
+      if (!initial) AppToast.info('Verification code resent');
+      _startCountdown();
+    } catch (error) {
+      resending.value = false;
+      AppToast.error('SMS send failed: $error');
       if (initial) resendLeft.value = 0;
-      return;
     }
-    if (!initial) AppToast.info('Verification code resent');
-    _startCountdown();
-  }
-
-  Future<void> resend() async {
-    if (!canResend) return;
-    await send();
   }
 
   Future<void> submitCode(String value) async {
     if (submitting.value) return;
     submitting.value = true;
-    final res = await ChimoApis.auth.smsAuth(phone: PhoneUtils.toApiPhone(phone), code: value);
-    if(res.ok) {
-      eventCenter.emit(Event(EventConstant.loginGetAuthRsp,data: res.data));
-    }else {
+    final res = await ChimoApis.auth.smsAuth(
+      phone: PhoneUtils.toApiPhone(phone),
+      code: value,
+    );
+    if (res.ok) {
+      eventCenter.emit(Event(EventConstant.loginGetAuthRsp, data: res.data));
+    } else {
       AppToast.error(res.message);
     }
-    idle();
+    if (!isClosed) submitting.value = false;
   }
 
   void _startCountdown() {
@@ -108,22 +114,5 @@ class VerificationLogic extends GetxController {
       }
       resendLeft.value -= 1;
     });
-  }
-
-  /// 进入验证码页后补发短信。失败只返回文案，不阻止输入。
-  Future<String?> sendCode(String apiPhone) async {
-    try {
-      final res = await ChimoApis.auth.sendSms(phone: apiPhone);
-      if (!res.ok) {
-        return res.message.isEmpty ? 'SMS send failed' : res.message;
-      }
-      return null;
-    } catch (error) {
-      return 'SMS send failed: $error';
-    }
-  }
-
-  void idle() {
-    if (!isClosed) submitting.value = false;
   }
 }

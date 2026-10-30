@@ -34,7 +34,8 @@ class TencentRoomRtc implements RoomRtc {
       onUserVoiceVolume: (volumes, _) {
         final speaking = <int>{};
         for (final item in volumes) {
-          final uid = int.tryParse(item.userId) ?? -1;
+          // 本地用户的 userId 是空字符串，和 Oumi 一样记成 0。
+          final uid = int.tryParse(item.userId) ?? 0;
           if (uid >= 0 && item.volume >= 4) speaking.add(uid);
         }
         onSpeaking?.call(speaking);

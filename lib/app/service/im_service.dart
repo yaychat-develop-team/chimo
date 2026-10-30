@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../chimo_api.dart';
 import '../../common/utils/app_log.dart';
+import '../../common/im/im_custom_events.dart';
 import '../../common/im/im_models.dart';
 import '../../common/im/im_message_codec.dart';
 
@@ -581,6 +582,49 @@ abstract final class ImService {
       return _emitAndReturn(sent, forceSelf: true);
     } on EMError catch (e) {
       AppLog.w('ImService sendFollowTip failed ${e.code} ${e.description}');
+      rethrow;
+    }
+  }
+
+  /// 客户端直发房间邀请（joyride `im_room_invite_message`）。
+  ///
+  /// 房间 Share 走服务端 `/user/invite`（会下发 `RoomInvite` V2）；
+  /// 聊天页 tip「邀请进房」等场景用本方法。
+  static Future<ImChatMessage?> sendRoomInvite({
+    required String peerEmUsername,
+    required int channelId,
+    String title = '',
+    String imageUrl = '',
+    String content = '',
+    String tag = '',
+    String number = '',
+    String tagIcon = '',
+    String tagColors = '',
+    ImPeerAttrs? peer,
+  }) async {
+    if (peerEmUsername.isEmpty || channelId <= 0) return null;
+    if (!_sdkInited) await connectFromServer();
+    try {
+      final msg = EMMessage.createCustomSendMessage(
+        targetId: peerEmUsername,
+        event: ImCustomEvents.roomInvite,
+        params: {
+          'tit': title,
+          'imageUrl': imageUrl,
+          'content': content,
+          'tag': tag,
+          'number': number,
+          'channelId': '$channelId',
+          'tagIcon': tagIcon,
+          'tagColors': tagColors,
+        },
+      );
+      msg.chatType = ChatType.Chat;
+      await _applyCommonAttrs(msg, peer: peer);
+      final sent = await _sendMessageAwaitSuccess(msg);
+      return _emitAndReturn(sent, forceSelf: true);
+    } on EMError catch (e) {
+      AppLog.w('ImService sendRoomInvite failed ${e.code} ${e.description}');
       rethrow;
     }
   }

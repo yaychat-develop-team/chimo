@@ -125,7 +125,10 @@ class ReportLogic extends GetxController {
       ];
       final res = await ChimoApis.report.submit(
         reportedId: id,
-        type: targetKind == ReportTargetKind.group ? 'CHANNEL' : 'USER',
+        type: switch (targetKind) {
+          ReportTargetKind.user => 'USER',
+          ReportTargetKind.group || ReportTargetKind.room => 'CHANNEL',
+        },
         reason: selectedType.value,
         description: text,
         evidenceImages: urls,

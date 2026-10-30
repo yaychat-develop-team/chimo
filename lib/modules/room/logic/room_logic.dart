@@ -80,8 +80,6 @@ class RoomLogic extends GetxController {
 
   void minimize() => service.minimize();
 
-  Future<void> leave() => service.leave();
-
   Future<void> abandon() => service.leave();
 
   Future<void> _apply(RoomJoinResult result) async {

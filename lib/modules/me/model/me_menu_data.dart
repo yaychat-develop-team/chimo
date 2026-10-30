@@ -26,6 +26,7 @@ abstract final class MeMenuData {
       if (AppConfig.isDebug)
         const QuickAccessItem(id: 'debug', label: 'Debug Page', iconAsset: AppAssets.mineInfo),
       const QuickAccessItem(id: 'information', label: 'Information', iconAsset: AppAssets.mineInfo),
+      const QuickAccessItem(id: 'honor', label: 'My Honor', iconAsset: AppAssets.mineHonor),
       const QuickAccessItem(id: 'bind_email', label: 'Bind Email', iconAsset: AppAssets.mineBind),
       const QuickAccessItem(id: 'settings', label: 'Settings', iconAsset: AppAssets.mineSetting),
       const QuickAccessItem(id: 'help', label: 'Help', iconAsset: AppAssets.mineHelp),

@@ -1,69 +1,28 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../../../common/constants/app_assets.dart';
 import '../../../common/theme/app_colors.dart';
-import '../../../common/widgets/app_image.dart';
+import 'package:chimo/common/utils/chimo.dart';
 import '../../../common/widgets/app_scaffold.dart';
 import '../logic/verification_logic.dart';
 
 /// 手机验证码页（原六格 UI，背景与邮箱登录同款）。
-class VerificationCodePage extends StatefulWidget {
-  const VerificationCodePage({super.key, required this.phone});
-
-  final String phone;
-
-  @override
-  State<VerificationCodePage> createState() => _VerificationCodePageState();
-}
-
-class _VerificationCodePageState extends State<VerificationCodePage> {
-  static const Color _green = AppColors.accentNeon;
-  static const double _gap = 8;
-
-  final TextEditingController _controller = TextEditingController();
-  final FocusNode _focusNode = FocusNode();
-  late final VerificationLogic logic;
-  Worker? _codeSync;
-
-  @override
-  void initState() {
-    super.initState();
-    logic = Get.put(VerificationLogic(phone: widget.phone));
-    _codeSync = ever(logic.code, (value) {
-      if (_controller.text == value) return;
-      _controller.value = TextEditingValue(
-        text: value,
-        selection: TextSelection.collapsed(offset: value.length),
-      );
-      if (value.isEmpty) _focusNode.requestFocus();
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _focusNode.requestFocus();
-      logic.send(initial: true);
-    });
-  }
-
-  @override
-  void dispose() {
-    _codeSync?.dispose();
-    _controller.dispose();
-    _focusNode.dispose();
-    Get.delete<VerificationLogic>();
-    super.dispose();
-  }
+///
+/// [VerificationLogic] 由路由 binding 注入，输入框和发码都在 logic 里。
+class VerificationCodePage extends GetView<VerificationLogic> {
+  const VerificationCodePage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.sizeOf(context).width;
-
-    return ChimoScaffold(
-      backgroundColor: AppColors.surface,
-      backdrop: AppImage(
+    return AppScaffold(
+      backgroundColor: AppColors.black111111,
+      appBar: AppNavBar(),
+      backdrop: Chimo.image(
         AppAssets.homeTopBg,
-        width: screenWidth,
         fit: BoxFit.fitWidth,
         alignment: Alignment.topCenter,
       ),
@@ -85,7 +44,7 @@ class _VerificationCodePageState extends State<VerificationCodePage> {
             const Text(
               'The verification code has been sent to your phone number below.',
               style: TextStyle(
-                color: AppColors.textGrayB0,
+                color: AppColors.grayB0B0B0,
                 fontSize: 14,
                 fontWeight: FontWeight.w400,
                 height: 1.4,
@@ -93,7 +52,7 @@ class _VerificationCodePageState extends State<VerificationCodePage> {
             ),
             const SizedBox(height: 16),
             Text(
-              logic.maskedPhone,
+              controller.maskedPhone,
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 22,
@@ -103,25 +62,25 @@ class _VerificationCodePageState extends State<VerificationCodePage> {
             const SizedBox(height: 36),
             GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: () => _focusNode.requestFocus(),
+              onTap: () => controller.focusNode.requestFocus(),
               child: Obx(() {
-                final code = logic.code.value;
-                final submitting = logic.submitting.value;
+                final code = controller.code.value;
+                final submitting = controller.submitting.value;
                 return Stack(
                   children: [
                     Row(
-                      children: [
-                        for (var i = 0; i < VerificationLogic.codeLength; i++) ...[
-                          if (i > 0) const SizedBox(width: _gap),
-                          Expanded(
+                      children: List.generate(VerificationLogic.codeLength, (i) {
+                        return Expanded(
+                          child: Padding(
+                            padding: EdgeInsets.only(left: i == 0 ? 0 : 8),
                             child: Container(
                               height: 52,
                               alignment: Alignment.center,
                               decoration: BoxDecoration(
-                                color: AppColors.tagBackground,
+                                color: AppColors.black2A2A2A,
                                 borderRadius: BorderRadius.circular(12),
                                 border: (i == code.length && !submitting)
-                                    ? Border.all(color: _green, width: 1.5)
+                                    ? Border.all(color: AppColors.green1CFF8A, width: 1.5)
                                     : Border.all(color: Colors.transparent, width: 1.5),
                               ),
                               child: submitting && i == 0
@@ -130,7 +89,7 @@ class _VerificationCodePageState extends State<VerificationCodePage> {
                                       height: 18,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        color: _green,
+                                        color: AppColors.green1CFF8A,
                                       ),
                                     )
                                   : Text(
@@ -143,14 +102,14 @@ class _VerificationCodePageState extends State<VerificationCodePage> {
                                     ),
                             ),
                           ),
-                        ],
-                      ],
+                        );
+                      }),
                     ),
                     Opacity(
                       opacity: 0,
                       child: TextField(
-                        controller: _controller,
-                        focusNode: _focusNode,
+                        controller: controller.input,
+                        focusNode: controller.focusNode,
                         keyboardType: TextInputType.number,
                         autofocus: true,
                         enabled: !submitting,
@@ -160,7 +119,6 @@ class _VerificationCodePageState extends State<VerificationCodePage> {
                           FilteringTextInputFormatter.digitsOnly,
                           LengthLimitingTextInputFormatter(VerificationLogic.codeLength),
                         ],
-                        onChanged: logic.onInput,
                       ),
                     ),
                   ],
@@ -169,7 +127,7 @@ class _VerificationCodePageState extends State<VerificationCodePage> {
             ),
             const SizedBox(height: 22),
             Obx(() {
-              final canResend = logic.canResend;
+              final canResend = controller.canResend;
               return Wrap(
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
@@ -182,11 +140,13 @@ class _VerificationCodePageState extends State<VerificationCodePage> {
                     ),
                   ),
                   GestureDetector(
-                    onTap: canResend ? logic.resend : null,
+                    onTap: canResend ? () => unawaited(controller.send()) : null,
                     child: Text(
-                      canResend ? 'Resend code' : 'Resend code (${logic.resendLeft.value}s)',
+                      canResend ? 'Resend code' : 'Resend code (${controller.resendLeft.value}s)',
                       style: TextStyle(
-                        color: canResend ? _green : _green.withValues(alpha: 0.7),
+                        color: canResend
+                            ? AppColors.green1CFF8A
+                            : AppColors.green1CFF8A.withValues(alpha: 0.7),
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                       ),

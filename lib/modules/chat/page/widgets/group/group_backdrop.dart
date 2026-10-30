@@ -3,9 +3,9 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 
 import '../../../../../common/theme/app_colors.dart';
-import '../../../../../common/widgets/app_image.dart';
 import '../../../../../common/constants/app_assets.dart';
 import '../../../../../common/models/server_client/group/group.pb.dart';
+import 'package:chimo/common/utils/chimo.dart';
 
 /// 群聊页顶部那条模糊头图：群头像放大模糊 + 一层往下收到底色的渐变。
 ///
@@ -23,7 +23,7 @@ class GroupBackdrop extends StatelessWidget {
       children: [
         ImageFiltered(
           imageFilter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-          child: AppImage(
+          child: Chimo.image(
             group.avatar,
             fallbackAsset: AppAssets.avatarPlace,
             fit: BoxFit.cover,
@@ -35,7 +35,7 @@ class GroupBackdrop extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Colors.black.withValues(alpha: 0.45), AppColors.background],
+              colors: [Colors.black.withValues(alpha: 0.45), AppColors.black],
             ),
           ),
         ),

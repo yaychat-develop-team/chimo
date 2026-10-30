@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:chimo/app/session_info.dart';
+import 'package:chimo/common/utils/chimo.dart';
 import 'package:chimo/common/utils/event_center.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -16,7 +17,6 @@ import '../../../common/utils/event_constant.dart';
 import '../logic/login_logic.dart';
 import '../../../common/theme/app_colors.dart';
 import '../../../common/widgets/app_webview_page.dart';
-import '../../../common/widgets/app_image.dart';
 import '../../../common/widgets/app_scaffold.dart';
 import '../../../common/theme/app_bottom_sheet.dart';
 
@@ -41,7 +41,6 @@ class _LoginPageState extends State<LoginPage> {
     });
   }
 
-
   @override
   void dispose() {
     Get.delete<LoginLogic>();
@@ -49,9 +48,9 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  Future _loginSuccess(AuthRsp? authRsp) async{
+  Future _loginSuccess(AuthRsp? authRsp) async {
     bool result = await SessionInfo.loginSuccessUpdateInfo(authRsp);
-    if(result) {
+    if (result) {
       AppJumper.toAfterAuth(goHome: SessionInfo.currentUser?.isRegister == true);
     }
   }
@@ -100,9 +99,7 @@ class _LoginPageState extends State<LoginPage> {
     final bottom = MediaQuery.paddingOf(context).bottom;
     final screenH = MediaQuery.sizeOf(context).height;
 
-    return ChimoScaffold(
-      showNav: false,
-      safeArea: false,
+    return AppScaffold(
       body: Stack(
         fit: StackFit.expand,
         children: [
@@ -111,7 +108,7 @@ class _LoginPageState extends State<LoginPage> {
               gradient: RadialGradient(
                 center: Alignment(-0.9, -1.1),
                 radius: 1.2,
-                colors: [AppColors.glowPrimary, AppColors.transparent],
+                colors: [AppColors.green6624B572, AppColors.transparent],
               ),
             ),
           ),
@@ -120,7 +117,7 @@ class _LoginPageState extends State<LoginPage> {
               gradient: RadialGradient(
                 center: Alignment(0.95, -1.05),
                 radius: 1.1,
-                colors: [AppColors.glowLoginBlue, AppColors.transparent],
+                colors: [AppColors.blue55203A8C, AppColors.transparent],
               ),
             ),
           ),
@@ -130,11 +127,11 @@ class _LoginPageState extends State<LoginPage> {
               child: Obx(
                 () => Column(
                   children: [
-                    AppImage(AppAssets.splashLogo, width: 120, height: 120, fit: BoxFit.contain),
+                    Chimo.image(AppAssets.splashLogo, width: 120, height: 120, fit: BoxFit.contain),
                     const SizedBox(height: 20),
-                    AppImage(AppAssets.splashTitle, height: 36, fit: BoxFit.contain),
+                    Chimo.image(AppAssets.splashTitle, height: 36, fit: BoxFit.contain),
                     const SizedBox(height: 10),
-                    AppImage(AppAssets.splashSlogan, height: 16, fit: BoxFit.contain),
+                    Chimo.image(AppAssets.splashSlogan, height: 16, fit: BoxFit.contain),
                     const Spacer(flex: 3),
                     // 正式环境固定入口；非正式环境按登录平台接口控制显隐。
                     if (logic.showAppleLogin) ...[
@@ -161,7 +158,7 @@ class _LoginPageState extends State<LoginPage> {
                         child: const Text(
                           'Debug Page',
                           style: TextStyle(
-                            color: AppColors.textPrimary,
+                            color: AppColors.white,
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
                           ),
@@ -210,15 +207,15 @@ class _AppleLoginButton extends StatelessWidget {
                 const SizedBox(
                   width: 22,
                   height: 22,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.outline),
+                  child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.gray333333),
                 )
               else
-                AppImage(AppAssets.appleIcon, width: 28, height: 28, fit: BoxFit.contain),
+                Chimo.image(AppAssets.appleIcon, width: 28, height: 28, fit: BoxFit.contain),
               const SizedBox(width: 12),
               const Text(
                 'Sign in with Apple',
                 style: TextStyle(
-                  color: AppColors.outline,
+                  color: AppColors.gray333333,
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
                 ),
@@ -239,7 +236,7 @@ class _EmailLoginButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: AppColors.surfaceField,
+      color: AppColors.black2A2A2A,
       borderRadius: BorderRadius.circular(28),
       child: InkWell(
         onTap: onTap,
@@ -250,7 +247,7 @@ class _EmailLoginButton extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              AppImage(AppAssets.emailIcon, width: 22, height: 22, fit: BoxFit.contain),
+              Chimo.image(AppAssets.emailIcon, width: 22, height: 22, fit: BoxFit.contain),
               const SizedBox(width: 10),
               const Text(
                 'Sign in with Email',
@@ -281,7 +278,7 @@ class _PhoneLoginButton extends StatelessWidget {
           height: 64,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.outlineField, width: 1),
+            border: Border.all(color: AppColors.gray333333, width: 1),
           ),
           child: const Icon(Icons.smartphone_outlined, color: Colors.white, size: 28),
         ),
@@ -301,9 +298,7 @@ class _OrContinueDivider extends StatelessWidget {
           child: Container(
             height: 1,
             decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [AppColors.outlineFieldClear, AppColors.outlineField],
-              ),
+              gradient: LinearGradient(colors: [AppColors.gray00333333, AppColors.gray333333]),
             ),
           ),
         ),
@@ -312,7 +307,7 @@ class _OrContinueDivider extends StatelessWidget {
           child: Text(
             'Or Continue with',
             style: TextStyle(
-              color: AppColors.textTertiary,
+              color: AppColors.gray6E6E6E,
               fontSize: 13,
               fontWeight: FontWeight.w400,
             ),
@@ -322,9 +317,7 @@ class _OrContinueDivider extends StatelessWidget {
           child: Container(
             height: 1,
             decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [AppColors.outlineField, AppColors.outlineFieldClear],
-              ),
+              gradient: LinearGradient(colors: [AppColors.gray333333, AppColors.gray00333333]),
             ),
           ),
         ),
@@ -385,7 +378,7 @@ class _AgreementRowState extends State<_AgreementRow> {
           behavior: HitTestBehavior.opaque,
           child: Padding(
             padding: const EdgeInsets.only(top: 2, right: 8),
-            child: AppImage(
+            child: Chimo.image(
               widget.agreed ? AppAssets.agreeChecked : AppAssets.agreeUnchecked,
               width: 18,
               height: 18,
@@ -397,7 +390,7 @@ class _AgreementRowState extends State<_AgreementRow> {
           child: Text.rich(
             TextSpan(
               style: const TextStyle(
-                color: AppColors.textSecondary,
+                color: AppColors.gray9A9A9A,
                 fontSize: 12,
                 height: 1.4,
                 fontWeight: FontWeight.w400,
@@ -406,19 +399,13 @@ class _AgreementRowState extends State<_AgreementRow> {
                 const TextSpan(text: 'By continuing, you agree to Chimo\'s '),
                 TextSpan(
                   text: 'User Service Agreement',
-                  style: const TextStyle(
-                    color: AppColors.primaryBright,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: const TextStyle(color: AppColors.green1BBA77, fontWeight: FontWeight.w500),
                   recognizer: _termsRecognizer,
                 ),
                 const TextSpan(text: ' and '),
                 TextSpan(
                   text: 'Privacy Agreement',
-                  style: const TextStyle(
-                    color: AppColors.primaryBright,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: const TextStyle(color: AppColors.green1BBA77, fontWeight: FontWeight.w500),
                   recognizer: _privacyRecognizer,
                 ),
                 const TextSpan(text: '.'),
@@ -471,7 +458,7 @@ class _WelcomeAgreementSheetState extends State<_WelcomeAgreementSheet> {
         gradient: LinearGradient(
           begin: Alignment.topRight,
           end: Alignment.center,
-          colors: [AppColors.tintGreenWhite, AppColors.textGrayF5],
+          colors: [AppColors.greenE8FFE8, AppColors.grayF0F0F0],
         ),
       ),
       child: Padding(
@@ -488,7 +475,7 @@ class _WelcomeAgreementSheetState extends State<_WelcomeAgreementSheet> {
             Text.rich(
               TextSpan(
                 style: const TextStyle(
-                  color: AppColors.textGray66,
+                  color: AppColors.gray6E6E6E,
                   fontSize: 14,
                   height: 1.45,
                   fontWeight: FontWeight.w400,
@@ -501,7 +488,7 @@ class _WelcomeAgreementSheetState extends State<_WelcomeAgreementSheet> {
                   TextSpan(
                     text: 'User Service Agreement',
                     style: const TextStyle(
-                      color: AppColors.primaryBright,
+                      color: AppColors.green1BBA77,
                       fontWeight: FontWeight.w600,
                     ),
                     recognizer: _termsRecognizer,
@@ -510,7 +497,7 @@ class _WelcomeAgreementSheetState extends State<_WelcomeAgreementSheet> {
                   TextSpan(
                     text: 'Privacy Agreement',
                     style: const TextStyle(
-                      color: AppColors.primaryBright,
+                      color: AppColors.green1BBA77,
                       fontWeight: FontWeight.w600,
                     ),
                     recognizer: _privacyRecognizer,
@@ -521,7 +508,7 @@ class _WelcomeAgreementSheetState extends State<_WelcomeAgreementSheet> {
             ),
             const SizedBox(height: 28),
             Material(
-              color: AppColors.primaryBright,
+              color: AppColors.green1BBA77,
               borderRadius: BorderRadius.circular(28),
               child: InkWell(
                 onTap: () => AppJumper.back(result: true),
@@ -543,7 +530,7 @@ class _WelcomeAgreementSheetState extends State<_WelcomeAgreementSheet> {
             ),
             const SizedBox(height: 12),
             Material(
-              color: AppColors.textGrayE8,
+              color: AppColors.grayE8E8E8,
               borderRadius: BorderRadius.circular(28),
               child: InkWell(
                 onTap: () => AppJumper.back(result: false),
@@ -554,7 +541,7 @@ class _WelcomeAgreementSheetState extends State<_WelcomeAgreementSheet> {
                     child: Text(
                       'Decline',
                       style: TextStyle(
-                        color: AppColors.textGray66,
+                        color: AppColors.gray6E6E6E,
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                       ),

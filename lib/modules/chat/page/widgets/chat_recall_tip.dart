@@ -33,7 +33,7 @@ class ChatRecallTip extends StatelessWidget {
 
   /// 私聊消息流。
   static const TextStyle dmStyle = TextStyle(
-    color: AppColors.textGrayAE,
+    color: AppColors.grayB0B0B0,
     fontSize: 12,
     fontWeight: FontWeight.w400,
     height: 1.3,
@@ -41,7 +41,7 @@ class ChatRecallTip extends StatelessWidget {
 
   /// 群聊消息流。
   static const TextStyle groupStyle = TextStyle(
-    color: AppColors.textGrayAE,
+    color: AppColors.grayB0B0B0,
     fontSize: 12,
     fontWeight: FontWeight.w500,
     height: 1.3,

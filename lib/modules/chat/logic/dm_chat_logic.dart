@@ -482,6 +482,17 @@ class DmChatLogic extends ChatBaseLogic {
           serverTimeMs: m.serverTimeMs,
           msgId: m.id,
         );
+      case 'custom':
+        return ChatLine(
+          side: side,
+          kind: ChatLineKind.custom,
+          text: m.text,
+          serverTimeMs: m.serverTimeMs,
+          msgId: m.id,
+          failed: m.failed,
+          customEvent: m.customEvent,
+          customPayload: m.customPayload,
+        );
       default:
         return ChatLine(
           side: side,
@@ -555,12 +566,13 @@ class DmChatLogic extends ChatBaseLogic {
               },
             },
           );
-        // join / recall 是群聊侧的 kind，私聊消息流里不会出现。
+        // join / recall 是群聊侧的 kind；custom 由服务端代发，本地不落失败草稿。
         case ChatLineKind.text:
         case ChatLineKind.gift:
         case ChatLineKind.tip:
         case ChatLineKind.join:
         case ChatLineKind.recall:
+        case ChatLineKind.custom:
           saved = await ImService.appendFailedText(
             peerEmUsername: peer,
             content: line.text,
@@ -1045,11 +1057,7 @@ class DmChatLogic extends ChatBaseLogic {
     }
   }
 
-  /// 礼物。**只收基本类型**：礼物面板的返回值 `_GiftSendResult` 是
-  /// 私聊详情页那个编译单元里的私有类，跨不到 Controller 来
-  /// 所以由 View 拆包后再调这里。
-  ///
-  /// 礼物气泡不走 IM 发送 —— 送礼接口在面板里已经调完了，这里只补气泡。
+  /// 礼物气泡。面板已走 [AppGift] / 送礼接口，这里只按 [GiftSendResult] 字段补气泡。
   void sendGift({
     required int id,
     required int qty,
@@ -1150,12 +1158,13 @@ class DmChatLogic extends ChatBaseLogic {
             },
           },
         ),
-        // 同上：join / recall 私聊侧不会走到，按文本发。
+        // 同上：join / recall / custom 私聊侧重发不走这里（custom 靠服务端代发）。
         ChatLineKind.text ||
         ChatLineKind.gift ||
         ChatLineKind.tip ||
         ChatLineKind.join ||
-        ChatLineKind.recall => await ImService.sendText(
+        ChatLineKind.recall ||
+        ChatLineKind.custom => await ImService.sendText(
           peerEmUsername: peer,
           content: line.text,
           peer: dmPeerAttrs,

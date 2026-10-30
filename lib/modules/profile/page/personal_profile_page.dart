@@ -53,7 +53,8 @@ class _PersonalProfilePageState extends State<PersonalProfilePage> {
     if (birth == null) return 0;
     final now = DateTime.now();
     var age = now.year - birth.year;
-    if (now.month < birth.month || (now.month == birth.month && now.day < birth.day)) {
+    if (now.month < birth.month ||
+        (now.month == birth.month && now.day < birth.day)) {
       age -= 1;
     }
     return age.clamp(0, 120);
@@ -82,11 +83,11 @@ class _PersonalProfilePageState extends State<PersonalProfilePage> {
 
   List<ProfileFlavorTag>? get _flavors {
     if (_profile.makeFriendsLabel.isEmpty) return const [];
-    return [
-      for (final tag in _profile.makeFriendsLabel)
-        if (FlavorLabelStore.display(tag).isNotEmpty)
-          ProfileFlavorTag(label: FlavorLabelStore.display(tag)),
-    ];
+    return _profile.makeFriendsLabel
+        .map(FlavorLabelStore.display)
+        .where((label) => label.isNotEmpty)
+        .map((label) => ProfileFlavorTag(label: label))
+        .toList();
   }
 
   List<String> get _momentUrls => _profile.approvedPics;
@@ -139,7 +140,9 @@ class _PersonalProfilePageState extends State<PersonalProfilePage> {
               showZodiac: _hasBirthday,
               showGenderAge: _hasGender,
               bio: _signatureText,
-              voiceSeconds: _profile.voiceDuration > 0 ? _profile.voiceDuration : null,
+              voiceSeconds: _profile.voiceDuration > 0
+                  ? _profile.voiceDuration
+                  : null,
               voiceUrl: _profile.voice.trim().isEmpty ? null : _profile.voice,
               vipIconUrl: _profile.vipSmallIcon,
               momentUrls: _momentUrls,
@@ -147,9 +150,13 @@ class _PersonalProfilePageState extends State<PersonalProfilePage> {
               inPartyName: null,
               showMore: false,
               onBack: _popWithResult,
-              bottomBar: ProfilePrimaryAction(label: 'Edit Profile', onTap: _openEditProfile),
+              bottomBar: ProfilePrimaryAction(
+                label: 'Edit Profile',
+                onTap: _openEditProfile,
+              ),
             ),
-            if (_showCardEffect && _profile.cardDynamicResource.trim().isNotEmpty)
+            if (_showCardEffect &&
+                _profile.cardDynamicResource.trim().isNotEmpty)
               PagNetworkOverlay(
                 url: _profile.cardDynamicResource,
                 onAnimationEnd: () {
@@ -164,7 +171,7 @@ class _PersonalProfilePageState extends State<PersonalProfilePage> {
                 right: 0,
                 child: LinearProgressIndicator(
                   minHeight: 2,
-                  color: AppColors.accentLimeBright,
+                  color: AppColors.greenB6FF2E,
                   backgroundColor: Colors.transparent,
                 ),
               ),

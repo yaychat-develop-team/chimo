@@ -51,7 +51,7 @@ class ChatPhotoPanel extends StatelessWidget {
   final VoidCallback onSend;
   final VoidCallback onRetry;
 
-  static const Color _green = AppColors.accentLime;
+  static const Color _green = AppColors.green00F875;
 
   @override
   Widget build(BuildContext context) {
@@ -80,7 +80,7 @@ class ChatPhotoPanel extends StatelessWidget {
                         Text(
                           error!,
                           textAlign: TextAlign.center,
-                          style: const TextStyle(color: AppColors.textGray88, fontSize: 13),
+                          style: const TextStyle(color: AppColors.gray8A8A8A, fontSize: 13),
                         ),
                         const SizedBox(height: 10),
                         TextButton(onPressed: onRetry, child: const Text('Retry')),
@@ -123,21 +123,21 @@ class ChatPhotoPanel extends StatelessWidget {
                   child: Text(
                     'Preview',
                     style: TextStyle(
-                      color: hasSelection ? AppColors.surfaceDark : AppColors.textGrayB0,
+                      color: hasSelection ? AppColors.black111111 : AppColors.grayB0B0B0,
                       fontSize: 15,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                 ),
                 const SizedBox(width: 12),
-                Container(width: 1, height: 14, color: AppColors.textGrayD8),
+                Container(width: 1, height: 14, color: AppColors.grayD5D5D5),
                 const SizedBox(width: 12),
                 GestureDetector(
                   onTap: onAlbum,
                   child: const Text(
                     'Album',
                     style: TextStyle(
-                      color: AppColors.surfaceDark,
+                      color: AppColors.black111111,
                       fontSize: 15,
                       fontWeight: FontWeight.w500,
                     ),
@@ -158,7 +158,7 @@ class ChatPhotoPanel extends StatelessWidget {
                           color: originalPhoto ? _green : Colors.transparent,
                           border: originalPhoto
                               ? null
-                              : Border.all(color: AppColors.textGrayC8, width: 1.5),
+                              : Border.all(color: AppColors.grayC8C8C8, width: 1.5),
                         ),
                         child: originalPhoto
                             ? const Icon(Icons.check_rounded, size: 13, color: Colors.white)
@@ -168,7 +168,7 @@ class ChatPhotoPanel extends StatelessWidget {
                       const Text(
                         'Original Photo',
                         style: TextStyle(
-                          color: AppColors.surfaceDark,
+                          color: AppColors.black111111,
                           fontSize: 13,
                           fontWeight: FontWeight.w400,
                         ),
@@ -218,20 +218,20 @@ class _CameraCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: AppColors.textGrayF5,
+      color: AppColors.grayF0F0F0,
       child: InkWell(
         onTap: onTap,
         child: DecoratedBox(
-          decoration: BoxDecoration(border: Border.all(color: AppColors.textGrayD8)),
+          decoration: BoxDecoration(border: Border.all(color: AppColors.grayD5D5D5)),
           child: const Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.photo_camera_outlined, size: 28, color: AppColors.textGray66),
+              Icon(Icons.photo_camera_outlined, size: 28, color: AppColors.gray6E6E6E),
               SizedBox(height: 4),
               Text(
                 'Camera',
                 style: TextStyle(
-                  color: AppColors.textGray88,
+                  color: AppColors.gray8A8A8A,
                   fontSize: 11,
                   fontWeight: FontWeight.w500,
                   height: 1,
@@ -267,7 +267,7 @@ class _AlbumPhotoCell extends StatelessWidget {
               final bytes = snapshot.data;
               if (bytes == null || bytes.isEmpty) {
                 return const ColoredBox(
-                  color: AppColors.textGrayE8,
+                  color: AppColors.grayE8E8E8,
                   child: Center(
                     child: SizedBox(
                       width: 16,
@@ -282,7 +282,7 @@ class _AlbumPhotoCell extends StatelessWidget {
               return AppImage.bytes(bytes, fit: BoxFit.cover);
             },
           ),
-          if (selected) const ColoredBox(color: AppColors.glowAccentLime),
+          if (selected) const ColoredBox(color: AppColors.green3300F875),
           Positioned(
             top: 6,
             right: 6,
@@ -292,9 +292,9 @@ class _AlbumPhotoCell extends StatelessWidget {
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: selected ? AppColors.accentLime : Colors.black.withValues(alpha: 0.15),
+                color: selected ? AppColors.green00F875 : Colors.black.withValues(alpha: 0.15),
                 border: Border.all(
-                  color: selected ? AppColors.accentLime : Colors.white,
+                  color: selected ? AppColors.green00F875 : Colors.white,
                   width: 1.5,
                 ),
               ),

@@ -1,11 +1,10 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../common/models/server_client/cash.pb.dart';
 import '../../../common/theme/app_colors.dart';
 import '../../../common/theme/app_text.dart';
+import '../../../common/widgets/app_pull_refresh.dart';
 import '../../../common/widgets/app_scaffold.dart';
 import '../../../common/utils/time_fmt.dart';
 import '../logic/coins_details_logic.dart';
@@ -19,7 +18,6 @@ class CoinsDetailsPage extends StatefulWidget {
 }
 
 class _CoinsDetailsPageState extends State<CoinsDetailsPage> {
-  final _scroll = ScrollController();
   late final CoinsDetailsLogic logic;
   bool _ownsController = false;
 
@@ -32,41 +30,21 @@ class _CoinsDetailsPageState extends State<CoinsDetailsPage> {
       logic = Get.put(CoinsDetailsLogic());
       _ownsController = true;
     }
-    _scroll.addListener(_onScroll);
   }
 
   @override
   void dispose() {
-    _scroll
-      ..removeListener(_onScroll)
-      ..dispose();
     if (_ownsController && Get.isRegistered<CoinsDetailsLogic>()) {
       Get.delete<CoinsDetailsLogic>();
     }
     super.dispose();
   }
 
-  void _onScroll() {
-    if (!_scroll.hasClients) return;
-    final pos = _scroll.position;
-    // 「还能不能翻」「是不是正在翻」由 Controller 自己挡。
-    if (pos.pixels >= pos.maxScrollExtent - 120) {
-      unawaited(logic.loadMore());
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Obx(
-      () => ChimoScaffold(
-        title: 'Coins Details',
-        loading: logic.loading.value,
-        body: RefreshIndicator(
-          color: AppColors.primaryBright,
-          onRefresh: logic.load,
-          child: _buildBody(),
-        ),
-      ),
+    return AppScaffold(
+      appBar: AppNavBar(title: 'Coins Details'),
+      body: Obx(_buildBody),
     );
   }
 
@@ -74,61 +52,37 @@ class _CoinsDetailsPageState extends State<CoinsDetailsPage> {
   Widget _buildBody() {
     final loading = logic.loading.value;
     final error = logic.error.value;
-    // `.toList()`：itemBuilder 在 builder 之外跑。
     final items = logic.items.toList();
 
-    if (error != null && items.isEmpty && !loading) {
-      return ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        children: [
-          const SizedBox(height: 120),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Text(
-              error,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
-            ),
-          ),
-        ],
-      );
-    }
-
-    if (!loading && items.isEmpty) {
-      return ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        children: const [
-          SizedBox(height: 120),
-          Text(
-            'No records yet',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
-          ),
-        ],
-      );
-    }
-
-    final loadingMore = logic.loadingMore.value;
-    return ListView.builder(
-      controller: _scroll,
-      physics: const AlwaysScrollableScrollPhysics(),
+    return AppPullRefresh.list(
+      style: AppPullRefreshStyle.bar,
+      onRefresh: logic.load,
+      onLoadMore: logic.loadMore,
+      hasMore: logic.canLoadMore.value,
+      loadingMore: logic.loadingMore.value,
+      showNoMoreFooter: false,
       padding: const EdgeInsets.only(top: 8, bottom: 24),
-      itemCount: items.length + (loadingMore ? 1 : 0),
-      itemBuilder: (context, index) {
-        if (index >= items.length) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 16),
-            child: Center(
-              child: SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(strokeWidth: 2),
+      itemCount: items.length,
+      empty: loading
+          ? null
+          : error != null
+          ? Padding(
+              padding: const EdgeInsets.fromLTRB(24, 120, 24, 24),
+              child: Text(
+                error,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.gray9A9A9A, fontSize: 14),
+              ),
+            )
+          : const Padding(
+              padding: EdgeInsets.only(top: 120),
+              child: Text(
+                'No records yet',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppColors.gray9A9A9A, fontSize: 14),
               ),
             ),
-          );
-        }
-        return _HistoryTile(item: items[index]);
-      },
+      itemBuilder: (context, index) => _HistoryTile(item: items[index]),
     );
   }
 }
@@ -163,7 +117,7 @@ class _HistoryTile extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: positive ? AppColors.primaryBright : AppColors.textPrimary,
+                    color: positive ? AppColors.green1BBA77 : AppColors.white,
                   ),
                 ),
               ),

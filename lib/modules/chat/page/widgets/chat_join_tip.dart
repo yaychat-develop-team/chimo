@@ -16,8 +16,8 @@ class ChatJoinTip extends StatelessWidget {
   /// 点昵称。为 null 时昵称不可点。
   final VoidCallback? onNameTap;
 
-  static const _nameColor = AppColors.accentTeal;
-  static const _restColor = AppColors.textGrayBC;
+  static const _nameColor = AppColors.green00D68F;
+  static const _restColor = AppColors.grayC8C8C8;
 
   @override
   Widget build(BuildContext context) {

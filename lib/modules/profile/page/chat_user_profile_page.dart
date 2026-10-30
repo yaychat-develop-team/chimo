@@ -3,18 +3,18 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../../app/app_gift.dart';
+import '../../../app/app_jumper.dart';
 import '../../../common/constants/app_assets.dart';
 import '../../../common/extensions/wire_view.dart';
 import '../../../common/models/server_client/user.pb.dart';
-import '../../../common/utils/zodiac.dart';
-import '../logic/flavor_label_store.dart';
 import '../../../common/theme/app_bottom_sheet.dart';
-import '../../../common/widgets/pag_network_overlay.dart';
-import '../../chat/page/widgets/gift_sheet.dart';
-import 'widgets/user_profile_scaffold.dart';
-import '../logic/chat_user_profile_logic.dart';
 import '../../../common/theme/app_colors.dart';
-import '../../../app/app_jumper.dart';
+import '../../../common/utils/zodiac.dart';
+import '../../../common/widgets/pag_network_overlay.dart';
+import '../logic/chat_user_profile_logic.dart';
+import '../logic/flavor_label_store.dart';
+import 'widgets/user_profile_scaffold.dart';
 
 class ChatUserProfilePage extends StatefulWidget {
   const ChatUserProfilePage({super.key, required this.seed});
@@ -48,7 +48,8 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
     if (birth != null) {
       final now = DateTime.now();
       var age = now.year - birth.year;
-      if (now.month < birth.month || (now.month == birth.month && now.day < birth.day)) {
+      if (now.month < birth.month ||
+          (now.month == birth.month && now.day < birth.day)) {
         age -= 1;
       }
       return age.clamp(0, 120);
@@ -64,11 +65,11 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
   List<ProfileFlavorTag>? get _flavors {
     final tags = logic.p.makeFriendsLabel;
     if (tags.isEmpty) return const [];
-    return [
-      for (final tag in tags)
-        if (FlavorLabelStore.display(tag).isNotEmpty)
-          ProfileFlavorTag(label: FlavorLabelStore.display(tag)),
-    ];
+    return tags
+        .map(FlavorLabelStore.display)
+        .where((label) => label.isNotEmpty)
+        .map((label) => ProfileFlavorTag(label: label))
+        .toList();
   }
 
   Future<void> _openMoreMenu() async {
@@ -119,7 +120,15 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
             child: ProfilePrimaryAction(label: 'Chat', onTap: logic.openChat),
           ),
           const SizedBox(width: 10),
-          ProfileGiftAction(onTap: () => showGiftBottomSheet(context, receiverUid: logic.p.uid)),
+          ProfileGiftAction(
+            onTap: () => AppGift.show(
+              context,
+              scene: AppGiftScene.profile,
+              receiverUid: logic.p.uid,
+              receiverName: logic.p.nickname,
+              receiverAvatar: logic.p.avatar,
+            ),
+          ),
         ],
       );
     }
@@ -137,7 +146,15 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
           child: ProfileOutlineAction(label: 'Chat', onTap: logic.openChat),
         ),
         const SizedBox(width: 10),
-        ProfileGiftAction(onTap: () => showGiftBottomSheet(context, receiverUid: logic.p.uid)),
+        ProfileGiftAction(
+          onTap: () => AppGift.show(
+            context,
+            scene: AppGiftScene.profile,
+            receiverUid: logic.p.uid,
+            receiverName: logic.p.nickname,
+            receiverAvatar: logic.p.avatar,
+          ),
+        ),
       ],
     );
   }
@@ -162,7 +179,9 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
             showZodiac: profile.birthday.trim().isNotEmpty,
             showGenderAge: profile.genderKnown,
             bio: logic.bioText,
-            voiceSeconds: profile.voiceDuration > 0 ? profile.voiceDuration : null,
+            voiceSeconds: profile.voiceDuration > 0
+                ? profile.voiceDuration
+                : null,
             voiceUrl: profile.voice.trim().isEmpty ? null : profile.voice,
             vipIconUrl: profile.vipSmallIcon,
             momentUrls: logic.momentUrls,
@@ -173,7 +192,8 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
             onMore: isSelf ? null : _openMoreMenu,
             bottomBar: _buildBottomBar(context),
           ),
-          if (logic.showCardEffect.value && profile.cardDynamicResource.trim().isNotEmpty)
+          if (logic.showCardEffect.value &&
+              profile.cardDynamicResource.trim().isNotEmpty)
             PagNetworkOverlay(
               url: profile.cardDynamicResource,
               onAnimationEnd: logic.dismissCardEffect,
@@ -185,7 +205,7 @@ class _ChatUserProfilePageState extends State<ChatUserProfilePage> {
               right: 0,
               child: LinearProgressIndicator(
                 minHeight: 2,
-                color: AppColors.accentLimeBright,
+                color: AppColors.greenB6FF2E,
                 backgroundColor: Colors.transparent,
               ),
             ),

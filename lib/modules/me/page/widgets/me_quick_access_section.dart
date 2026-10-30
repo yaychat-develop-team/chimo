@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../common/theme/app_colors.dart';
 import '../../model/me_menu_data.dart';
-import '../../../../common/widgets/app_image.dart';
+import 'package:chimo/common/utils/chimo.dart';
 
 /// 快捷入口：标题 + 四列网格，42×42 图标。
 ///
@@ -27,7 +27,7 @@ class MeQuickAccessSection extends StatelessWidget {
           child: Text(
             'Quick Access',
             style: TextStyle(
-              color: AppColors.textPrimary,
+              color: AppColors.white,
               fontSize: 17,
               fontWeight: FontWeight.w700,
               height: 1.2,
@@ -37,9 +37,7 @@ class MeQuickAccessSection extends StatelessWidget {
         const SizedBox(height: 16),
         Column(
           spacing: 16,
-          children: List.generate((items.length / crossAxisCount).ceil(), (
-            row,
-          ) {
+          children: List.generate((items.length / crossAxisCount).ceil(), (row) {
             final rowStart = row * crossAxisCount;
             return Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -78,7 +76,7 @@ class _QuickAccessTile extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          AppImage(
+          Chimo.image(
             item.iconAsset,
             width: MeQuickAccessSection.iconSize,
             height: MeQuickAccessSection.iconSize,
@@ -93,7 +91,7 @@ class _QuickAccessTile extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                color: AppColors.textSecondary,
+                color: AppColors.gray9A9A9A,
                 fontSize: 11,
                 fontWeight: FontWeight.w400,
                 height: 1.2,

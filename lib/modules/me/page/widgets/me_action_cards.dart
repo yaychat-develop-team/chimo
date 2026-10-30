@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../common/constants/app_assets.dart';
 import '../../../../common/theme/app_colors.dart';
-import '../../../../common/widgets/app_image.dart';
+import 'package:chimo/common/utils/chimo.dart';
 
 /// 钱包 / 等级卡片：铺满背景、标题、图标（高 60）。
 class MeActionCards extends StatelessWidget {
@@ -56,7 +56,7 @@ class _ActionCard extends StatelessWidget {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                AppImage(cardAsset, fit: BoxFit.cover, alignment: Alignment.centerRight),
+                Chimo.image(cardAsset, fit: BoxFit.cover, alignment: Alignment.centerRight),
                 Padding(
                   padding: const EdgeInsets.only(left: 14),
                   child: Align(
@@ -81,7 +81,7 @@ class _ActionCard extends StatelessWidget {
                       height: 14,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: AppColors.dangerPink,
+                        color: AppColors.redE53955,
                         borderRadius: BorderRadius.circular(7),
                       ),
                       child: Text(

@@ -139,7 +139,7 @@ class AppDialog extends StatelessWidget {
                 contentText,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
-                  color: AppColors.textGray66,
+                  color: AppColors.gray6E6E6E,
                   fontSize: 14,
                   fontWeight: FontWeight.w400,
                   height: 1.4,
@@ -183,8 +183,8 @@ class AppDialog extends StatelessWidget {
   Widget _cancelButton() {
     return _DialogButton(
       label: cancelLabel,
-      background: AppColors.textGrayF0,
-      foreground: AppColors.textGray66,
+      background: AppColors.grayF0F0F0,
+      foreground: AppColors.gray6E6E6E,
       onTap: () {
         if (autoPop) AppJumper.back(result: false);
         onCancel?.call();

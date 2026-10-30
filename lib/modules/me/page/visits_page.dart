@@ -7,106 +7,87 @@ import '../../../common/constants/app_assets.dart';
 import '../../../common/theme/app_colors.dart';
 import '../../../common/utils/text_fmt.dart';
 import '../../../common/utils/time_fmt.dart';
+import '../../../common/widgets/app_pull_refresh.dart';
 import '../../../common/widgets/app_scaffold.dart';
 import '../../../common/models/server_client/user.pb.dart';
-import '../../../common/widgets/app_image.dart';
+import 'package:chimo/common/utils/chimo.dart';
 import '../logic/visits_logic.dart';
+import 'package:chimo/common/widgets/app_image.dart';
 
 /// Me → 访客：谁看过我的资料列表（`GET /user-relation/viewedBy`）。
-class VisitsPage extends StatefulWidget {
+///
+/// [VisitsLogic] 由路由 binding 注入。
+class VisitsPage extends GetView<VisitsLogic> {
   const VisitsPage({super.key});
 
   @override
-  State<VisitsPage> createState() => _VisitsPageState();
-}
-
-class _VisitsPageState extends State<VisitsPage> {
-  late final VisitsLogic logic;
-
-  @override
-  void initState() {
-    super.initState();
-    logic = Get.put(VisitsLogic());
-  }
-
-  @override
-  void dispose() {
-    if (Get.isRegistered<VisitsLogic>()) Get.delete<VisitsLogic>();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return Obx(() {
-      final items = logic.items.toList();
-      final loading = logic.loading.value;
-      final error = logic.error.value;
-      return ChimoScaffold(
+    return AppScaffold(
+      appBar: AppNavBar(
         title: 'Visits',
-        loading: loading,
         titleStyle: const TextStyle(
-          color: AppColors.textPrimary,
+          color: AppColors.white,
           fontSize: 17,
           fontWeight: FontWeight.w700,
         ),
-        body: RefreshIndicator(
-          color: AppColors.primaryBright,
-          onRefresh: logic.load,
-          child: error != null && items.isEmpty
-              ? ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  children: [
-                    const SizedBox(height: 120),
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          children: [
-                            Text(
-                              error,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
-                            ),
-                            const SizedBox(height: 12),
-                            TextButton(
-                              onPressed: () => unawaited(logic.load()),
-                              child: const Text('Retry'),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                )
-              : items.isEmpty && !loading
-              ? ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  children: const [
-                    SizedBox(height: 140),
-                    Center(
-                      child: Text(
-                        'No visitors yet',
-                        style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
-                      ),
-                    ),
-                  ],
-                )
-              : ListView.builder(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.only(top: 4, bottom: 24),
-                  itemCount: items.length,
-                  itemBuilder: (context, index) {
-                    final item = items[index];
-                    return _VisitTile(
-                      item: item,
-                      onTap: () => unawaited(logic.open(item)),
-                      onDelete: () => unawaited(logic.remove(item)),
-                    );
-                  },
-                ),
+      ),
+      body: Obx(_buildList),
+    );
+  }
+
+  Widget _buildList() {
+    final items = controller.items.toList();
+    final loading = controller.loading.value;
+    final error = controller.error.value;
+
+    final Widget sliver;
+    if (error != null && items.isEmpty) {
+      sliver = SliverFillRemaining(
+        hasScrollBody: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 120, 24, 24),
+          child: Column(
+            children: [
+              Text(
+                error,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.gray9A9A9A, fontSize: 14),
+              ),
+              const SizedBox(height: 12),
+              TextButton(onPressed: () => unawaited(controller.load()), child: const Text('Retry')),
+            ],
+          ),
         ),
       );
-    });
+    } else if (items.isEmpty && !loading) {
+      sliver = const SliverFillRemaining(
+        hasScrollBody: false,
+        child: Padding(
+          padding: EdgeInsets.only(top: 140),
+          child: Text(
+            'No visitors yet',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: AppColors.gray9A9A9A, fontSize: 14),
+          ),
+        ),
+      );
+    } else {
+      sliver = SliverPadding(
+        padding: const EdgeInsets.only(top: 4, bottom: 24),
+        sliver: SliverList.builder(
+          itemCount: items.length,
+          itemBuilder: (context, index) {
+            final item = items[index];
+            return _VisitTile(
+              item: item,
+              onTap: () => unawaited(controller.open(item)),
+              onDelete: () => unawaited(controller.remove(item)),
+            );
+          },
+        ),
+      );
+    }
+    return AppPullRefresh(onRefresh: controller.load, slivers: [sliver]);
   }
 }
 
@@ -155,7 +136,7 @@ class _VisitTile extends StatelessWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
-                                color: AppColors.textSecondary,
+                                color: AppColors.gray9A9A9A,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w400,
                               ),
@@ -164,13 +145,13 @@ class _VisitTile extends StatelessWidget {
                           Container(
                             width: 0.5,
                             height: 10,
-                            color: AppColors.textGrayD5,
+                            color: AppColors.grayD5D5D5,
                             margin: const EdgeInsets.symmetric(horizontal: 6),
                           ),
                           Text(
                             TextFmt.times(item.viewCnt),
                             style: const TextStyle(
-                              color: AppColors.textSecondary,
+                              color: AppColors.gray9A9A9A,
                               fontSize: 12,
                               fontWeight: FontWeight.w400,
                             ),
@@ -184,7 +165,12 @@ class _VisitTile extends StatelessWidget {
                   onPressed: onDelete,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                  icon: AppImage(AppAssets.msgDelete, width: 20, height: 20, fit: BoxFit.contain),
+                  icon: Chimo.image(
+                    AppAssets.msgDelete,
+                    width: 20,
+                    height: 20,
+                    fit: BoxFit.contain,
+                  ),
                 ),
               ],
             ),

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../../../common/constants/app_assets.dart';
 import '../../../../common/theme/app_colors.dart';
 import '../../../../common/widgets/app_image.dart';
+import 'package:chimo/common/utils/chimo.dart';
 
 /// 图片气泡的形状与解码预算。私聊四角 12 + 一层浅投影，群聊尾角 4 / 其余 18、
 /// 无投影 —— 两边设计稿本来就不一样， 合并时照抄，没有统一（同
@@ -85,12 +86,12 @@ class ChatImageBubble extends StatelessWidget {
     return Container(
       width: width,
       height: height,
-      color: AppColors.surfaceOlive,
+      color: AppColors.black2A2A2A,
       alignment: Alignment.center,
       child: const Text(
         'Picture expired',
         textAlign: TextAlign.center,
-        style: TextStyle(color: AppColors.textGray66, fontSize: 12, fontWeight: FontWeight.w600),
+        style: TextStyle(color: AppColors.gray6E6E6E, fontSize: 12, fontWeight: FontWeight.w600),
       ),
     );
   }
@@ -100,14 +101,14 @@ class ChatImageBubble extends StatelessWidget {
     if (src.isEmpty) return _expired();
 
     if (src.startsWith('http://') || src.startsWith('https://')) {
-      return AppImage(
+      return Chimo.image(
         src,
         width: width,
         height: height,
         fit: BoxFit.cover,
         memWidth: style.memWidth,
         placeholder: ColoredBox(
-          color: locked ? AppColors.outlineBright : AppColors.textGrayF3,
+          color: locked ? AppColors.gray333333 : AppColors.grayF0F0F0,
           child: const Center(
             child: SizedBox(
               width: 22,
@@ -121,7 +122,7 @@ class ChatImageBubble extends StatelessWidget {
     }
 
     if (src.startsWith('assets/')) {
-      return AppImage(src, width: width, height: height, fit: BoxFit.cover, error: _expired());
+      return Chimo.image(src, width: width, height: height, fit: BoxFit.cover, error: _expired());
     }
 
     final file = File(src);
@@ -151,7 +152,7 @@ class ChatImageBubble extends StatelessWidget {
               fit: StackFit.expand,
               children: [
                 ImageFiltered(imageFilter: ImageFilter.blur(sigmaX: 8, sigmaY: 8), child: image),
-                const ColoredBox(color: AppColors.scrimBlack20),
+                const ColoredBox(color: AppColors.black20),
                 Positioned(
                   left: 0,
                   right: 0,
@@ -163,7 +164,7 @@ class ChatImageBubble extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        AppImage(AppAssets.lockIcon, width: 14, height: 14, color: Colors.white),
+                        Chimo.image(AppAssets.lockIcon, width: 14, height: 14, color: Colors.white),
                         const SizedBox(width: 5),
                         const Text(
                           'Join to view',

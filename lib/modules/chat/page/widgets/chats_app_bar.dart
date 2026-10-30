@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../common/constants/app_assets.dart';
 import '../../../../common/theme/app_colors.dart';
-import '../../../../common/widgets/app_image.dart';
+import 'package:chimo/common/utils/chimo.dart';
 
 /// Chats 应用栏：带绿色下划线的标题 + 联系人/搜索。
 /// 规格来自 Figma 39:428 — 标题 24 ExtraBold；图标按钮 36×36 r12。
@@ -14,49 +14,51 @@ class ChatsAppBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-      child: Row(
-        children: [
-          SizedBox(
-            height: 40,
-            child: Stack(
-              clipBehavior: Clip.none,
-              alignment: Alignment.topLeft,
-              children: [
-                // 非 Positioned，使 Stack 在 Row 中获得有限宽度。
-                const Text(
-                  'Chats',
-                  style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800,
-                    height: 1.2,
-                  ),
-                ),
-                // 「a」下方的绿色涂鸦（Figma Vector 1）。
-                const Positioned(
-                  left: 17,
-                  top: 22,
-                  child: SizedBox(
-                    width: 48,
-                    height: 17,
-                    child: AppImage(
-                      AppAssets.chatTitleTips,
-                      width: 48,
-                      height: 17,
-                      fit: BoxFit.fill,
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+        child: Row(
+          children: [
+            SizedBox(
+              height: 40,
+              child: Stack(
+                clipBehavior: Clip.none,
+                alignment: Alignment.topLeft,
+                children: [
+                  // 非 Positioned，使 Stack 在 Row 中获得有限宽度。
+                  const Text(
+                    'Chats',
+                    style: TextStyle(
+                      color: AppColors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      height: 1.2,
                     ),
                   ),
-                ),
-              ],
+                  // 「a」下方的绿色涂鸦（Figma Vector 1）。
+                  Positioned(
+                    left: 17,
+                    top: 22,
+                    child: SizedBox(
+                      width: 48,
+                      height: 17,
+                      child: Chimo.image(
+                        AppAssets.chatTitleTips,
+                        width: 48,
+                        height: 17,
+                        fit: BoxFit.fill,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const Spacer(),
-          _HeaderIconButton(asset: AppAssets.msgContacts, onTap: onContactsTap, iconSize: 22),
-          const SizedBox(width: 8),
-          _HeaderIconButton(asset: AppAssets.msgSearch, onTap: onSearchTap, iconSize: 18),
-        ],
+            const Spacer(),
+            _HeaderIconButton(asset: AppAssets.msgContacts, onTap: onContactsTap, iconSize: 22),
+            const SizedBox(width: 8),
+            _HeaderIconButton(asset: AppAssets.msgSearch, onTap: onSearchTap, iconSize: 18),
+          ],
+        ),
       ),
     );
   }
@@ -73,7 +75,7 @@ class _HeaderIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: AppColors.chatsRowFill,
+      color: AppColors.white8,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onTap,
@@ -82,7 +84,7 @@ class _HeaderIconButton extends StatelessWidget {
           width: 36,
           height: 36,
           child: Center(
-            child: AppImage(asset, width: iconSize, height: iconSize, fit: BoxFit.contain),
+            child: Chimo.image(asset, width: iconSize, height: iconSize, fit: BoxFit.contain),
           ),
         ),
       ),

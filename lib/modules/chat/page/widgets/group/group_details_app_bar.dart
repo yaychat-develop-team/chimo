@@ -1,12 +1,12 @@
+import 'package:chimo/common/widgets/app_scaffold.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../../common/constants/app_assets.dart';
-import '../../../../../common/widgets/app_back_button.dart';
 import '../../../../../common/theme/app_colors.dart';
-import '../../../../../common/widgets/app_image.dart';
 import '../../../../../common/models/server_client/group/group.pb.dart';
 import '../../../../../common/widgets/group_level_badge.dart';
 import 'group_desc_toggle_chip.dart';
+import 'package:chimo/common/utils/chimo.dart';
 
 /// 群聊导航栏：返回 / 群名 / 等级 / 简介芯片 / 更多。
 ///
@@ -42,7 +42,7 @@ class GroupDetailsAppBar extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  color: AppColors.textPrimary,
+                  color: AppColors.white,
                   fontSize: 17,
                   fontWeight: FontWeight.w700,
                 ),
@@ -56,7 +56,7 @@ class GroupDetailsAppBar extends StatelessWidget {
           const Spacer(),
           IconButton(
             onPressed: onMoreTap,
-            icon: AppImage(AppAssets.msgMore, width: 22, height: 22, color: AppColors.textPrimary),
+            icon: Chimo.image(AppAssets.msgMore, width: 22, height: 22, color: AppColors.white),
           ),
         ],
       ),

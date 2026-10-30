@@ -11,14 +11,16 @@ class AccountCancelResultPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChimoScaffold(
-      title: 'Cancel Account',
-      backgroundColor: Colors.white,
-      titleStyle: const TextStyle(
-        color: AppColors.outline,
-        fontSize: 16,
-        fontWeight: FontWeight.w600,
+    return AppScaffold(
+      appBar: AppNavBar(
+        title: 'Cancel Account',
+        titleStyle: const TextStyle(
+          color: AppColors.gray333333,
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+        ),
       ),
+      backgroundColor: Colors.white,
       body: const Padding(
         padding: EdgeInsets.symmetric(horizontal: 48),
         child: Column(
@@ -30,7 +32,7 @@ class AccountCancelResultPage extends StatelessWidget {
               'Application for account cancellation is under review.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: AppColors.outline,
+                color: AppColors.gray333333,
                 fontSize: 20,
                 fontWeight: FontWeight.w500,
                 height: 1.35,
@@ -40,7 +42,7 @@ class AccountCancelResultPage extends StatelessWidget {
             Text(
               'The application for account cancellation has been submitted successfully. The staff will complete the review within 15 working days. Once the review is approved, the user can confirm again to complete the cancellation successfully.',
               style: TextStyle(
-                color: AppColors.textGray99,
+                color: AppColors.gray9A9A9A,
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
                 height: 1.45,
@@ -75,7 +77,7 @@ class _ReviewBadgePainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.shortestSide / 2;
 
-    canvas.drawCircle(center, radius, Paint()..color = AppColors.warningYellow);
+    canvas.drawCircle(center, radius, Paint()..color = AppColors.yellowFFD400);
 
     // 白色表针（审核中标记）。
     final hand = Paint()

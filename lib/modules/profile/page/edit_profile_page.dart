@@ -12,12 +12,9 @@ import '../../../common/constants/app_assets.dart';
 import '../../../common/theme/app_colors.dart';
 import '../../../common/theme/app_text.dart';
 import '../../../common/utils/app_log.dart';
-import '../../../common/widgets/app_back_button.dart';
-import '../../../common/widgets/app_image.dart';
-import '../../../common/widgets/app_gradient_button.dart';
+import 'package:chimo/common/utils/chimo.dart';
 import '../../../common/widgets/app_scaffold.dart';
 import '../../../app/auth/onboarding_state.dart';
-import '../../../common/widgets/skip_button.dart';
 import '../../../common/extensions/wire_view.dart';
 import '../../../common/models/server_client/user.pb.dart';
 import 'album_photo_viewer_page.dart';
@@ -117,7 +114,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     if (temp.isAfter(now)) temp = now;
 
     final picked = await AppBottomSheet.show<DateTime>(
-      backgroundColor: AppColors.surfaceSheet,
+      backgroundColor: AppColors.black1C1C1E,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -140,7 +137,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                       child: const Text(
                         'Done',
                         style: TextStyle(
-                          color: AppColors.primaryBright,
+                          color: AppColors.green1BBA77,
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                         ),
@@ -191,10 +188,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
         child: Obx(() {
           final profile = logic.profile.value;
           final signature = logic.signature.value;
-          return ChimoScaffold(
-            backgroundColor: AppColors.backgroundDeep,
-            loading: logic.loading.value || logic.albumUploading.value,
-            navigation: _EditProfileAppBar(
+          return AppScaffold(
+            backgroundColor: AppColors.black111111,
+            // loading: logic.loading.value || logic.albumUploading.value,
+            appBar: _EditProfileAppBar(
               onBack: () => _leave(context),
               completionPercent: logic.completionPercent,
               onSkip: logic.fromOnboarding
@@ -270,7 +267,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 if (logic.fromOnboarding)
                   Padding(
                     padding: EdgeInsets.fromLTRB(16, 8, 16, 12 + bottom),
-                    child: AppGradientButton(
+                    child: Chimo.s.gradientButton(
                       label: 'Save',
                       onTap: () => unawaited(_save(context)),
                       height: 48,
@@ -296,47 +293,49 @@ class _EditProfileAppBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 48,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: AppBackButton(onPressed: onBack),
-          ),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Edit Profile',
-                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
+    return SafeArea(
+      child: SizedBox(
+        height: 48,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: AppBackButton(onBack: onBack),
+            ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Edit Profile',
+                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
                 ),
-                child: Text(
-                  '$completionPercent%',
-                  style: const TextStyle(
-                    color: Colors.black,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    height: 1.1,
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '$completionPercent%',
+                    style: const TextStyle(
+                      color: Colors.black,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      height: 1.1,
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-          if (onSkip != null)
-            Align(
-              alignment: Alignment.centerRight,
-              child: SkipButton(onPressed: onSkip),
+              ],
             ),
-        ],
+            if (onSkip != null)
+              Align(
+                alignment: Alignment.centerRight,
+                child: Chimo.s.skipButton(onPressed: onSkip),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -347,7 +346,7 @@ class _Chevron extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppImage(AppAssets.mineArrow, width: 5, height: 8, color: AppColors.textGray8A);
+    return Chimo.image(AppAssets.mineArrow, width: 5, height: 8, color: AppColors.gray8A8A8A);
   }
 }
 
@@ -366,7 +365,7 @@ class _SectionCard extends StatelessWidget {
     );
 
     return Material(
-      color: AppColors.surfaceSheet,
+      color: AppColors.black1C1C1E,
       borderRadius: BorderRadius.circular(16),
       clipBehavior: Clip.antiAlias,
       child: onTap == null
@@ -406,7 +405,7 @@ class _AvatarCard extends StatelessWidget {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    AppImage(
+                    Chimo.image(
                       avatarUrl,
                       fallbackAsset: avatarAsset,
                       width: 96,
@@ -418,14 +417,14 @@ class _AvatarCard extends StatelessWidget {
                       const Align(
                         alignment: Alignment.bottomCenter,
                         child: ColoredBox(
-                          color: AppColors.scrimBlack60,
+                          color: AppColors.black60,
                           child: Padding(
                             padding: EdgeInsets.symmetric(vertical: 4),
                             child: Text(
                               'Under review',
                               textAlign: TextAlign.center,
                               style: TextStyle(
-                                color: AppColors.giftYellow,
+                                color: AppColors.yellowFDF652,
                                 fontSize: 10,
                                 fontWeight: FontWeight.w400,
                               ),
@@ -442,7 +441,7 @@ class _AvatarCard extends StatelessWidget {
             const Text(
               'Edit',
               style: TextStyle(
-                color: AppColors.textGray8A,
+                color: AppColors.gray8A8A8A,
                 fontSize: 14,
                 fontWeight: FontWeight.w400,
               ),
@@ -490,7 +489,7 @@ class _PhotoCard extends StatelessWidget {
             children: [
               if (canAdd)
                 Material(
-                  color: AppColors.surfaceField,
+                  color: AppColors.black2A2A2A,
                   borderRadius: BorderRadius.circular(12),
                   child: InkWell(
                     onTap: onAdd,
@@ -542,7 +541,7 @@ class _PhotoThumb extends StatelessWidget {
           onTap: onTap,
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
-            child: AppImage(
+            child: Chimo.image(
               path,
               width: 98,
               height: 98,
@@ -550,7 +549,7 @@ class _PhotoThumb extends StatelessWidget {
               error: Container(
                 width: 98,
                 height: 98,
-                color: AppColors.surfaceField,
+                color: AppColors.black2A2A2A,
                 alignment: Alignment.center,
                 child: const Icon(Icons.broken_image_outlined, color: Colors.white54),
               ),
@@ -564,7 +563,7 @@ class _PhotoThumb extends StatelessWidget {
             bottom: 4,
             child: DecoratedBox(
               decoration: BoxDecoration(
-                color: AppColors.scrimBlack50,
+                color: AppColors.black50,
                 borderRadius: BorderRadius.all(Radius.circular(8)),
               ),
               child: Padding(
@@ -573,7 +572,7 @@ class _PhotoThumb extends StatelessWidget {
                   'Under review',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: AppColors.giftYellow,
+                    color: AppColors.yellowFDF652,
                     fontSize: 10,
                     fontWeight: FontWeight.w400,
                   ),
@@ -591,10 +590,7 @@ class _PhotoThumb extends StatelessWidget {
               child: Container(
                 width: 22,
                 height: 22,
-                decoration: const BoxDecoration(
-                  color: AppColors.scrimBlack80,
-                  shape: BoxShape.circle,
-                ),
+                decoration: const BoxDecoration(color: AppColors.black80, shape: BoxShape.circle),
                 child: const Icon(Icons.close, size: 14, color: Colors.white),
               ),
             ),
@@ -636,7 +632,7 @@ class _PromptCard extends StatelessWidget {
             maxLines: 4,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: hintAsValue ? AppColors.textGrayB0 : AppColors.textGray8A,
+              color: hintAsValue ? AppColors.grayB0B0B0 : AppColors.gray8A8A8A,
               fontSize: 13,
               fontWeight: FontWeight.w400,
               height: 20 / 13,
@@ -797,7 +793,7 @@ class _VoiceNoteCardState extends State<_VoiceNoteCard> {
               child: const Text(
                 'Speak up — your voice is your vibe!',
                 style: TextStyle(
-                  color: AppColors.textGray8A,
+                  color: AppColors.gray8A8A8A,
                   fontSize: 13,
                   fontWeight: FontWeight.w400,
                   height: 20 / 13,
@@ -816,12 +812,12 @@ class _VoiceNoteCardState extends State<_VoiceNoteCard> {
                     padding: const EdgeInsets.symmetric(horizontal: 10),
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: AppColors.giftYellowSoft,
+                      color: AppColors.yellow1FFDF652,
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Row(
                       children: [
-                        AppImage(
+                        Chimo.image(
                           _playing ? AppAssets.voicePauseIcon : AppAssets.voicePlayIcon,
                           width: 18,
                           height: 18,
@@ -831,12 +827,12 @@ class _VoiceNoteCardState extends State<_VoiceNoteCard> {
                           child: SizedBox(
                             height: 14,
                             child: _playing
-                                ? AppImage(
+                                ? Chimo.image(
                                     AppAssets.voiceWaveAnim,
                                     fit: BoxFit.contain,
                                     alignment: Alignment.centerLeft,
                                   )
-                                : AppImage(
+                                : Chimo.image(
                                     AppAssets.voiceWaveLine,
                                     height: 10,
                                     fit: BoxFit.contain,
@@ -860,7 +856,7 @@ class _VoiceNoteCardState extends State<_VoiceNoteCard> {
                 const Spacer(),
                 GestureDetector(
                   onTap: () => unawaited(_onDelete()),
-                  child: AppImage(
+                  child: Chimo.image(
                     AppAssets.voiceDeleteIcon,
                     width: 28,
                     height: 28,
@@ -899,7 +895,7 @@ class _TagsCard extends StatelessWidget {
             const Text(
               'Pick tags to find like-minded friends!',
               style: TextStyle(
-                color: AppColors.textGray8A,
+                color: AppColors.gray8A8A8A,
                 fontSize: 13,
                 fontWeight: FontWeight.w400,
                 height: 20 / 13,
@@ -912,7 +908,7 @@ class _TagsCard extends StatelessWidget {
               children: tags.map((tag) {
                 return DecoratedBox(
                   decoration: BoxDecoration(
-                    color: AppColors.surfaceField,
+                    color: AppColors.black2A2A2A,
                     borderRadius: BorderRadius.circular(15),
                   ),
                   child: Padding(
@@ -1043,7 +1039,7 @@ class _InfoRow extends StatelessWidget {
             ),
           ),
         ),
-        if (showDivider) const Divider(height: 1, thickness: 1, color: AppColors.divider),
+        if (showDivider) const Divider(height: 1, thickness: 1, color: AppColors.black2A2A2A),
       ],
     );
   }
@@ -1073,7 +1069,7 @@ class _GenderPickerSheetState extends State<_GenderPickerSheet> {
 
     return Container(
       decoration: const BoxDecoration(
-        color: AppColors.surfaceSheet,
+        color: AppColors.black1C1C1E,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: EdgeInsets.fromLTRB(16, 24, 16, 20 + bottom),
@@ -1099,7 +1095,7 @@ class _GenderPickerSheetState extends State<_GenderPickerSheet> {
                       child: Text(
                         'Save',
                         style: TextStyle(
-                          color: AppColors.accentLime,
+                          color: AppColors.green00F875,
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
                         ),
@@ -1154,7 +1150,7 @@ class _GenderOption extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: selected ? AppColors.surfaceOliveActive : AppColors.tagBackground,
+      color: selected ? AppColors.green2E2E16 : AppColors.black2A2A2A,
       borderRadius: BorderRadius.circular(27),
       child: InkWell(
         onTap: onTap,
@@ -1164,14 +1160,14 @@ class _GenderOption extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(27),
             border: Border.all(
-              color: selected ? AppColors.accentLime : Colors.transparent,
+              color: selected ? AppColors.green00F875 : Colors.transparent,
               width: 1.5,
             ),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              AppImage(iconAsset, width: 16, height: 16),
+              Chimo.image(iconAsset, width: 16, height: 16),
               const SizedBox(width: 8),
               Text(label, style: AppText.field),
             ],

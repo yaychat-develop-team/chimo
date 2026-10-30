@@ -33,18 +33,14 @@ class ChatVoiceBubble extends StatefulWidget {
   State<ChatVoiceBubble> createState() => _ChatVoiceBubbleState();
 }
 
-class _ChatVoiceBubbleState extends State<ChatVoiceBubble>
-    with SingleTickerProviderStateMixin {
+class _ChatVoiceBubbleState extends State<ChatVoiceBubble> with SingleTickerProviderStateMixin {
   late final ChatVoicePlayback _playback;
   late final AnimationController _waveController;
 
   @override
   void initState() {
     super.initState();
-    _waveController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 700),
-    );
+    _waveController = AnimationController(vsync: this, duration: const Duration(milliseconds: 700));
     _playback = ChatVoicePlayback(
       seconds: widget.seconds,
       mediaSource: widget.mediaSource,
@@ -108,7 +104,7 @@ class _ChatVoiceBubbleState extends State<ChatVoiceBubble>
         height: 40,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-          color: isSelf ? AppColors.accentLimeSoft : AppColors.textGrayF0,
+          color: isSelf ? AppColors.greenB8FF6A : AppColors.grayF0F0F0,
           borderRadius: BorderRadius.only(
             topLeft: Radius.circular(isSelf ? 16 : 4),
             topRight: Radius.circular(isSelf ? 4 : 16),
@@ -125,7 +121,7 @@ class _ChatVoiceBubbleState extends State<ChatVoiceBubble>
                 child: Text(
                   'Voice expired',
                   style: TextStyle(
-                    color: AppColors.textGray66,
+                    color: AppColors.gray6E6E6E,
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
@@ -136,7 +132,7 @@ class _ChatVoiceBubbleState extends State<ChatVoiceBubble>
               Text(
                 '${displaySeconds > 0 ? displaySeconds : widget.seconds}s',
                 style: const TextStyle(
-                  color: AppColors.surfaceDark,
+                  color: AppColors.black111111,
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                 ),
@@ -172,10 +168,7 @@ class _VoiceBarsIcon extends StatelessWidget {
           width: 16,
           height: 16,
           child: CustomPaint(
-            painter: _VoiceBarsPainter(
-              phase: animation!.value * 2 * math.pi,
-              playing: true,
-            ),
+            painter: _VoiceBarsPainter(phase: animation!.value * 2 * math.pi, playing: true),
           ),
         );
       },
@@ -192,7 +185,7 @@ class _VoiceBarsPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = AppColors.surfaceDark
+      ..color = AppColors.black111111
       ..style = PaintingStyle.fill
       ..strokeCap = StrokeCap.round;
 
@@ -208,10 +201,7 @@ class _VoiceBarsPainter extends CustomPainter {
       final x = i * (widths + gap);
       final y = (size.height - h) / 2;
       canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(x, y, widths, h),
-          const Radius.circular(1.2),
-        ),
+        RRect.fromRectAndRadius(Rect.fromLTWH(x, y, widths, h), const Radius.circular(1.2)),
         paint,
       );
     }

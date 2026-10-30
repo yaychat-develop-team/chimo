@@ -5,17 +5,13 @@ import '../../../common/theme/app_colors.dart';
 import '../../../common/theme/app_input.dart';
 import '../../../common/theme/app_text.dart';
 import '../../../common/widgets/app_scaffold.dart';
-import '../../../common/widgets/app_image.dart';
+import 'package:chimo/common/utils/chimo.dart';
 import '../../../app/app_jumper.dart';
 import '../../../common/utils/app_toast.dart';
 
 /// 编辑昵称页。
 class NicknamePage extends StatefulWidget {
-  const NicknamePage({
-    super.key,
-    this.initialText = '',
-    this.showRules = false,
-  });
+  const NicknamePage({super.key, this.initialText = '', this.showRules = false});
 
   final String initialText;
 
@@ -51,9 +47,7 @@ class _NicknamePageState extends State<NicknamePage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _focusNode.requestFocus();
-      _controller.selection = TextSelection.collapsed(
-        offset: _controller.text.length,
-      );
+      _controller.selection = TextSelection.collapsed(offset: _controller.text.length);
     });
   }
 
@@ -77,16 +71,18 @@ class _NicknamePageState extends State<NicknamePage> {
   Widget build(BuildContext context) {
     final length = _controller.text.characters.length;
 
-    return ChimoScaffold(
-      title: 'Nickname',
-      trailing: TextButton(
-        onPressed: _onConfirm,
-        child: const Text(
-          'Confirm',
-          style: TextStyle(
-            color: AppColors.primaryBright,
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
+    return AppScaffold(
+      appBar: AppNavBar(
+        title: 'Nickname',
+        trailing: TextButton(
+          onPressed: _onConfirm,
+          child: const Text(
+            'Confirm',
+            style: TextStyle(
+              color: AppColors.green1BBA77,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
       ),
@@ -99,7 +95,7 @@ class _NicknamePageState extends State<NicknamePage> {
               height: 52,
               padding: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
-                color: AppColors.tagBackground,
+                color: AppColors.black2A2A2A,
                 borderRadius: BorderRadius.circular(26),
               ),
               child: Row(
@@ -109,23 +105,15 @@ class _NicknamePageState extends State<NicknamePage> {
                       controller: _controller,
                       focusNode: _focusNode,
                       maxLength: NicknamePage.maxLength,
-                      buildCounter:
-                          (
-                            _, {
-                            required currentLength,
-                            required isFocused,
-                            maxLength,
-                          }) => const SizedBox.shrink(),
+                      buildCounter: (_, {required currentLength, required isFocused, maxLength}) =>
+                          const SizedBox.shrink(),
                       onChanged: (_) => setState(() {}),
                       style: AppText.field,
-                      cursorColor: AppColors.primaryBright,
+                      cursorColor: AppColors.green1BBA77,
                       decoration: const AppInputDecoration(
                         isCollapsed: true,
                         hintText: 'Enter nickname',
-                        hintStyle: TextStyle(
-                          color: AppColors.textGray8A,
-                          fontSize: 16,
-                        ),
+                        hintStyle: TextStyle(color: AppColors.gray8A8A8A, fontSize: 16),
                       ),
                     ),
                   ),
@@ -135,11 +123,7 @@ class _NicknamePageState extends State<NicknamePage> {
                         _controller.clear();
                         setState(() {});
                       },
-                      child: AppImage(
-                        AppAssets.closeCircle,
-                        width: 18,
-                        height: 18,
-                      ),
+                      child: Chimo.image(AppAssets.closeCircle, width: 18, height: 18),
                     ),
                 ],
               ),
@@ -153,7 +137,7 @@ class _NicknamePageState extends State<NicknamePage> {
                   child: Text(
                     'It will be displayed after review.',
                     style: TextStyle(
-                      color: AppColors.textTertiary,
+                      color: AppColors.gray6E6E6E,
                       fontSize: 12,
                       fontWeight: FontWeight.w400,
                     ),
@@ -162,7 +146,7 @@ class _NicknamePageState extends State<NicknamePage> {
                 Text(
                   '$length/${NicknamePage.maxLength}',
                   style: const TextStyle(
-                    color: AppColors.textTertiary,
+                    color: AppColors.gray6E6E6E,
                     fontSize: 12,
                     fontWeight: FontWeight.w400,
                   ),
@@ -179,7 +163,7 @@ class _NicknamePageState extends State<NicknamePage> {
                   Text(
                     'Nickname Modification Rules:',
                     style: TextStyle(
-                      color: AppColors.textTertiary,
+                      color: AppColors.gray6E6E6E,
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                       height: 1.4,
@@ -189,7 +173,7 @@ class _NicknamePageState extends State<NicknamePage> {
                   Text(
                     NicknamePage.rulesText,
                     style: TextStyle(
-                      color: AppColors.textTertiary,
+                      color: AppColors.gray6E6E6E,
                       fontSize: 13,
                       fontWeight: FontWeight.w400,
                       height: 1.5,

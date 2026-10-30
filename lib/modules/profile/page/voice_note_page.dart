@@ -12,7 +12,7 @@ import '../../../common/constants/app_assets.dart';
 import '../../../common/theme/app_colors.dart';
 import '../../../common/theme/app_text.dart';
 import '../../../common/utils/app_log.dart';
-import '../../../common/widgets/app_image.dart';
+import 'package:chimo/common/utils/chimo.dart';
 import '../model/voice_note_result.dart';
 import '../../../app/app_jumper.dart';
 import '../../../common/utils/time_fmt.dart';
@@ -114,8 +114,7 @@ class _VoiceNotePageState extends State<VoiceNotePage> {
       await _player.stop();
       await _stopRecorderIfNeeded(deleteFile: true);
       final dir = await getTemporaryDirectory();
-      final path =
-          '${dir.path}/chimo_profile_voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      final path = '${dir.path}/chimo_profile_voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
       await _recorder.start(
         const RecordConfig(
           encoder: AudioEncoder.aacLc,
@@ -138,8 +137,7 @@ class _VoiceNotePageState extends State<VoiceNotePage> {
       });
       _timer = Timer.periodic(const Duration(milliseconds: 50), (_) {
         if (!mounted || _startedAt == null) return;
-        final elapsed =
-            DateTime.now().difference(_startedAt!).inMilliseconds / 1000;
+        final elapsed = DateTime.now().difference(_startedAt!).inMilliseconds / 1000;
         if (elapsed >= VoiceNotePage.maxSeconds) {
           setState(() {
             _seconds = VoiceNotePage.maxSeconds;
@@ -266,13 +264,9 @@ class _VoiceNotePageState extends State<VoiceNotePage> {
     final bottom = MediaQuery.paddingOf(context).bottom;
     final isPreview = _phase == _VoicePhase.preview;
 
-    return ChimoScaffold(
+    return AppScaffold(
       backgroundColor: Colors.black,
-      backdrop: AppImage(
-        AppAssets.recordBg,
-        fit: BoxFit.cover,
-        alignment: Alignment.topCenter,
-      ),
+      backdrop: Chimo.image(AppAssets.recordBg, fit: BoxFit.cover, alignment: Alignment.topCenter),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -302,7 +296,7 @@ class _VoiceNotePageState extends State<VoiceNotePage> {
               '...',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: AppColors.textGrayCF,
+                color: AppColors.grayC8C8C8,
                 fontSize: 15,
                 fontWeight: FontWeight.w400,
                 height: 1.55,
@@ -314,7 +308,7 @@ class _VoiceNotePageState extends State<VoiceNotePage> {
             _timeLabel,
             textAlign: TextAlign.center,
             style: const TextStyle(
-              color: AppColors.textSecondary,
+              color: AppColors.gray9A9A9A,
               fontSize: 28,
               fontWeight: FontWeight.w500,
               letterSpacing: 1,
@@ -330,7 +324,7 @@ class _VoiceNotePageState extends State<VoiceNotePage> {
                 child: isPreview
                     ? _SideActionButton(
                         onTap: () => unawaited(_reset()),
-                        child: AppImage(
+                        child: Chimo.image(
                           AppAssets.audioRefreshIcon,
                           width: 24,
                           height: 24,
@@ -353,7 +347,7 @@ class _VoiceNotePageState extends State<VoiceNotePage> {
                 child: isPreview
                     ? _SideActionButton(
                         onTap: () => unawaited(_confirm()),
-                        child: AppImage(
+                        child: Chimo.image(
                           AppAssets.audioFinishIcon,
                           width: 24,
                           height: 24,
@@ -369,8 +363,7 @@ class _VoiceNotePageState extends State<VoiceNotePage> {
             switch (_phase) {
               _VoicePhase.idle => 'Click to record.',
               _VoicePhase.recording => 'Recording',
-              _VoicePhase.preview =>
-                _previewPlaying ? 'Playing…' : 'Click to preview.',
+              _VoicePhase.preview => _previewPlaying ? 'Playing…' : 'Click to preview.',
             },
             textAlign: TextAlign.center,
             style: AppText.body,
@@ -417,14 +410,11 @@ class _MainRecordButton extends StatelessWidget {
               height: 96,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.85),
-                  width: 2,
-                ),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.85), width: 2),
               ),
             ),
           Material(
-            color: AppColors.warningGold,
+            color: AppColors.yellowFFD54F,
             shape: const CircleBorder(),
             child: InkWell(
               customBorder: const CircleBorder(),
@@ -434,16 +424,14 @@ class _MainRecordButton extends StatelessWidget {
                 height: 88,
                 child: Center(
                   child: switch (phase) {
-                    _VoicePhase.idle || _VoicePhase.recording => AppImage(
+                    _VoicePhase.idle || _VoicePhase.recording => Chimo.image(
                       AppAssets.audioRecordIcon,
                       width: 36,
                       height: 36,
                       fit: BoxFit.contain,
                     ),
-                    _VoicePhase.preview => AppImage(
-                      previewPlaying
-                          ? AppAssets.voiceWaveAnim
-                          : AppAssets.audioPlayingIcon,
+                    _VoicePhase.preview => Chimo.image(
+                      previewPlaying ? AppAssets.voiceWaveAnim : AppAssets.audioPlayingIcon,
                       width: previewPlaying ? 48 : 36,
                       height: previewPlaying ? 14 : 28,
                       fit: BoxFit.contain,
@@ -507,7 +495,7 @@ class _SideActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: AppColors.tagBackground,
+      color: AppColors.black2A2A2A,
       shape: const CircleBorder(),
       child: InkWell(
         customBorder: const CircleBorder(),

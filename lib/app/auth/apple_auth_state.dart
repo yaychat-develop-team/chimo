@@ -9,10 +9,8 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../../common/utils/event_center.dart';
 import '../../common/utils/event_constant.dart';
-import '../app_jumper.dart';
 import '../chimo_api.dart';
 import '../../common/utils/app_log.dart';
-import 'onboarding_state.dart';
 import '../../common/utils/app_toast.dart';
 
 /// iOS Sign in with Apple，对齐 forya [AppleLoginPlatform]。
@@ -85,8 +83,8 @@ abstract final class AppleAuthState {
       AppToast.info(res.message.isEmpty ? 'Apple Sign-In failed' : res.message);
       return;
     }
-    if(res.ok) {
-      eventCenter.emit(Event(EventConstant.loginGetAuthRsp,data: res.data));
+    if (res.ok) {
+      eventCenter.emit(Event(EventConstant.loginGetAuthRsp, data: res.data));
     } else {
       AppToast.success(res.message);
     }

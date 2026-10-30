@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:chimo/common/widgets/line_loading_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -8,7 +9,7 @@ import '../../../app/app_jumper.dart';
 import '../../../common/constants/app_assets.dart';
 import '../../../common/theme/app_colors.dart';
 import '../../../common/theme/app_input.dart';
-import '../../../common/widgets/app_image.dart';
+import 'package:chimo/common/utils/chimo.dart';
 import '../../../common/widgets/app_scaffold.dart';
 import '../../../common/utils/time_fmt.dart';
 import '../logic/im_search_logic.dart';
@@ -76,22 +77,12 @@ class _ImSearchPageState extends State<ImSearchPage> {
 
   @override
   Widget build(BuildContext context) {
-    return ChimoScaffold(
-      showNav: false,
+    return AppScaffold(
+      appBar: _buildTopBar(),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SizedBox(height: 8),
-          _buildTopBar(),
-          Obx(
-            () => logic.searching.value
-                ? const LinearProgressIndicator(
-                    minHeight: 2,
-                    color: AppColors.primaryBright,
-                    backgroundColor: Colors.transparent,
-                  )
-                : const SizedBox.shrink(),
-          ),
+          Obx(() => LineLoadingBar(visible: logic.searching.value)),
           Expanded(child: Obx(_buildBody)),
         ],
       ),
@@ -99,62 +90,66 @@ class _ImSearchPageState extends State<ImSearchPage> {
   }
 
   Widget _buildTopBar() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 8, 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Container(
-              height: 44,
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: AppColors.outlineBright),
-              ),
-              child: Row(
-                children: [
-                  const AppImage(
-                    AppAssets.msgSearch,
-                    width: 18,
-                    height: 18,
-                    color: AppColors.textTertiary,
-                    fit: BoxFit.contain,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: TextField(
-                      controller: _controller,
-                      focusNode: _focusNode,
-                      style: const TextStyle(color: AppColors.textPrimary, fontSize: 15),
-                      cursorColor: AppColors.primaryBright,
-                      textInputAction: TextInputAction.search,
-                      inputFormatters: [LengthLimitingTextInputFormatter(64)],
-                      decoration: AppInputDecoration(
-                        isDense: true,
-                        hintText: logic.scoped ? 'Search messages' : 'Search contacts or messages',
-                        hintStyle: const TextStyle(color: AppColors.textTertiary, fontSize: 15),
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 8, 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: Container(
+                height: 44,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(color: AppColors.gray333333),
+                ),
+                child: Row(
+                  children: [
+                    Chimo.image(
+                      AppAssets.msgSearch,
+                      width: 18,
+                      height: 18,
+                      color: AppColors.gray6E6E6E,
+                      fit: BoxFit.contain,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: TextField(
+                        controller: _controller,
+                        focusNode: _focusNode,
+                        style: const TextStyle(color: AppColors.white, fontSize: 15),
+                        cursorColor: AppColors.green1BBA77,
+                        textInputAction: TextInputAction.search,
+                        inputFormatters: [LengthLimitingTextInputFormatter(64)],
+                        decoration: AppInputDecoration(
+                          isDense: true,
+                          hintText: logic.scoped
+                              ? 'Search messages'
+                              : 'Search contacts or messages',
+                          hintStyle: const TextStyle(color: AppColors.gray6E6E6E, fontSize: 15),
+                        ),
+                        onChanged: logic.onChanged,
+                        onSubmitted: (v) => unawaited(logic.submit(v)),
                       ),
-                      onChanged: logic.onChanged,
-                      onSubmitted: (v) => unawaited(logic.submit(v)),
                     ),
-                  ),
-                  if (_controller.text.isNotEmpty)
-                    GestureDetector(
-                      onTap: () {
-                        _controller.clear();
-                        logic.onChanged('');
-                      },
-                      child: const Icon(Icons.close, size: 18, color: AppColors.textTertiary),
-                    ),
-                ],
+                    if (_controller.text.isNotEmpty)
+                      GestureDetector(
+                        onTap: () {
+                          _controller.clear();
+                          logic.onChanged('');
+                        },
+                        child: const Icon(Icons.close, size: 18, color: AppColors.gray6E6E6E),
+                      ),
+                  ],
+                ),
               ),
             ),
-          ),
-          TextButton(
-            onPressed: () => AppJumper.back(),
-            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
-          ),
-        ],
+            TextButton(
+              onPressed: () => AppJumper.back(),
+              child: const Text('Cancel', style: TextStyle(color: AppColors.gray9A9A9A)),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -165,7 +160,7 @@ class _ImSearchPageState extends State<ImSearchPage> {
         return const Center(
           child: Text(
             'Sorry. No relevant content.',
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
+            style: TextStyle(color: AppColors.gray9A9A9A, fontSize: 14),
           ),
         );
       case 2:
@@ -189,14 +184,14 @@ class _ImSearchPageState extends State<ImSearchPage> {
             const Expanded(
               child: Text(
                 'Search history',
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                style: TextStyle(color: AppColors.gray9A9A9A, fontSize: 13),
               ),
             ),
             GestureDetector(
               onTap: logic.clearHistory,
               child: const Text(
                 'Clear',
-                style: TextStyle(color: AppColors.textTertiary, fontSize: 13),
+                style: TextStyle(color: AppColors.gray6E6E6E, fontSize: 13),
               ),
             ),
           ],
@@ -216,10 +211,10 @@ class _ImSearchPageState extends State<ImSearchPage> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: AppColors.surfaceSheet,
+                  color: AppColors.black1C1C1E,
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: Text(h, style: const TextStyle(color: AppColors.textPrimary, fontSize: 13)),
+                child: Text(h, style: const TextStyle(color: AppColors.white, fontSize: 13)),
               ),
             );
           }).toList(),
@@ -240,7 +235,7 @@ class _ImSearchPageState extends State<ImSearchPage> {
           if (index == 0) {
             return const Text(
               'Related chat records',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
+              style: TextStyle(color: AppColors.gray9A9A9A, fontSize: 14),
             );
           }
           final hit = scopedMsgs[index - 1];
@@ -255,7 +250,7 @@ class _ImSearchPageState extends State<ImSearchPage> {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         if (contacts.isNotEmpty) ...[
-          const Text('Contacts', style: TextStyle(color: AppColors.textPrimary, fontSize: 14)),
+          const Text('Contacts', style: TextStyle(color: AppColors.white, fontSize: 14)),
           const SizedBox(height: 8),
           ...contacts.map(
             (c) => Padding(
@@ -266,7 +261,7 @@ class _ImSearchPageState extends State<ImSearchPage> {
           const SizedBox(height: 12),
         ],
         if (historyHits.isNotEmpty) ...[
-          const Text('Chat history', style: TextStyle(color: AppColors.textPrimary, fontSize: 14)),
+          const Text('Chat history', style: TextStyle(color: AppColors.white, fontSize: 14)),
           const SizedBox(height: 8),
           ...historyHits.map(
             (hit) => Padding(
@@ -292,15 +287,14 @@ class _ContactRow extends StatelessWidget {
       height: 64,
       child: Row(
         children: [
-          ClipOval(
-            child: AppImage(
-              conversation.avatarUrl,
-              fallbackAsset: conversation.avatarAsset,
-              width: 42,
-              height: 42,
-              fit: BoxFit.cover,
-              fadeIn: Duration.zero,
-            ),
+          Chimo.image(
+            conversation.avatarUrl,
+            fallbackAsset: conversation.avatarAsset,
+            width: 42,
+            height: 42,
+            circle: true,
+            fit: BoxFit.cover,
+            fadeIn: Duration.zero,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -309,7 +303,7 @@ class _ContactRow extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                color: AppColors.textPrimary,
+                color: AppColors.white,
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
               ),
@@ -318,7 +312,7 @@ class _ContactRow extends StatelessWidget {
           TextButton(
             onPressed: onChat,
             style: TextButton.styleFrom(
-              foregroundColor: AppColors.primaryBright,
+              foregroundColor: AppColors.green1BBA77,
               padding: const EdgeInsets.symmetric(horizontal: 12),
             ),
             child: const Text('Chat'),
@@ -345,7 +339,7 @@ class _HistoryRow extends StatelessWidget {
         child: Row(
           children: [
             ClipOval(
-              child: AppImage(
+              child: Chimo.image(
                 hit.conversation.avatarUrl,
                 fallbackAsset: hit.conversation.avatarAsset,
                 width: 42,
@@ -365,7 +359,7 @@ class _HistoryRow extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      color: AppColors.textPrimary,
+                      color: AppColors.white,
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                     ),
@@ -375,12 +369,12 @@ class _HistoryRow extends StatelessWidget {
                     count == 1 ? hit.messages.first.text : '$count related messages',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                    style: const TextStyle(color: AppColors.gray9A9A9A, fontSize: 12),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: AppColors.textTertiary),
+            const Icon(Icons.chevron_right, color: AppColors.gray6E6E6E),
           ],
         ),
       ),
@@ -406,7 +400,7 @@ class _MsgRow extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ClipOval(
-              child: AppImage(
+              child: Chimo.image(
                 hit.conversation.avatarUrl,
                 fallbackAsset: hit.conversation.avatarAsset,
                 width: 42,
@@ -428,7 +422,7 @@ class _MsgRow extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            color: AppColors.textPrimary,
+                            color: AppColors.white,
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
                           ),
@@ -437,7 +431,7 @@ class _MsgRow extends StatelessWidget {
                       if (ms > 0)
                         Text(
                           TimeFmt.chatListPreview(ms),
-                          style: const TextStyle(color: AppColors.textTertiary, fontSize: 11),
+                          style: const TextStyle(color: AppColors.gray6E6E6E, fontSize: 11),
                         ),
                     ],
                   ),
@@ -466,7 +460,7 @@ class _HighlightText extends StatelessWidget {
         text,
         maxLines: 2,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+        style: const TextStyle(color: AppColors.gray9A9A9A, fontSize: 13),
       );
     }
     final lower = text.toLowerCase();
@@ -485,14 +479,14 @@ class _HighlightText extends StatelessWidget {
       spans.add(
         TextSpan(
           text: text.substring(i, i + keyword.length),
-          style: const TextStyle(color: AppColors.primaryBright),
+          style: const TextStyle(color: AppColors.green1BBA77),
         ),
       );
       start = i + keyword.length;
     }
     return Text.rich(
       TextSpan(
-        style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+        style: const TextStyle(color: AppColors.gray9A9A9A, fontSize: 13),
         children: spans,
       ),
       maxLines: 2,
@@ -509,8 +503,8 @@ class _ImSearchMsgListPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChimoScaffold(
-      title: hit.conversation.title,
+    return AppScaffold(
+      appBar: AppNavBar(title: hit.conversation.title),
       body: ListView.separated(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         itemCount: hit.messages.length,

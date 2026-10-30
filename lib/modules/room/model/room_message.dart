@@ -1,5 +1,5 @@
 /// 公屏上一行的种类，对应 Oumi 的几种消息 builder。
-enum RoomMessageKind { text, gift, join, qa, pet, activity, card, heart, named }
+enum RoomMessageType { text, gift, join, qa, pet, activity, card, heart, named }
 
 /// 富文本里的一段。
 enum RoomPieceKind { text, icon, emote }
@@ -16,6 +16,9 @@ class RoomShowPiece {
     this.gradient = false,
     this.giftCount = false,
     this.emoji = false,
+    this.tapUid = '',
+    this.tapAvatar = '',
+    this.tapLink = '',
   });
 
   final RoomPieceKind kind;
@@ -28,6 +31,13 @@ class RoomShowPiece {
   final bool gradient;
   final bool giftCount;
   final bool emoji;
+
+  /// `ItemStyle.at` 解析出的用户，点名称开资料卡。
+  final String tapUid;
+  final String tapAvatar;
+
+  /// `ItemStyle.link` 的跳转；`room_user_card` 也会开资料卡。
+  final String tapLink;
 }
 
 /// 昵称前的身份标。地址为空的项不画。
@@ -74,12 +84,19 @@ class RoomQaBody {
 }
 
 class RoomPetBody {
-  const RoomPetBody({this.icon = '', this.name = '', this.tag = '', this.text = ''});
+  const RoomPetBody({
+    this.icon = '',
+    this.name = '',
+    this.tag = '',
+    this.text = '',
+    this.ownerUid = '',
+  });
 
   final String icon;
   final String name;
   final String tag;
   final String text;
+  final String ownerUid;
 }
 
 class RoomCardBody {
@@ -116,7 +133,7 @@ class RoomMessage {
     required this.text,
     this.sender = '',
     this.senderUid = '',
-    this.kind = RoomMessageKind.text,
+    this.type = RoomMessageType.text,
     this.showSender = true,
     this.avatar = '',
     this.avatarFrame = '',
@@ -130,6 +147,7 @@ class RoomMessage {
     this.giftIcon = '',
     this.giftCount = 0,
     this.giftTo = '',
+    this.giftToUid = '',
     this.boxIcon = '',
     this.qa,
     this.pet,
@@ -143,7 +161,7 @@ class RoomMessage {
   final String sender;
   final String senderUid;
   final String text;
-  final RoomMessageKind kind;
+  final RoomMessageType type;
   final bool showSender;
   final String avatar;
   final String avatarFrame;
@@ -157,6 +175,7 @@ class RoomMessage {
   final String giftIcon;
   final int giftCount;
   final String giftTo;
+  final String giftToUid;
   final String boxIcon;
   final RoomQaBody? qa;
   final RoomPetBody? pet;

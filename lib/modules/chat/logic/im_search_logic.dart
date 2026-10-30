@@ -21,7 +21,7 @@ class ImSearchLogic extends GetxController {
   /// 非空时仅搜该会话内消息（私聊「更多 → Search」）。
   final ChatConversation? scopeConversation;
 
-  final ChatsListLogic chats = Get.find<ChatsListLogic>();
+  final ConversationListLogic chats = Get.find<ConversationListLogic>();
 
   final RxList<String> history = <String>[].obs;
 

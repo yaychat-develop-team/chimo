@@ -20,7 +20,7 @@ class GroupJoinBar extends StatelessWidget {
       child: Padding(
         padding: EdgeInsets.fromLTRB(16, 10, 16, 10 + bottomInset),
         child: Material(
-          color: AppColors.accentNeon,
+          color: AppColors.green1CFF8A,
           borderRadius: BorderRadius.circular(28),
           child: InkWell(
             onTap: onTap,

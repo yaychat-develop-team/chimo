@@ -2,31 +2,7 @@ import 'dart:async';
 
 import 'package:chimo/common/utils/app_log.dart';
 
-/// 事件中心<br/>
-/// Example:<br/>
-/// ```dart
-/// 注册单个事
-/// StreamSubscription<Event> subscription = eventCenter.subscribe('my.event').listen((event) {
-///   // use data
-///   dynamic data = event.data; // Outputs event values: 'this is data!'
-/// });
-///
-/// 注册多个事件
-/// StreamSubscription<Event> subscription = eventCenter.subscribe(['my.event','my.event1']).listen((event) {
-///   switch(event.name){
-///     case 'my.event':
-///       break;
-///     case 'my.event1':
-///       break;
-///   }
-/// });
-///
-/// 取消注册，一般在dispose或者其他地方
-/// subscription.cancel();
-///
-/// 发布事件
-/// eventCenter.emit(Event('my.event',data: 'this is data!'));
-/// ```
+/// 事件中心
 class EventCenter {
   late StreamController<Event> _eventStream;
 

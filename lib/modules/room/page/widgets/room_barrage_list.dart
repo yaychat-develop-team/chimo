@@ -4,9 +4,9 @@ import 'package:get/get.dart';
 import '../../../../app/app_jumper.dart';
 import '../../../../common/constants/app_assets.dart';
 import '../../../../common/theme/app_colors.dart';
-import '../../../../common/widgets/app_image.dart';
 import '../../logic/barrage_logic.dart';
 import 'room_message_item.dart';
+import 'package:chimo/common/utils/chimo.dart';
 
 /// 公屏。不在底部时累计未读，点「新消息」回到最新一条。
 class RoomBarrageList extends StatefulWidget {
@@ -19,6 +19,7 @@ class RoomBarrageList extends StatefulWidget {
 class _RoomBarrageListState extends State<RoomBarrageList> {
   final _scroll = ScrollController();
   Worker? _worker;
+  BarrageLogic? _bound;
   var _unread = 0;
   var _pinned = true;
   var _count = 0;
@@ -27,10 +28,7 @@ class _RoomBarrageListState extends State<RoomBarrageList> {
   void initState() {
     super.initState();
     _scroll.addListener(_onScroll);
-    if (!Get.isRegistered<BarrageLogic>()) return;
-    final logic = Get.find<BarrageLogic>();
-    _count = logic.messages.length;
-    _worker = ever(logic.messages, _onMessages);
+    _bind();
   }
 
   @override
@@ -38,6 +36,20 @@ class _RoomBarrageListState extends State<RoomBarrageList> {
     _worker?.dispose();
     _scroll.dispose();
     super.dispose();
+  }
+
+  /// 进房瞬间 BarrageLogic 可能尚未 put；对齐礼物层，build 里补绑，避免偶发空白。
+  void _bind() {
+    if (!Get.isRegistered<BarrageLogic>()) return;
+    final logic = Get.find<BarrageLogic>();
+    if (identical(logic, _bound)) return;
+    _worker?.dispose();
+    _bound = logic;
+    _count = logic.messages.length;
+    // messages + listEpoch 双通道，避免 RxList 变更偶发不通知（对齐礼物层）。
+    _worker = everAll([logic.messages, logic.listEpoch], (_) {
+      _onMessages(logic.messages);
+    });
   }
 
   void _onScroll() {
@@ -52,7 +64,15 @@ class _RoomBarrageListState extends State<RoomBarrageList> {
   void _onMessages(List<dynamic> lines) {
     final added = lines.length - _count;
     _count = lines.length;
-    if (added <= 0 || _pinned || !mounted) return;
+    if (!mounted) return;
+    if (added <= 0) {
+      setState(() {});
+      return;
+    }
+    if (_pinned) {
+      setState(() {});
+      return;
+    }
     setState(() => _unread += added);
   }
 
@@ -72,12 +92,14 @@ class _RoomBarrageListState extends State<RoomBarrageList> {
 
   @override
   Widget build(BuildContext context) {
-    if (!Get.isRegistered<BarrageLogic>()) return const SizedBox.expand();
-    final logic = Get.find<BarrageLogic>();
+    _bind();
+    if (_bound == null) return const SizedBox.expand();
+    final logic = _bound!;
     return Stack(
       children: [
         Obx(() {
-          final lines = logic.messages;
+          logic.listEpoch.value;
+          final lines = logic.messages.toList();
           return ShaderMask(
             shaderCallback: (rect) {
               return const LinearGradient(
@@ -99,7 +121,9 @@ class _RoomBarrageListState extends State<RoomBarrageList> {
                 return RoomMessageItem(
                   key: ValueKey(line.id),
                   message: line,
-                  onSender: () => AppJumper.toProfile(line.senderUid),
+                  onProfile: ({required uid, name = '', avatar = ''}) {
+                    AppJumper.showUserProfileSheet(uid: uid, name: name, avatar: avatar);
+                  },
                   onLink: _openRoomLink,
                 );
               },
@@ -116,7 +140,7 @@ class _RoomBarrageListState extends State<RoomBarrageList> {
                 height: 26,
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 decoration: BoxDecoration(
-                  color: AppColors.roomNewMsg,
+                  color: AppColors.white,
                   borderRadius: BorderRadius.circular(13),
                 ),
                 child: Row(
@@ -125,7 +149,7 @@ class _RoomBarrageListState extends State<RoomBarrageList> {
                     Text(
                       '$_unread New Messages',
                       style: const TextStyle(
-                        color: AppColors.roomNewMsgText,
+                        color: AppColors.green00D68F,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -133,11 +157,11 @@ class _RoomBarrageListState extends State<RoomBarrageList> {
                     const SizedBox(width: 4),
                     Transform.rotate(
                       angle: 1.5707963,
-                      child: const AppImage(
+                      child: Chimo.image(
                         AppAssets.roomArrowRight,
                         width: 8,
                         height: 12,
-                        color: AppColors.roomNewMsgText,
+                        color: AppColors.green00D68F,
                         colorBlendMode: BlendMode.srcIn,
                       ),
                     ),

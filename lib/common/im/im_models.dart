@@ -167,6 +167,7 @@ class ImChatMessage {
     this.thumbnailUrl = '',
     this.durationSecs = 0,
     this.customEvent = '',
+    this.customPayload = const {},
     this.giftId = 0,
     this.giftQty = 1,
     this.giftName = '',
@@ -198,6 +199,9 @@ class ImChatMessage {
   final bool failed;
 
   /// 消息类型：`txt` | `image` | `voice` | `gift` | `follow` | `emote` | `join` | `custom` | `recall`
+  ///
+  /// 可识别的环信 CUSTOM（如房间邀请）统一为 `custom`，具体类型看 [customEvent]
+  /// / [customPayload]；未知 CUSTOM 也落在 `custom`，预览走 [text]。
   final String msgType;
 
   /// forya `im_recall_message` 提示（区别于 SDK `onMessagesRecalledInfo`）。
@@ -220,8 +224,11 @@ class ImChatMessage {
   /// 语音时长（秒）。
   final int durationSecs;
 
-  /// 环信自定义消息体事件（SendGift、Smiley 等）。
+  /// 环信自定义消息体事件（SendGift、RoomInvite、Smiley 等）。
   final String customEvent;
+
+  /// 自定义消息结构化载荷（[ImCustomPayload] 写出的 map）。空 = 无 / 未解析。
+  final Map<String, dynamic> customPayload;
 
   final int giftId;
   final int giftQty;

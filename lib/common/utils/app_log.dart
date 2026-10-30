@@ -1,8 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-
-import 'log.dart';
+import 'package:talker_flutter/talker_flutter.dart';
 
 /// 日志级别。数值越大越严重；低于 [AppLog.minLevel] 的直接丢弃。
 enum AppLogLevel { debug, info, warn, error }
@@ -32,18 +31,34 @@ abstract final class AppLog {
   /// **先打码再截断**，否则截断处可能留下半截 token。
   static int maxBodyLength = 1000;
 
+  /// 线上 Talker。未 [init] 时为 null。
+  static Talker? talker;
+
+  /// 创建 Talker。须在任何日志和 Dio 日志拦截器之前调用。
+  static void init() {
+    talker = TalkerFlutter.init(
+      settings: TalkerSettings(
+        enabled: true,
+        useHistory: true,
+        useConsoleLogs: true,
+        maxHistoryItems: 1000,
+      ),
+      logger: TalkerLogger(),
+    );
+  }
+
   /// 输出目标。测试里替换成收集器即可断言，记得在 tearDown 里换回 [defaultSink]。
   ///
-  /// 默认落到线上的 Talker（[logger]）。打码仍在进 sink 之前完成。
+  /// 默认落到 [talker]。打码仍在进 sink 之前完成。
   static void Function(String line) sink = defaultSink;
 
   static void defaultSink(String line) {
-    final talker = loggerOrNull;
-    if (talker == null) {
+    final current = talker;
+    if (current == null) {
       debugPrint(line);
       return;
     }
-    talker.info(line);
+    current.info(line);
   }
 
   /// 流程追踪：生命周期、SDK 状态。

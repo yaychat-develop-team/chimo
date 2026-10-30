@@ -30,19 +30,18 @@ class ChatBubbleStyle {
   /// 纯自定义表情（放大 28、不套气泡）时是否仍画引用条。
   final bool pureEmojiKeepsQuote;
 
-  TextStyle textStyleFor({required bool isSelf}) =>
-      isSelf ? selfTextStyle : peerTextStyle;
+  TextStyle textStyleFor({required bool isSelf}) => isSelf ? selfTextStyle : peerTextStyle;
 
   /// 私聊消息流（Figma 55:274）。
   static const ChatBubbleStyle dm = ChatBubbleStyle(
     peerTextStyle: TextStyle(
-      color: AppColors.promoText,
+      color: AppColors.black1C1C1E,
       fontSize: 14,
       fontWeight: FontWeight.w600,
       height: 20 / 14,
     ),
     selfTextStyle: TextStyle(
-      color: AppColors.surfaceDark,
+      color: AppColors.black111111,
       fontSize: 14,
       fontWeight: FontWeight.w600,
       height: 20 / 14,
@@ -54,13 +53,13 @@ class ChatBubbleStyle {
   /// 群聊消息流。
   static const ChatBubbleStyle group = ChatBubbleStyle(
     peerTextStyle: TextStyle(
-      color: AppColors.surfaceDark,
+      color: AppColors.black111111,
       fontSize: 15,
       fontWeight: FontWeight.w500,
       height: 20 / 15,
     ),
     selfTextStyle: TextStyle(
-      color: AppColors.surfaceDark,
+      color: AppColors.black111111,
       fontSize: 15,
       fontWeight: FontWeight.w500,
       height: 20 / 15,
@@ -101,8 +100,8 @@ class ChatBubble extends StatelessWidget {
   /// 气泡最大宽度。私聊按对方 / 自己各给一个值；群聊在外层统一约束，传 null。
   final double? maxWidth;
 
-  static const Color _peerColor = AppColors.textGrayF0;
-  static const Color _selfColor = AppColors.accentLimeSoft;
+  static const Color _peerColor = AppColors.grayF0F0F0;
+  static const Color _selfColor = AppColors.greenB8FF6A;
 
   /// 引用条 + 正文。引用为空时就只有正文。
   Widget _body(TextStyle textStyle) {
@@ -119,7 +118,7 @@ class ChatBubble extends StatelessWidget {
           width: 1,
           height: 12,
           margin: const EdgeInsets.only(top: 3),
-          color: AppColors.textGray99,
+          color: AppColors.gray9A9A9A,
         ),
         const SizedBox(width: 2),
         Flexible(
@@ -128,7 +127,7 @@ class ChatBubble extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              color: AppColors.textGray99,
+              color: AppColors.gray9A9A9A,
               fontSize: 12,
               fontWeight: FontWeight.w400,
               height: 1.3,
@@ -161,19 +160,12 @@ class ChatBubble extends StatelessWidget {
     final base = style.textStyleFor(isSelf: isSelf);
     // 纯表情：放大到 28 且不套灰气泡，对齐 forya。
     final textStyle = pureEmoji
-        ? base.copyWith(
-            fontSize: 28,
-            height: 1.2,
-            letterSpacing: 1.5,
-            fontWeight: FontWeight.w500,
-          )
+        ? base.copyWith(fontSize: 28, height: 1.2, letterSpacing: 1.5, fontWeight: FontWeight.w500)
         : base;
 
     final Widget child;
     if (pureEmoji) {
-      child = style.pureEmojiKeepsQuote
-          ? _body(textStyle)
-          : AppEmojiText(text, style: textStyle);
+      child = style.pureEmojiKeepsQuote ? _body(textStyle) : AppEmojiText(text, style: textStyle);
     } else {
       child = Container(
         padding: style.padding,

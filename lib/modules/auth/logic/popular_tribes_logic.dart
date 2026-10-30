@@ -56,47 +56,23 @@ class PopularTribesLogic extends GetxController {
     }
   }
 
-  /// 已经在提交时返回 false。
-  bool beginSubmit() {
-    if (submitting.value) return false;
-    submitting.value = true;
-    return true;
-  }
-
-  void endSubmit() {
-    if (!isClosed) submitting.value = false;
-  }
-
   /// 按需加入已选部落，然后结束引导并进入首页。
   Future<void> continueHome({bool joinSelected = false}) async {
-    if (!beginSubmit()) return;
+    if (submitting.value) return;
+    submitting.value = true;
     try {
       if (joinSelected && selected.isNotEmpty) {
-        final failure = await join(selected.toList(growable: false));
-        if (isClosed) return;
-        if (failure != null) {
-          AppToast.info(failure);
+        final res = await ChimoApis.group.join(selected.toList(growable: false));
+        if (!res.ok) {
+          AppToast.info(res.message.isEmpty ? 'Join failed' : res.message);
           return;
         }
       }
-      if (isClosed) return;
       await OnboardingState.finishToHome();
     } catch (error) {
-      if (isClosed) return;
       AppToast.info('Failed: $error');
     } finally {
-      endSubmit();
-    }
-  }
-
-  /// 返回 `null` 表示已加入。
-  Future<String?> join(List<String> ids) async {
-    try {
-      final res = await ChimoApis.group.join(ids);
-      if (!res.ok) return res.message.isEmpty ? 'Join failed' : res.message;
-      return null;
-    } catch (e) {
-      return 'Failed: $e';
+      if (!isClosed) submitting.value = false;
     }
   }
 }

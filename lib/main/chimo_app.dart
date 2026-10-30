@@ -1,4 +1,5 @@
 import 'package:chimo/app/session_info.dart';
+import 'package:chimo/common/utils/chimo.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -6,10 +7,9 @@ import 'package:get/get.dart';
 import '../app/service/iap_service.dart';
 import '../common/constants/app_assets.dart';
 import '../common/theme/app_theme.dart';
-import '../common/widgets/app_image.dart';
 import '../modules/auth/page/login_page.dart';
 import '../modules/auth/page/profile_setup_page.dart';
-import '../modules/shell/page/main_tab_shell.dart';
+import '../modules/root/page/root_tab_page.dart';
 import 'main_init.dart';
 
 /// Chimo 根组件：[GetMaterialApp] 一层。
@@ -56,16 +56,20 @@ class _ChimoAppState extends State<ChimoApp> {
       return Column(
         children: [
           // Logo 与字标已在资源内；按宽度适配以保持在屏幕上方。
-          AppImage(AppAssets.launchBg, width: MediaQuery.sizeOf(context).width, fit: BoxFit.fitWidth),
+          Chimo.image(
+            AppAssets.launchBg,
+            width: MediaQuery.sizeOf(context).width,
+            fit: BoxFit.fitWidth,
+          ),
           const Spacer(),
-          AppImage(AppAssets.splashSlogan, height: 15, fit: BoxFit.contain),
+          Chimo.image(AppAssets.splashSlogan, height: 15, fit: BoxFit.contain),
           SizedBox(height: 54 + bottom),
         ],
       );
     }
-    if(SessionInfo.hasLogin) {
-      if(SessionInfo.currentUser?.isRegister == true) {
-        return MainTabShell();
+    if (SessionInfo.hasLogin) {
+      if (SessionInfo.currentUser?.isRegister == true) {
+        return RootTabPage();
       } else {
         return ProfileSetupPage();
       }
@@ -76,6 +80,6 @@ class _ChimoAppState extends State<ChimoApp> {
   Future<void> _launchLoading() async {
     await MainInit.launchInit();
     loading = false;
-    if(mounted) setState(() {});
+    if (mounted) setState(() {});
   }
 }

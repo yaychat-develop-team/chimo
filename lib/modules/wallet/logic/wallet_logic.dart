@@ -6,6 +6,7 @@ import '../../../app/service/iap_service.dart';
 import '../../../app/chimo_api.dart';
 import '../../../common/extensions/wire_view.dart';
 import '../../../common/models/server_client/cash.pb.dart';
+import '../../../common/utils/app_toast.dart';
 
 /// 我的钱包：余额 + 充值套餐（`/cash/balance` + `/cash/rechargeOptions`）。
 ///
@@ -63,45 +64,42 @@ class WalletLogic extends GetxController {
     super.onClose();
   }
 
-  /// 拉余额 + 套餐。返回错误文案，`null` 表示成功。
-  Future<String?> load() async {
+  /// 拉余额 + 套餐。失败 toast。
+  Future<void> load() async {
     loading.value = true;
     try {
-      // 两个接口并发发出去，再一起等 —— 别改成顺序 await。
       final balanceFuture = ChimoApis.cash.balance();
       final optionsFuture = ChimoApis.cash.rechargeOptions();
       final balanceRes = await balanceFuture;
       final optionsRes = await optionsFuture;
-      if (isClosed) return null;
 
       final nextBalance = balanceRes.data == null ? 0 : cashCoins(balanceRes.data!);
       var products = optionsRes.data ?? const <CashChargeProductListItem>[];
       if (products.isNotEmpty) {
         products = await IapService.applyStorePrices(products);
       }
-      if (isClosed) return null;
 
       balance.value = nextBalance;
-      // 套餐拉空就保留上一次的（接口偶发空列表时页面不至于变成没得选）。
       if (products.isNotEmpty) {
         options.assignAll(products);
         selectedIndex.value = 0;
       }
-      return null;
     } catch (error) {
-      return isClosed ? null : 'Failed to load wallet: $error';
+      AppToast.error('Failed to load wallet: $error');
     } finally {
-      if (!isClosed) loading.value = false;
+      loading.value = false;
     }
   }
 
   void select(int index) => selectedIndex.value = index;
 
-  /// 发起内购。返回错误文案，`null` 表示已交给商店。
-  Future<String?> topUp() async {
+  /// 发起内购。没有套餐时 toast。
+  Future<void> topUp() async {
     final product = selected;
-    if (product == null) return 'No recharge packages available';
+    if (product == null) {
+      AppToast.error('No recharge packages available');
+      return;
+    }
     await IapService.buy(product);
-    return null;
   }
 }

@@ -7,6 +7,7 @@ import '../../../../common/extensions/wire_view.dart';
 import '../../../../common/models/server_client/user.pb.dart';
 import '../../../../common/widgets/app_image.dart';
 import '../../../../common/utils/app_toast.dart';
+import 'package:chimo/common/utils/chimo.dart';
 
 /// 上方头像；下方一行：左侧名称 + ID，右侧 My Profile。
 class MeProfileHeader extends StatelessWidget {
@@ -70,7 +71,7 @@ class MeProfileHeader extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      color: AppColors.textPrimary,
+                      color: AppColors.white,
                       fontSize: 22,
                       fontWeight: FontWeight.w800,
                       height: 1.1,
@@ -86,14 +87,14 @@ class MeProfileHeader extends StatelessWidget {
                         Text(
                           'ID:${profile.uid}',
                           style: const TextStyle(
-                            color: AppColors.textSecondary,
+                            color: AppColors.gray9A9A9A,
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
                             height: 1.2,
                           ),
                         ),
                         const SizedBox(width: 4),
-                        AppImage(AppAssets.mineCopy, width: 12, height: 12),
+                        Chimo.image(AppAssets.mineCopy, width: 12, height: 12),
                       ],
                     ),
                   ),
@@ -102,7 +103,7 @@ class MeProfileHeader extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Material(
-              color: AppColors.tagBackground,
+              color: AppColors.black2A2A2A,
               borderRadius: BorderRadius.circular(12),
               child: InkWell(
                 onTap: onProfileTap ?? onAvatarTap,
@@ -116,14 +117,14 @@ class MeProfileHeader extends StatelessWidget {
                       Text(
                         'My Profile',
                         style: TextStyle(
-                          color: AppColors.textPrimary,
+                          color: AppColors.white,
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                           height: 1,
                         ),
                       ),
                       SizedBox(width: 2),
-                      Icon(Icons.chevron_right_rounded, size: 14, color: AppColors.textPrimary),
+                      Icon(Icons.chevron_right_rounded, size: 14, color: AppColors.white),
                     ],
                   ),
                 ),

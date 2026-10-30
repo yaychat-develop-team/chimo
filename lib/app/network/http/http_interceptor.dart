@@ -97,7 +97,11 @@ class HttpInterceptor extends Interceptor {
         options.headers[Headers.contentTypeHeader] = Http.protobufContentType;
         options.data = Stream.fromIterable([msg.writeToBuffer()]);
       } else {
-        final jsonMap = msg.toProto3Json(typeRegistry: AnyParser.typeRegistry);
+        // 对齐 joyride：优先用 Options.extra['typeRegistry']（如 send-to-room 的 ChatContent）。
+        final extraRegistry = options.extra['typeRegistry'];
+        final registry =
+            extraRegistry is TypeRegistry ? extraRegistry : AnyParser.typeRegistry;
+        final jsonMap = msg.toProto3Json(typeRegistry: registry);
         options.data = jsonEncode({'bizParam': jsonMap});
       }
     } else if (options.data is Map) {

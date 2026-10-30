@@ -57,28 +57,9 @@ class ProfileSetupLogic extends GetxController {
   }
 
   Future<void> next() async {
-    if (!canNext) return;
-    final failure = await save();
-    if (isClosed) return;
-    if (failure != null) {
-      AppToast.error(failure);
-      return;
-    }
-    AppJumper.toAlmostIn();
-    idle();
-  }
-
-  /// 写入引导草稿并提交资料。返回 `null` 表示已保存。
-  ///
-  /// 未填完时返回提示。正在保存时直接返回 `null`，不再发请求。
-  /// 成功时 [saving] 保持 true，等页面跳走再 [idle]。
-  Future<String?> save() async {
     final genderValue = genderApi;
     final picked = birthday.value;
-    if (genderValue == null || picked == null) {
-      return 'Please select gender and birthday';
-    }
-    if (saving.value) return null;
+    if (genderValue == null || picked == null || saving.value) return;
     final iso = TimeFmt.isoDate(picked);
     OnboardingState.setGenderAndBirthday(gender: genderValue, birthday: iso);
     saving.value = true;
@@ -89,17 +70,15 @@ class ProfileSetupLogic extends GetxController {
         'register': true,
       });
       if (!res.ok) {
-        idle();
-        return res.message.isEmpty ? 'Unable to save profile' : res.message;
+        saving.value = false;
+        AppToast.error(res.message.isEmpty ? 'Unable to save profile' : res.message);
+        return;
       }
-      return null;
+      AppJumper.toAlmostIn();
+      saving.value = false;
     } catch (error) {
-      idle();
-      return 'Unable to save profile: $error';
+      saving.value = false;
+      AppToast.error('Unable to save profile: $error');
     }
-  }
-
-  void idle() {
-    if (!isClosed) saving.value = false;
   }
 }

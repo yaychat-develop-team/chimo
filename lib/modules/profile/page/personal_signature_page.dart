@@ -61,17 +61,18 @@ class _PersonalSignaturePageState extends State<PersonalSignaturePage> {
 
   @override
   Widget build(BuildContext context) {
-    return ChimoScaffold(
-      title: 'Personal Signature',
-      loading: _saving,
-      trailing: TextButton(
-        onPressed: _saving ? null : () => unawaited(_onConfirm()),
-        child: const Text(
-          'Confirm',
-          style: TextStyle(
-            color: AppColors.primaryBright,
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
+    return AppScaffold(
+      appBar: AppNavBar(
+        title: 'Personal Signature',
+        trailing: TextButton(
+          onPressed: _saving ? null : () => unawaited(_onConfirm()),
+          child: const Text(
+            'Confirm',
+            style: TextStyle(
+              color: AppColors.green1BBA77,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
       ),
@@ -81,7 +82,7 @@ class _PersonalSignaturePageState extends State<PersonalSignaturePage> {
           constraints: const BoxConstraints(minHeight: 140),
           padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
           decoration: BoxDecoration(
-            color: AppColors.surfaceSheet,
+            color: AppColors.black1C1C1E,
             borderRadius: BorderRadius.circular(16),
           ),
           child: Column(
@@ -93,26 +94,21 @@ class _PersonalSignaturePageState extends State<PersonalSignaturePage> {
                 maxLines: 5,
                 minLines: 4,
                 maxLength: PersonalSignaturePage.maxLength,
-                buildCounter:
-                    (
-                      _, {
-                      required currentLength,
-                      required isFocused,
-                      maxLength,
-                    }) => const SizedBox.shrink(),
+                buildCounter: (_, {required currentLength, required isFocused, maxLength}) =>
+                    const SizedBox.shrink(),
                 onChanged: (_) => setState(() {}),
                 style: const TextStyle(
-                  color: AppColors.textPrimary,
+                  color: AppColors.white,
                   fontSize: 16,
                   fontWeight: FontWeight.w400,
                   height: 1.4,
                 ),
-                cursorColor: AppColors.primaryBright,
+                cursorColor: AppColors.green1BBA77,
                 decoration: const AppInputDecoration(
                   isCollapsed: true,
                   hintText: "Don't be shy! Drop a fun line about yourself!",
                   hintStyle: TextStyle(
-                    color: AppColors.textTertiary,
+                    color: AppColors.gray6E6E6E,
                     fontSize: 15,
                     fontWeight: FontWeight.w400,
                   ),
@@ -125,7 +121,7 @@ class _PersonalSignaturePageState extends State<PersonalSignaturePage> {
                     child: Text(
                       'It will be displayed after review.',
                       style: TextStyle(
-                        color: AppColors.textTertiary,
+                        color: AppColors.gray6E6E6E,
                         fontSize: 12,
                         fontWeight: FontWeight.w400,
                       ),
@@ -134,7 +130,7 @@ class _PersonalSignaturePageState extends State<PersonalSignaturePage> {
                   Text(
                     '${_controller.text.characters.length}/${PersonalSignaturePage.maxLength}',
                     style: const TextStyle(
-                      color: AppColors.textTertiary,
+                      color: AppColors.gray6E6E6E,
                       fontSize: 12,
                       fontWeight: FontWeight.w400,
                     ),

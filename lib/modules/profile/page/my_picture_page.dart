@@ -5,9 +5,10 @@ import '../logic/my_picture_logic.dart';
 import '../../../common/widgets/app_scaffold.dart';
 import 'widgets/photo_pick_sheet.dart';
 import '../../../common/theme/app_colors.dart';
-import '../../../common/widgets/app_image.dart';
+import 'package:chimo/common/utils/chimo.dart';
 import '../../../app/app_jumper.dart';
 import '../../../common/utils/app_toast.dart';
+import 'package:chimo/common/widgets/app_image.dart';
 
 /// 全尺寸头像预览 / 更换页。
 ///
@@ -65,15 +66,15 @@ class _MyPicturePageState extends State<MyPicturePage> {
     }
     final remote = (_avatarUrl ?? '').trim();
     if (remote.isNotEmpty) {
-      return AppImage(
+      return Chimo.image(
         remote,
         width: size,
         height: size,
         fit: BoxFit.cover,
-        error: AppImage(widget.avatarAsset, width: size, height: size, fit: BoxFit.cover),
+        error: Chimo.image(widget.avatarAsset, width: size, height: size, fit: BoxFit.cover),
       );
     }
-    return AppImage(widget.avatarAsset, width: size, height: size, fit: BoxFit.cover);
+    return Chimo.image(widget.avatarAsset, width: size, height: size, fit: BoxFit.cover);
   }
 
   @override
@@ -87,19 +88,20 @@ class _MyPicturePageState extends State<MyPicturePage> {
           if (didPop) return;
           _pop(_changed ? _avatarUrl : null);
         },
-        child: ChimoScaffold(
-          title: 'My Picture',
-          backgroundColor: Colors.black,
-          loading: _uploading,
-          onBack: () => _pop(_changed ? _avatarUrl : null),
-          trailing: IconButton(
-            onPressed: _uploading ? null : _showMoreSheet,
-            icon: Icon(
-              Icons.more_horiz,
-              color: _uploading ? Colors.white38 : Colors.white,
-              size: 26,
+        child: AppScaffold(
+          appBar: AppNavBar(
+            title: 'My Picture',
+            onBack: () => _pop(_changed ? _avatarUrl : null),
+            trailing: IconButton(
+              onPressed: _uploading ? null : _showMoreSheet,
+              icon: Icon(
+                Icons.more_horiz,
+                color: _uploading ? Colors.white38 : Colors.white,
+                size: 26,
+              ),
             ),
           ),
+          backgroundColor: Colors.black,
           body: Center(
             child: SizedBox(
               width: width,
@@ -110,7 +112,7 @@ class _MyPicturePageState extends State<MyPicturePage> {
                   _buildImage(width),
                   if (_uploading)
                     const ColoredBox(
-                      color: AppColors.scrimBlack40,
+                      color: AppColors.black40,
                       child: Center(child: CircularProgressIndicator(color: Colors.white)),
                     ),
                 ],

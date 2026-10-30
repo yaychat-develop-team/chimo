@@ -27,7 +27,7 @@ class ChatTimestampStyle {
   /// 私聊消息流。[TimeFmt.chatSeparator]：小写 `yesterday`、跨年带年份。
   static const ChatTimestampStyle dm = ChatTimestampStyle(
     textStyle: TextStyle(
-      color: AppColors.textGrayB0,
+      color: AppColors.grayB0B0B0,
       fontSize: 12,
       fontWeight: FontWeight.w500,
       height: 1.2,
@@ -39,7 +39,7 @@ class ChatTimestampStyle {
   /// 群聊消息流。[TimeFmt.chatBubble]：大写 `Yesterday`、跨年**不**带年份。
   static const ChatTimestampStyle group = ChatTimestampStyle(
     textStyle: TextStyle(
-      color: AppColors.textGrayAE,
+      color: AppColors.grayB0B0B0,
       fontSize: 12,
       fontWeight: FontWeight.w400,
       height: 1.2,

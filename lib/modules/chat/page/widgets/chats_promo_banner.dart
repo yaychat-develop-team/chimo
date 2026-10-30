@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../common/constants/app_assets.dart';
 import '../../../../common/theme/app_colors.dart';
-import '../../../../common/widgets/app_image.dart';
+import 'package:chimo/common/utils/chimo.dart';
 
 /// 列表上方推广横幅（Figma 39:428 / Group 7463）。
 /// 渐变胶囊 + 手势/Hi 插图 + 文案 + 关闭。
@@ -30,7 +30,7 @@ class ChatsPromoBanner extends StatelessWidget {
                 child: Container(
                   height: 54,
                   decoration: BoxDecoration(
-                    gradient: AppColors.promoBannerGradient,
+                    gradient: AppColors.primaryGradient,
                     borderRadius: BorderRadius.circular(30),
                   ),
                   padding: const EdgeInsets.only(left: 82, right: 36),
@@ -42,7 +42,7 @@ class ChatsPromoBanner extends StatelessWidget {
                       Text(
                         'Your Adventure Awaits',
                         style: TextStyle(
-                          color: AppColors.promoText,
+                          color: AppColors.black1C1C1E,
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
                           height: 1.2,
@@ -52,7 +52,7 @@ class ChatsPromoBanner extends StatelessWidget {
                       Text(
                         'Complete your info, get more friends!',
                         style: TextStyle(
-                          color: AppColors.promoText,
+                          color: AppColors.black1C1C1E,
                           fontSize: 11,
                           fontWeight: FontWeight.w500,
                           height: 1.2,
@@ -63,16 +63,26 @@ class ChatsPromoBanner extends StatelessWidget {
                 ),
               ),
               // 伸出的手（48×42）。
-              const Positioned(
+              Positioned(
                 left: 24,
                 top: 12,
-                child: AppImage(AppAssets.msgPromoHand, width: 48, height: 42, fit: BoxFit.contain),
+                child: Chimo.image(
+                  AppAssets.msgPromoHand,
+                  width: 48,
+                  height: 42,
+                  fit: BoxFit.contain,
+                ),
               ),
               // 手上方的 Hi 气泡。
-              const Positioned(
+              Positioned(
                 left: 52,
                 top: 0,
-                child: AppImage(AppAssets.msgPromoHi, width: 24, height: 24, fit: BoxFit.contain),
+                child: Chimo.image(
+                  AppAssets.msgPromoHi,
+                  width: 24,
+                  height: 24,
+                  fit: BoxFit.contain,
+                ),
               ),
               Positioned(
                 right: 12,
@@ -81,10 +91,10 @@ class ChatsPromoBanner extends StatelessWidget {
                 child: GestureDetector(
                   onTap: onClose,
                   behavior: HitTestBehavior.opaque,
-                  child: const SizedBox(
+                  child: SizedBox(
                     width: 32,
                     child: Center(
-                      child: AppImage(
+                      child: Chimo.image(
                         AppAssets.msgPromoClose,
                         width: 8,
                         height: 8,

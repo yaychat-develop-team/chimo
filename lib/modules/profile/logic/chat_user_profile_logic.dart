@@ -28,7 +28,7 @@ class ChatUserProfileLogic extends GetxController {
   ChatUserProfileLogic({required User seed}) : profile = seed.obs, following = seed.following.obs;
 
   /// 会话列表：Chat 按钮要先把会话补进列表再跳。
-  final ChatsListLogic chats = Get.find<ChatsListLogic>();
+  final ConversationListLogic chats = Get.find<ConversationListLogic>();
 
   final Rx<User> profile;
   final RxBool following;
@@ -68,8 +68,7 @@ class ChatUserProfileLogic extends GetxController {
 
   Future<void> bootstrap() async {
     final seedUid = targetUid;
-    final self =
-        seedUid.isNotEmpty && seedUid == SessionInfo.uid.toString();
+    final self = seedUid.isNotEmpty && seedUid == SessionInfo.uid.toString();
     if (isClosed) return;
     isSelf.value = self;
     await loadProfile();

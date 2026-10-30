@@ -15,7 +15,7 @@ class AppSheetAction {
   final String label;
   final VoidCallback onTap;
 
-  /// 为 true 时使用 [AppColors.badge]（如 Report）。
+  /// 为 true 时使用 [AppColors.redFD4B4B]（如 Report）。
   final bool destructive;
 
   /// 覆盖文字颜色；优先于 [destructive]。
@@ -54,7 +54,7 @@ class _ActionSheet extends StatelessWidget {
 
   final List<AppSheetAction> items;
 
-  static const Color _bg = AppColors.surfaceSheet;
+  static const Color _bg = AppColors.black1C1C1E;
   static const double _topRadius = 28;
   static const double _tileHeight = 48;
   static const double _tileGap = 8;
@@ -87,7 +87,7 @@ class _ActionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = item.color ?? (item.destructive ? AppColors.badge : AppColors.textPrimary);
+    final color = item.color ?? (item.destructive ? AppColors.redFD4B4B : AppColors.white);
 
     return InkWell(
       onTap: item.onTap,

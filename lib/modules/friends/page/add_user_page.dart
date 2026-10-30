@@ -5,7 +5,7 @@ import '../../../common/constants/app_assets.dart';
 import '../../../common/theme/app_colors.dart';
 import '../../../common/theme/app_input.dart';
 import '../../../common/widgets/app_scaffold.dart';
-import '../../../common/widgets/app_image.dart';
+import 'package:chimo/common/utils/chimo.dart';
 
 /// 添加用户页：按用户 ID 或昵称搜索（消息搜索入口）。
 class AddUserPage extends StatefulWidget {
@@ -37,8 +37,8 @@ class _AddUserPageState extends State<AddUserPage> {
 
   @override
   Widget build(BuildContext context) {
-    return ChimoScaffold(
-      title: 'Add',
+    return AppScaffold(
+      appBar: AppNavBar(title: 'Add'),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -50,15 +50,15 @@ class _AddUserPageState extends State<AddUserPage> {
               decoration: BoxDecoration(
                 color: Colors.transparent,
                 borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: AppColors.outlineBright, width: 1),
+                border: Border.all(color: AppColors.gray333333, width: 1),
               ),
               child: Row(
                 children: [
-                  const AppImage(
+                  Chimo.image(
                     AppAssets.msgSearch,
                     width: 18,
                     height: 18,
-                    color: AppColors.textTertiary,
+                    color: AppColors.gray6E6E6E,
                     fit: BoxFit.contain,
                   ),
                   const SizedBox(width: 10),
@@ -66,15 +66,15 @@ class _AddUserPageState extends State<AddUserPage> {
                     child: TextField(
                       controller: _controller,
                       focusNode: _focusNode,
-                      style: const TextStyle(color: AppColors.textPrimary, fontSize: 15),
-                      cursorColor: AppColors.primaryBright,
+                      style: const TextStyle(color: AppColors.white, fontSize: 15),
+                      cursorColor: AppColors.green1BBA77,
                       cursorWidth: 1.5,
                       textInputAction: TextInputAction.search,
                       inputFormatters: [LengthLimitingTextInputFormatter(64)],
                       decoration: const AppInputDecoration(
                         isDense: true,
                         hintText: 'Search by User ID or Nickname',
-                        hintStyle: TextStyle(color: AppColors.textTertiary, fontSize: 15),
+                        hintStyle: TextStyle(color: AppColors.gray6E6E6E, fontSize: 15),
                       ),
                     ),
                   ),

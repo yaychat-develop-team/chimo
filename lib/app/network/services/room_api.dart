@@ -1,10 +1,14 @@
 import 'package:dio/dio.dart';
 import 'package:fixnum/fixnum.dart';
+import 'package:protobuf/protobuf.dart';
 
 import '../../../common/models/server_client/message.pb.dart';
 import '../../../common/models/server_client/message_api.pb.dart';
+import '../../../common/models/server_client/mic_tool.pb.dart';
 import '../../../common/models/server_client/room/base.pb.dart';
 import '../../../common/models/server_client/rtc.pb.dart';
+import '../../../common/models/server_client/super_admin.pb.dart';
+import '../../../common/models/server_client/user.pb.dart';
 import '../http/api_result.dart';
 import '../http/http.dart';
 import '../http/response_ext.dart';
@@ -30,19 +34,13 @@ class RoomApi {
   Future<ApiResult<void>> enterRoom(int rid, {String password = ''}) {
     return Http.ins.postAndParse(
       '/room/enter',
-      data: {
-        'rid': rid,
-        if (password.isNotEmpty) 'password': password,
-      },
+      data: {'rid': rid, if (password.isNotEmpty) 'password': password},
     );
   }
 
   /// 离开房间
   Future<ApiResult<void>> leaveRoom(int rid) {
-    return Http.ins.postAndParse(
-      '/room/leave',
-      data: {'rid': rid},
-    );
+    return Http.ins.postAndParse('/room/leave', data: {'rid': rid});
   }
 
   Future<ApiResult<JoinChannelRsp>> join({
@@ -83,7 +81,9 @@ class RoomApi {
   }
 
   Future<ApiResult<void>> downMic(int rid) {
-    return _update(ChannelUpdate(channel: Int64(rid), downMic: ChannelDownMic()));
+    return _update(
+      ChannelUpdate(channel: Int64(rid), downMic: ChannelDownMic()),
+    );
   }
 
   Future<ApiResult<void>> collect(int rid) {
@@ -94,11 +94,116 @@ class RoomApi {
     return _verb('DELETE', '/user-relation/collect/0/content/$rid');
   }
 
+  /// 已收藏房间。对齐 joyride `GET /user-relation/collect/0`。
+  Future<ApiResult<CollectListRsp>> collectList({int size = 100}) {
+    return Http.ins.getAndParse<CollectListRsp>(
+      '/user-relation/collect/0',
+      query: {'size': '$size'},
+    );
+  }
+
+  /// 侧栏 Tab。对齐 joyride `GET /rtc/channel-tags`。
+  Future<ApiResult<ChannelTagsData>> channelTags() {
+    return Http.ins.getAndParse<ChannelTagsData>('/rtc/channel-tags');
+  }
+
+  /// 侧栏房间列表。对齐 joyride `GET /rtc/sidebar`。
+  Future<ApiResult<RtcSidebarRsp>> sidebar({
+    required String tagId,
+    int pageNum = 1,
+    int pageSize = 20,
+    String? snapshotId,
+  }) {
+    return Http.ins.getAndParse<RtcSidebarRsp>(
+      '/rtc/sidebar',
+      query: {
+        'tagId': tagId,
+        'pageNum': '$pageNum',
+        'pageSize': '$pageSize',
+        'snapshotId': snapshotId ?? '',
+      },
+    );
+  }
+
+  /// 房间用户 / 榜单。对齐 joyride `GET /rtc/channel/{id}/users`。
+  /// [scope] 空=在线；`cash_day`/`cash_week`=送礼；`charm_day`/`charm_week`=收礼。
+  Future<ApiResult<ChannelUserListRsp>> channelUsers(
+    int rid, {
+    int offset = 0,
+    int count = 50,
+    String scope = '',
+  }) {
+    return Http.ins.getAndParse<ChannelUserListRsp>(
+      '/rtc/channel/$rid/users',
+      query: {'offset': '$offset', 'count': '$count', 'scope': scope},
+    );
+  }
+
   Future<ApiResult<void>> sendText(int rid, String text) {
-    final chat = ChatContent()..showItem.add(ShowItem(style: ItemStyle.text, text: text));
+    return sendShowItems(rid, [ShowItem(style: ItemStyle.text, text: text)]);
+  }
+
+  /// 公屏任意 [ShowItem]（文本 / icon / 带 extra 的贴纸）。
+  ///
+  /// 对齐 joyride `MessageCheckApi.sendToRoom`：JSON + ChatContent TypeRegistry。
+  /// `toRoomId` 强制为数字（部分环境对 int64 字符串解析成 0 → 100201002）。
+  Future<ApiResult<void>> sendShowItems(int rid, List<ShowItem> items) {
+    final chat = ChatContent()..showItem.addAll(items);
+    final req = SendToRoomReq(toRoomId: Int64(rid), chat: chat);
+    final json = req.toProto3Json(
+      typeRegistry: TypeRegistry([
+        ChatContent.create(),
+        CardChatContent.create(),
+      ]),
+    );
+    if (json is Map) {
+      json['toRoomId'] = rid;
+    }
     return Http.ins.postAndParse(
       '/msg/send-to-room',
-      data: SendToRoomReq(toRoomId: Int64(rid), chat: chat),
+      data: json,
+      options: _jsonBody,
+    );
+  }
+
+  /// 麦上表情。对齐 joyride `RtcApi.sendMicImage` → `POST /rtc/mic_img/show`。
+  Future<ApiResult<void>> sendMicImage({
+    required int rid,
+    required int uid,
+    required String url,
+    int type = 3,
+  }) {
+    return Http.ins.postAndParse(
+      '/rtc/mic_img/show',
+      data: MicImgShowReq(
+        rid: Int64(rid),
+        uid: Int64(uid),
+        type: type,
+        url: url,
+      ),
+      options: _jsonBody,
+    );
+  }
+
+  /// 房主/接待关闭或打开房间。对齐 joyride `ChannelChangeStatus`。
+  Future<ApiResult<void>> changeStatus(int rid, RoomStatusEnum status) {
+    return _update(
+      ChannelUpdate(
+        channel: Int64(rid),
+        changeStatus: ChannelChangeStatus(status: status),
+      ),
+    );
+  }
+
+  /// 全员警告。对齐 joyride `POST /super_admin/warn`。
+  Future<ApiResult<void>> warnAll(int rid, {String reason = ''}) {
+    return Http.ins.postAndParse(
+      '/super_admin/warn',
+      data: WarnReq(
+        channelId: Int64(rid),
+        warnType: WarnType.ALL_USER,
+        reason: reason,
+      ),
       options: _jsonBody,
     );
   }
@@ -109,6 +214,11 @@ class RoomApi {
       data: req,
       options: _jsonBody,
     );
+  }
+
+  /// 房间 Tab 顶部热门故事。
+  Future<ApiResult<HotStoryRsp>> hotStories() {
+    return Http.ins.getAndParse<HotStoryRsp>('/rtc/getHotStory');
   }
 
   Future<ApiResult<void>> _verb(String method, String path) async {

@@ -10,11 +10,10 @@ import '../../../../common/constants/app_assets.dart';
 import '../../../../common/theme/app_colors.dart';
 import '../../../../common/utils/app_log.dart';
 import '../album_photo_viewer_page.dart';
-import '../../../../common/widgets/app_back_button.dart';
-import '../../../../common/widgets/app_image.dart';
 import '../../../../common/widgets/app_scaffold.dart';
 import '../../../../common/utils/app_toast.dart';
 import '../../../../common/utils/zodiac.dart';
+import 'package:chimo/common/utils/chimo.dart';
 
 /// Flavor 标签（emoji + 文案）。
 class ProfileFlavorTag {
@@ -115,10 +114,8 @@ class UserProfileScaffold extends StatelessWidget {
     // 设计：头像顶在 y=289；状态栏 44 + 按钮区约 48 → 顶栏下方 spacer。
     final avatarTop = 289.0 - topPadding - 48;
 
-    return ChimoScaffold(
-      showNav: false,
-      safeArea: false,
-      backgroundColor: AppColors.backgroundDeep,
+    return AppScaffold(
+      backgroundColor: AppColors.black111111,
       body: Stack(
         children: [
           Positioned(
@@ -126,7 +123,7 @@ class UserProfileScaffold extends StatelessWidget {
             left: 0,
             right: 0,
             height: 360,
-            child: AppImage(
+            child: Chimo.image(
               AppAssets.personalBg,
               fit: BoxFit.cover,
               alignment: Alignment.topCenter,
@@ -144,8 +141,8 @@ class UserProfileScaffold extends StatelessWidget {
                   end: Alignment.bottomCenter,
                   colors: [
                     Colors.transparent,
-                    AppColors.backgroundDeep.withValues(alpha: 0.85),
-                    AppColors.backgroundDeep,
+                    AppColors.black111111.withValues(alpha: 0.85),
+                    AppColors.black111111,
                   ],
                 ),
               ),
@@ -161,7 +158,7 @@ class UserProfileScaffold extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Row(
                       children: [
-                        AppBackButton.circle(onPressed: onBack),
+                        AppBackButton.circle(onBack: onBack),
                         const Spacer(),
                         if (showMore)
                           _TopCircleButton(
@@ -202,7 +199,7 @@ class UserProfileScaffold extends StatelessWidget {
                                     child: Stack(
                                       fit: StackFit.expand,
                                       children: [
-                                        AppImage(
+                                        Chimo.image(
                                           avatarUrl,
                                           fallbackAsset: avatarAsset,
                                           fit: BoxFit.cover,
@@ -265,18 +262,18 @@ class UserProfileScaffold extends StatelessWidget {
                                           Text(
                                             'ID:$userId',
                                             style: const TextStyle(
-                                              color: AppColors.textGrayA3,
+                                              color: AppColors.gray9A9A9A,
                                               fontSize: 12,
                                               fontWeight: FontWeight.w400,
                                               height: 18 / 12,
                                             ),
                                           ),
                                           const SizedBox(width: 6),
-                                          AppImage(
+                                          Chimo.image(
                                             AppAssets.mineCopy,
                                             width: 10,
                                             height: 10,
-                                            color: AppColors.textGrayA3,
+                                            color: AppColors.gray9A9A9A,
                                           ),
                                         ],
                                       ),
@@ -307,12 +304,12 @@ class UserProfileScaffold extends StatelessWidget {
                                             height: 16,
                                             padding: const EdgeInsets.fromLTRB(0, 0, 4, 0),
                                             background: isMale
-                                                ? AppColors.linkBlue
-                                                : AppColors.genderFemaleAlt,
+                                                ? AppColors.blue0091FF
+                                                : AppColors.pinkFF5BA8,
                                             child: Row(
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
-                                                AppImage(
+                                                Chimo.image(
                                                   isMale
                                                       ? AppAssets.genderMan
                                                       : AppAssets.genderWoman,
@@ -388,12 +385,12 @@ class UserProfileScaffold extends StatelessWidget {
                                   ),
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(10),
-                                    child: AppImage(
+                                    child: Chimo.image(
                                       src,
                                       width: 90,
                                       height: 89,
                                       fit: BoxFit.cover,
-                                      error: AppImage(
+                                      error: Chimo.image(
                                         avatarAsset,
                                         width: 90,
                                         height: 89,
@@ -435,7 +432,7 @@ class UserProfileScaffold extends StatelessWidget {
                   ),
                 ),
                 ColoredBox(
-                  color: AppColors.backgroundDeep,
+                  color: AppColors.black111111,
                   child: Padding(
                     padding: EdgeInsets.fromLTRB(16, 8, 16, 12 + bottomPadding),
                     child: bottomBar,
@@ -465,13 +462,13 @@ class ProfilePrimaryAction extends StatelessWidget {
         height: 48,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          gradient: AppColors.promoBannerGradient,
+          gradient: AppColors.primaryGradient,
           borderRadius: BorderRadius.circular(24),
         ),
         child: Text(
           label,
           style: const TextStyle(
-            color: AppColors.promoText,
+            color: AppColors.black1C1C1E,
             fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
@@ -496,14 +493,14 @@ class ProfileOutlineAction extends StatelessWidget {
         height: 48,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: AppColors.surfaceSheet,
+          color: AppColors.black1C1C1E,
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: AppColors.accentLime, width: 1),
+          border: Border.all(color: AppColors.green00F875, width: 1),
         ),
         child: Text(
           label,
           style: const TextStyle(
-            color: AppColors.accentLime,
+            color: AppColors.green00F875,
             fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
@@ -527,11 +524,11 @@ class ProfileGiftAction extends StatelessWidget {
         width: 48,
         height: 48,
         decoration: BoxDecoration(
-          color: AppColors.surfaceSheet,
+          color: AppColors.black1C1C1E,
           borderRadius: BorderRadius.circular(24),
         ),
         alignment: Alignment.center,
-        child: AppImage(AppAssets.giftIcon, width: 30, height: 30, fit: BoxFit.contain),
+        child: Chimo.image(AppAssets.giftIcon, width: 30, height: 30, fit: BoxFit.contain),
       ),
     );
   }
@@ -560,7 +557,7 @@ class _TopCircleButton extends StatelessWidget {
 class _ProfileChip extends StatelessWidget {
   const _ProfileChip({
     required this.child,
-    this.background = AppColors.outlineBright,
+    this.background = AppColors.gray333333,
     this.height = 22,
     this.padding = const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
   });
@@ -596,7 +593,7 @@ class _VipLevelIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsetsDirectional.only(end: 4),
-      child: AppImage(url, height: 22, fit: BoxFit.fitHeight, error: const SizedBox.shrink()),
+      child: Chimo.image(url, height: 22, fit: BoxFit.fitHeight, error: const SizedBox.shrink()),
     );
   }
 }
@@ -725,7 +722,7 @@ class _VoiceCardState extends State<_VoiceCard> {
         padding: const EdgeInsets.symmetric(horizontal: 10),
         alignment: Alignment.center,
         decoration: const BoxDecoration(
-          color: AppColors.giftYellowSoft,
+          color: AppColors.yellow1FFDF652,
           borderRadius: BorderRadiusDirectional.only(
             topStart: Radius.circular(16),
             bottomStart: Radius.circular(16),
@@ -733,7 +730,7 @@ class _VoiceCardState extends State<_VoiceCard> {
         ),
         child: Row(
           children: [
-            AppImage(
+            Chimo.image(
               _playing ? AppAssets.voicePauseIcon : AppAssets.voicePlayIcon,
               width: 18,
               height: 18,
@@ -743,12 +740,12 @@ class _VoiceCardState extends State<_VoiceCard> {
               child: SizedBox(
                 height: 14,
                 child: _playing
-                    ? AppImage(
+                    ? Chimo.image(
                         AppAssets.voiceWaveAnim,
                         fit: BoxFit.contain,
                         alignment: Alignment.centerLeft,
                       )
-                    : AppImage(
+                    : Chimo.image(
                         AppAssets.voiceWaveLine,
                         height: 10,
                         fit: BoxFit.contain,
@@ -781,16 +778,13 @@ class _FlavorChip extends StatelessWidget {
   Widget build(BuildContext context) {
     // 原 My Flavor 标签仅为文字（无 emoji 前缀）。
     return DecoratedBox(
-      decoration: BoxDecoration(
-        color: AppColors.overlayWhite12,
-        borderRadius: BorderRadius.circular(15),
-      ),
+      decoration: BoxDecoration(color: AppColors.white12, borderRadius: BorderRadius.circular(15)),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         child: Text(
           label,
           style: const TextStyle(
-            color: AppColors.textGrayA3,
+            color: AppColors.gray9A9A9A,
             fontSize: 12,
             fontWeight: FontWeight.w400,
             height: 1.2,

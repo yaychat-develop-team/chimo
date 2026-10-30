@@ -10,6 +10,7 @@ class MicSeat {
     this.contribution = 0,
     this.frame = '',
     this.boss = false,
+    this.downMicAt = 0,
   });
 
   final int index;
@@ -22,9 +23,19 @@ class MicSeat {
   final String frame;
   final bool boss;
 
+  /// 下麦截止时间（unix 秒）。0 表示不限时。
+  final int downMicAt;
+
   bool get occupied => uid != null && uid! > 0;
 
-  MicSeat copyWith({bool? speaking, bool? micOpen}) {
+  /// 剩余上麦秒数。≤0 表示已到期或不限时。
+  int remainSeconds([DateTime? now]) {
+    if (downMicAt <= 0) return 0;
+    final seconds = now?.millisecondsSinceEpoch ?? DateTime.now().millisecondsSinceEpoch;
+    return downMicAt - seconds ~/ 1000;
+  }
+
+  MicSeat copyWith({bool? speaking, bool? micOpen, int? downMicAt}) {
     return MicSeat(
       index: index,
       uid: uid,
@@ -35,6 +46,7 @@ class MicSeat {
       contribution: contribution,
       frame: frame,
       boss: boss,
+      downMicAt: downMicAt ?? this.downMicAt,
     );
   }
 }

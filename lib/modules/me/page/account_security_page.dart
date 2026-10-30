@@ -3,7 +3,7 @@ import 'package:get/get.dart';
 
 import '../../../common/widgets/app_scaffold.dart';
 import '../logic/account_security_logic.dart';
-import '../../../common/widgets/app_settings_tile.dart';
+import '../../../common/widgets/settings_tile.dart';
 import '../../../common/theme/app_colors.dart';
 
 /// 账号安全入口（对齐 forya AccountSecurityPage）。
@@ -32,23 +32,21 @@ class _AccountSecurityPageState extends State<AccountSecurityPage> {
   @override
   Widget build(BuildContext context) {
     return Obx(
-      () => ChimoScaffold(
-        title: 'Account Security',
+      () => AppScaffold(
+        appBar: AppNavBar(title: 'Account Security'),
         body: logic.loading.value
             ? const Center(child: CircularProgressIndicator())
             : ListView(
+                padding: EdgeInsets.zero,
                 children: [
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                     child: DecoratedBox(
                       decoration: BoxDecoration(
-                        color: AppColors.surfaceSheet,
+                        color: AppColors.black1C1C1E,
                         borderRadius: BorderRadius.circular(16),
                       ),
-                      child: AppSettingsTile(
-                        title: 'Cancel Account',
-                        onTap: logic.openCancelAccount,
-                      ),
+                      child: SettingsTile(title: 'Cancel Account', onTap: logic.openCancelAccount),
                     ),
                   ),
                 ],

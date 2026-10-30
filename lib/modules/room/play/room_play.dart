@@ -24,9 +24,7 @@ abstract class RoomPlay {
 /// 玩法登记点。新增玩法只加一个类，再放进这里。
 abstract final class RoomPlays {
   static List<RoomPlay> resolve(Channel channel) {
-    return [
-      for (final play in [VoiceRoomPlay()])
-        if (play.supports(channel)) play,
-    ];
+    final registered = <RoomPlay>[VoiceRoomPlay()];
+    return registered.where((play) => play.supports(channel)).toList();
   }
 }

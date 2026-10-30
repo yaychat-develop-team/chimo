@@ -6,9 +6,7 @@ import 'package:get/get.dart';
 import '../../../common/constants/app_assets.dart';
 import '../../../common/theme/app_colors.dart';
 import '../logic/welcome_brand_logic.dart';
-import '../../../common/widgets/app_gradient_button.dart';
-import '../../../common/widgets/skip_button.dart';
-import '../../../common/widgets/app_image.dart';
+import 'package:chimo/common/utils/chimo.dart';
 import '../../../common/widgets/app_scaffold.dart';
 
 /// 品牌欢迎页 → 点击任意位置进入行业选择（同页形变动画，对齐 forya）。
@@ -54,10 +52,8 @@ class _WelcomeBrandPageState extends State<WelcomeBrandPage> with SingleTickerPr
     final bottom = media.padding.bottom;
     final size = media.size;
 
-    return ChimoScaffold(
-      showNav: false,
-      safeArea: false,
-      backgroundColor: AppColors.backgroundDeep,
+    return AppScaffold(
+      backgroundColor: AppColors.black111111,
       body: AnimatedBuilder(
         animation: _progress,
         builder: (context, _) {
@@ -76,7 +72,7 @@ class _WelcomeBrandPageState extends State<WelcomeBrandPage> with SingleTickerPr
                   gradient: RadialGradient(
                     center: const Alignment(0, -1.05),
                     radius: 1.15,
-                    colors: [AppColors.chipGreenDark.withValues(alpha: 0.85), Colors.transparent],
+                    colors: [AppColors.green1A3A28.withValues(alpha: 0.85), Colors.transparent],
                   ),
                 ),
               ),
@@ -96,7 +92,7 @@ class _WelcomeBrandPageState extends State<WelcomeBrandPage> with SingleTickerPr
                 right: 0,
                 child: IgnorePointer(
                   child: Center(
-                    child: AppImage(
+                    child: Chimo.image(
                       AppAssets.brandTitleLogo,
                       height: logoHeight,
                       fit: BoxFit.contain,
@@ -165,9 +161,7 @@ class _WelcomeBrandPageState extends State<WelcomeBrandPage> with SingleTickerPr
                               final loading = logic.loadingTypes.value;
                               if (loading) {
                                 return const Center(
-                                  child: CircularProgressIndicator(
-                                    color: AppColors.accentLimeBright,
-                                  ),
+                                  child: CircularProgressIndicator(color: AppColors.greenB6FF2E),
                                 );
                               }
                               final industries = logic.industries.toList();
@@ -194,8 +188,9 @@ class _WelcomeBrandPageState extends State<WelcomeBrandPage> with SingleTickerPr
                           Padding(
                             padding: EdgeInsets.fromLTRB(30, 8, 30, bottom + 16),
                             child: Obx(() {
-                              final canNext = _expanded && !logic.loadingTypes.value;
-                              return AppGradientButton(
+                              final loading = logic.loadingTypes.value;
+                              final canNext = _expanded && !loading;
+                              return Chimo.s.gradientButton(
                                 label: 'Next Step',
                                 onTap: canNext ? logic.next : null,
                                 enabled: canNext,
@@ -212,7 +207,7 @@ class _WelcomeBrandPageState extends State<WelcomeBrandPage> with SingleTickerPr
               Positioned(
                 top: top + 8,
                 right: 18,
-                child: SkipButton(onPressed: logic.skip),
+                child: Chimo.s.skipButton(onPressed: logic.skip),
               ),
             ],
           );
@@ -232,7 +227,7 @@ class _IndustryTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: AppColors.tagBackground,
+      color: AppColors.black2A2A2A,
       borderRadius: BorderRadius.circular(27),
       child: InkWell(
         onTap: onTap,
@@ -258,11 +253,11 @@ class _IndustryTile extends StatelessWidget {
                   height: 20,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: selected ? AppColors.promoBannerGradient : null,
-                    border: selected ? null : Border.all(color: AppColors.textGray5A, width: 1.5),
+                    gradient: selected ? AppColors.primaryGradient : null,
+                    border: selected ? null : Border.all(color: AppColors.gray5A5A5E, width: 1.5),
                   ),
                   child: selected
-                      ? const Icon(Icons.check, size: 14, color: AppColors.promoText)
+                      ? const Icon(Icons.check, size: 14, color: AppColors.black1C1C1E)
                       : null,
                 ),
               ],

@@ -11,11 +11,10 @@ import '../../../common/theme/app_dialog.dart';
 import '../../../common/utils/app_toast.dart';
 import '../../../common/theme/app_bottom_sheet.dart';
 import '../../../common/widgets/app_scaffold.dart';
-import '../../../common/widgets/chat_message_action_popup.dart';
+import '../../../common/widgets/chat_action_pop_menu.dart';
 import '../../report/model/report_target.dart';
 import '../../../common/extensions/wire_view.dart';
 import '../../../common/models/server_client/group/group.pb.dart';
-import '../../profile/page/widgets/chat_user_profile_sheet.dart';
 import '../../profile/page/album_photo_viewer_page.dart';
 import 'chat_scroll_anchor.dart';
 import '../logic/group_chat_logic.dart';
@@ -104,7 +103,9 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
   /// 撤回 / 删除那两刀在 [GroupChatLogic]。
   Future<void> _onMessageLongPress(ChatLine message, Rect anchor) async {
     if (!logic.isJoined.value) return;
-    if (message.kind == ChatLineKind.join || message.kind == ChatLineKind.recall) {
+    if (message.kind == ChatLineKind.join ||
+        message.kind == ChatLineKind.recall ||
+        message.kind == ChatLineKind.custom) {
       return;
     }
 
@@ -128,11 +129,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
     if (actions.isEmpty) return;
 
     _inputBarKey.currentState?.dismissComposer();
-    final action = await ChatMessageActionPopup.show(
-      context: context,
-      anchor: anchor,
-      actions: actions,
-    );
+    final action = await ChatActionPopMenu.show(context: context, anchor: anchor, actions: actions);
     if (!mounted || action == null) return;
 
     switch (action) {
@@ -241,7 +238,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
     try {
       final profile = await logic.resolveSenderProfile(message);
       if (!mounted) return;
-      await ChatUserProfileSheet.show(context, profile: profile);
+      await AppJumper.showUserProfileSheet(uid: profile.uid, preview: profile);
     } finally {
       _openingSenderProfile = false;
     }
@@ -252,10 +249,8 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
     final topPadding = MediaQuery.paddingOf(context).top;
     final bottomPadding = MediaQuery.paddingOf(context).bottom;
 
-    return ChimoScaffold(
-      showNav: false,
-      safeArea: false,
-      backgroundColor: AppColors.background,
+    return AppScaffold(
+      backgroundColor: AppColors.black,
       // 对齐私聊：输入栏自行处理键盘 / 面板 inset（避免双重收缩）。
       resizeToAvoidBottomInset: false,
       body: Stack(
@@ -293,7 +288,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
                 Expanded(
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      color: logic.isJoined.value ? Colors.white : AppColors.glowLime,
+                      color: logic.isJoined.value ? Colors.white : AppColors.green1FC0F600,
                       borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
                     ),
                     child: Column(
@@ -306,7 +301,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
                                 'Not a member? Viewing is limited to 10 messages',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  color: AppColors.accentLimeDim,
+                                  color: AppColors.greenC7EF4C,
                                   fontSize: 12,
                                   fontWeight: FontWeight.w500,
                                 ),

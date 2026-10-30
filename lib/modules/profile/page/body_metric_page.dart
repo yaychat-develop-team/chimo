@@ -38,16 +38,12 @@ class _BodyMetricPageState extends State<BodyMetricPage> {
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(
-      text: widget.initialValue?.toString() ?? '',
-    );
+    _controller = TextEditingController(text: widget.initialValue?.toString() ?? '');
     _focusNode = FocusNode();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _focusNode.requestFocus();
-      _controller.selection = TextSelection.collapsed(
-        offset: _controller.text.length,
-      );
+      _controller.selection = TextSelection.collapsed(offset: _controller.text.length);
     });
   }
 
@@ -63,8 +59,7 @@ class _BodyMetricPageState extends State<BodyMetricPage> {
     final value = int.tryParse(text);
     if (value == null || value < widget.min || value > widget.max) {
       setState(() {
-        _error =
-            'Please fill in the numbers between ${widget.min} and ${widget.max}';
+        _error = 'Please fill in the numbers between ${widget.min} and ${widget.max}';
       });
       return;
     }
@@ -73,16 +68,18 @@ class _BodyMetricPageState extends State<BodyMetricPage> {
 
   @override
   Widget build(BuildContext context) {
-    return ChimoScaffold(
-      title: widget.title,
-      trailing: TextButton(
-        onPressed: _onConfirm,
-        child: const Text(
-          'Confirm',
-          style: TextStyle(
-            color: AppColors.primaryBright,
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
+    return AppScaffold(
+      appBar: AppNavBar(
+        title: widget.title,
+        trailing: TextButton(
+          onPressed: _onConfirm,
+          child: const Text(
+            'Confirm',
+            style: TextStyle(
+              color: AppColors.green1BBA77,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
       ),
@@ -95,7 +92,7 @@ class _BodyMetricPageState extends State<BodyMetricPage> {
               height: 52,
               padding: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
-                color: AppColors.tagBackground,
+                color: AppColors.black2A2A2A,
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Row(
@@ -113,14 +110,11 @@ class _BodyMetricPageState extends State<BodyMetricPage> {
                         if (_error != null) setState(() => _error = null);
                       },
                       style: AppText.field,
-                      cursorColor: AppColors.primaryBright,
+                      cursorColor: AppColors.green1BBA77,
                       decoration: AppInputDecoration(
                         isCollapsed: true,
                         hintText: widget.hint,
-                        hintStyle: const TextStyle(
-                          color: AppColors.textGray8A,
-                          fontSize: 16,
-                        ),
+                        hintStyle: const TextStyle(color: AppColors.gray8A8A8A, fontSize: 16),
                       ),
                     ),
                   ),
@@ -132,10 +126,9 @@ class _BodyMetricPageState extends State<BodyMetricPage> {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
             child: Text(
-              _error ??
-                  'Please fill in the numbers between ${widget.min} and ${widget.max}',
+              _error ?? 'Please fill in the numbers between ${widget.min} and ${widget.max}',
               style: TextStyle(
-                color: _error != null ? AppColors.danger : Colors.white,
+                color: _error != null ? AppColors.redE44E50 : Colors.white,
                 fontSize: 13,
                 fontWeight: FontWeight.w400,
               ),

@@ -1,5 +1,4 @@
 import 'package:chimo/app/chimo_api.dart';
-import 'package:chimo/main/chimo_app.dart';
 
 import '../common/models/server_client/common/app.pb.dart';
 import '../common/models/server_client/user.pb.dart';

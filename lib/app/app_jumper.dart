@@ -19,10 +19,11 @@ import '../modules/auth/page/login_page.dart';
 import '../modules/auth/page/phone_login_page.dart';
 import '../modules/auth/page/popular_tribes_page.dart';
 import '../modules/auth/page/profile_setup_page.dart';
+import '../modules/auth/logic/verification_logic.dart';
 import '../modules/auth/page/verification_code_page.dart';
 import '../modules/auth/page/welcome_brand_page.dart';
 import '../modules/chat/page/chat_detail_page.dart';
-import '../modules/chat/page/chats_page.dart';
+import '../modules/chat/page/message_list_page.dart';
 import '../modules/chat/page/group_details_page.dart';
 import '../modules/chat/page/joined_groups_page.dart';
 import '../modules/chat/page/widgets/group/group_members_sheet.dart';
@@ -32,23 +33,35 @@ import '../modules/chat/page/album_selection_preview_page.dart';
 import '../modules/debug/page/debug_page.dart';
 import '../modules/room/logic/room_logic.dart';
 import '../modules/room/page/room_page.dart';
+import '../modules/room/page/widgets/more_rooms_drawer.dart';
 import '../modules/room/service/room_service.dart';
 import '../modules/debug/page/proxy_config_page.dart';
+import '../modules/friends/logic/friends_logic.dart';
 import '../modules/friends/page/add_user_page.dart';
 import '../modules/friends/page/friends_page.dart';
+import '../modules/profile/logic/chat_user_profile_sheet_logic.dart';
 import '../modules/profile/page/chat_user_profile_page.dart';
-import '../modules/home/page/home_search_page.dart';
+import '../modules/honor/page/my_honor_page.dart';
+import '../modules/profile/page/gift_wall_page.dart';
+import '../modules/profile/page/widgets/chat_user_profile_sheet.dart';
+import '../modules/search/logic/user_search_logic.dart';
+import '../modules/search/page/user_search_page.dart';
+import 'chimo_api.dart';
 import '../modules/me/page/level_page.dart';
 import '../modules/me/page/about_us_page.dart';
 import '../modules/me/page/account_cancel_result_page.dart';
 import '../modules/me/page/account_cancellation_page.dart';
 import '../modules/me/page/account_security_page.dart';
+import '../modules/me/logic/bind_email_logic.dart';
 import '../modules/me/page/bind_email_page.dart';
 import '../modules/me/page/help_page.dart';
-import '../modules/me/page/joy_coins_help_page.dart';
+import '../modules/me/page/coins_help_page.dart';
 import '../modules/me/page/levels_help_page.dart';
+import '../modules/me/logic/blacklist_logic.dart';
+import '../modules/me/page/blacklist_page.dart';
 import '../modules/me/page/privacy_settings_page.dart';
 import '../modules/me/page/settings_page.dart';
+import '../modules/me/logic/visits_logic.dart';
 import '../modules/me/page/visits_page.dart';
 import '../modules/profile/page/album_photo_viewer_page.dart';
 import '../modules/profile/page/body_metric_page.dart';
@@ -60,11 +73,10 @@ import '../modules/profile/page/personal_signature_page.dart';
 import '../modules/profile/page/voice_note_page.dart';
 import '../modules/profile/page/personal_profile_page.dart';
 import '../modules/report/page/report_page.dart';
-import '../modules/shell/page/main_tab_shell.dart';
+import '../modules/root/page/root_tab_page.dart';
 import '../modules/wallet/page/coins_details_page.dart';
 import '../modules/wallet/page/wallet_page.dart';
 import '../modules/chat/model/chat_conversation.dart';
-import '../modules/friends/model/friends_tab.dart';
 import '../modules/report/model/report_target.dart';
 
 abstract class AppJumper {
@@ -78,7 +90,7 @@ abstract class AppJumper {
 
   /// 进壳层并清栈（登录成功 / 引导结束）。
   static void toShellAndClear() =>
-      Get.offAll(() => const MainTabShell(), transition: Transition.fadeIn);
+      Get.offAll(() => const RootTabPage(), transition: Transition.fadeIn);
 
   /// 进完善资料并清栈（登录成功但资料没齐）。
   static void toProfileSetupAndClear() =>
@@ -95,8 +107,14 @@ abstract class AppJumper {
 
   static Future toPhoneLogin() async => await Get.to(() => const PhoneLoginPage());
 
-  static Future toVerify(String phone) async =>
-      await Get.to(() => VerificationCodePage(phone: phone));
+  static Future toVerify(String phone) async {
+    await Get.to(
+      () => const VerificationCodePage(),
+      binding: BindingsBuilder(() {
+        Get.lazyPut(() => VerificationLogic(phone: phone));
+      }),
+    );
+  }
 
   static Future toAlmostIn() async => await Get.to(() => const AlmostInPage());
 
@@ -104,8 +122,23 @@ abstract class AppJumper {
   static Future toTribes({String typeList = ''}) async =>
       await Get.to(() => PopularTribesPage(typeList: typeList));
 
-  static Future toBindEmail({bool forLogin = false}) async =>
-      await Get.to(() => BindEmailPage(forLogin: forLogin));
+  static Future toBindEmail({bool forLogin = false}) async {
+    return await Get.to(
+      () => const BindEmailPage(),
+      binding: BindingsBuilder(() {
+        Get.lazyPut(() => BindEmailLogic(forLogin: forLogin));
+      }),
+    );
+  }
+
+  static Future<bool?> toEmailCode({required String email, required bool forLogin}) async {
+    return await Get.to<bool>(
+      () => const BindEmailCodePage(),
+      binding: BindingsBuilder(() {
+        Get.lazyPut(() => EmailCodeLogic(email: email, forLogin: forLogin, sendOnOpen: true));
+      }),
+    );
+  }
 
   /// 会话详情。[preview] 只作首帧预填，为 `null` 是正常路径（深链 / 冷启动）。
   static Future toChat(String id, {ChatConversation? preview}) async {
@@ -154,10 +187,85 @@ abstract class AppJumper {
     await Get.to(() => ChatUserProfilePage(seed: seed));
   }
 
-  /// 通讯录；[initialTab] 决定落在好友 / 关注 / 粉丝哪个 Tab。
-  static Future toFriends({FriendsTab initialTab = FriendsTab.friends}) async {
+  static var _openingUserProfileSheet = false;
+
+  /// 通用用户资料底栏。对齐群聊 [ChatUserProfileSheet]。
+  ///
+  /// 有 [preview] 直接展示；否则按 [uid] 拉 `/user/info`，失败则用 name/avatar 占位。
+  /// 礼物墙 / 关注由 [ChatUserProfileSheetLogic] 对齐 joyride 接口拉取。
+  static Future<void> showUserProfileSheet({
+    required String uid,
+    String name = '',
+    String avatar = '',
+    User? preview,
+  }) async {
     if (!_requireAuth()) return;
-    await Get.to(() => FriendsPage(initialTab: initialTab));
+    final id = uid.trim();
+    if (id.isEmpty || id == '0') return;
+    if (_openingUserProfileSheet) return;
+    _openingUserProfileSheet = true;
+    try {
+      late User profile;
+      if (preview != null) {
+        profile = preview;
+      } else {
+        profile = User()
+          ..id = Int64(int.tryParse(id) ?? 0)
+          ..nickname = name.trim().isEmpty ? 'User' : name.trim()
+          ..avatar = avatar.trim();
+        try {
+          final res = await ChimoApis.user.profileByUid(id);
+          if (res.ok && res.data != null) {
+            profile = res.data!.user;
+            final apiAvatar = profile.avatar.trim();
+            final seedAvatar = avatar.trim();
+            if (apiAvatar.isEmpty && seedAvatar.isNotEmpty) {
+              profile = profile.deepCopy()..avatar = seedAvatar;
+            }
+            final seedName = name.trim();
+            if (profile.nickname.trim().isEmpty && seedName.isNotEmpty) {
+              profile = profile.deepCopy()..nickname = seedName;
+            }
+          }
+        } catch (_) {}
+      }
+      if (Get.isRegistered<ChatUserProfileSheetLogic>()) {
+        Get.delete<ChatUserProfileSheetLogic>(force: true);
+      }
+      Get.put(ChatUserProfileSheetLogic(profile));
+      await ChatUserProfileSheet.show(profile: profile);
+    } finally {
+      if (Get.isRegistered<ChatUserProfileSheetLogic>()) {
+        Get.delete<ChatUserProfileSheetLogic>(force: true);
+      }
+      _openingUserProfileSheet = false;
+    }
+  }
+
+  /// 礼物墙详情。对齐 joyride `GiftWallPage`。
+  static Future<void> toGiftWall(int uid) async {
+    if (!_requireAuth()) return;
+    if (uid <= 0) return;
+    await Get.to(() => GiftWallPage(targetId: uid));
+  }
+
+  /// 我的荣誉。对齐 joyride `MineHonorPage`；[uid] 缺省为自己。
+  static Future<void> toMyHonor({int? uid}) async {
+    if (!_requireAuth()) return;
+    final target = uid ?? SessionInfo.uid;
+    if (target <= 0) return;
+    await Get.to(() => MyHonorPage(targetUid: target));
+  }
+
+  /// 通讯录。[initialTab] 是好友页 tabs 下标，0 好友、1 关注、2 粉丝。
+  static Future toFriends({int initialTab = 0}) async {
+    if (!_requireAuth()) return;
+    await Get.to(
+      () => const FriendsPage(),
+      binding: BindingsBuilder(() {
+        Get.lazyPut(() => FriendsLogic(initialTab: initialTab));
+      }),
+    );
   }
 
   static Future toAddUser() async {
@@ -184,7 +292,12 @@ abstract class AppJumper {
 
   static Future toVisits() async {
     if (!_requireAuth()) return;
-    await Get.to(() => const VisitsPage());
+    await Get.to(
+      () => const VisitsPage(),
+      binding: BindingsBuilder(() {
+        Get.lazyPut(VisitsLogic.new);
+      }),
+    );
   }
 
   static Future toAccountCancellation() async {
@@ -354,14 +467,28 @@ abstract class AppJumper {
 
   static Future<void> toChats() async {
     if (!_requireAuth()) return;
-    await Get.to(() => const ChatsPage());
+    await Get.to(() => const MessageListPage());
+  }
+
+  /// 房间内消息入口：底部弹窗展示会话列表（Cosmic Lounge 设计稿）。
+  static Future<void> showChatsSheet() async {
+    if (!_requireAuth()) return;
+    await MessageListPage.showAsSheet();
+  }
+
+  /// 房间内 More Rooms：右侧抽屉（Saved + For You）。
+  static Future<void> showMoreRoomsDrawer() async {
+    if (!_requireAuth()) return;
+    await MoreRoomsDrawer.show();
   }
 
   static Future<void> toRoom(int rid) async {
     if (!_requireAuth() || rid <= 0) return;
     final service = RoomService.findOrNull();
     final showing =
-        Get.isRegistered<RoomLogic>() && Get.find<RoomLogic>().pageMounted && Get.find<RoomLogic>().rid == rid;
+        Get.isRegistered<RoomLogic>() &&
+        Get.find<RoomLogic>().pageMounted &&
+        Get.find<RoomLogic>().rid == rid;
     if (service != null && service.inRoom.value && service.rid == rid) {
       service.restore();
       if (showing) return;
@@ -416,7 +543,7 @@ abstract class AppJumper {
 
   static Future toJoyCoinsHelp() async {
     if (!_requireAuth()) return;
-    await Get.to(() => const JoyCoinsHelpPage());
+    await Get.to(() => const CoinsHelpPage());
   }
 
   static Future toAboutUs() async {
@@ -428,7 +555,12 @@ abstract class AppJumper {
 
   static Future toHomeSearch() async {
     if (!_requireAuth()) return;
-    await Get.to(() => const HomeSearchPage());
+    await Get.to(
+      () => const HomeSearchPage(),
+      binding: BindingsBuilder(() {
+        Get.lazyPut(() => UserSearchLogic());
+      }),
+    );
   }
 
   /// 消息搜索；[scopeConversation] 非空表示只搜这一个会话。
@@ -453,7 +585,12 @@ abstract class AppJumper {
 
   static Future toBlacklist() async {
     if (!_requireAuth()) return;
-    await Get.to(() => const BlacklistPage());
+    await Get.to(
+      () => const BlacklistPage(),
+      binding: BindingsBuilder(() {
+        Get.lazyPut(BlacklistLogic.new);
+      }),
+    );
   }
 
   static Future toAccountSecurity() async {
@@ -527,7 +664,7 @@ abstract class AppJumper {
   /// 所以深链进来看到的是「空 → 真实」，不是伪造的「Chat」。
   static ChatConversation _chatSeed(String id, ChatConversation? preview) {
     if (preview != null) return preview;
-    for (final c in Get.find<ChatsListLogic>().conversations) {
+    for (final c in Get.find<ConversationListLogic>().conversations) {
       if (c.id == id) return c;
     }
     return ChatConversation(
@@ -547,13 +684,13 @@ class _RouteLoadingPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: AppColors.surface,
+    backgroundColor: AppColors.black111111,
     appBar: AppBar(backgroundColor: Colors.transparent, elevation: 0),
     body: const Center(
       child: SizedBox(
         width: 22,
         height: 22,
-        child: CircularProgressIndicator(strokeWidth: 2.2, color: AppColors.primaryBright),
+        child: CircularProgressIndicator(strokeWidth: 2.2, color: AppColors.green1BBA77),
       ),
     ),
   );

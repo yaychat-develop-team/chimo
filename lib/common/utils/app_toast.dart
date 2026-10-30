@@ -83,7 +83,7 @@ class _ToastBody extends StatelessWidget {
           margin: const EdgeInsets.symmetric(horizontal: 48),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           decoration: BoxDecoration(
-            color: AppColors.toastBackground,
+            color: AppColors.blackE62A2A2A,
             borderRadius: BorderRadius.circular(24),
           ),
           child: Text(

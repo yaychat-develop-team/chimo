@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
+import '../../../app/app_gift.dart';
 import '../../../app/app_jumper.dart';
 import '../../../app/service/im_service.dart';
 import '../../../common/extensions/wire_view.dart';
@@ -11,7 +12,7 @@ import '../../../common/theme/app_colors.dart';
 import '../../../common/theme/app_bottom_sheet.dart';
 import '../../../common/utils/app_toast.dart';
 import '../../../common/widgets/app_scaffold.dart';
-import '../../../common/widgets/chat_message_action_popup.dart';
+import '../../../common/widgets/chat_action_pop_menu.dart';
 import '../model/chat_conversation.dart';
 import 'chat_scroll_anchor.dart';
 import '../logic/dm_chat_logic.dart';
@@ -19,7 +20,6 @@ import '../model/chat_line.dart';
 import 'widgets/chat_input_bar.dart';
 import 'widgets/dm/dm_app_bar.dart';
 import 'widgets/dm/dm_chat_body.dart';
-import 'widgets/gift_sheet.dart';
 
 /// 私聊详情：黑色应用栏 + 白色消息区（拖动手柄）+ 输入栏。
 class ChatDetailPage extends StatefulWidget {
@@ -138,7 +138,9 @@ class _ChatDetailPageState extends State<ChatDetailPage> with SingleTickerProvid
   /// 长按气泡：菜单里有哪几项留在 View（要 `BuildContext` 与气泡的 `Rect`），
   /// 撤回 / 删除那两刀在 [DmChatLogic]。
   Future<void> _onMessageLongPress(ChatLine line, Rect anchor) async {
-    if (line.kind == ChatLineKind.gift || line.kind == ChatLineKind.tip) {
+    if (line.kind == ChatLineKind.gift ||
+        line.kind == ChatLineKind.tip ||
+        line.kind == ChatLineKind.custom) {
       return;
     }
 
@@ -162,11 +164,7 @@ class _ChatDetailPageState extends State<ChatDetailPage> with SingleTickerProvid
     ];
     if (actions.isEmpty) return;
 
-    final action = await ChatMessageActionPopup.show(
-      context: context,
-      anchor: anchor,
-      actions: actions,
-    );
+    final action = await ChatActionPopMenu.show(context: context, anchor: anchor, actions: actions);
     if (!mounted || action == null) return;
 
     switch (action) {
@@ -213,12 +211,16 @@ class _ChatDetailPageState extends State<ChatDetailPage> with SingleTickerProvid
     await logic.sendText(text);
   }
 
-  /// 礼物弹层与资料页那个是同一个。
+  /// 礼物弹层走统一入口 [AppGift]；私聊场景回传结果后插气泡。
   /// 键盘与面板已由 [ChatInputBar] 收好。
   Future<void> _showGiftSheet() async {
-    final result = await AppBottomSheet.show<GiftSendResult>(
-      isScrollControlled: true,
-      child: GiftSheet(style: GiftSheetStyle.chat, receiverUid: logic.profileUid),
+    final seed = widget.conversation;
+    final result = await AppGift.show(
+      context,
+      scene: AppGiftScene.chat,
+      receiverUid: logic.profileUid,
+      receiverName: seed.title,
+      receiverAvatar: seed.avatarUrl ?? '',
     );
     if (!mounted || result == null) return;
     logic.sendGift(
@@ -284,10 +286,8 @@ class _ChatDetailPageState extends State<ChatDetailPage> with SingleTickerProvid
     final topPadding = MediaQuery.paddingOf(context).top;
     final bottomPadding = MediaQuery.paddingOf(context).bottom;
 
-    return ChimoScaffold(
-      showNav: false,
-      safeArea: false,
-      backgroundColor: AppColors.backgroundDeep,
+    return AppScaffold(
+      backgroundColor: AppColors.black111111,
       resizeToAvoidBottomInset: false,
       body: Column(
         children: [

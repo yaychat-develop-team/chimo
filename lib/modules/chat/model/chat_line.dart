@@ -5,7 +5,10 @@ import '../../../common/theme/app_emoji.dart';
 enum ChatSide { peer, self }
 
 /// 消息类型。私聊与群聊**共用这一个枚举**：
-enum ChatLineKind { text, voice, image, gift, emote, tip, join, recall }
+///
+/// [custom]：环信 CUSTOM 卡片（房间邀请等）。具体类型看 [ChatLine.customEvent]
+/// / [ChatLine.customPayload]，UI 由 `ChatCustomBubble` 分发。
+enum ChatLineKind { text, voice, image, gift, emote, tip, join, recall, custom }
 
 /// 一行聊天消息 —— 私聊与群聊**同一个模型**。
 ///
@@ -47,6 +50,8 @@ class ChatLine {
     this.senderGender = '',
     this.joinName = '',
     this.joinUid = '',
+    this.customEvent = '',
+    this.customPayload = const {},
   });
 
   // 群聊风格的命名构造
@@ -227,6 +232,12 @@ class ChatLine {
   final String joinName;
   final String joinUid;
 
+  /// 自定义消息 event（`RoomInvite` / `im_room_invite_message` 等）。
+  final String customEvent;
+
+  /// 自定义消息结构化载荷（[ImCustomPayload] map）。
+  final Map<String, dynamic> customPayload;
+
   bool get isSelf => side == ChatSide.self;
 
   /// 群聊侧原来直接存 `DateTime`；统一成毫秒后由这里换算。
@@ -269,6 +280,9 @@ class ChatLine {
     }
     if (kind == ChatLineKind.emote) return '[Smiley]';
     if (kind == ChatLineKind.tip) return text;
+    if (kind == ChatLineKind.custom) {
+      return text.trim().isNotEmpty ? text : '[Message]';
+    }
     return AppEmoji.normalize(text);
   }
 
@@ -324,5 +338,7 @@ class ChatLine {
     senderGender: senderGender ?? this.senderGender,
     joinName: joinName,
     joinUid: joinUid,
+    customEvent: customEvent,
+    customPayload: customPayload,
   );
 }

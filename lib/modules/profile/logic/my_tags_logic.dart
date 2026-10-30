@@ -77,33 +77,22 @@ class MyTagsLogic extends AsyncListLogic<MakeFriendLabelRespEntry> {
   }
 
   Future<void> confirm() async {
-    final message = await save();
-    if (isClosed || message == null) return;
-    AppToast.info(message);
-  }
-
-  /// 保存。返回 `null` = 成功（已经 `AppJumper.back` 回传标签名），
-  /// 非 `null` = 要 toast 的文案。
-  Future<String?> save() async {
-    if (saving.value) return null;
+    if (saving.value) return;
     if (selectedIds.length < minTags) {
-      return 'You must select at least $minTags tags.';
+      AppToast.info('You must select at least $minTags tags.');
+      return;
     }
     saving.value = true;
     try {
       final ids = selectedIds.toList(growable: false);
       final res = await ChimoApis.user.saveMakeFriendLabels(ids);
-      if (isClosed) return null;
       if (!res.ok) {
-        return res.message.isEmpty ? 'Save failed' : res.message;
+        AppToast.info(res.message.isEmpty ? 'Save failed' : res.message);
+        return;
       }
-      // 名字要在 pop 之前取：pop 之后 Controller 就被回收了。
-      final names = selectedNames;
-      AppJumper.back(result: names);
-      return null;
+      AppJumper.back(result: selectedNames);
     } catch (failure) {
-      if (isClosed) return null;
-      return 'Save failed: $failure';
+      AppToast.info('Save failed: $failure');
     } finally {
       if (!isClosed) saving.value = false;
     }

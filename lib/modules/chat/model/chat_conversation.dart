@@ -43,6 +43,7 @@ class ChatConversation {
     this.postCount = 0,
     this.level = 1,
     this.emUserName = '',
+    this.appUid = '',
     this.lastMsgAtMs = 0,
     this.isSystem = false,
   });
@@ -101,11 +102,30 @@ class ChatConversation {
   /// 1v1 对端环信用户名（群组为空）。
   final String emUserName;
 
+  /// 业务数字 uid（邀请进房 / 资料页）。会话 [id] 多为 `dm_<em>`，不能当 uid。
+  final String appUid;
+
   /// 最近消息服务端时间（毫秒），用于排序 / 相对时间文案。
   final int lastMsgAtMs;
 
   /// 官方 / 系统会话（新朋友等）。
   final bool isSystem;
+
+  /// 能直接解析出的业务 uid；解不出返回 0（需再走 `msgUser`）。
+  int get parsedAppUid {
+    final cached = appUid.trim();
+    if (cached.isNotEmpty) {
+      final n = int.tryParse(cached);
+      if (n != null && n > 0) return n;
+    }
+    var bare = id.trim();
+    if (bare.startsWith('dm_')) {
+      bare = bare.substring(3);
+    } else if (bare.startsWith('sys_')) {
+      bare = bare.substring(4);
+    }
+    return int.tryParse(bare) ?? 0;
+  }
 
   String get signatureDisplay {
     if (signature.trim().isNotEmpty) return signature.trim();
@@ -152,6 +172,7 @@ class ChatConversation {
     int? postCount,
     int? level,
     String? emUserName,
+    String? appUid,
     int? lastMsgAtMs,
     bool? isSystem,
   }) {
@@ -181,6 +202,7 @@ class ChatConversation {
       postCount: postCount ?? this.postCount,
       level: level ?? this.level,
       emUserName: emUserName ?? this.emUserName,
+      appUid: appUid ?? this.appUid,
       lastMsgAtMs: lastMsgAtMs ?? this.lastMsgAtMs,
       isSystem: isSystem ?? this.isSystem,
     );

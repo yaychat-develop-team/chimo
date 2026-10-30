@@ -60,117 +60,117 @@ class _DebugPageState extends State<DebugPage> {
   @override
   Widget build(BuildContext context) {
     if (!AppConfig.isDebug) {
-      return ChimoScaffold(
-        title: 'Debug page',
+      return AppScaffold(
+        appBar: AppNavBar(title: 'Debug page'),
         backgroundColor: Colors.white,
         body: const Center(
           child: Text(
             'Not available in production build.',
-            style: TextStyle(color: AppColors.textGray8E, fontSize: 14),
+            style: TextStyle(color: AppColors.gray8A8A8A, fontSize: 14),
           ),
         ),
       );
     }
 
-    return ChimoScaffold(
-      title: 'Debug page',
+    return AppScaffold(
+      appBar: AppNavBar(title: 'Debug page'),
       backgroundColor: Colors.white,
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
-            _SectionHeader(
-              title: 'Server environment',
-              actionLabel: _saving ? 'Saving…' : 'Save & restart',
-              onAction: _saveAndRestart,
-            ),
-            const SizedBox(height: 8),
-            if (!AppConfig.isDebug)
-              const Padding(
-                padding: EdgeInsets.only(bottom: 8),
-                child: Text(
-                  'Official build: environment is locked to Production.',
-                  style: TextStyle(color: AppColors.textGray8E, fontSize: 13),
-                ),
+          _SectionHeader(
+            title: 'Server environment',
+            actionLabel: _saving ? 'Saving…' : 'Save & restart',
+            onAction: _saveAndRestart,
+          ),
+          const SizedBox(height: 8),
+          if (!AppConfig.isDebug)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 8),
+              child: Text(
+                'Official build: environment is locked to Production.',
+                style: TextStyle(color: AppColors.gray8A8A8A, fontSize: 13),
               ),
-            _EnvOption(
-              selected: _env == ApiEnvironment.production,
-              title: 'Production',
-              subtitle: 'api.echimo.com/api/v1',
-              onTap: AppConfig.isDebug
-                  ? () => setState(() => _env = ApiEnvironment.production)
-                  : null,
             ),
-            _EnvOption(
-              selected: _env == ApiEnvironment.test,
-              title: 'Test environment',
-              subtitle: 'test-api.echimo.com/api/v1',
-              onTap: AppConfig.isDebug ? () => setState(() => _env = ApiEnvironment.test) : null,
-            ),
-            _EnvOption(
-              selected: _env == ApiEnvironment.local,
-              title: 'Local host',
-              subtitle: '127.0.0.1:8080/api/v1',
-              subtitleMuted: true,
-              onTap: AppConfig.isDebug ? () => setState(() => _env = ApiEnvironment.local) : null,
-            ),
-            const SizedBox(height: 6),
-            _ToggleRow(label: 'http2', value: _http2, onChanged: (v) => setState(() => _http2 = v)),
-            _ToggleRow(label: 'pb', value: _pb, onChanged: (v) => setState(() => _pb = v)),
-            _NavRow(
-              label: 'Proxy config',
+          _EnvOption(
+            selected: _env == ApiEnvironment.production,
+            title: 'Production',
+            subtitle: 'api.echimo.com/api/v1',
+            onTap: AppConfig.isDebug
+                ? () => setState(() => _env = ApiEnvironment.production)
+                : null,
+          ),
+          _EnvOption(
+            selected: _env == ApiEnvironment.test,
+            title: 'Test environment',
+            subtitle: 'test-api.echimo.com/api/v1',
+            onTap: AppConfig.isDebug ? () => setState(() => _env = ApiEnvironment.test) : null,
+          ),
+          _EnvOption(
+            selected: _env == ApiEnvironment.local,
+            title: 'Local host',
+            subtitle: '127.0.0.1:8080/api/v1',
+            subtitleMuted: true,
+            onTap: AppConfig.isDebug ? () => setState(() => _env = ApiEnvironment.local) : null,
+          ),
+          const SizedBox(height: 6),
+          _ToggleRow(label: 'http2', value: _http2, onChanged: (v) => setState(() => _http2 = v)),
+          _ToggleRow(label: 'pb', value: _pb, onChanged: (v) => setState(() => _pb = v)),
+          _NavRow(
+            label: 'Proxy config',
+            onTap: () {
+              AppJumper.toDebugProxy();
+            },
+          ),
+          _InputActionRow(
+            label: 'Platform domain',
+            controller: _midDomainController,
+            action: _GreenCapsuleButton(label: 'Save & restart', onTap: _saveAndRestart),
+          ),
+          _InputActionRow(
+            label: 'H5 jump',
+            controller: _h5Controller,
+            action: _GreenCircleButton(label: 'Jump', onTap: () => _toast('H5 jump')),
+          ),
+          _InputActionRow(
+            label: 'Voice room',
+            controller: _roomIdController,
+            action: _GreenCircleButton(
+              label: 'Enter',
               onTap: () {
-                AppJumper.toDebugProxy();
-              },
-            ),
-            _InputActionRow(
-              label: 'Platform domain',
-              controller: _midDomainController,
-              action: _GreenCapsuleButton(label: 'Save & restart', onTap: _saveAndRestart),
-            ),
-            _InputActionRow(
-              label: 'H5 jump',
-              controller: _h5Controller,
-              action: _GreenCircleButton(label: 'Jump', onTap: () => _toast('H5 jump')),
-            ),
-            _InputActionRow(
-              label: 'Voice room',
-              controller: _roomIdController,
-              action: _GreenCircleButton(
-                label: 'Enter',
-                onTap: () {
-                  final rid = int.tryParse(_roomIdController.text.trim()) ?? 0;
-                  if (rid <= 0) {
-                    _toast('Enter a room id');
-                    return;
-                  }
-                  AppJumper.toRoom(rid);
-                },
-              ),
-            ),
-            _NavRow(
-              label: 'Ping test API',
-              onTap: () async {
-                try {
-                  final ping = await ChimoApis.user.pingOpen();
-                  _toast(
-                    '${AppConfig.baseUrl}\n'
-                    '${ping.success ? 'OK' : ping.message} (${ping.code})',
-                  );
-                } catch (error) {
-                  _toast('Ping failed: $error');
+                final rid = int.tryParse(_roomIdController.text.trim()) ?? 0;
+                if (rid <= 0) {
+                  _toast('Enter a room id');
+                  return;
                 }
+                AppJumper.toRoom(rid);
               },
             ),
-            _NavRow(label: 'Jump test', onTap: () => _toast('Jump test')),
-            _NavRow(label: 'Create chat group', onTap: () => _toast('Create chat group')),
-            _NavRow(label: 'Message push banner', onTap: () => _toast('Message push banner')),
-            _NavRow(label: 'Test push', onTap: () => _toast('Test push')),
-            _NavRow(label: 'Global popup', onTap: () => _toast('Global popup')),
-            _NavRow(label: 'Global floating banner', onTap: () => _toast('Global floating banner')),
-            _NavRow(label: 'Room entry banner', onTap: () => _toast('Room entry banner')),
-            _NavRow(label: 'Test log upload', onTap: () => _toast('Test log upload')),
-          ],
-        ),
+          ),
+          _NavRow(
+            label: 'Ping test API',
+            onTap: () async {
+              try {
+                final ping = await ChimoApis.user.pingOpen();
+                _toast(
+                  '${AppConfig.baseUrl}\n'
+                  '${ping.success ? 'OK' : ping.message} (${ping.code})',
+                );
+              } catch (error) {
+                _toast('Ping failed: $error');
+              }
+            },
+          ),
+          _NavRow(label: 'Jump test', onTap: () => _toast('Jump test')),
+          _NavRow(label: 'Create chat group', onTap: () => _toast('Create chat group')),
+          _NavRow(label: 'Message push banner', onTap: () => _toast('Message push banner')),
+          _NavRow(label: 'Test push', onTap: () => _toast('Test push')),
+          _NavRow(label: 'Global popup', onTap: () => _toast('Global popup')),
+          _NavRow(label: 'Global floating banner', onTap: () => _toast('Global floating banner')),
+          _NavRow(label: 'Room entry banner', onTap: () => _toast('Room entry banner')),
+          _NavRow(label: 'Test log upload', onTap: () => _toast('Test log upload')),
+        ],
+      ),
     );
   }
 }
@@ -196,7 +196,7 @@ class _SectionHeader extends StatelessWidget {
           child: Text(
             actionLabel,
             style: const TextStyle(
-              color: AppColors.accentNeon,
+              color: AppColors.green1CFF8A,
               fontSize: 15,
               fontWeight: FontWeight.w600,
             ),
@@ -252,7 +252,7 @@ class _EnvOption extends StatelessWidget {
                   Text(
                     subtitle,
                     style: TextStyle(
-                      color: subtitleMuted ? AppColors.textGrayB0 : AppColors.textGray8A,
+                      color: subtitleMuted ? AppColors.grayB0B0B0 : AppColors.gray8A8A8A,
                       fontSize: 13,
                       fontWeight: FontWeight.w400,
                     ),
@@ -280,7 +280,7 @@ class _RadioDot extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(
-          color: selected ? AppColors.textGray8A : AppColors.textGrayC8,
+          color: selected ? AppColors.gray8A8A8A : AppColors.grayC8C8C8,
           width: 1.5,
         ),
       ),
@@ -289,7 +289,7 @@ class _RadioDot extends StatelessWidget {
           ? Container(
               width: 10,
               height: 10,
-              decoration: const BoxDecoration(color: AppColors.textGray8A, shape: BoxShape.circle),
+              decoration: const BoxDecoration(color: AppColors.gray8A8A8A, shape: BoxShape.circle),
             )
           : null,
     );
@@ -317,9 +317,9 @@ class _ToggleRow extends StatelessWidget {
           Switch.adaptive(
             value: value,
             activeThumbColor: Colors.white,
-            activeTrackColor: AppColors.warningAmber,
+            activeTrackColor: AppColors.yellowFFD54F,
             inactiveThumbColor: Colors.white,
-            inactiveTrackColor: AppColors.textGrayE0,
+            inactiveTrackColor: AppColors.grayE8E8E8,
             onChanged: onChanged,
           ),
         ],
@@ -352,7 +352,7 @@ class _NavRow extends StatelessWidget {
                 ),
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, color: AppColors.textGrayC0, size: 22),
+            const Icon(Icons.chevron_right_rounded, color: AppColors.grayC8C8C8, size: 22),
           ],
         ),
       ),
@@ -389,7 +389,7 @@ class _InputActionRow extends StatelessWidget {
               height: 40,
               padding: const EdgeInsets.only(left: 12, right: 4),
               decoration: BoxDecoration(
-                color: AppColors.textGrayF2,
+                color: AppColors.grayF0F0F0,
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Row(
@@ -434,7 +434,7 @@ class _GreenCapsuleButton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: AppColors.accentNeon,
+          color: AppColors.green1CFF8A,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Text(
@@ -461,7 +461,7 @@ class _GreenCircleButton extends StatelessWidget {
         height: 32,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: AppColors.accentNeon,
+          color: AppColors.green1CFF8A,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Text(

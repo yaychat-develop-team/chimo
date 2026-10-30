@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../../common/theme/app_colors.dart';
-import '../../../common/widgets/app_back_button.dart';
-import '../../../common/widgets/app_image.dart';
+import 'package:chimo/common/utils/chimo.dart';
 import '../../../common/widgets/app_scaffold.dart';
 import '../../../app/app_jumper.dart';
+import 'package:chimo/common/widgets/app_image.dart';
 
 /// 全屏照片详情（可滑动）；支持资源路径与文件路径。
 class AlbumPhotoViewerPage extends StatefulWidget {
@@ -49,10 +49,7 @@ class _AlbumPhotoViewerPageState extends State<AlbumPhotoViewerPage> {
   late final PageController _pageController = PageController(
     initialPage: widget.initialIndex.clamp(0, widget.paths.length - 1),
   );
-  late int _currentIndex = widget.initialIndex.clamp(
-    0,
-    widget.paths.length - 1,
-  );
+  late int _currentIndex = widget.initialIndex.clamp(0, widget.paths.length - 1);
 
   @override
   void dispose() {
@@ -61,26 +58,17 @@ class _AlbumPhotoViewerPageState extends State<AlbumPhotoViewerPage> {
   }
 
   Widget _imageFor(String path) {
-    const error = Icon(
-      Icons.broken_image_outlined,
-      color: Colors.white54,
-      size: 48,
-    );
+    const error = Icon(Icons.broken_image_outlined, color: Colors.white54, size: 48);
     // 来源交给 AppImage 自己判断；这里只剩解码预算的差别：远程原图尺寸不可控，
     // 按屏幕宽封顶，assets 与本地图本就是设备尺寸，保持原始解码，
     // InteractiveViewer 放大时才不会糊。
     final memWidth = AppImage.classify(path) == AppImageSource.network
-        ? (MediaQuery.sizeOf(context).width *
-                  MediaQuery.devicePixelRatioOf(context))
-              .round()
-              .clamp(1, 2048)
+        ? (MediaQuery.sizeOf(context).width * MediaQuery.devicePixelRatioOf(context)).round().clamp(
+            1,
+            2048,
+          )
         : null;
-    return AppImage(
-      path,
-      fit: BoxFit.contain,
-      memWidth: memWidth,
-      error: error,
-    );
+    return Chimo.image(path, fit: BoxFit.contain, memWidth: memWidth, error: error);
   }
 
   @override
@@ -88,9 +76,7 @@ class _AlbumPhotoViewerPageState extends State<AlbumPhotoViewerPage> {
     final total = widget.paths.length;
     final top = MediaQuery.paddingOf(context).top;
 
-    return ChimoScaffold(
-      showNav: false,
-      safeArea: false,
+    return AppScaffold(
       backgroundColor: Colors.black,
       body: Stack(
         children: [
@@ -115,15 +101,12 @@ class _AlbumPhotoViewerPageState extends State<AlbumPhotoViewerPage> {
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: const AppBackButton(),
-                  ),
+                  Align(alignment: Alignment.centerLeft, child: const AppBackButton()),
                   if (widget.showPageIndicator)
                     Text(
                       total > 1 ? '${_currentIndex + 1}/$total' : 'Photo',
                       style: const TextStyle(
-                        color: AppColors.textPrimary,
+                        color: AppColors.white,
                         fontSize: 17,
                         fontWeight: FontWeight.w600,
                       ),

@@ -39,7 +39,7 @@ class _AppWebViewPageState extends State<AppWebViewPage> {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..enableZoom(false)
-      ..setBackgroundColor(AppColors.background)
+      ..setBackgroundColor(AppColors.black)
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (_) {
@@ -127,25 +127,17 @@ class _AppWebViewPageState extends State<AppWebViewPage> {
       children: [
         WebViewWidget(controller: _controller),
         if (_loading)
-          const Center(
-            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.textPrimary),
-          ),
+          const Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.white)),
       ],
     );
 
     // 全屏活动 H5 自行绘制返回 / 标题（forya CommonWebView）。
     if (_fullScreen) {
-      return ChimoScaffold(
-        showNav: false,
-        safeArea: false,
-        resizeToAvoidBottomInset: false,
-        body: body,
-      );
+      return AppScaffold(resizeToAvoidBottomInset: false, body: body);
     }
 
-    return ChimoScaffold(
-      title: (_title ?? '').trim().isEmpty ? 'Chimo' : _title!.trim(),
-      onBack: _onBack,
+    return AppScaffold(
+      appBar: AppNavBar(title: _title ?? '', onBack: _onBack),
       resizeToAvoidBottomInset: false,
       body: body,
     );

@@ -7,15 +7,9 @@ import '../../../common/utils/app_log.dart';
 import 'chats_list_logic.dart';
 import '../model/chat_line.dart';
 
-/// 私聊与群聊共有的会话状态。
-///
-/// 放这里的东西只有一个判据：**私聊和群聊都需要，且不需要 `BuildContext`**。
-/// 滚动位置、`GlobalKey`、面板相位、动画留在 View 里（那些是 widget 的事）。
-///
-/// 命名规则（3.2 第 3 条）：`.obs` 只活在字段上，不作为方法参数或返回值跨层。
 abstract class ChatBaseLogic extends GetxController {
   /// 会话列表（未读 / 预览 / 置顶）—— Controller ↔ Controller，允许 `Get.find`。
-  final ChatsListLogic chats = Get.find<ChatsListLogic>();
+  final ConversationListLogic chats = Get.find<ConversationListLogic>();
 
   /// 本地 + 环信历史合并后的消息流。**用 `RxList` 而不是普通 List**：
   /// `add` / `[i] = x` / `assignAll` 都会自动通知，不用再手写 `setState`。

@@ -60,7 +60,7 @@ abstract class AsyncListLogic<T> extends GetxController {
     unawaited(load());
   }
 
-  /// 重新取一次。下拉刷新直接把它接给 `RefreshIndicator.onRefresh`。
+  /// 重新取一次。下拉刷新直接把它接给 [AppPullRefresh.onRefresh]。
   Future<void> load() async {
     loading.value = true;
     error.value = null;

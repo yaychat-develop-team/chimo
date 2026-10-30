@@ -1,10 +1,27 @@
+import 'package:dio/dio.dart';
+import 'package:fixnum/fixnum.dart';
+
 import '../../../common/models/server_client/user.pb.dart';
+import '../../../common/models/server_client/user_realtion.pb.dart';
 import '../http/api_result.dart';
 import '../http/http.dart';
 
 /// 当前用户 / 资料相关接口。返回 `lib/common/models` 里的生成模型。
 class UserApi {
   const UserApi();
+
+  static final _jsonBody = Options(
+    headers: {Headers.contentTypeHeader: Headers.jsonContentType},
+  );
+
+  /// 邀请进房。对齐 joyride `POST /user/invite`。
+  Future<ApiResult<void>> inviteRoom({required int roomId, required int toUid}) {
+    return Http.ins.postAndParse(
+      '/user/invite',
+      data: UserInviteRoomReq(roomId: Int64(roomId), toUid: Int64(toUid)),
+      options: _jsonBody,
+    );
+  }
 
   Future<ApiResult<UserInfoRsp>> profile() async {
     return await Http.ins.getAndParse<UserInfoRsp>('/user/info');

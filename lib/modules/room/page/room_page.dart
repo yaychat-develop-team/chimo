@@ -1,27 +1,30 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../../app/app_gift.dart';
 import '../../../app/app_jumper.dart';
-import '../../../common/theme/app_bottom_sheet.dart';
+import '../../../common/constants/app_assets.dart';
 import '../../../common/theme/app_colors.dart';
 import '../../../common/theme/app_dialog.dart';
-import '../../../common/utils/app_toast.dart';
-import '../../../common/widgets/app_image.dart';
+import 'package:chimo/common/utils/chimo.dart';
 import '../../../common/widgets/app_scaffold.dart';
-import '../../chat/page/widgets/gift_sheet.dart';
 import '../logic/mic_logic.dart';
 import '../logic/room_logic.dart';
-import '../model/mic_seat.dart';
+import '../logic/room_rank_logic.dart';
 import '../service/room_service.dart';
 import 'widgets/room_barrage_list.dart';
+import 'widgets/room_bulletin_dialog.dart';
 import 'widgets/room_gift_layer.dart';
 import 'widgets/room_input_bar.dart';
 import 'widgets/room_join_layer.dart';
 import 'widgets/room_lyric_layer.dart';
 import 'widgets/room_mic_grid.dart';
+import 'widgets/room_mic_remain_dialog.dart';
 import 'widgets/room_rank_sheet.dart';
+import 'widgets/room_tools_sheet.dart';
 import 'widgets/room_top_bar.dart';
-import 'widgets/room_user_sheet.dart';
 
 class RoomPage extends StatefulWidget {
   const RoomPage({super.key, required this.rid});
@@ -35,10 +38,13 @@ class RoomPage extends StatefulWidget {
 class _RoomPageState extends State<RoomPage> {
   late final RoomLogic logic;
   late final Worker _phaseWorker;
+  Worker? _micAlertWorker;
   final _input = TextEditingController();
   final _password = TextEditingController();
+  final _giftPagKey = GlobalKey();
   var _allowPop = false;
   var _askingPassword = false;
+  var _showingInsufficient = false;
 
   @override
   void initState() {
@@ -53,6 +59,7 @@ class _RoomPageState extends State<RoomPage> {
 
   @override
   void dispose() {
+    _micAlertWorker?.dispose();
     _phaseWorker.dispose();
     _input.dispose();
     _password.dispose();
@@ -61,11 +68,34 @@ class _RoomPageState extends State<RoomPage> {
   }
 
   void _onPhase(RoomPhase phase) {
-    if (phase == RoomPhase.needPassword) {
+    if (phase == RoomPhase.ready) {
+      _bindMicAlert();
+      // RoomGiftPag 在 Obx 外：进房完成后强制重建一次，确保订上 RoomEffectLogic。
+      if (mounted) setState(() {});
+    } else if (phase == RoomPhase.needPassword) {
       _askPassword();
     } else if (phase == RoomPhase.failed) {
       _pop();
     }
+  }
+
+  void _bindMicAlert() {
+    _micAlertWorker?.dispose();
+    if (!Get.isRegistered<MicLogic>()) return;
+    final mic = Get.find<MicLogic>();
+    _micAlertWorker = ever(mic.insufficientPrompt, (show) {
+      if (show == true) unawaited(_insufficientMic());
+    });
+    if (mic.insufficientPrompt.value) unawaited(_insufficientMic());
+  }
+
+  /// 麦上剩余 ≤30 秒弹一次；点 Send Gift 打开礼物面板。
+  Future<void> _insufficientMic() async {
+    if (_showingInsufficient || !mounted) return;
+    _showingInsufficient = true;
+    final send = await showRoomMicRemainDialog();
+    _showingInsufficient = false;
+    if (send == true && mounted) await _gift();
   }
 
   Future<void> _askPassword() async {
@@ -93,22 +123,6 @@ class _RoomPageState extends State<RoomPage> {
     _pop();
   }
 
-  Future<void> _close() async {
-    final onMic = Get.isRegistered<MicLogic>() && Get.find<MicLogic>().onMic;
-    if (onMic) {
-      final ok = await AppDialog.show(
-        title: 'Leave the room?',
-        content: 'You are on the mic.',
-        confirmLabel: 'Leave',
-        cancelLabel: 'Stay',
-        buttons: DialogLoyoutStyle.horizontal,
-      );
-      if (ok != true || !mounted) return;
-    }
-    await logic.leave();
-    _pop();
-  }
-
   void _minimize() {
     logic.minimize();
     _pop();
@@ -129,109 +143,13 @@ class _RoomPageState extends State<RoomPage> {
   }
 
   void _bulletin(String notice) {
-    final text = notice.trim();
-    AppDialog.show(
-      title: 'Room Bulletin',
-      content: text.isEmpty ? 'No bulletin yet' : text,
-      confirmLabel: 'OK',
-    );
+    RoomBulletinDialog.show(notice);
   }
 
-  void _emoji() {
-    showRoomEmojiSheet(context, (glyph) {
-      final text = _input.text;
-      final selection = _input.selection;
-      final start = selection.start < 0 ? text.length : selection.start;
-      final end = selection.end < 0 ? text.length : selection.end;
-      final next = text.replaceRange(start, end, glyph);
-      _input.value = TextEditingValue(
-        text: next,
-        selection: TextSelection.collapsed(offset: start + glyph.length),
-      );
-    });
-  }
-
-  Future<void> _gift() async {
-    if (!Get.isRegistered<MicLogic>()) return;
-    final people = Get.find<MicLogic>().seats.where((seat) => seat.occupied).toList();
-    if (people.isEmpty) {
-      AppToast.info('No one on the mic');
-      return;
-    }
-    final picked = people.length == 1 ? people.first : await _pickReceiver(people);
-    if (picked == null || !mounted) return;
-    await _giftTo(picked);
-  }
-
-  Future<void> _giftTo(MicSeat seat) {
-    return showGiftBottomSheet(
-      context,
-      receiverUid: '${seat.uid}',
-      channelId: '${widget.rid}',
-      rid: widget.rid,
-    );
-  }
-
-  Future<MicSeat?> _pickReceiver(List<MicSeat> people) {
-    return showModalBottomSheet<MicSeat>(
-      context: context,
-      backgroundColor: AppColors.rankSheet,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) {
-        return SafeArea(
-          child: ListView(
-            shrinkWrap: true,
-            children: [
-              for (final seat in people)
-                ListTile(
-                  leading: ClipOval(
-                    child: seat.avatar.trim().isEmpty
-                        ? const ColoredBox(
-                            color: AppColors.roomEmptySeat,
-                            child: SizedBox(width: 36, height: 36),
-                          )
-                        : AppImage(seat.avatar, width: 36, height: 36, fit: BoxFit.cover),
-                  ),
-                  title: Text(seat.name, style: const TextStyle(color: AppColors.textPrimary)),
-                  onTap: () => AppJumper.back(result: seat),
-                ),
-            ],
-          ),
-        );
-      },
-    );
-  }
+  Future<void> _gift() => AppGift.show(context, scene: AppGiftScene.room);
 
   void _tools() {
-    final service = RoomService.findOrNull();
-    AppBottomSheet.actions(
-      buildItems: () => [
-        AppSheetAction(
-          label: (service?.saved.value ?? false) ? 'Unsave' : 'Save',
-          onTap: () {
-            AppJumper.back();
-            logic.toggleSave();
-          },
-        ),
-        AppSheetAction(
-          label: 'Bulletin',
-          onTap: () {
-            AppJumper.back();
-            _bulletin(service?.notice.value ?? '');
-          },
-        ),
-        AppSheetAction(
-          label: 'Leave room',
-          destructive: true,
-          onTap: () {
-            AppJumper.back();
-            _close();
-          },
-        ),
-      ],
-    );
+    showRoomToolsSheet();
   }
 
   Widget _background(String url) {
@@ -239,9 +157,9 @@ class _RoomPageState extends State<RoomPage> {
     return Stack(
       fit: StackFit.expand,
       children: [
-        const ColoredBox(color: AppColors.roomBackdrop),
+        const ColoredBox(color: AppColors.purple14081F),
         if (src.isNotEmpty)
-          AppImage(src, fit: BoxFit.cover, width: double.infinity, height: double.infinity),
+          Chimo.image(src, fit: BoxFit.cover, width: double.infinity, height: double.infinity),
         const DecoratedBox(decoration: BoxDecoration(gradient: AppColors.roomBackdropScrim)),
       ],
     );
@@ -255,80 +173,80 @@ class _RoomPageState extends State<RoomPage> {
         if (didPop) return;
         _minimize();
       },
-      child: ChimoScaffold(
-        showNav: false,
-        safeArea: false,
-        backgroundColor: AppColors.roomBackdrop,
-        body: Obx(() {
-          final service = RoomService.findOrNull();
-          return Stack(
-            fit: StackFit.expand,
-            children: [
-              _background(service?.background.value ?? ''),
-              if (logic.phase.value != RoomPhase.ready)
-                const Center(child: CircularProgressIndicator(color: AppColors.roomSave))
-              else
-                SafeArea(
-                  child: Column(
-                    children: [
-                      RoomTopBar(
-                        title: service?.title.value ?? '',
-                        roomId: service?.rid ?? widget.rid,
-                        cover: service?.cover.value ?? '',
-                        saved: service?.saved.value ?? false,
-                        online: service?.online.value ?? 0,
-                        hot: service?.hot.value ?? 0,
-                        avatars: service?.audience.toList() ?? const [],
-                        onSave: logic.toggleSave,
-                        onBulletin: () => _bulletin(service?.notice.value ?? ''),
-                        onMoreRooms: _minimize,
-                        onAudience: () => RoomRankSheet.show(context),
-                        onScale: _minimize,
+      child: AppScaffold(
+        resizeToAvoidBottomInset: false,
+        backgroundColor: AppColors.purple14081F,
+        // 对齐 yaychat：飞麦挂房间 Stack，且放在 Obx 外，关 sheet / Obx 刷新都不拆播放层。
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            Obx(() {
+              final service = RoomService.findOrNull();
+              final notice = service?.notice.value ?? '';
+              final background = service?.background.value ?? '';
+              return Stack(
+                fit: StackFit.expand,
+                children: [
+                  _background(background),
+                  if (logic.phase.value != RoomPhase.ready)
+                    const Center(child: CircularProgressIndicator(color: AppColors.green29EEAA))
+                  else
+                    SafeArea(
+                      child: Column(
+                        children: [
+                          RoomTopBar(
+                            roomId: service?.rid ?? widget.rid,
+                            onSave: logic.toggleSave,
+                            onBulletin: () => _bulletin(notice),
+                            onMoreRooms: AppJumper.showMoreRoomsDrawer,
+                            onRank: () => RoomRankSheet.show(initial: RoomRankTab.givers),
+                            onAudience: () => RoomRankSheet.show(initial: RoomRankTab.members),
+                            onScale: _minimize,
+                          ),
+                          RoomMicGrid(
+                            onTap: (seat) {
+                              if (!seat.occupied) {
+                                logic.toggleMic(position: seat.index);
+                                return;
+                              }
+                              // 与弹幕 / 榜单同一信息卡；自己底部为上/下麦。
+                              AppJumper.showUserProfileSheet(
+                                uid: '${seat.uid ?? 0}',
+                                name: seat.name,
+                                avatar: seat.avatar,
+                              );
+                            },
+                          ),
+                          ...(service?.plays.map((play) => play.buildSlot()) ?? const []),
+                          const Expanded(
+                            child: Stack(
+                              children: [
+                                Positioned.fill(child: RoomBarrageList()),
+                                Positioned(top: 0, left: 0, right: 0, child: RoomJoinLayer()),
+                                Positioned(right: 8, bottom: 8, child: _GamesButton()),
+                              ],
+                            ),
+                          ),
+                          RoomInputBar(
+                            controller: _input,
+                            onSend: _send,
+                            onJoinMic: logic.toggleMic,
+                            onToggleMic: logic.toggleLocalMic,
+                            onGift: _gift,
+                            onMessages: AppJumper.showChatsSheet,
+                            onTools: _tools,
+                          ),
+                        ],
                       ),
-                      RoomMicGrid(
-                        onTap: (seat) {
-                          if (!seat.occupied) {
-                            logic.toggleMic(position: seat.index);
-                            return;
-                          }
-                          RoomUserSheet.show(
-                            context,
-                            seat: seat,
-                            mine: seat.uid == service?.myUid,
-                            onLeave: logic.toggleMic,
-                            onGift: () => _giftTo(seat),
-                          );
-                        },
-                      ),
-                      for (final play in service?.plays ?? const []) play.buildSlot(),
-                      const Expanded(
-                        child: Stack(
-                          children: [
-                            Positioned.fill(child: RoomBarrageList()),
-                            Positioned(top: 0, left: 0, right: 0, child: RoomJoinLayer()),
-                            Positioned(top: 0, left: 0, right: 0, child: RoomGiftBanner()),
-                            Positioned(right: 8, bottom: 8, child: _GamesButton()),
-                          ],
-                        ),
-                      ),
-                      RoomInputBar(
-                        controller: _input,
-                        onSend: _send,
-                        onJoinMic: logic.toggleMic,
-                        onToggleMic: logic.toggleLocalMic,
-                        onEmoji: _emoji,
-                        onGift: _gift,
-                        onMessages: AppJumper.toChats,
-                        onTools: _tools,
-                      ),
-                    ],
-                  ),
-                ),
-              const Positioned.fill(child: RoomGiftPag()),
-              const Positioned.fill(child: RoomLyricLayer()),
-            ],
-          );
-        }),
+                    ),
+                ],
+              );
+            }),
+            // 歌词在上便于拖动；空态 shrink，不挡 PAG。礼物层保持可被 VisibilityDetector 看见。
+            const Positioned.fill(child: RoomLyricLayer()),
+            Positioned.fill(child: RoomGiftPag(key: _giftPagKey)),
+          ],
+        ),
       ),
     );
   }
@@ -343,31 +261,7 @@ class _GamesButton extends StatelessWidget {
       onTap: () {
         AppDialog.show(title: 'Games', content: 'No games in this room.', confirmLabel: 'OK');
       },
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 52,
-            height: 52,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: AppColors.roomGlass,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.roomId),
-            ),
-            child: const Icon(Icons.sports_esports_rounded, color: AppColors.textPrimary, size: 28),
-          ),
-          const SizedBox(height: 2),
-          const Text(
-            'Games',
-            style: TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
+      child: Chimo.image(AppAssets.roomGames, width: 64, fit: BoxFit.contain),
     );
   }
 }

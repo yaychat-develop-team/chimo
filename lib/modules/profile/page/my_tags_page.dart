@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:chimo/common/widgets/tag_chip.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -7,7 +8,6 @@ import '../../../common/models/server_client/user.pb.dart';
 import '../../../common/theme/app_colors.dart';
 import '../../../common/theme/app_text.dart';
 import '../../../common/widgets/app_scaffold.dart';
-import '../../../common/widgets/app_tag_chip.dart';
 import '../logic/my_tags_logic.dart';
 
 /// Tag picker page (forya FriendWishPage): load catalog, save by id.
@@ -69,7 +69,7 @@ class _MyTagsPageState extends State<MyTagsPage> {
               margin: const EdgeInsets.symmetric(horizontal: 48),
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
               decoration: BoxDecoration(
-                color: AppColors.toastBackground,
+                color: AppColors.blackE62A2A2A,
                 borderRadius: BorderRadius.circular(24),
               ),
               child: const Text(
@@ -91,29 +91,31 @@ class _MyTagsPageState extends State<MyTagsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return ChimoScaffold(
-      title: '',
-      trailing: Obx(() {
-        final busy = logic.loading.value || logic.saving.value;
-        return TextButton(
-          onPressed: busy ? null : logic.confirm,
-          child: Text(
-            logic.saving.value ? 'Saving…' : 'Confirm',
-            style: TextStyle(
-              color: busy ? AppColors.textTertiary : AppColors.primaryBright,
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
+    return AppScaffold(
+      appBar: AppNavBar(
+        title: 'My Tags',
+        trailing: Obx(() {
+          final busy = logic.loading.value || logic.saving.value;
+          return TextButton(
+            onPressed: busy ? null : logic.confirm,
+            child: Text(
+              logic.saving.value ? 'Saving…' : 'Confirm',
+              style: TextStyle(
+                color: busy ? AppColors.gray6E6E6E : AppColors.green1BBA77,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
-        );
-      }),
+          );
+        }),
+      ),
       body: Obx(_buildBody),
     );
   }
 
   Widget _buildBody() {
     if (logic.loading.value) {
-      return const Center(child: CircularProgressIndicator(color: AppColors.primaryBright));
+      return const Center(child: CircularProgressIndicator(color: AppColors.green1BBA77));
     }
     final error = logic.error.value;
     if (error != null) {
@@ -126,7 +128,7 @@ class _MyTagsPageState extends State<MyTagsPage> {
               Text(
                 error,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.textSecondary),
+                style: const TextStyle(color: AppColors.gray9A9A9A),
               ),
               const SizedBox(height: 16),
               TextButton(onPressed: () => unawaited(logic.load()), child: const Text('Retry')),
@@ -156,7 +158,7 @@ class _MyTagsPageState extends State<MyTagsPage> {
           runSpacing: 10,
           children: catalog
               .map(
-                (tag) => AppTagChip.selectable(
+                (tag) => TagChip.selectable(
                   label: tag.name,
                   selected: logic.selectedIds.contains(tag.id.toInt()),
                   onTap: () => _onTagTap(tag),

@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/scheduler.dart';
 import 'package:get/get.dart';
 
 import '../../../app/app_jumper.dart';
@@ -5,28 +8,21 @@ import '../../../app/chimo_api.dart';
 import '../../../common/extensions/wire_view.dart';
 import '../../../common/models/server_client/group/group.pb.dart';
 import '../../../common/models/server_client/home_page/home_page_main.pb.dart';
+import '../../../common/models/server_client/rtc.pb.dart';
+import '../../../common/utils/app_toast.dart';
 import '../../chat/logic/chats_list_logic.dart';
 
-/// 首页（Home Tab）的取数与加群状态。
-///
-/// **留在 View 的**：手搓的下拉刷新相位机（`_pullExtent` / `_phase`）与
-/// `ScrollController`。那些是 widget 的手势状态，不是会话数据。
-///
-/// 没有 `onReady` 自动取数：原版是 `initState` 里 `addPostFrameCallback` 发两条
-/// 独立请求，且失败提示只在首次 / Retry 弹（下拉刷新与翻页静默）。**谁触发谁提
-/// 示**，所以取数由 View 调，方法把要弹的文案 `return` 回去，`null` = 不提示。
+/// 首页小组和房间列表。下拉刷新、重试、首屏都走 [loadGroups] / [loadRooms]。
 class HomeLogic extends GetxController {
-  /// 会话列表：加群状态的唯一事实来源（乐观加入 + 换号清零都在它那边）。
-  final ChatsListLogic chats = Get.find<ChatsListLogic>();
+  /// 加群状态以会话列表为准（乐观加入和换号清零都在那边）。
+  final ConversationListLogic chats = Get.find<ConversationListLogic>();
 
   final RxList<GroupInfo> popularGroups = <GroupInfo>[].obs;
   final RxList<GroupInfo> joinedGroups = <GroupInfo>[].obs;
   final RxList<HomeBannerItem> banners = <HomeBannerItem>[].obs;
 
-  /// 0 是群组，后面每一项对应 [roomTabs] 里的一个房间 Tab。
-  final RxInt feedIndex = 0.obs;
-  final RxList<HomeTabItem> roomTabs = <HomeTabItem>[].obs;
   final RxList<HomeRoomItem> rooms = <HomeRoomItem>[].obs;
+  final RxList<HotStoryInfo> hotStories = <HotStoryInfo>[].obs;
   final RxBool roomsInitialLoading = false.obs;
   final RxBool roomsLoadingMore = false.obs;
   final RxnString roomsError = RxnString();
@@ -34,17 +30,18 @@ class HomeLogic extends GetxController {
   bool roomsHasMore = true;
   int roomsPage = 1;
   String? _roomsSnapshot;
-  String? _loadedRoomTabId;
+  List<HomeTabItem> _roomTabs = const [];
 
   final RxBool initialLoading = true.obs;
   final RxBool loadingMore = false.obs;
   final RxnString loadError = RxnString();
 
-  /// 翻页游标。只在 `_onScroll` / [loadGroups] 里读写，不进 build，所以是普通字段。
   bool hasMore = true;
   int pageNum = 1;
   static const int pageSize = 20;
   static const int roomPageSize = 8;
+
+  HomeTabItem? get _roomTab => _roomTabs.isEmpty ? null : _roomTabs.first;
 
   @override
   void onInit() {
@@ -53,70 +50,52 @@ class HomeLogic extends GetxController {
   }
 
   @override
+  void onReady() {
+    super.onReady();
+    unawaited(loadBanners());
+    unawaited(loadHotStories());
+    unawaited(loadGroups());
+  }
+
+  @override
   void onClose() {
     chats.removeListener(syncMembershipFromChats);
     super.onClose();
   }
 
-  /// 别处（群详情 / 已加入列表 / 会话列表）改了加群状态后回流到首页两张列表。
+  /// 群详情、已加入列表或会话列表改了加群状态后，回流到首页两张列表。
   void syncMembershipFromChats() {
     final ids = chats.joinedGroupIds;
-    final staleJoined = joinedGroups.any((g) => !ids.contains(g.gid));
-    final popularMismatch = popularGroups.any((g) => g.isJoin != ids.contains(g.gid));
+    final joinedIds = {for (final group in joinedGroups) group.gid};
+    final staleJoined = joinedGroups.any((group) => !ids.contains(group.gid));
+    final popularMismatch = popularGroups.any(
+      (group) => group.isJoin != ids.contains(group.gid),
+    );
     final missingJoined = popularGroups.any(
-      (g) => ids.contains(g.gid) && !joinedGroups.any((j) => j.gid == g.gid),
+      (group) => ids.contains(group.gid) && !joinedIds.contains(group.gid),
     );
     if (!staleJoined && !popularMismatch && !missingJoined) return;
 
-    final nextPopular = [for (final g in popularGroups) g.withJoined(ids.contains(g.gid))];
-    final nextJoined = [
-      for (final g in joinedGroups)
-        if (ids.contains(g.gid)) g.withJoined(true),
+    final nextPopular = [
+      for (final group in popularGroups)
+        group.withJoined(ids.contains(group.gid)),
     ];
-    for (final g in nextPopular) {
-      if (!ids.contains(g.gid)) continue;
-      if (nextJoined.any((j) => j.gid == g.gid)) continue;
-      nextJoined.add(g);
+    final nextJoined = [
+      for (final group in joinedGroups)
+        if (ids.contains(group.gid)) group.withJoined(true),
+    ];
+    final nextJoinedIds = {for (final group in nextJoined) group.gid};
+    for (final group in nextPopular) {
+      if (ids.contains(group.gid) && nextJoinedIds.add(group.gid)) {
+        nextJoined.add(group);
+      }
     }
-    if (isClosed) return;
     popularGroups.assignAll(nextPopular);
     joinedGroups.assignAll(nextJoined);
   }
 
-  bool get showingGroups => feedIndex.value == 0;
-
-  HomeTabItem? get selectedRoomTab {
-    final index = feedIndex.value - 1;
-    if (index < 0 || index >= roomTabs.length) return null;
-    return roomTabs[index];
-  }
-
-  List<String> get feedLabels => [
-    'Groups',
-    if (roomTabs.isEmpty) 'Rooms',
-    for (final tab in roomTabs) tab.name.trim().isEmpty ? 'Rooms' : tab.name.trim(),
-  ];
-
-  void selectFeed(int index) {
-    if (index == feedIndex.value || index < 0 || index >= feedLabels.length) return;
-    feedIndex.value = index;
-    final tab = selectedRoomTab;
-    if (tab == null) return;
-    if (tab.id != _loadedRoomTabId) {
-      rooms.clear();
-      roomsPage = 1;
-      roomsHasMore = true;
-      _roomsSnapshot = null;
-      roomsError.value = null;
-      _loadedRoomTabId = null;
-    }
-    if (rooms.isEmpty) {
-      loadRooms();
-    }
-  }
-
-  /// 取当前列表里最新的那份（乐观加入后 `isJoin` 已经变了，别用旧闭包里的）。
-  GroupInfo latestGroup(GroupInfo group) {
+  /// 用列表里最新的那份，避免乐观加入后闭包还拿着旧的 `isJoin`。
+  GroupInfo _latest(GroupInfo group) {
     for (final item in popularGroups) {
       if (item.gid == group.gid) return item;
     }
@@ -126,91 +105,121 @@ class HomeLogic extends GetxController {
     return group;
   }
 
-  /// 两张列表 + 会话列表一起改。加群失败时原样再调一次（`joined: false`）回滚。
+  /// 两张列表和会话列表一起改。加群失败时再调一次（`joined: false`）回滚。
   void setJoined(GroupInfo group, bool joined) {
-    late GroupInfo updated;
-    final popularIndex = popularGroups.indexWhere((item) => item.gid == group.gid);
+    final popularIndex = popularGroups.indexWhere(
+      (item) => item.gid == group.gid,
+    );
     if (popularIndex >= 0) {
-      popularGroups[popularIndex] = popularGroups[popularIndex].withJoined(joined);
+      popularGroups[popularIndex] = popularGroups[popularIndex].withJoined(
+        joined,
+      );
     }
 
-    final joinedIndex = joinedGroups.indexWhere((item) => item.gid == group.gid);
     if (joined) {
-      updated = (popularIndex >= 0 ? popularGroups[popularIndex] : group).withJoined(true);
+      final updated = (popularIndex >= 0 ? popularGroups[popularIndex] : group)
+          .withJoined(true);
+      final joinedIndex = joinedGroups.indexWhere(
+        (item) => item.gid == group.gid,
+      );
       if (joinedIndex < 0) {
         joinedGroups.add(updated);
       } else {
         joinedGroups[joinedIndex] = updated;
       }
-    } else {
-      updated = group.withJoined(false);
-      joinedGroups.removeWhere((item) => item.gid == group.gid);
+      chats.joinGroup(updated);
+      return;
     }
 
-    if (joined) {
-      chats.joinGroup(updated);
-    } else {
-      chats.leaveGroup(group.gid);
-    }
+    joinedGroups.removeWhere((item) => item.gid == group.gid);
+    chats.leaveGroup(group.gid);
   }
 
-  /// 加群：先乐观置上，失败回滚并把文案交给 View 弹。
-  Future<String?> toggleJoin(GroupInfo group) async {
-    final latest = latestGroup(group);
-    if (latest.isJoin) return null;
+  void openGroup(GroupInfo group) {
+    final latest = _latest(group);
+    AppJumper.toGroup(
+      latest.gid,
+      preview: latest,
+      onMembershipChanged: (joined) => setJoined(latest, joined),
+    );
+  }
 
+  /// 先关掉成员弹层再进资料页，避免返回时弹层还盖在上面。
+  void openMembers(GroupInfo group) {
+    AppJumper.showGroupMembers(
+      groupId: group.gid,
+      onMemberTap: (member) {
+        AppJumper.back();
+        SchedulerBinding.instance.addPostFrameCallback((_) {
+          AppJumper.toProfile(member.uid, preview: member);
+        });
+      },
+    );
+  }
+
+  /// 房间下拉刷新：房间列表和热门故事一起重取。
+  Future<void> onRefresh() async {
+    await loadRooms();
+    await loadHotStories();
+  }
+
+  /// 失败时保留上一次的故事，不影响房间列表。
+  Future<void> loadHotStories() async {
+    try {
+      final res = await ChimoApis.room.hotStories();
+      if (!res.ok) return;
+      hotStories.assignAll(res.data?.hotStoryList ?? const <HotStoryInfo>[]);
+    } catch (_) {}
+  }
+
+  /// 已加入则忽略。失败回滚并 toast。
+  Future<void> join(GroupInfo group) async {
+    final latest = _latest(group);
+    if (latest.isJoin) return;
     setJoined(latest, true);
-
     try {
       final res = await ChimoApis.group.join([latest.gid]);
-      if (isClosed) return null;
-      if (!res.ok) {
-        setJoined(latest, false);
-        return res.message.isEmpty ? 'Join failed' : res.message;
-      }
-    } catch (failure) {
-      if (isClosed) return null;
+      if (res.ok) return;
       setJoined(latest, false);
-      return 'Join failed: $failure';
+      AppToast.error(res.message.isEmpty ? 'Join failed' : res.message);
+    } catch (failure) {
+      setJoined(latest, false);
+      AppToast.error('Join failed: $failure');
     }
-    return null;
   }
 
+  /// 横幅失败不影响小组列表。拿到房间分类后再拉房间。
   Future<void> loadBanners() async {
     try {
       final homeRes = await ChimoApis.home.homeMain();
-      if (isClosed || !homeRes.ok) return;
+      if (!homeRes.ok) return;
       final data = homeRes.data;
       if (data == null) return;
       banners.assignAll([
         for (final banner in data.banners)
-          if (banner.type == HomeBannerItem_Type.image || banner.type == HomeBannerItem_Type.unknown)
+          if (banner.type == HomeBannerItem_Type.image ||
+              banner.type == HomeBannerItem_Type.unknown)
             banner,
       ]);
-      final nextTabs = [
+      _roomTabs = [
         for (final tab in data.tabs)
           if (tab.type == HomeTabItem_Type.room && tab.id.isNotEmpty) tab,
       ];
-      roomTabs.assignAll(nextTabs);
-      if (feedIndex.value > feedLabels.length - 1) feedIndex.value = 0;
-      if (!showingGroups && rooms.isEmpty && selectedRoomTab != null) {
-        loadRooms();
-      }
-    } catch (_) {
-      // Banner 失败不影响下方小组列表。
-    }
+      if (rooms.isEmpty && _roomTab != null) unawaited(loadRooms());
+    } catch (_) {}
   }
 
-  Future<String?> loadRooms({bool loadMore = false}) async {
-    final tab = selectedRoomTab;
-    if (tab == null) return null;
+  Future<void> loadRooms({bool loadMore = false}) async {
+    final tab = _roomTab;
+    if (tab == null) return;
     if (loadMore) {
-      if (roomsLoadingMore.value || !roomsHasMore) return null;
+      if (roomsLoadingMore.value || !roomsHasMore) return;
       roomsLoadingMore.value = true;
     } else {
       roomsPage = 1;
       roomsHasMore = true;
       _roomsSnapshot = null;
+      roomsError.value = null;
       if (rooms.isEmpty) roomsInitialLoading.value = true;
     }
     try {
@@ -221,10 +230,9 @@ class HomeLogic extends GetxController {
         pageSize: roomPageSize,
         snapshotId: _roomsSnapshot,
       );
-      if (isClosed) return null;
       if (!res.ok && res.isNotLogin) {
         AppJumper.toLoginAndClear();
-        return null;
+        return;
       }
       final data = res.data;
       final page = [
@@ -233,113 +241,100 @@ class HomeLogic extends GetxController {
       ];
       if (loadMore) {
         final seen = {for (final room in rooms) room.rid.toInt()};
-        rooms.addAll([for (final room in page) if (seen.add(room.rid.toInt())) room]);
+        rooms.addAll([
+          for (final room in page)
+            if (seen.add(room.rid.toInt())) room,
+        ]);
       } else {
         rooms.assignAll(page);
       }
-      _loadedRoomTabId = tab.id;
       _roomsSnapshot = data?.snapshotId;
       roomsHasMore = page.length >= roomPageSize;
       roomsPage = requestPage + 1;
-      roomsInitialLoading.value = false;
-      roomsLoadingMore.value = false;
-      roomsError.value = res.ok ? null : (res.message.isEmpty ? 'Failed to load rooms' : res.message);
-      return null;
+      roomsError.value = res.ok
+          ? null
+          : (res.message.isEmpty ? 'Failed to load rooms' : res.message);
     } catch (failure) {
-      if (isClosed) return null;
+      roomsError.value = '$failure';
+    } finally {
       roomsInitialLoading.value = false;
       roomsLoadingMore.value = false;
-      roomsError.value = '$failure';
-      return 'Failed to load rooms: $failure';
     }
   }
 
-  /// Retry 按钮：先回到 loading 态再重取（原版就是这两步）。
-  Future<String?> retryGroups() {
-    initialLoading.value = true;
-    loadError.value = null;
-    return loadGroups();
-  }
-
-  /// 返回值 = 要弹的文案，`null` = 不弹。首次进页与 Retry 弹，下拉刷新与翻页不弹。
-  Future<String?> loadGroups({bool loadMore = false}) async {
+  Future<void> loadGroups({bool loadMore = false}) async {
     if (loadMore) {
-      if (loadingMore.value || !hasMore) return null;
+      if (loadingMore.value || !hasMore) return;
       loadingMore.value = true;
     } else {
       pageNum = 1;
       hasMore = true;
+      loadError.value = null;
+      if (popularGroups.isEmpty) initialLoading.value = true;
     }
     try {
       await chats.ensureBoundToCurrentUser();
       final requestPage = pageNum;
-      final popularFuture = ChimoApis.group.list(pageNum: requestPage, pageSize: pageSize);
-      final mineFuture = ChimoApis.group.myGroups();
-      final popularRes = await popularFuture;
-      final mineRes = await mineFuture;
-
-      if (isClosed) return null;
+      final popularRes = await ChimoApis.group.list(
+        pageNum: requestPage,
+        pageSize: pageSize,
+      );
+      final mineRes = await ChimoApis.group.myGroups();
 
       if (!popularRes.ok && popularRes.isNotLogin) {
         AppJumper.toLoginAndClear();
-        return null;
+        return;
       }
 
       final popular = popularRes.data ?? const <GroupInfo>[];
       final mine = mineRes.data ?? const <GroupInfo>[];
-
-      // My Groups 以 myGroups 为准；controller 只作本会话乐观加入。
-      final mineIds = {for (final g in mine) g.gid};
-      final optimisticIds = chats.joinedGroupIds;
-      final joinedFlagIds = {...mineIds, ...optimisticIds};
+      final joinedFlagIds = {
+        for (final group in mine) group.gid,
+        ...chats.joinedGroupIds,
+      };
       final mergedPopularPage = [
-        for (final g in popular) g.withJoined(g.isJoin || joinedFlagIds.contains(g.gid)),
+        for (final group in popular)
+          group.withJoined(group.isJoin || joinedFlagIds.contains(group.gid)),
       ];
+      final seen = {for (final group in popularGroups) group.gid};
       final mergedPopular = loadMore
           ? [
               ...popularGroups,
-              for (final g in mergedPopularPage)
-                if (!popularGroups.any((old) => old.gid == g.gid)) g,
+              for (final group in mergedPopularPage)
+                if (seen.add(group.gid)) group,
             ]
           : mergedPopularPage;
 
-      final joined = <GroupInfo>[for (final g in mine) g.withJoined(true)];
-      // Popular 上服务端已标 isJoin 的，补进 My Groups。
-      for (final g in mergedPopular) {
-        if (!g.isJoin) continue;
-        if (joined.any((j) => j.gid == g.gid)) continue;
-        joined.add(g.withJoined(true));
-      }
-      // 本会话刚加入、mine 尚未回写时，从 Popular 卡片乐观补一条。
-      for (final id in optimisticIds) {
-        if (joined.any((j) => j.gid == id)) continue;
-        final index = mergedPopular.indexWhere((g) => g.gid == id);
-        if (index < 0) continue;
-        joined.add(mergedPopular[index].withJoined(true));
+      // myGroups 为准；Popular 上已加入（含本会话乐观加入）的补进 My Groups。
+      final joinedIds = <String>{};
+      final joined = <GroupInfo>[
+        for (final group in mine)
+          if (joinedIds.add(group.gid)) group.withJoined(true),
+      ];
+      for (final group in mergedPopular) {
+        if (group.isJoin && joinedIds.add(group.gid)) {
+          joined.add(group.withJoined(true));
+        }
       }
 
       popularGroups.assignAll(mergedPopular);
       joinedGroups.assignAll(joined);
-      initialLoading.value = false;
-      loadingMore.value = false;
       hasMore = popular.length >= pageSize;
       pageNum = requestPage + 1;
       loadError.value = popularRes.ok
           ? null
-          : (popularRes.message.isEmpty ? 'Failed to load groups' : popularRes.message);
+          : (popularRes.message.isEmpty
+                ? 'Failed to load groups'
+                : popularRes.message);
 
-      for (final g in joined) {
-        if (!chats.joinedGroupIds.contains(g.gid)) {
-          chats.joinGroup(g);
-        }
+      for (final group in joined) {
+        if (!chats.joinedGroupIds.contains(group.gid)) chats.joinGroup(group);
       }
-      return null;
     } catch (failure) {
-      if (isClosed) return null;
+      loadError.value = '$failure';
+    } finally {
       initialLoading.value = false;
       loadingMore.value = false;
-      loadError.value = '$failure';
-      return 'Failed to load groups: $failure';
     }
   }
 }

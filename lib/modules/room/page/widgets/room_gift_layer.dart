@@ -1,13 +1,12 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../../common/theme/app_colors.dart';
-import '../../../../common/widgets/app_image.dart';
-import '../../../../common/widgets/pag_network_overlay.dart';
 import '../../logic/room_effect_logic.dart';
 import '../../model/room_fx.dart';
+import '../../model/room_gift_display.dart';
+import 'room_gift_item_display.dart';
+import 'package:chimo/common/utils/chimo.dart';
 
 /// 左侧礼物条。没有 PAG 地址时播，同一时刻一条。
 class RoomGiftBanner extends StatefulWidget {
@@ -17,7 +16,8 @@ class RoomGiftBanner extends StatefulWidget {
   State<RoomGiftBanner> createState() => _RoomGiftBannerState();
 }
 
-class _RoomGiftBannerState extends State<RoomGiftBanner> with SingleTickerProviderStateMixin {
+class _RoomGiftBannerState extends State<RoomGiftBanner>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _slide;
   Worker? _worker;
@@ -27,7 +27,10 @@ class _RoomGiftBannerState extends State<RoomGiftBanner> with SingleTickerProvid
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 2200));
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2200),
+    );
     _slide = TweenSequence<double>([
       TweenSequenceItem(tween: Tween(begin: -1.2, end: 0), weight: 4),
       TweenSequenceItem(tween: ConstantTween(0), weight: 14),
@@ -76,7 +79,8 @@ class _RoomGiftBannerState extends State<RoomGiftBanner> with SingleTickerProvid
 
   void _finish() {
     _playing = null;
-    if (Get.isRegistered<RoomEffectLogic>()) Get.find<RoomEffectLogic>().finishBanner();
+    if (Get.isRegistered<RoomEffectLogic>())
+      Get.find<RoomEffectLogic>().finishBanner();
   }
 
   @override
@@ -90,7 +94,10 @@ class _RoomGiftBannerState extends State<RoomGiftBanner> with SingleTickerProvid
         child: AnimatedBuilder(
           animation: _slide,
           builder: (context, child) {
-            return FractionalTranslation(translation: Offset(_slide.value, 0), child: child);
+            return FractionalTranslation(
+              translation: Offset(_slide.value, 0),
+              child: child,
+            );
           },
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 48, 0),
@@ -113,15 +120,32 @@ class _RoomGiftBannerState extends State<RoomGiftBanner> with SingleTickerProvid
         spacing: 4,
         children: [
           if (gift.fromName.isNotEmpty)
-            Text(gift.fromName, style: const TextStyle(color: AppColors.textPrimary, fontSize: 12)),
-          const Text('sent to', style: TextStyle(color: AppColors.textPrimary, fontSize: 12)),
-          Text(gift.toName, style: const TextStyle(color: AppColors.giftGold, fontSize: 12)),
-          Text(gift.giftName, style: const TextStyle(color: AppColors.textPreview, fontSize: 12)),
-          if (gift.icon.isNotEmpty) AppImage(gift.icon, width: 42, height: 42, fit: BoxFit.contain),
+            Text(
+              gift.fromName,
+              style: const TextStyle(color: AppColors.white, fontSize: 12),
+            ),
+          const Text(
+            'sent to',
+            style: TextStyle(color: AppColors.white, fontSize: 12),
+          ),
+          Text(
+            gift.toName,
+            style: const TextStyle(color: AppColors.yellowFFD400, fontSize: 12),
+          ),
+          Text(
+            gift.giftName,
+            style: const TextStyle(color: AppColors.white70, fontSize: 12),
+          ),
+          if (gift.icon.isNotEmpty)
+            Chimo.image(gift.icon, width: 42, height: 42, fit: BoxFit.contain),
           if (gift.count > 0)
             Text(
               'x${gift.count}',
-              style: const TextStyle(color: AppColors.textPrimary, fontSize: 12, fontStyle: FontStyle.italic),
+              style: const TextStyle(
+                color: AppColors.white,
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
+              ),
             ),
         ],
       ),
@@ -129,7 +153,11 @@ class _RoomGiftBannerState extends State<RoomGiftBanner> with SingleTickerProvid
   }
 }
 
-/// 全屏 PAG。礼物图标或进房特效地址以 `.pag` 结尾时播一次。
+/// 全屏礼物层。对齐 joyride [GiftDisplay] + [GiftItemDisplay]（麦位飞入飞出 + PAG）。
+///
+/// 挂在房间 Stack、且在进房 Obx **之外**（关 sheet / Obx 刷新不拆播放层）。
+/// [RoomEffectLogic] 往往晚于本层首帧才 `Get.put`，必须重试绑定；
+/// 否则 `ever` 订不上 → 表现为「送礼无动画，热 reload 后才有」。
 class RoomGiftPag extends StatefulWidget {
   const RoomGiftPag({super.key});
 
@@ -140,8 +168,8 @@ class RoomGiftPag extends StatefulWidget {
 class _RoomGiftPagState extends State<RoomGiftPag> {
   Worker? _worker;
   RoomEffectLogic? _bound;
-  Timer? _timeout;
-  String? _url;
+  List<RoomGiftDisplay> _items = const [];
+  var _bindRetries = 0;
 
   @override
   void initState() {
@@ -151,55 +179,69 @@ class _RoomGiftPagState extends State<RoomGiftPag> {
 
   @override
   void dispose() {
-    _timeout?.cancel();
     _worker?.dispose();
     super.dispose();
   }
 
   void _bind() {
-    if (!Get.isRegistered<RoomEffectLogic>()) return;
+    if (!mounted) return;
+    if (!Get.isRegistered<RoomEffectLogic>()) {
+      // 进房 HTTP 返回前 logic 还不在；下一帧再试，避免永久订空。
+      if (_bindRetries >= 60) return;
+      _bindRetries++;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _bind());
+      return;
+    }
     final logic = Get.find<RoomEffectLogic>();
     if (identical(logic, _bound)) return;
     _worker?.dispose();
     _bound = logic;
-    _worker = ever(logic.pag, (url) {
-      if (mounted) _arm(url);
+    _bindRetries = 0;
+    // playingGifts + flyEpoch 双通道，避免 RxList 变更偶发不通知。
+    _worker = everAll([logic.playingGifts, logic.flyEpoch], (_) {
+      if (mounted) _sync();
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && Get.isRegistered<RoomEffectLogic>()) {
-        _arm(Get.find<RoomEffectLogic>().pag.value);
-      }
+      if (mounted) _sync();
     });
   }
 
-  void _arm(String? url) {
-    _timeout?.cancel();
-    if (url == null || url.isEmpty) {
-      if (_url != null) setState(() => _url = null);
-      return;
-    }
-    if (_url == url) return;
-    setState(() => _url = url);
-    _timeout = Timer(const Duration(seconds: 8), _finish);
-  }
-
-  void _finish() {
-    _timeout?.cancel();
-    _url = null;
-    if (Get.isRegistered<RoomEffectLogic>()) Get.find<RoomEffectLogic>().finishPag();
+  void _sync() {
+    final next = List<RoomGiftDisplay>.from(_bound?.playingGifts ?? const []);
+    final same =
+        next.length == _items.length &&
+        List.generate(
+          next.length,
+          (i) => next[i].id == _items[i].id,
+        ).every((ok) => ok);
+    if (same) return;
+    setState(() => _items = next);
   }
 
   @override
   Widget build(BuildContext context) {
     _bind();
-    final url = _url;
-    if (url == null || url.isEmpty) return const IgnorePointer(child: SizedBox.expand());
-    return IgnorePointer(
-      child: Stack(
-        children: [
-          PagNetworkOverlay(url: url, onAnimationEnd: _finish),
-        ],
-      ),
-    );
+    final logic = _bound;
+    if (logic == null) return const SizedBox.shrink();
+    // Obx 再订 flyEpoch，避免仅靠 ever 时偶发不同步。
+    return Obx(() {
+      logic.flyEpoch.value;
+      final items = List<RoomGiftDisplay>.from(logic.playingGifts);
+      if (items.isEmpty) return const SizedBox.shrink();
+      return IgnorePointer(
+        child: Stack(
+          fit: StackFit.expand,
+          children: items
+              .map(
+                (config) => RoomGiftItemDisplay(
+                  key: config.key,
+                  config: config,
+                  onComplete: logic.finishGiftDisplay,
+                ),
+              )
+              .toList(),
+        ),
+      );
+    });
   }
 }

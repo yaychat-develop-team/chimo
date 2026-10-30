@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:extended_image/extended_image.dart';
@@ -30,40 +31,9 @@ enum AppImageSource {
 enum AppImageFormat { bitmap, svg, pag }
 
 /// 全 App 唯一的图片入口。
-///
-/// 参考 joyride `JR.img()` 的单入口 + 按来源和扩展名分派的思路，把
-/// 网络 / assets / 本地文件 / base64 五种来源，位图 / svg / pag 三种格式
-/// 收敛到一个组件里。业务侧只写 `AppImage(src)`，不再关心该用
-/// `Image.asset` 还是 `SvgPicture.network`。
-///
-/// **只传 path 即可**：来源由 [classify] 按前缀判断，格式由 [formatOf] 按扩展名
-/// （字节则由 [sniffFormat]）判断，路径先经 [resolve] 规整——相对路径补
-/// `assets/images/`，接口返回的 CDN 相对 key 补 [cdnBase]。所以下面这些写法
-/// 都能直接显示，不用在调用处 `startsWith('http')` 分支：
-///
-/// ```dart
-/// AppImage('https://cdn.x.com/a.jpg')      // 网络位图
-/// AppImage('https://cdn.x.com/a.svg')      // 网络 svg
-/// AppImage('assets/images/forya/logo.webp')// 打包资源
-/// AppImage('forya/logo.webp')              // 同上，相对路径
-/// AppImage('/upload/2026/a.jpg')           // CDN 相对 key（需先配 cdnBase）
-/// AppImage('/var/mobile/…/pick.jpg')       // 本地文件
-/// AppImage('data:image/png;base64,…')      // 内联数据
-/// ```
-///
-/// 自动判断拿不到依据时（没有扩展名的 CDN 地址、裸字节的 pag），用 [format]
-/// 显式指定；不要退回裸 `SvgPicture` / `PAGView`。
-///
-/// 网络位图由 `extended_image` 承担内存 + 磁盘缓存（替换原
-/// `cached_network_image`）；assets / 文件 / 内存位图仍走 Flutter 原生
-/// `Image.*`——这几条分支本来就命中框架的 `ImageCache`，换成
-/// `ExtendedImage` 只会引入不同的 loadState 行为，没有收益。
-///
-/// 与参考实现的一处有意偏差：解码尺寸用真实 `devicePixelRatio` 计算
-/// （见 [_px]），而不是硬编码 ×3。`.webp` 与参考实现一样套 [RepaintBoundary]。
 class AppImage extends StatelessWidget {
   /// 自动识别来源。[src] 可以是网络地址、assets 路径、本地绝对路径或 data URI。
-  const AppImage(
+  const AppImage.image(
     this.src, {
     super.key,
     this.format,
@@ -94,74 +64,6 @@ class AppImage extends StatelessWidget {
     this.autoPlay = true,
   }) : bytes = null,
        _forcedSource = null;
-
-  /// 强制按网络地址渲染。
-  const AppImage.network(
-    String url, {
-    super.key,
-    this.format,
-    this.width,
-    this.height,
-    this.fit,
-    this.alignment = Alignment.center,
-    this.color,
-    this.colorBlendMode,
-    this.radius,
-    this.circle = false,
-    this.placeholder,
-    this.error,
-    this.fallbackAsset,
-    this.fadeIn = const Duration(milliseconds: 200),
-    this.memWidth,
-    this.memHeight,
-    this.scale,
-    this.centerSlice,
-    this.matchTextDirection = false,
-    this.gaplessPlayback = false,
-    this.filterQuality = FilterQuality.low,
-    this.repaintBoundary = false,
-    this.semanticLabel,
-    this.excludeFromSemantics = false,
-    this.repeatCount = -1,
-    this.autoPlay = true,
-  }) : src = url,
-       bytes = null,
-       package = null,
-       _forcedSource = AppImageSource.network;
-
-  /// 强制按打包资源渲染。优先传 `AppAssets` 常量。
-  const AppImage.asset(
-    String name, {
-    super.key,
-    this.format,
-    this.width,
-    this.height,
-    this.fit,
-    this.alignment = Alignment.center,
-    this.color,
-    this.colorBlendMode,
-    this.radius,
-    this.circle = false,
-    this.error,
-    this.memWidth,
-    this.memHeight,
-    this.scale,
-    this.centerSlice,
-    this.matchTextDirection = false,
-    this.gaplessPlayback = false,
-    this.filterQuality = FilterQuality.low,
-    this.repaintBoundary = false,
-    this.package,
-    this.semanticLabel,
-    this.excludeFromSemantics = false,
-    this.repeatCount = -1,
-    this.autoPlay = true,
-  }) : src = name,
-       bytes = null,
-       placeholder = null,
-       fadeIn = Duration.zero,
-       fallbackAsset = null,
-       _forcedSource = AppImageSource.asset;
 
   /// 强制按本地文件渲染。[path] 传文件系统路径（`File.path` 即可）。
   const AppImage.file(
@@ -231,7 +133,8 @@ class AppImage extends StatelessWidget {
        autoPlay = true,
        _forcedSource = AppImageSource.memory;
 
-  /// 头像：[src] 为空或加载失败时回退到 [fallbackAsset]，默认裁成圆形。
+  /// 头像：[src] 为空或加载失败时，用 CDN 卡通图 `avatar2.jpg`–`avatar8.jpg`。
+  /// 卡通图本身加载失败才回退到 [fallbackAsset]。默认裁成圆形。
   const AppImage.avatar(
     this.src, {
     super.key,
@@ -333,18 +236,26 @@ class AppImage extends StatelessWidget {
 
   // ---------- 全局配置 ----------
 
+  /// 空头像用的卡通图。对齐 Oumi：`{cdn}/ugc-media/user/default_config/avatar{2-8}.jpg`。
+  static String? cartoonAvatarUrl(int index) {
+    final root = _cdnRoot;
+    if (root == null) return null;
+    return '$root/ugc-media/user/default_config/avatar$index.jpg';
+  }
+
   /// CDN 域名，例如 `https://cdn.example.com`。
   ///
-  /// 接口返回的图片常常是不带域名的相对 key（`/upload/2026/a.jpg`）。配好它之后
-  /// `AppImage('/upload/2026/a.jpg')` 会自动补全成完整地址，业务侧不用再手拼域名。
-  /// 未配置时 `/` 开头的 src 一律按本地文件处理，与配置前完全一致。
+  /// 接口返回的图片常常是不带域名的相对 key（`/upload/2026/a.jpg`）。
+  /// 配好之后会补成完整地址。未配置时 `/` 开头的 src 按本地文件处理。
   static String? cdnBase;
 
-  /// 额外的本地文件根前缀。用于把本地绝对路径与 CDN 相对 key 区分开。
-  static List<String> extraLocalRoots = const <String>[];
+  static String? get _cdnRoot {
+    final base = cdnBase?.trim() ?? '';
+    if (base.isEmpty) return null;
+    return base.endsWith('/') ? base.substring(0, base.length - 1) : base;
+  }
 
-  /// 各平台沙盒根前缀。`path_provider` 在移动端只会返回这些前缀下的路径，
-  /// 所以不必在启动时真去查一次目录，也就不用为了识别本地路径做磁盘 IO。
+  /// 各平台沙盒根前缀。用来区分本地绝对路径和 CDN 相对 key，不必在启动时查目录。
   static const List<String> _fsRoots = <String>[
     // iOS / macOS
     '/var/', '/private/', '/Users/',
@@ -354,14 +265,7 @@ class AppImage extends StatelessWidget {
     '/home/', '/tmp/',
   ];
 
-  /// 一次性配置，通常在 `main()` 里调用。
-  static void configure({String? cdnBase, List<String>? extraLocalRoots}) {
-    if (cdnBase != null) AppImage.cdnBase = cdnBase;
-    if (extraLocalRoots != null) AppImage.extraLocalRoots = extraLocalRoots;
-  }
-
-  static bool _isLocalPath(String s) =>
-      _fsRoots.any(s.startsWith) || extraLocalRoots.any(s.startsWith);
+  static bool _isLocalPath(String s) => _fsRoots.any(s.startsWith);
 
   // ---------- 静态工具 ----------
 
@@ -370,27 +274,17 @@ class AppImage extends StatelessWidget {
   /// | 传入 | 规整为 |
   /// |---|---|
   /// | `logo.webp` | `assets/images/logo.webp` |
-  /// | `forya/logo.webp` | `assets/images/forya/logo.webp` |
+  /// | `chimo/common/logo.webp` | `assets/images/chimo/common/logo.webp` |
   /// | `/upload/a.jpg`（配了 [cdnBase]） | `$cdnBase/upload/a.jpg` |
   /// | `/var/mobile/…/a.jpg` | 原样（本地文件） |
   /// | `http(s)://` `file://` `data:` `assets/` `packages/` | 原样 |
   ///
-  /// [forced] 非空表示调用方已用命名构造明确了来源，此时只做 assets 相对路径
-  /// 补全，不再改写其他形态——否则 `AppImage.file('/upload/a.jpg')` 会被误拼成
-  /// CDN 地址。结果是幂等的，可以重复调用。
+  /// [forced] 为 file / memory 时原样返回，避免 `AppImage.file('/upload/a.jpg')` 被拼成 CDN 地址。
   static String resolve(String? src, {AppImageSource? forced}) {
     final s = src?.trim() ?? '';
     if (s.isEmpty) return '';
-    switch (forced) {
-      case AppImageSource.asset:
-        return _assetPath(s);
-      case AppImageSource.network:
-      case AppImageSource.file:
-      case AppImageSource.memory:
-        return s;
-      case AppImageSource.empty:
-      case null:
-        break;
+    if (forced == AppImageSource.file || forced == AppImageSource.memory) {
+      return s;
     }
     if (s.startsWith('data:') ||
         s.startsWith('http://') ||
@@ -399,28 +293,18 @@ class AppImage extends StatelessWidget {
       return s;
     }
     if (s.startsWith('/')) {
-      final base = cdnBase?.trim() ?? '';
-      if (base.isEmpty || _isLocalPath(s)) return s;
-      final root = base.endsWith('/') ? base.substring(0, base.length - 1) : base;
+      final root = _cdnRoot;
+      if (root == null || _isLocalPath(s)) return s;
       return '$root$s';
     }
     return _assetPath(s);
   }
 
-  /// 资源路径，对齐 `JR.imagePath`。
-  ///
-  /// 已是 `assets/...` 或 `packages/...` 时原样返回。相对路径补 `assets/images/`。
-  /// 传了 [package] 时写成 `packages/<package>/assets/images/...`，这时不要再把
-  /// 同一个 package 交给 `Image.asset(package:)`，否则会套两层。
-  static String imagePath(String path, {String? package}) {
-    if (path.startsWith('assets/') || path.startsWith('packages/')) return path;
-    if (package != null && package.isNotEmpty) {
-      return 'packages/$package/assets/images/$path';
-    }
-    return 'assets/images/$path';
+  /// 已是 `assets/...` 或 `packages/...` 时原样返回，相对路径补 `assets/images/`。
+  static String _assetPath(String s) {
+    if (s.startsWith('assets/') || s.startsWith('packages/')) return s;
+    return 'assets/images/$s';
   }
-
-  static String _assetPath(String s) => imagePath(s);
 
   /// 从字节魔数推断格式。[AppImage.bytes] 拿到的是裸字节，没有扩展名可判。
   ///
@@ -443,8 +327,10 @@ class AppImage extends StatelessWidget {
   }
 
   /// 判断来源。先经 [resolve] 规整，保证判断结果与真正加载的地址一致。
-  static AppImageSource classify(String? src) {
-    final s = resolve(src);
+  static AppImageSource classify(String? src) => _sourceOf(resolve(src));
+
+  /// [s] 必须已经过 [resolve]。
+  static AppImageSource _sourceOf(String s) {
     if (s.isEmpty) return AppImageSource.empty;
     if (s.startsWith('data:')) return AppImageSource.memory;
     if (s.startsWith('http://') || s.startsWith('https://')) {
@@ -461,16 +347,12 @@ class AppImage extends StatelessWidget {
     final s = src?.trim() ?? '';
     if (s.isEmpty) return AppImageFormat.bitmap;
     if (s.startsWith('data:')) {
-      return s.startsWith('data:image/svg+xml') ? AppImageFormat.svg : AppImageFormat.bitmap;
+      return s.startsWith('data:image/svg+xml')
+          ? AppImageFormat.svg
+          : AppImageFormat.bitmap;
     }
-    var path = s;
-    try {
-      final parsed = Uri.parse(s).path;
-      if (parsed.isNotEmpty) path = parsed;
-    } on FormatException {
-      // 非法 URI 就按原串判扩展名。
-    }
-    final lower = path.toLowerCase();
+    final parsed = Uri.tryParse(s)?.path;
+    final lower = (parsed == null || parsed.isEmpty ? s : parsed).toLowerCase();
     if (lower.endsWith('.svg')) return AppImageFormat.svg;
     if (lower.endsWith('.pag')) return AppImageFormat.pag;
     return AppImageFormat.bitmap;
@@ -485,12 +367,11 @@ class AppImage extends StatelessWidget {
     AppImageFormat? format,
   }) {
     final s = resolve(src);
-    final source = classify(s);
-    if (source == AppImageSource.empty) return null;
-
+    final source = _sourceOf(s);
     final fmt = format ?? formatOf(s);
-    assert(fmt == AppImageFormat.bitmap, 'AppImage.providerOf 不支持 svg / pag，请直接用 AppImage 组件：$s');
-    if (fmt != AppImageFormat.bitmap) return null;
+    if (source == AppImageSource.empty || fmt != AppImageFormat.bitmap) {
+      return null;
+    }
 
     final ImageProvider<Object> base;
     switch (source) {
@@ -540,37 +421,6 @@ class AppImage extends StatelessWidget {
     );
   }
 
-  /// 预热到内存缓存。
-  static Future<void> precache(
-    BuildContext context,
-    String? src, {
-    int? memWidth,
-    int? memHeight,
-  }) async {
-    final provider = providerOf(src, memWidth: memWidth, memHeight: memHeight);
-    if (provider == null) return;
-    await precacheImage(provider, context);
-  }
-
-  /// 逐条失效：网络图同时清内存和磁盘。
-  static Future<void> evict(String? src) async {
-    final s = resolve(src);
-    if (s.isEmpty) return;
-    if (classify(s) == AppImageSource.network) {
-      await ExtendedNetworkImageProvider(s, cache: true).evict();
-      await clearDiskCachedImage(s);
-      return;
-    }
-    await providerOf(s)?.evict();
-  }
-
-  /// 清空图片内存缓存。
-  static void clearMemoryCache() => clearMemoryImageCache();
-
-  /// 清空图片磁盘缓存，[olderThan] 只清超过该时长的旧文件。
-  static Future<bool> clearDiskCache({Duration? olderThan}) =>
-      clearDiskCachedImages(duration: olderThan);
-
   /// centerSlice 与 `none` / `cover` 语义冲突，参考实现同样强制 `fill`。
   static BoxFit? _fitFor(BoxFit? fit, Rect? centerSlice) {
     if (centerSlice == null) return fit;
@@ -617,26 +467,40 @@ class AppImage extends StatelessWidget {
 
   // ---------- 渲染 ----------
 
-  AppImageSource get _source {
-    final data = bytes;
-    if (data != null) {
-      return data.isEmpty ? AppImageSource.empty : AppImageSource.memory;
-    }
-    final s = src?.trim() ?? '';
-    if (s.isEmpty) return AppImageSource.empty;
-    return _forcedSource ?? classify(s);
-  }
-
-  ColorFilter? get _colorFilter =>
-      color == null ? null : ColorFilter.mode(color!, colorBlendMode ?? BlendMode.srcIn);
+  ColorFilter? get _colorFilter => color == null
+      ? null
+      : ColorFilter.mode(color!, colorBlendMode ?? BlendMode.srcIn);
 
   Widget get _box => SizedBox(width: width, height: height);
 
+  /// 占位是默认头像资源时，改走 CDN 卡通图，而不是本地剪影。
+  bool get _cartoonFallback {
+    final asset = fallbackAsset;
+    return asset == AppAssets.defaultAvatar ||
+        asset == AppAssets.avatarPlace ||
+        asset == AppAssets.emptyAvatar;
+  }
+
+  Widget _cartoon() {
+    return _CartoonAvatar(
+      width: width,
+      height: height,
+      fit: fit ?? BoxFit.cover,
+      alignment: alignment,
+      filterQuality: filterQuality,
+      circle: circle,
+      radius: radius,
+    );
+  }
+
   /// [fallbackAsset] 兜底图。外层已统一裁剪，这里不再重复裁。
+  ///
+  /// 直接用 [Image.asset]，不要再套 [AppImage]。webp 资源会强制包一层
+  /// [RepaintBoundary]，公屏的 [ShaderMask] 采不到这一层，空头像就会是空白。
   Widget? get _fallback {
     final asset = fallbackAsset;
     if (asset == null || asset.isEmpty) return null;
-    return AppImage.asset(
+    return Image.asset(
       asset,
       width: width,
       height: height,
@@ -673,7 +537,15 @@ class AppImage extends StatelessWidget {
         if (fadeIn <= Duration.zero) return null;
         return _FadeIn(duration: fadeIn, child: state.completedWidget);
       case LoadState.failed:
-        return error ?? _fallback ?? _box;
+        if (error != null) {
+          state.returnLoadStateChangedWidget = true;
+          return error;
+        }
+        if (_cartoonFallback) {
+          state.returnLoadStateChangedWidget = true;
+          return _cartoon();
+        }
+        return _fallback ?? _box;
     }
   }
 
@@ -689,26 +561,51 @@ class AppImage extends StatelessWidget {
     return result;
   }
 
+  Widget _unresolved() {
+    if (placeholder != null) return _decorate(placeholder!);
+    if (_cartoonFallback) return _cartoon();
+    return _decorate(_fallback ?? _box);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final source = _source;
-    if (source == AppImageSource.empty) {
-      return _decorate(placeholder ?? _fallback ?? _box);
+    final data = bytes;
+    if (data != null) {
+      if (data.isEmpty) return _unresolved();
+      return _loaded(
+        context,
+        AppImageSource.memory,
+        '',
+        format ?? sniffFormat(data),
+      );
     }
 
     final path = resolve(src, forced: _forcedSource);
-    final data = bytes;
-    final fmt = format ?? (data != null ? sniffFormat(data) : formatOf(path));
+    if (path.isEmpty) return _unresolved();
+    final source = _forcedSource ?? _sourceOf(path);
+    return _loaded(context, source, path, format ?? formatOf(path));
+  }
+
+  Widget _loaded(
+    BuildContext context,
+    AppImageSource source,
+    String path,
+    AppImageFormat fmt,
+  ) {
     var boxFit = _fitFor(fit, centerSlice);
     final (cacheW, cacheH) = memWidth != null || memHeight != null
         ? _singleSide(memWidth, memHeight)
         : _singleSide(_px(context, width), _px(context, height));
     // 参考实现：只缓存 1 倍图时不设 fit，内容会缩得比布局小，这时改成 cover。
     final dpr = MediaQuery.devicePixelRatioOf(context);
-    if (centerSlice == null && dpr <= 1 && (cacheW != null || cacheH != null) && boxFit == null) {
+    if (centerSlice == null &&
+        dpr <= 1 &&
+        (cacheW != null || cacheH != null) &&
+        boxFit == null) {
       boxFit = BoxFit.cover;
     }
-    final webp = fmt == AppImageFormat.bitmap && path.toLowerCase().endsWith('.webp');
+    final webp =
+        fmt == AppImageFormat.bitmap && path.toLowerCase().endsWith('.webp');
 
     switch (source) {
       case AppImageSource.network:
@@ -716,15 +613,24 @@ class AppImage extends StatelessWidget {
       case AppImageSource.asset:
         return _decorate(_asset(path, fmt, boxFit, cacheW, cacheH), webp: webp);
       case AppImageSource.file:
-        return _decorate(_file(_fsPath(path), fmt, boxFit, cacheW, cacheH), webp: webp);
+        return _decorate(
+          _file(_fsPath(path), fmt, boxFit, cacheW, cacheH),
+          webp: webp,
+        );
       case AppImageSource.memory:
         return _decorate(_memory(path, fmt, boxFit, cacheW, cacheH));
       case AppImageSource.empty:
-        return _decorate(_box);
+        return _unresolved();
     }
   }
 
-  Widget _network(String url, AppImageFormat fmt, BoxFit? boxFit, int? cacheW, int? cacheH) {
+  Widget _network(
+    String url,
+    AppImageFormat fmt,
+    BoxFit? boxFit,
+    int? cacheW,
+    int? cacheH,
+  ) {
     switch (fmt) {
       case AppImageFormat.pag:
         return PAGView.network(
@@ -771,11 +677,13 @@ class AppImage extends StatelessWidget {
     }
   }
 
-  Widget _asset(String name, AppImageFormat fmt, BoxFit? boxFit, int? cacheW, int? cacheH) {
-    assert(
-      name.startsWith('assets/') || name.startsWith('packages/') || package != null,
-      'AppImage 未能识别来源，已按 assets 处理：$name',
-    );
+  Widget _asset(
+    String name,
+    AppImageFormat fmt,
+    BoxFit? boxFit,
+    int? cacheW,
+    int? cacheH,
+  ) {
     switch (fmt) {
       case AppImageFormat.pag:
         return PAGView.asset(
@@ -825,10 +733,15 @@ class AppImage extends StatelessWidget {
     }
   }
 
-  Widget _file(String path, AppImageFormat fmt, BoxFit? boxFit, int? cacheW, int? cacheH) {
+  Widget _file(
+    String path,
+    AppImageFormat fmt,
+    BoxFit? boxFit,
+    int? cacheW,
+    int? cacheH,
+  ) {
     switch (fmt) {
       case AppImageFormat.pag:
-        assert(false, 'pag 不支持从本地文件加载，请走 assets 或网络：$path');
         return error ?? _fallback ?? _box;
       case AppImageFormat.svg:
         return SvgPicture.file(
@@ -867,9 +780,15 @@ class AppImage extends StatelessWidget {
     }
   }
 
-  Widget _memory(String path, AppImageFormat fmt, BoxFit? boxFit, int? cacheW, int? cacheH) {
+  Widget _memory(
+    String path,
+    AppImageFormat fmt,
+    BoxFit? boxFit,
+    int? cacheW,
+    int? cacheH,
+  ) {
     final data = bytes ?? _dataBytes(path);
-    if (data == null || data.isEmpty) return error ?? _fallback ?? _box;
+    if (data == null) return error ?? _fallback ?? _box;
     if (fmt == AppImageFormat.pag) {
       return PAGView.bytes(
         data,
@@ -925,6 +844,61 @@ class _FadeIn extends StatefulWidget {
 
   @override
   State<_FadeIn> createState() => _FadeInState();
+}
+
+/// 空头像随机一张卡通图，同一个位置重建时不换脸。
+class _CartoonAvatar extends StatefulWidget {
+  const _CartoonAvatar({
+    required this.width,
+    required this.height,
+    required this.fit,
+    required this.alignment,
+    required this.filterQuality,
+    required this.circle,
+    required this.radius,
+  });
+
+  final double? width;
+  final double? height;
+  final BoxFit fit;
+  final AlignmentGeometry alignment;
+  final FilterQuality filterQuality;
+  final bool circle;
+  final BorderRadius? radius;
+
+  @override
+  State<_CartoonAvatar> createState() => _CartoonAvatarState();
+}
+
+class _CartoonAvatarState extends State<_CartoonAvatar> {
+  late final int _index = Random().nextInt(7) + 2;
+
+  @override
+  Widget build(BuildContext context) {
+    final url = AppImage.cartoonAvatarUrl(_index);
+    final local = Image.asset(
+      AppAssets.defaultAvatar,
+      width: widget.width,
+      height: widget.height,
+      fit: widget.fit,
+      alignment: widget.alignment,
+      filterQuality: widget.filterQuality,
+      excludeFromSemantics: true,
+    );
+    if (url == null) return local;
+    return AppImage.image(
+      url,
+      width: widget.width,
+      height: widget.height,
+      fit: widget.fit,
+      alignment: widget.alignment,
+      filterQuality: widget.filterQuality,
+      circle: widget.circle,
+      radius: widget.radius,
+      fadeIn: Duration.zero,
+      error: local,
+    );
+  }
 }
 
 class _FadeInState extends State<_FadeIn> {

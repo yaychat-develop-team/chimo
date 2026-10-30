@@ -15,13 +15,13 @@ class GroupDescToggleChip extends StatelessWidget {
   final bool joinedStyle;
   final VoidCallback onTap;
 
-  static const Color _joinedBg = AppColors.chipGreenDark;
-  static const Color _joinedFg = AppColors.accentLimeSoft;
+  static const Color _joinedBg = AppColors.green1A3A28;
+  static const Color _joinedFg = AppColors.greenB8FF6A;
 
   @override
   Widget build(BuildContext context) {
     final bg = joinedStyle ? _joinedBg : Colors.white.withValues(alpha: 0.12);
-    final fg = joinedStyle ? _joinedFg : AppColors.textPrimary;
+    final fg = joinedStyle ? _joinedFg : AppColors.white;
 
     return GestureDetector(
       onTap: onTap,

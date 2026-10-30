@@ -54,17 +54,9 @@ class GroupChatBody extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _TabLabel(
-                  label: 'Messages',
-                  selected: tabIndex == 0,
-                  onTap: () => onTabChanged(0),
-                ),
+                _TabLabel(label: 'Messages', selected: tabIndex == 0, onTap: () => onTabChanged(0)),
                 const SizedBox(width: 28),
-                _TabLabel(
-                  label: 'Photos',
-                  selected: tabIndex == 1,
-                  onTap: () => onTabChanged(1),
-                ),
+                _TabLabel(label: 'Photos', selected: tabIndex == 1, onTap: () => onTabChanged(1)),
               ],
             ),
           ),
@@ -86,11 +78,7 @@ class GroupChatBody extends StatelessWidget {
                     onQuoteTap: onQuoteTap,
                     messageKeyFor: messageKeyFor,
                   )
-                : GroupPhotosGrid(
-                    isJoined: isJoined,
-                    sections: photos,
-                    onPhotoTap: onPhotoTap,
-                  ),
+                : GroupPhotosGrid(isJoined: isJoined, sections: photos, onPhotoTap: onPhotoTap),
           ),
         ],
       ),
@@ -99,11 +87,7 @@ class GroupChatBody extends StatelessWidget {
 }
 
 class _TabLabel extends StatelessWidget {
-  const _TabLabel({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
+  const _TabLabel({required this.label, required this.selected, required this.onTap});
 
   final String label;
   final bool selected;
@@ -119,7 +103,7 @@ class _TabLabel extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              color: selected ? AppColors.surfaceDark : AppColors.textTertiary,
+              color: selected ? AppColors.black111111 : AppColors.gray6E6E6E,
               fontSize: 16,
               fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
             ),
@@ -130,7 +114,7 @@ class _TabLabel extends StatelessWidget {
             height: 3,
             width: selected ? 28 : 0,
             decoration: BoxDecoration(
-              color: AppColors.accentNeon,
+              color: AppColors.green1CFF8A,
               borderRadius: BorderRadius.circular(2),
             ),
           ),

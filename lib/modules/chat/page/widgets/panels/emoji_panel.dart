@@ -7,7 +7,7 @@ import '../../../../../app/network/http/api_result.dart';
 import '../../../../../common/models/server_client/emote.pb.dart';
 import '../../../../../common/theme/app_colors.dart';
 import '../../../../../common/theme/app_emoji.dart';
-import '../../../../../common/widgets/app_image.dart';
+import 'package:chimo/common/utils/chimo.dart';
 
 /// 贴纸（表情包）的取数与发送。私聊传入，群聊传 null，面板就只剩 emoji 网格。
 class ChatStickerSource {
@@ -70,14 +70,14 @@ class ChatEmojiPanelStyle {
   final ChatEmojiActions actions;
 
   static const ChatEmojiPanelStyle dm = ChatEmojiPanelStyle(
-    panelColor: AppColors.textGrayF5,
+    panelColor: AppColors.grayF0F0F0,
     gridPadding: EdgeInsets.fromLTRB(8, 0, 8, 56),
     glyphFontSize: 24,
     actions: ChatEmojiActions.floatingPills,
   );
 
   static const ChatEmojiPanelStyle group = ChatEmojiPanelStyle(
-    panelColor: AppColors.textGrayF7,
+    panelColor: AppColors.grayF0F0F0,
     gridPadding: EdgeInsets.fromLTRB(12, 12, 12, 8),
     glyphFontSize: 26,
     actions: ChatEmojiActions.boxedRow,
@@ -98,6 +98,7 @@ class ChatEmojiPanel extends StatefulWidget {
     required this.onBackspace,
     required this.onSend,
     this.stickers,
+    this.preferPackType,
   });
 
   final ChatEmojiPanelStyle style;
@@ -111,6 +112,9 @@ class ChatEmojiPanel extends StatefulWidget {
 
   /// 贴纸包。null = 只有 emoji 网格（群聊），连 tab 行都不画，也不发请求。
   final ChatStickerSource? stickers;
+
+  /// 房间在麦时默认切到该 type 的包（如 `mic_emote`）。对齐 joyride EmotePanel。
+  final String? preferPackType;
 
   @override
   State<ChatEmojiPanel> createState() => _ChatEmojiPanelState();
@@ -154,15 +158,23 @@ class _ChatEmojiPanelState extends State<ChatEmojiPanel> {
       final res = await source.loadPacks();
       if (!mounted) return;
       final packs = res.data ?? const [];
+      var tab = _tab;
+      final prefer = widget.preferPackType?.trim() ?? '';
+      if (prefer.isNotEmpty) {
+        final micIndex = packs.indexWhere((pack) => pack.type.trim() == prefer);
+        if (micIndex >= 0) tab = micIndex + 1;
+      }
       setState(() {
         _packs = packs;
         _packsLoading = false;
+        _tab = tab;
         if (packs.isEmpty && !res.ok) {
-          _packsError = res.message.isEmpty
-              ? 'Failed to load stickers'
-              : res.message;
+          _packsError = res.message.isEmpty ? 'Failed to load stickers' : res.message;
         }
       });
+      if (tab > 0 && tab <= packs.length) {
+        unawaited(_ensureStickers(packs[tab - 1]));
+      }
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -175,8 +187,7 @@ class _ChatEmojiPanelState extends State<ChatEmojiPanel> {
   Future<void> _ensureStickers(Emoticons pack) async {
     final source = widget.stickers;
     if (source == null) return;
-    if (_stickersByPack.containsKey(pack.id) ||
-        _loadingPacks.contains(pack.id)) {
+    if (_stickersByPack.containsKey(pack.id) || _loadingPacks.contains(pack.id)) {
       return;
     }
     _loadingPacks.add(pack.id);
@@ -207,43 +218,31 @@ class _ChatEmojiPanelState extends State<ChatEmojiPanel> {
   }
 
   // ------------------------------------------------------------- 贴纸 tab 行
-  Widget _tabChip({
-    required bool selected,
-    required Widget child,
-    required VoidCallback onTap,
-  }) {
+  Widget _tabChip({required bool selected, required Widget child, required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      child: Container(
-        width: 32,
-        height: 32,
-        margin: const EdgeInsets.symmetric(horizontal: 5),
-        decoration: BoxDecoration(
-          color: selected ? Colors.white : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
+      child: UnconstrainedBox(
+        child: Container(
+          width: 32,
+          height: 32,
+          margin: const EdgeInsets.symmetric(horizontal: 5),
+          decoration: BoxDecoration(
+            color: selected ? AppColors.white30 : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          alignment: Alignment.center,
+          child: child,
         ),
-        alignment: Alignment.center,
-        child: child,
       ),
     );
   }
 
   Widget _packCover(Emoticons pack) {
-    const fallback = Icon(
-      Icons.emoji_emotions_outlined,
-      size: 18,
-      color: AppColors.textGray99,
-    );
+    const fallback = Icon(Icons.emoji_emotions_outlined, size: 18, color: AppColors.white30);
     // cover 可能是完整 URL 也可能是 CDN 相对 key，交给 AppImage 判断。
     if (pack.cover.trim().isEmpty) return fallback;
-    return AppImage(
-      pack.cover,
-      width: 22,
-      height: 22,
-      fit: BoxFit.contain,
-      error: fallback,
-    );
+    return Chimo.image(pack.cover, width: 22, height: 22, fit: BoxFit.contain, error: fallback);
   }
 
   Widget _tabRow() {
@@ -256,12 +255,7 @@ class _ChatEmojiPanelState extends State<ChatEmojiPanel> {
           _tabChip(
             selected: _tab == 0,
             onTap: () => _selectTab(0),
-            child: AppImage(
-              AppAssets.inputEmoji,
-              width: 22,
-              height: 22,
-              fit: BoxFit.contain,
-            ),
+            child: Chimo.image(AppAssets.inputEmoji, width: 22, height: 22, fit: BoxFit.contain),
           ),
           if (_packsLoading)
             const Padding(
@@ -296,16 +290,9 @@ class _ChatEmojiPanelState extends State<ChatEmojiPanel> {
         child: Container(
           width: 60,
           height: 34,
-          decoration: const ShapeDecoration(
-            shape: StadiumBorder(),
-            color: Colors.white,
-          ),
+          decoration: const ShapeDecoration(shape: StadiumBorder(), color: Colors.white),
           alignment: Alignment.center,
-          child: AppImage(
-            AppAssets.voiceDeleteIcon,
-            width: 18,
-            fit: BoxFit.fitWidth,
-          ),
+          child: Chimo.image(AppAssets.voiceDeleteIcon, width: 18, fit: BoxFit.fitWidth),
         ),
       ),
       const SizedBox(width: 10),
@@ -316,15 +303,12 @@ class _ChatEmojiPanelState extends State<ChatEmojiPanel> {
           child: Container(
             width: 60,
             height: 36,
-            decoration: const ShapeDecoration(
-              shape: StadiumBorder(),
-              color: AppColors.accentLime,
-            ),
+            decoration: const ShapeDecoration(shape: StadiumBorder(), color: AppColors.green00F875),
             alignment: Alignment.center,
             child: const Text(
               'Send',
               style: TextStyle(
-                color: AppColors.surfaceDark,
+                color: AppColors.black111111,
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
               ),
@@ -349,13 +333,9 @@ class _ChatEmojiPanelState extends State<ChatEmojiPanel> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppColors.textGrayE5),
+                border: Border.all(color: AppColors.grayE8E8E8),
               ),
-              child: const Icon(
-                Icons.backspace_outlined,
-                size: 20,
-                color: AppColors.textGray66,
-              ),
+              child: const Icon(Icons.backspace_outlined, size: 20, color: AppColors.gray6E6E6E),
             ),
           ),
           const SizedBox(width: 10),
@@ -366,15 +346,13 @@ class _ChatEmojiPanelState extends State<ChatEmojiPanel> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: widget.canSend
-                    ? AppColors.accentLime
-                    : AppColors.textGrayE0,
+                color: widget.canSend ? AppColors.green00F875 : AppColors.grayE8E8E8,
                 borderRadius: BorderRadius.circular(18),
               ),
               child: Text(
                 'Send',
                 style: TextStyle(
-                  color: widget.canSend ? Colors.black : AppColors.textGray99,
+                  color: widget.canSend ? Colors.black : AppColors.gray9A9A9A,
                   fontSize: 14,
                   fontWeight: FontWeight.w800,
                 ),
@@ -390,11 +368,7 @@ class _ChatEmojiPanelState extends State<ChatEmojiPanel> {
   Widget _glyphGrid() {
     if (_glyphsLoading) {
       return const Center(
-        child: SizedBox(
-          width: 22,
-          height: 22,
-          child: CircularProgressIndicator(strokeWidth: 2),
-        ),
+        child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2)),
       );
     }
     final grid = GridView.builder(
@@ -414,9 +388,7 @@ class _ChatEmojiPanelState extends State<ChatEmojiPanel> {
           child: Center(
             child: Text(
               emoji,
-              style: TextStyle(
-                fontSize: widget.style.glyphFontSize,
-              ).withAppEmojiFont,
+              style: TextStyle(fontSize: widget.style.glyphFontSize).withAppEmojiFont,
             ),
           ),
         );
@@ -436,28 +408,20 @@ class _ChatEmojiPanelState extends State<ChatEmojiPanel> {
   }
 
   Widget _stickerGrid(ChatStickerSource source, Emoticons pack) {
-    final loading =
-        _loadingPacks.contains(pack.id) &&
-        !_stickersByPack.containsKey(pack.id);
+    final loading = _loadingPacks.contains(pack.id) && !_stickersByPack.containsKey(pack.id);
     final stickers = _stickersByPack[pack.id];
     if (loading || stickers == null) {
       return const Center(
         child: SizedBox(
           width: 22,
           height: 22,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            color: AppColors.textGrayB0,
-          ),
+          child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.grayB0B0B0),
         ),
       );
     }
     if (stickers.isEmpty) {
       return const Center(
-        child: Text(
-          'No stickers',
-          style: TextStyle(color: AppColors.textGrayAE, fontSize: 13),
-        ),
+        child: Text('No stickers', style: TextStyle(color: AppColors.grayB0B0B0, fontSize: 13)),
       );
     }
     return GridView.builder(
@@ -481,27 +445,24 @@ class _ChatEmojiPanelState extends State<ChatEmojiPanel> {
               width: 50,
               height: 50,
               child: thumb.isEmpty
-                  ? const ColoredBox(color: AppColors.textGrayEA)
-                  : AppImage(
+                  ? const ColoredBox(color: AppColors.grayE8E8E8)
+                  : Chimo.image(
                       thumb,
                       width: 50,
                       height: 50,
                       fit: BoxFit.contain,
-                      placeholder: const ColoredBox(
-                        color: AppColors.textGrayF0,
-                        child: Center(
-                          child: SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
+                      placeholder: Center(
+                        child: SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
                         ),
                       ),
                       error: const ColoredBox(
-                        color: AppColors.textGrayEA,
+                        color: AppColors.grayE8E8E8,
                         child: Icon(
                           Icons.broken_image_outlined,
-                          color: AppColors.textGray99,
+                          color: AppColors.gray9A9A9A,
                           size: 20,
                         ),
                       ),
@@ -520,9 +481,7 @@ class _ChatEmojiPanelState extends State<ChatEmojiPanel> {
     // 对齐 forya EmotePanel：emoji tab + 包 tab；贴纸 4 列。
     final showEmoji = _tab == 0;
     final packIndex = _tab - 1;
-    final activePack = packIndex >= 0 && packIndex < _packs.length
-        ? _packs[packIndex]
-        : null;
+    final activePack = packIndex >= 0 && packIndex < _packs.length ? _packs[packIndex] : null;
 
     return ColoredBox(
       color: style.panelColor,
@@ -538,10 +497,7 @@ class _ChatEmojiPanelState extends State<ChatEmojiPanel> {
                   ? Center(
                       child: Text(
                         _packsError ?? 'No sticker packs',
-                        style: const TextStyle(
-                          color: AppColors.textGrayAE,
-                          fontSize: 13,
-                        ),
+                        style: const TextStyle(color: AppColors.grayB0B0B0, fontSize: 13),
                       ),
                     )
                   : _stickerGrid(source, activePack),

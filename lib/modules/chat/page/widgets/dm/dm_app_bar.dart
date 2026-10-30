@@ -1,12 +1,12 @@
+import 'package:chimo/common/widgets/app_scaffold.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../../common/constants/app_assets.dart';
 import '../../../../../common/theme/app_colors.dart';
-import '../../../../../common/widgets/app_back_button.dart';
-import '../../../../../common/widgets/app_image.dart';
 import '../../../../../common/utils/zodiac.dart';
 import '../../../model/chat_conversation.dart';
 import '../../../../profile/page/album_photo_viewer_page.dart';
+import 'package:chimo/common/utils/chimo.dart';
 
 /// 私聊导航栏：头像 / 昵称 / 在线点 / 关注 / 更多，下面挂一段可收起的简介。
 ///
@@ -52,7 +52,7 @@ class DmAppBar extends StatelessWidget {
                 GestureDetector(
                   onTap: onAvatarTap,
                   child: ClipOval(
-                    child: AppImage(
+                    child: Chimo.image(
                       conversation.avatarUrl,
                       fallbackAsset: conversation.avatarAsset,
                       width: 36,
@@ -88,7 +88,7 @@ class DmAppBar extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(width: 4),
-                            AppImage(
+                            Chimo.image(
                               conversation.isMale ? AppAssets.genderMan : AppAssets.genderWoman,
                               width: 16,
                               height: 16,
@@ -104,7 +104,7 @@ class DmAppBar extends StatelessWidget {
                                 width: 6,
                                 height: 6,
                                 decoration: const BoxDecoration(
-                                  color: AppColors.onlineDot,
+                                  color: AppColors.green00F875,
                                   shape: BoxShape.circle,
                                 ),
                               ),
@@ -142,13 +142,13 @@ class DmAppBar extends StatelessWidget {
                                   height: 28,
                                   alignment: Alignment.center,
                                   decoration: BoxDecoration(
-                                    gradient: AppColors.promoBannerGradient,
+                                    gradient: AppColors.primaryGradient,
                                     borderRadius: BorderRadius.circular(16),
                                   ),
                                   child: const Text(
                                     'Follow',
                                     style: TextStyle(
-                                      color: AppColors.promoText,
+                                      color: AppColors.black1C1C1E,
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -162,9 +162,9 @@ class DmAppBar extends StatelessWidget {
                 GestureDetector(
                   onTap: onMoreTap,
                   behavior: HitTestBehavior.opaque,
-                  child: const Padding(
+                  child: Padding(
                     padding: EdgeInsets.all(8),
-                    child: AppImage(
+                    child: Chimo.image(
                       AppAssets.chatDmMore,
                       width: 18,
                       height: 18,
@@ -240,7 +240,7 @@ class DmAppBar extends StatelessWidget {
                                 ),
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(8),
-                                  child: AppImage(
+                                  child: Chimo.image(
                                     conversation.momentUrls[i],
                                     fallbackAsset: AppAssets.avatarPlace,
                                     width: 72,
@@ -270,7 +270,7 @@ class DmAppBar extends StatelessWidget {
                                 ),
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(8),
-                                  child: AppImage(
+                                  child: Chimo.image(
                                     conversation.momentAssets[i],
                                     width: 72,
                                     height: 72,
@@ -314,7 +314,7 @@ class _ProfileTag extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (iconAsset != null) ...[
-            AppImage(iconAsset!, width: 14, height: 14),
+            Chimo.image(iconAsset!, width: 14, height: 14),
             const SizedBox(width: 3),
           ],
           Text(

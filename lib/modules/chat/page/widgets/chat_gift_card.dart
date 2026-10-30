@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../common/constants/app_assets.dart';
 import '../../../../common/theme/app_colors.dart';
-import '../../../../common/widgets/app_image.dart';
+import 'package:chimo/common/utils/chimo.dart';
 
 /// 礼物消息卡片（对齐 forya `GiftItemV2`：padding 16、图标 56、间距 16、字号 14）。
 ///
@@ -36,9 +36,9 @@ class ChatGiftCard extends StatelessWidget {
   /// 头像与卡片的间距，和文本 / 图片气泡那一行一致。
   static const double _avatarGap = 10;
 
-  static const _qtyYellow = AppColors.giftYellow;
+  static const _qtyYellow = AppColors.yellowFDF652;
   static const _labelStyle = TextStyle(
-    color: AppColors.surfaceInput,
+    color: AppColors.black1C1C1E,
     fontSize: 14,
     fontWeight: FontWeight.w600,
     height: 1.25,
@@ -46,7 +46,7 @@ class ChatGiftCard extends StatelessWidget {
 
   Widget _giftIcon() {
     if (giftIconUrl.isNotEmpty) {
-      return AppImage(
+      return Chimo.image(
         giftIconUrl,
         width: 56,
         height: 56,
@@ -75,7 +75,7 @@ class ChatGiftCard extends StatelessWidget {
                 fontStyle: FontStyle.italic,
                 height: 1.25,
                 shadows: [
-                  Shadow(color: AppColors.scrimGray50, blurRadius: 1, offset: Offset(0, 0.5)),
+                  Shadow(color: AppColors.gray80333333, blurRadius: 1, offset: Offset(0, 0.5)),
                 ],
               ),
             ),
@@ -96,8 +96,8 @@ class ChatGiftCard extends StatelessWidget {
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: isSelf
-                  ? const [AppColors.glowGiftOrange, AppColors.glowGiftPink]
-                  : const [AppColors.glowGiftPink, AppColors.glowGiftOrange],
+                  ? const [AppColors.orange33FE8F19, AppColors.pink33FC1192]
+                  : const [AppColors.pink33FC1192, AppColors.orange33FE8F19],
             ),
             borderRadius: BorderRadiusDirectional.only(
               topStart: Radius.circular(isSelf ? 16 : 0),
@@ -154,6 +154,6 @@ class _GiftBoxBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppImage(AppAssets.giftIcon, width: 28, height: 28, fit: BoxFit.contain);
+    return Chimo.image(AppAssets.giftIcon, width: 28, height: 28, fit: BoxFit.contain);
   }
 }
