@@ -65,16 +65,16 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
-    - assets/images/chimo/common/
-    - assets/images/chimo/auth/
-    - assets/images/chimo/home/
-    - assets/images/chimo/me/
-    - assets/images/chimo/wallet/
-    - assets/images/chimo/level/
-    - assets/images/chimo/profile/
-    - assets/images/chimo/chat/
-    - assets/images/chimo/msg/
-    - assets/images/chimo/tab/
+    - assets/images/common/
+    - assets/images/auth/
+    - assets/images/home/
+    - assets/images/me/
+    - assets/images/wallet/
+    - assets/images/level/
+    - assets/images/profile/
+    - assets/images/chat/
+    - assets/images/msg/
+    - assets/images/tab/
     - assets/images/honor/
     - assets/images/room/common/
     - assets/json/

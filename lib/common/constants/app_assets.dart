@@ -1,16 +1,15 @@
 /// 本地图片路径集中管理。请勿硬编码 `assets/images/...`，统一使用这些常量。
 abstract final class AppAssets {
-  static const String _chimo = 'assets/images/chimo';
-  static const String _common = '$_chimo/common';
-  static const String _auth = '$_chimo/auth';
-  static const String _home = '$_chimo/home';
-  static const String _me = '$_chimo/me';
-  static const String _wallet = '$_chimo/wallet';
-  static const String _level = '$_chimo/level';
-  static const String _profile = '$_chimo/profile';
-  static const String _chat = '$_chimo/chat';
-  static const String _msg = '$_chimo/msg';
-  static const String _tab = '$_chimo/tab';
+  static const String _common = 'assets/images/common';
+  static const String _auth = 'assets/images/auth';
+  static const String _home = 'assets/images/home';
+  static const String _me = 'assets/images/me';
+  static const String _wallet = 'assets/images/wallet';
+  static const String _level = 'assets/images/level';
+  static const String _profile = 'assets/images/profile';
+  static const String _chat = 'assets/images/chat';
+  static const String _msg = 'assets/images/msg';
+  static const String _tab = 'assets/images/tab';
   static const String _honor = 'assets/images/honor';
 
   // ---------- 品牌 / 共用 ----------

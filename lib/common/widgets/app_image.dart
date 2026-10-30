@@ -274,7 +274,7 @@ class AppImage extends StatelessWidget {
   /// | 传入 | 规整为 |
   /// |---|---|
   /// | `logo.webp` | `assets/images/logo.webp` |
-  /// | `chimo/common/logo.webp` | `assets/images/chimo/common/logo.webp` |
+  /// | `common/logo.webp` | `assets/images/common/logo.webp` |
   /// | `/upload/a.jpg`（配了 [cdnBase]） | `$cdnBase/upload/a.jpg` |
   /// | `/var/mobile/…/a.jpg` | 原样（本地文件） |
   /// | `http(s)://` `file://` `data:` `assets/` `packages/` | 原样 |
