@@ -3,17 +3,23 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import 'package:forya_pag/pag.dart';
+
 import '../../../app/app_gift.dart';
 import '../../../app/app_jumper.dart';
 import '../../../common/constants/app_assets.dart';
 import '../../../common/theme/app_colors.dart';
 import '../../../common/theme/app_dialog.dart';
 import 'package:chimo/common/utils/chimo.dart';
+import '../../../common/widgets/app_image.dart';
 import '../../../common/widgets/app_scaffold.dart';
 import '../logic/mic_logic.dart';
 import '../logic/room_logic.dart';
 import '../logic/room_rank_logic.dart';
+import '../model/room_fx.dart';
 import '../service/room_service.dart';
+import '../types/auction/logic/auction_logic.dart';
+import '../types/auction/widgets/auction_bid_bar.dart';
 import 'widgets/room_barrage_list.dart';
 import 'widgets/room_bulletin_dialog.dart';
 import 'widgets/room_gift_layer.dart';
@@ -152,17 +158,103 @@ class _RoomPageState extends State<RoomPage> {
     showRoomToolsSheet();
   }
 
-  Widget _background(String url) {
+  Widget _background(String url, RoomService? service) {
     final src = url.trim();
+    final resolved = AppImage.resolve(src);
+    final pag = roomIsPag(resolved);
     return Stack(
       fit: StackFit.expand,
       children: [
         const ColoredBox(color: AppColors.purple14081F),
         if (src.isNotEmpty)
-          Chimo.image(src, fit: BoxFit.cover, width: double.infinity, height: double.infinity),
-        const DecoratedBox(decoration: BoxDecoration(gradient: AppColors.roomBackdropScrim)),
+          if (pag)
+            // PAG 需要明确宽高；Chimo.image 的 infinity.w 会导致播不起来。
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final w = constraints.maxWidth;
+                final h = constraints.maxHeight;
+                return PAGView.network(
+                  resolved,
+                  width: w,
+                  height: h,
+                  autoPlay: true,
+                  repeatCount: PAGView.REPEAT_COUNT_LOOP,
+                );
+              },
+            )
+          else
+            Positioned.fill(
+              child: AppImage.image(resolved, fit: BoxFit.cover),
+            ),
+        // 压暗静态底图；房型 PAG 叠在遮罩之上，避免动画被洗暗。
+        const DecoratedBox(
+          decoration: BoxDecoration(gradient: AppColors.roomBackdropScrim),
+        ),
+        ..._playBackdrops(context, service),
       ],
     );
+  }
+
+  Widget _micArea(BuildContext context, RoomService? service) {
+    final plays = service?.plays ?? const [];
+    for (final play in plays) {
+      final area = play.buildMicArea(context);
+      if (area != null) return area;
+    }
+    return RoomMicGrid(
+      onTap: (seat) {
+        if (!seat.occupied) {
+          logic.toggleMic(position: seat.index);
+          return;
+        }
+        // 与弹幕 / 榜单同一信息卡；自己底部为上/下麦。
+        AppJumper.showUserProfileSheet(
+          uid: '${seat.uid ?? 0}',
+          name: seat.name,
+          avatar: seat.avatar,
+        );
+      },
+    );
+  }
+
+  List<Widget> _topPills(BuildContext context, RoomService? service) {
+    final pills = <Widget>[];
+    final plays = service?.plays ?? const [];
+    for (final play in plays) {
+      pills.addAll(play.buildTopPills(context));
+    }
+    return pills;
+  }
+
+  List<Widget> _playSlots(RoomService? service) {
+    final slots = <Widget>[];
+    final plays = service?.plays ?? const [];
+    for (final play in plays) {
+      slots.add(play.buildSlot());
+    }
+    return slots;
+  }
+
+  List<Widget> _playBackdrops(BuildContext context, RoomService? service) {
+    final layers = <Widget>[];
+    final plays = service?.plays ?? const [];
+    for (final play in plays) {
+      final backdrop = play.buildBackdrop(context);
+      if (backdrop != null) layers.add(backdrop);
+    }
+    return layers;
+  }
+
+  List<Widget> _playOverlays(BuildContext context, RoomService? service) {
+    final layers = <Widget>[];
+    final plays = service?.plays ?? const [];
+    for (final play in plays) {
+      final overlay = play.buildOverlay(context);
+      if (overlay != null) {
+        layers.add(Positioned.fill(child: overlay));
+      }
+    }
+    return layers;
   }
 
   @override
@@ -184,12 +276,19 @@ class _RoomPageState extends State<RoomPage> {
               final service = RoomService.findOrNull();
               final notice = service?.notice.value ?? '';
               final background = service?.background.value ?? '';
+              final ready = logic.phase.value == RoomPhase.ready;
+              // 订阅玩法列表，进拍卖房后才能挂上 BidBar。
+              service?.plays.length;
               return Stack(
                 fit: StackFit.expand,
                 children: [
-                  _background(background),
-                  if (logic.phase.value != RoomPhase.ready)
-                    const Center(child: CircularProgressIndicator(color: AppColors.green29EEAA))
+                  _background(background, service),
+                  if (!ready)
+                    const Center(
+                      child: CircularProgressIndicator(
+                        color: AppColors.green29EEAA,
+                      ),
+                    )
                   else
                     SafeArea(
                       child: Column(
@@ -199,34 +298,37 @@ class _RoomPageState extends State<RoomPage> {
                             onSave: logic.toggleSave,
                             onBulletin: () => _bulletin(notice),
                             onMoreRooms: AppJumper.showMoreRoomsDrawer,
-                            onRank: () => RoomRankSheet.show(initial: RoomRankTab.givers),
-                            onAudience: () => RoomRankSheet.show(initial: RoomRankTab.members),
+                            onRank: () =>
+                                RoomRankSheet.show(initial: RoomRankTab.givers),
+                            onAudience: () => RoomRankSheet.show(
+                              initial: RoomRankTab.members,
+                            ),
                             onScale: _minimize,
+                            extraPills: _topPills(context, service),
                           ),
-                          RoomMicGrid(
-                            onTap: (seat) {
-                              if (!seat.occupied) {
-                                logic.toggleMic(position: seat.index);
-                                return;
-                              }
-                              // 与弹幕 / 榜单同一信息卡；自己底部为上/下麦。
-                              AppJumper.showUserProfileSheet(
-                                uid: '${seat.uid ?? 0}',
-                                name: seat.name,
-                                avatar: seat.avatar,
-                              );
-                            },
-                          ),
-                          ...(service?.plays.map((play) => play.buildSlot()) ?? const []),
+                          _micArea(context, service),
+                          ..._playSlots(service),
                           const Expanded(
                             child: Stack(
                               children: [
                                 Positioned.fill(child: RoomBarrageList()),
-                                Positioned(top: 0, left: 0, right: 0, child: RoomJoinLayer()),
-                                Positioned(right: 8, bottom: 8, child: _GamesButton()),
+                                Positioned(
+                                  top: 0,
+                                  left: 0,
+                                  right: 0,
+                                  child: RoomJoinLayer(),
+                                ),
+                                Positioned(
+                                  right: 8,
+                                  bottom: 8,
+                                  child: _GamesButton(),
+                                ),
                               ],
                             ),
                           ),
+                          // Bid 在底栏上方 Column 内，不被礼物全屏层盖住。
+                          if (Get.isRegistered<AuctionLogic>())
+                            const AuctionBidBar(),
                           RoomInputBar(
                             controller: _input,
                             onSend: _send,
@@ -239,6 +341,7 @@ class _RoomPageState extends State<RoomPage> {
                         ],
                       ),
                     ),
+                  if (ready) ..._playOverlays(context, service),
                 ],
               );
             }),
@@ -259,7 +362,11 @@ class _GamesButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        AppDialog.show(title: 'Games', content: 'No games in this room.', confirmLabel: 'OK');
+        AppDialog.show(
+          title: 'Games',
+          content: 'No games in this room.',
+          confirmLabel: 'OK',
+        );
       },
       child: Chimo.image(AppAssets.roomGames, width: 64, fit: BoxFit.contain),
     );

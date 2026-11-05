@@ -25,6 +25,7 @@ class RoomMicGrid extends StatelessWidget {
       // 必须在 Obx 回调里读完整 map，否则只改 value、length 不变时不会刷新。
       final emotes = Map<int, String>.from(logic.micEmotes);
       final hostOnTop = RoomService.findOrNull()?.hostOnTop.value ?? true;
+      RoomService.findOrNull()?.giftValueCountSwitch.value;
       final seats = logic.seats.toList();
       if (seats.isEmpty) return const SizedBox(height: 220);
       if (!hostOnTop || seats.length < 5) {
@@ -34,7 +35,7 @@ class RoomMicGrid extends StatelessWidget {
       final guests = seats.skip(1).toList();
       return Column(
         children: [
-          _Seat(
+          RoomMicSeat(
             seat: host,
             host: true,
             anchor: logic.anchorFor(host),
@@ -65,7 +66,7 @@ class RoomMicGrid extends StatelessWidget {
       ),
       children: seats
           .map(
-            (seat) => _Seat(
+            (seat) => RoomMicSeat(
               seat: seat,
               host: host,
               anchor: logic.anchorFor(seat),
@@ -83,8 +84,10 @@ class RoomMicGrid extends StatelessWidget {
   }
 }
 
-class _Seat extends StatelessWidget {
-  const _Seat({
+/// 单个麦位。普通网格和兜风双麦共用。
+class RoomMicSeat extends StatelessWidget {
+  const RoomMicSeat({
+    super.key,
     required this.seat,
     required this.host,
     required this.anchor,
@@ -109,7 +112,8 @@ class _Seat extends StatelessWidget {
           SizedBox(key: anchor, width: size, height: size, child: _face(size)),
           const SizedBox(height: 4),
           _label(),
-          if (seat.occupied) ...[
+          if (seat.occupied &&
+              (RoomService.findOrNull()?.giftValueCountSwitch.value ?? false)) ...[
             const SizedBox(height: 2),
             UnconstrainedBox(
               child: Container(
@@ -167,7 +171,7 @@ class _Seat extends StatelessWidget {
       alignment: Alignment.center,
       clipBehavior: Clip.none,
       children: [
-        if (seat.speaking) _SeatWave(size: size),
+        if (seat.speaking) RoomSeatWave(size: size),
         avatar,
         if (frame.isNotEmpty) IgnorePointer(child: _frame(frame, size)),
         if (emote.isNotEmpty)
@@ -301,16 +305,16 @@ class _Seat extends StatelessWidget {
 }
 
 /// 说话时从头像边缘扩出去的一圈，1 秒淡出后重复。对齐 Oumi `WaveBorder`。
-class _SeatWave extends StatefulWidget {
-  const _SeatWave({required this.size});
+class RoomSeatWave extends StatefulWidget {
+  const RoomSeatWave({super.key, required this.size});
 
   final double size;
 
   @override
-  State<_SeatWave> createState() => _SeatWaveState();
+  State<RoomSeatWave> createState() => _RoomSeatWaveState();
 }
 
-class _SeatWaveState extends State<_SeatWave>
+class _RoomSeatWaveState extends State<RoomSeatWave>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(
     vsync: this,

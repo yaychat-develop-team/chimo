@@ -169,6 +169,24 @@ abstract final class AppAssets {
   /// 「关于我们」页 Logo。
   static const String aboutLogo = '$_me/about_logo.webp';
 
+  /// 个人页顶栏：菜单、编辑。
+  static const String mineMenu = '$_me/mine_menu.webp';
+  static const String mineEdit = '$_me/mine_edit.webp';
+
+  /// 新个人页入口图标 / 卡片（后续接入）。
+  static const String mineEchoHall = '$_me/mine_echo_hall.webp';
+  static const String mineFrame = '$_me/mine_frame.webp';
+  static const String mineMarket = '$_me/mine_market.webp';
+  static const String mineCardWallet = '$_me/mine_card_wallet.webp';
+  static const String mineGoldCouple = '$_me/mine_gold_couple.webp';
+  static const String mineCharmLv = '$_me/mine_charm_lv.webp';
+  static const String mineMount = '$_me/mine_mount.webp';
+  static const String mineMedal = '$_me/mine_medal.webp';
+  static const String mineCardPeerage = '$_me/mine_card_peerage.webp';
+  static const String mineInviteEarn = '$_me/mine_invite_earn.webp';
+  static const String minePet = '$_me/mine_pet.webp';
+  static const String mineCardWealth = '$_me/mine_card_wealth.webp';
+
   /// 个人资料页顶部背景。
   static const String personalBg = '$_profile/personal_bg.webp';
   static const String infoBg = '$_profile/info_bg.webp';
@@ -435,4 +453,121 @@ abstract final class AppAssets {
 
   /// 房间工具：关闭房间。
   static const String roomToolClose = '$_room/icon_exit.webp';
+
+  // ---------- 房间用户更多（对齐 joyride room/tool/*） ----------
+  static const String _roomTool = 'assets/images/room/tool';
+
+  /// 房间工具：房间设置。
+  static const String roomToolSetting = '$_roomTool/setting.webp';
+
+  /// 房间工具：打开公屏。
+  static const String roomToolScreenOpen = '$_roomTool/screen_open.webp';
+
+  /// 房间工具：关闭公屏。
+  static const String roomToolScreenClose = '$_roomTool/screen_close.webp';
+
+  /// 房间工具：礼物统计开关。
+  static const String roomToolStatistic = '$_roomTool/statistic.webp';
+
+  /// 房间工具：房间倒计时（CP 主持）。
+  static const String roomToolTimer = '$_roomTool/timer.webp';
+
+  static const String roomUserMicOn = '$_roomTool/mic_on.webp';
+  static const String roomUserMicDown = '$_roomTool/mic_down.webp';
+  static const String roomUserMicForbid = '$_roomTool/mic_forbid.webp';
+  static const String roomUserMicForbidCancel = '$_roomTool/mic_forbid_cancel.webp';
+  static const String roomUserTimer = '$_roomTool/timer.webp';
+  static const String roomUserClear = '$_roomTool/clear.webp';
+  static const String roomUserKick = '$_roomTool/kick.webp';
+  static const String roomUserKnightKick = '$_roomTool/knight_kick.webp';
+  static const String roomUserKnightBan = '$_roomTool/knight_ban.webp';
+  static const String roomUserAdmin = '$_roomTool/admin.webp';
+  static const String roomUserReport = '$_roomTool/report.webp';
+  static const String roomUserBlock = '$_roomTool/block.webp';
+  static const String roomUserWarn = '$_roomTool/warn.webp';
+  static const String roomUserBan = '$_roomTool/ban.webp';
+  static const String roomUserMore = '$_chat/chat_dm_more.svg';
+
+  // ---------- 拍卖房（对齐 joyride auction/*） ----------
+  static const String _auction = 'assets/images/room/auction';
+
+  static const String auctionHost = '$_auction/host.webp';
+  static const String auctionStar = '$_auction/star.webp';
+  static const String auctionHeart = '$_auction/heart.webp';
+  /// 出价排行皇冠：1 金 / 2 银 / 3 铜。
+  static const String auctionCrown = '$_auction/crown_1.webp';
+  static const String auctionCrown1 = auctionCrown;
+  static const String auctionCrown2 = '$_auction/crown_2.webp';
+  static const String auctionCrown3 = '$_auction/crown_3.webp';
+  static const String auctionCoin = '$_auction/coin.webp';
+  static const String auctionClock = '$_auction/clock.webp';
+  static const String auctionPlus = '$_auction/plus_btn.webp';
+  static const String auctionPriceTipsBg = '$_auction/price_tips_bg.webp';
+  static const String auctionTimeBg = '$_auction/time_bg.webp';
+  static const String auctionBidBtnBg = '$_auction/bid_btn_bg.webp';
+  static const String auctionBidBg = '$_auction/bid_bg.webp';
+  static const String auctionMicTipsBg = '$_auction/mic_tips_bg.webp';
+  static const String auctionClose = '$_auction/close.webp';
+  static const String auctionBossWheat = '$_auction/boss_wheat.png';
+  static const String auctionSuccessBg = '$_auction/success_bg.webp';
+  static const String auctionSuccessBgSmall = '$_auction/success_bg_small.webp';
+  static const String auctionSuccessArrowBg = '$_auction/success_arrow_bg.webp';
+  static const String auctionSuccessHeart = '$_auction/success_heart.webp';
+  static const String auctionSuccessShadow = '$_auction/success_shadow.webp';
+  static const String auctionBidFailBg = '$_auction/bid_fail_bg.webp';
+  static const String auctionCircleClose = '$_auction/circle_close.webp';
+
+  // ---------- CP 房（对齐 joyride room_cp） ----------
+  static const String _cp = 'assets/images/room/cp';
+
+  static const String cpMainBg = '$_cp/bg_cp_main.webp';
+  static const String cpHeartBg = '$_cp/bg_cp_heart.pag';
+  static const String cpStarBg = '$_cp/bg_cp_star.pag';
+  static const String cpMicHeart1 = '$_cp/bg_cp_mic_heart1.webp';
+  static const String cpMicHeart2 = '$_cp/bg_cp_mic_heart2.webp';
+  static const String cpChooseTop = '$_cp/bg_cp_choose_top.webp';
+  static const String cpHandsTop = '$_cp/bg_cp_hands_top.webp';
+  static const String cpHandsTitle = '$_cp/bg_hands_title.webp';
+  static const String cpChooseHeart = '$_cp/ic_cp_choose_heart.webp';
+  static const String cpProgressEnd = '$_cp/ic_cp_progress_desc_end.webp';
+  static const String cpHandsTitleArrow = '$_cp/ic_hands_title_arrow.webp';
+  static const String cpStageIntroduce = '$_cp/cp_stage_change_introduce.pag';
+  static const String cpStageChoose = '$_cp/cp_stage_change_choose.pag';
+  static const String cpStageHands = '$_cp/cp_stage_change_hands.pag';
+  static const String cpChooseChangeBg = '$_cp/cp_choose_change_bg.webp';
+  static const String cpSelectBg = '$_cp/cp_select_bg.webp';
+  static const String cpSelectNumberBg = '$_cp/cp_select_number_bg.png';
+  static const String cpSelectNumberArrow = '$_cp/cp_select_number_arrow.png';
+  static const String cpRankIcon = '$_cp/cp_rank_icon.png';
+  static const String cpCountDown = '$_cp/cp_count_down_icon.webp';
+  static const String cpRankItemBg = '$_cp/rank_cp_item_bg.webp';
+  static const String cpRankCrown = '$_cp/rank_cp_item_crown.webp';
+  static const String cpRankLineLeft = '$_cp/rank_cp_item_line_left.webp';
+  static const String cpRankLineRight = '$_cp/rank_cp_item_line_right.webp';
+  static const String cpRankLoveIcon = '$_cp/rank_cp_item_love_icon.webp';
+  static const String cpRankLoveImg = '$_cp/rank_cp_item_love_img.webp';
+
+  /// 授予关系弹窗背景。
+  static const String cpAssignRelationBg = '$_cp/cp_assign_relation_bg.webp';
+
+  /// 授予关系卡片背景。
+  static const String cpAssignRelationCardBg = '$_cp/cp_assign_relation_card_bg.webp';
+
+  /// 心动排行榜背景。
+  static const String cpHeartRankBg = '$_cp/cp_heart_rank_bg.webp';
+
+  /// 翅膀装饰卡片（授予关系 / 排行榜）。
+  static const String cpWingCard = '$_cp/cp_wing_card.webp';
+
+  /// 带翅爱心图标。
+  static const String cpHeartWing = '$_cp/ic_cp_heart_wing.webp';
+
+  /// 心动榜第 1 名皇冠。
+  static const String cpRankNo1 = '$_cp/rank_cp_no1.webp';
+
+  /// 装饰左翅。
+  static const String cpWingLeft = '$_cp/ic_cp_wing_left.webp';
+
+  /// 装饰右翅。
+  static const String cpWingRight = '$_cp/ic_cp_wing_right.webp';
 }

@@ -1,7 +1,7 @@
 name: chimo
 description: "Chimo — groups & community."
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.6.7+1
 
 environment:
   sdk: ^3.12.2
@@ -77,6 +77,9 @@ flutter:
     - assets/images/tab/
     - assets/images/honor/
     - assets/images/room/common/
+    - assets/images/room/auction/
+    - assets/images/room/cp/
+    - assets/images/room/tool/
     - assets/json/
   fonts:
     - family: Emoji

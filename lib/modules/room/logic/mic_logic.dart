@@ -42,7 +42,14 @@ class MicLogic extends GetxController {
       final uid = seat.uid;
       if (seat.speaking && uid != null) speaking[uid] = true;
     }
-    final count = seatCount != null && seatCount > slots.length ? seatCount : slots.length;
+    // 对齐 joyride `uidWithPosition`：broadcaster 下标即麦位（0 主持 / 1 表演 / 2–4 Boss）。
+    // 拍卖房强制 5 坑，避免 MIC_CHANGE 只推占用位时表演位被裁掉。
+    final count = () {
+      if (seatCount != null && seatCount > 0) {
+        return seatCount > slots.length ? seatCount : slots.length;
+      }
+      return slots.isEmpty ? 9 : slots.length;
+    }();
     final next = <MicSeat>[];
     for (var i = 0; i < (count == 0 ? 9 : count); i++) {
       final slot = i < slots.length ? slots[i] : null;
@@ -61,7 +68,7 @@ class MicLogic extends GetxController {
           speaking: speaking[uid] == true,
           contribution: slot?.contributionValue.toInt() ?? 0,
           frame: frame,
-          boss: slot?.micType == MicTypeEnum.CAR_OWNER_MIC || (count == 9 && i == count - 1),
+          boss: (count == 0 ? 9 : count) == 9 && i == (count == 0 ? 8 : count - 1),
           downMicAt: slot?.downMicTimestamp ?? 0,
         ),
       );
@@ -72,8 +79,9 @@ class MicLogic extends GetxController {
       _syncTimer();
       return;
     }
-    seats.assignAll(next);
-    seats.refresh();
+    seats
+      ..assignAll(next)
+      ..refresh();
     _syncTimer();
   }
 
@@ -264,7 +272,8 @@ class _MicMsgHandler implements RoomMsgHandler {
         return;
       }
       final change = message.data.content.unpackInto(RoomMicChange());
-      logic.apply(change.broadcaster);
+      final seatCount = RoomService.findOrNull()?.preferredSeatCount;
+      logic.apply(change.broadcaster, seatCount: seatCount);
     } catch (error) {
       AppLog.w(
         'MicMsgHandler failed type=${message.type} scene=${message.data.scene}',

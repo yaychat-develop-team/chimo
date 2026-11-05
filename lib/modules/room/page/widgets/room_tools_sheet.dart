@@ -10,13 +10,14 @@ import '../../../../common/theme/app_dialog.dart';
 import '../../../../common/utils/app_toast.dart';
 import '../../../../modules/report/model/report_target.dart';
 import '../../service/room_service.dart';
+import 'room_setting_sheet.dart';
 import 'room_share_sheet.dart';
 import 'package:chimo/common/utils/chimo.dart';
 
 /// 房间工具弹层。
 ///
 /// UI 对齐 Cosmic Lounge；能力与可见性对齐 joyride/yaychat `RoomToolWidget`：
-/// Share 邀请好友、Report/Save 非房主、Warn 管理角色、Close/Open 房主(接待)。
+/// Share / Report / Save；管理：公屏、礼物统计、Warn、Close/Open、CP Timer。
 Future<void> showRoomToolsSheet() {
   final service = RoomService.findOrNull();
   if (service == null || !service.inRoom.value) {
@@ -40,7 +41,13 @@ class _RoomToolsSheet extends StatelessWidget {
     return Obx(() {
       final saved = service.saved.value;
       final closed = service.isRoomClosed;
+      final publicOn = service.freePublicChat.value;
+      final giftOn = service.giftValueCountSwitch.value;
+      final timing = service.hasRoomTimer;
       final items = <_ToolItem>[
+        // 房间设置：房主 / 接待。对齐 joyride `room_setting`。
+        if (service.isOwnerOrReceptionist)
+          _ToolItem(icon: AppAssets.roomToolSetting, label: 'Setting', onTap: _setting),
         // 对齐 joyride：分享打开好友邀请页，不是剪贴板。
         _ToolItem(icon: AppAssets.roomToolShare, label: 'Share Room', onTap: _share),
         // 房主不举报自己的房。
@@ -53,6 +60,20 @@ class _RoomToolsSheet extends StatelessWidget {
             label: saved ? 'Cancel Save' : 'Save Room',
             onTap: _save,
           ),
+        // 公屏开关：房主 / 接待 / 管理。对齐 joyride `switchPublicScreen`。
+        if (service.isStaff)
+          _ToolItem(
+            icon: publicOn ? AppAssets.roomToolScreenClose : AppAssets.roomToolScreenOpen,
+            label: publicOn ? 'Close Screen' : 'Open Screen',
+            onTap: _togglePublicChat,
+          ),
+        // 礼物统计：房主 / 接待。对齐 joyride `package_statistics`。
+        if (service.isOwnerOrReceptionist)
+          _ToolItem(
+            icon: AppAssets.roomToolStatistic,
+            label: giftOn ? 'Hide Gift Stats' : 'Gift Stats',
+            onTap: _toggleGiftStats,
+          ),
         // joyride 超管 Warn；此处管理角色可见（Owner/Manager/Receptionist）。
         if (service.isStaff) _ToolItem(icon: AppAssets.roomToolWarn, label: 'Warn', onTap: _warn),
         if (service.canToggleClose)
@@ -60,6 +81,13 @@ class _RoomToolsSheet extends StatelessWidget {
             icon: AppAssets.roomToolClose,
             label: closed ? 'Open Room' : 'Close Room',
             onTap: closed ? _openRoom : _closeRoom,
+          ),
+        // CP 房间倒计时：本人在 0 号主持麦。对齐 joyride `showTimeAction`。
+        if (service.showCpRoomTimer)
+          _ToolItem(
+            icon: AppAssets.roomToolTimer,
+            label: timing ? 'Close Timer' : 'Timer',
+            onTap: timing ? _closeRoomTimer : _openRoomTimer,
           ),
       ];
 
@@ -103,6 +131,11 @@ class _RoomToolsSheet extends StatelessWidget {
     });
   }
 
+  Future<void> _setting() async {
+    AppJumper.back();
+    await showRoomSettingSheet();
+  }
+
   Future<void> _share() async {
     AppJumper.back();
     await showRoomShareSheet();
@@ -120,6 +153,28 @@ class _RoomToolsSheet extends StatelessWidget {
       return;
     }
     AppToast.info(service.saved.value ? 'Saved' : 'Cancel Save');
+  }
+
+  Future<void> _togglePublicChat() async {
+    final next = !service.freePublicChat.value;
+    final failure = await service.togglePublicChat();
+    if (failure != null) {
+      AppToast.error(failure);
+      return;
+    }
+    AppJumper.back();
+    AppToast.info(next ? 'Public screen opened' : 'Public screen closed');
+  }
+
+  Future<void> _toggleGiftStats() async {
+    final next = !service.giftValueCountSwitch.value;
+    final failure = await service.toggleGiftValueCount();
+    if (failure != null) {
+      AppToast.error(failure);
+      return;
+    }
+    AppJumper.back();
+    AppToast.info(next ? 'Gift stats shown' : 'Gift stats hidden');
   }
 
   Future<void> _warn() async {
@@ -166,6 +221,36 @@ class _RoomToolsSheet extends StatelessWidget {
     }
     AppJumper.back();
     AppToast.info('Room opened');
+  }
+
+  Future<void> _closeRoomTimer() async {
+    final failure = await service.setRoomTimer(open: false);
+    if (failure != null) {
+      AppToast.error(failure);
+      return;
+    }
+    AppJumper.back();
+    AppToast.info('Timer closed');
+  }
+
+  Future<void> _openRoomTimer() async {
+    final seconds = await AppBottomSheet.actions<int>(
+      buildItems: () => [
+        AppSheetAction(label: '30s', onTap: () => AppJumper.back(result: 30)),
+        AppSheetAction(label: '1 min', onTap: () => AppJumper.back(result: 60)),
+        AppSheetAction(label: '3 min', onTap: () => AppJumper.back(result: 180)),
+        AppSheetAction(label: '5 min', onTap: () => AppJumper.back(result: 300)),
+        AppSheetAction(label: 'Cancel', onTap: () => AppJumper.back()),
+      ],
+    );
+    if (seconds == null || seconds <= 0) return;
+    final failure = await service.setRoomTimer(open: true, seconds: seconds);
+    if (failure != null) {
+      AppToast.error(failure);
+      return;
+    }
+    AppJumper.back();
+    AppToast.info('Timer started');
   }
 }
 

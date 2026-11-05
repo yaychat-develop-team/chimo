@@ -15,9 +15,10 @@ import '../../../../common/utils/app_toast.dart';
 import '../../../chat/page/widgets/panels/emoji_panel.dart';
 import '../../logic/mic_logic.dart';
 import '../../service/room_service.dart';
+import 'mic_queue_sheet.dart';
 import 'package:chimo/common/utils/chimo.dart';
 
-/// 房间底栏。顺序按设计图：上麦、输入框、礼物、消息、功能。
+/// 房间底栏。顺序：主持排麦管理、上麦、输入框、礼物、消息、功能。
 class RoomInputBar extends StatelessWidget {
   const RoomInputBar({
     super.key,
@@ -48,6 +49,7 @@ class RoomInputBar extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(14, 8, 16, 8),
         child: Row(
           children: [
+            _manageMic(),
             _mic(),
             const SizedBox(width: 8),
             Expanded(child: _field(context)),
@@ -61,6 +63,74 @@ class RoomInputBar extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// 主持排麦管理：管理角色 + 非自由上麦时显示，在上麦按钮左侧。
+  Widget _manageMic() {
+    final room = RoomService.findOrNull();
+    if (room == null) return const SizedBox.shrink();
+    return Obx(() {
+      room.freePub.value;
+      room.role.value;
+      room.waitQueue.length;
+      room.carOwnerMicQueue.length;
+      if (!room.isStaff || room.freePub.value) return const SizedBox.shrink();
+      final count = room.waitQueue.length + room.carOwnerMicQueue.length;
+      return Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: GestureDetector(
+          onTap: () => MicQueueSheet.show(),
+          behavior: HitTestBehavior.opaque,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                height: _barHeight.w,
+                padding: EdgeInsets.symmetric(horizontal: 10.w),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppColors.white.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  'Wait',
+                  style: TextStyle(
+                    color: AppColors.white,
+                    fontSize: 12.sp,
+                    fontWeight: FontWeight.w600,
+                    height: 1,
+                  ),
+                ),
+              ),
+              if (count > 0)
+                Positioned(
+                  top: -4.w,
+                  right: -4.w,
+                  child: Container(
+                    constraints: BoxConstraints(minWidth: 16.w),
+                    height: 16.w,
+                    padding: EdgeInsets.symmetric(horizontal: 4.w),
+                    alignment: Alignment.center,
+                    decoration: const ShapeDecoration(
+                      shape: StadiumBorder(),
+                      color: AppColors.redFF3B30,
+                    ),
+                    child: Text(
+                      count > 99 ? '99+' : '$count',
+                      style: TextStyle(
+                        color: AppColors.white,
+                        fontSize: 9.sp,
+                        fontWeight: FontWeight.w700,
+                        height: 1,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    });
   }
 
   Widget _field(BuildContext context) {

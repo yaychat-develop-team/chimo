@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 
 import '../../../app/app_jumper.dart';
 import '../../../app/chimo_api.dart';
+import '../../../common/extensions/wire_view.dart';
 import '../../../common/models/server_client/user.pb.dart';
 import '../../../common/utils/app_toast.dart';
 import '../model/me_menu_data.dart';
@@ -17,6 +18,9 @@ class MeLogic extends GetxController {
 
   /// 邮箱已绑定后隐藏 Bind Email（邮箱登录或走过绑定流程）。
   final RxBool hasBoundEmail = false.obs;
+
+  /// 钱包展示文案。对齐 oumi `CashApi.getCurrUserCash` → `showCoin`。
+  final RxString coinText = '0'.obs;
 
   /// `onReady` = 首帧之后，等价于原页面 `initState` 里的
   /// `addPostFrameCallback`。
@@ -43,30 +47,53 @@ class MeLogic extends GetxController {
   List<MeStatItem> get stats {
     final p = profile.value;
     return [
-      MeStatItem(label: 'Friends', value: formatCount(p.friendNum)),
-      MeStatItem(label: 'Follows', value: formatCount(p.followNum)),
-      MeStatItem(label: 'Fans', value: formatCount(p.fanNum)),
-      MeStatItem(label: 'Visitors', value: formatCount(p.viewNum)),
+      MeStatItem(
+        label: 'Friends',
+        value: formatCount(p.friendNum),
+        badge: p.newFriendCount.toInt(),
+      ),
+      MeStatItem(label: 'Follow', value: formatCount(p.followNum)),
+      MeStatItem(
+        label: 'Followers',
+        value: formatCount(p.fanNum),
+        badge: p.newFollowerCount.toInt(),
+      ),
+      MeStatItem(
+        label: 'Visitors',
+        value: formatCount(p.viewNum),
+        badge: p.newVisitorCount.toInt(),
+      ),
     ];
   }
 
-  List<QuickAccessItem> get quickAccess {
+  /// 财富等级。`vipLevel == 0` 仍展示 `Lv.0`。
+  String get wealthText => 'Lv.${profile.value.vipLevel}';
+
+  /// 爵位。无等级时对齐设计稿 “No Title Yet”。
+  String get peerageText {
+    final level = profile.value.knightLevel;
+    if (level <= 0) return 'No Title Yet';
+    return 'Lv.$level';
+  }
+
+  String get inviteUrl => profile.value.inviteCodeEntrance.trim();
+
+  List<QuickAccessItem> get menuItems {
     if (hasBoundEmail.value) {
-      return MeMenuData.quickAccess
+      return MeMenuData.menuItems
           .where((item) => item.id != 'bind_email')
           .toList(growable: false);
     }
-    return MeMenuData.quickAccess;
+    return MeMenuData.menuItems;
   }
 
-  /// 拉资料 + 访客数。失败 toast。
+  /// 拉资料 + 余额。余额失败不挡资料。对齐 oumi `refreshCoins`。
   Future<void> load() async {
     try {
       final profileFuture = ChimoApis.user.profile();
-      // Me「Visitors」= Visits 列表中的去重人数（不是 viewNum 总次数）。
-      final visitsFuture = ChimoApis.relation.viewedBy();
+      final cashFuture = ChimoApis.cash.balance();
       final res = await profileFuture;
-      await visitsFuture;
+      final cash = await cashFuture;
       if (!res.ok || res.data == null) {
         loading.value = false;
         if (res.isNotLogin) AppJumper.toLoginAndClear();
@@ -75,11 +102,26 @@ class MeLogic extends GetxController {
 
       profile.value = res.data!.user;
       hasBoundEmail.value = profile.value.email.isNotEmpty;
+      if (cash.ok && cash.data != null) {
+        final show = cash.data!.showCoin.trim();
+        coinText.value = show.isNotEmpty ? show : _comma(cashCoins(cash.data!));
+      }
       loading.value = false;
     } catch (failure) {
       loading.value = false;
       AppToast.error('Failed to load profile: $failure');
     }
+  }
+
+  String _comma(int value) {
+    final raw = '$value';
+    final buffer = StringBuffer();
+    for (var i = 0; i < raw.length; i++) {
+      final fromEnd = raw.length - i;
+      if (i > 0 && fromEnd % 3 == 0) buffer.write(',');
+      buffer.write(raw[i]);
+    }
+    return buffer.toString();
   }
 
   // 跳转回来要改的是 profile，那份状态在这一层（和 EditProfileLogic 一样）。
@@ -104,8 +146,8 @@ class MeLogic extends GetxController {
     }
     final tab = switch (item.label) {
       'Friends' => 0,
-      'Fans' => 2,
-      'Follows' => 1,
+      'Followers' => 2,
+      'Follow' => 1,
       _ => null,
     };
     if (tab == null) return;
@@ -129,6 +171,20 @@ class MeLogic extends GetxController {
         await AppJumper.toHelp();
       case 'settings':
         await AppJumper.toSettings();
+      case 'wallet':
+        await AppJumper.toWallet();
+        await load();
+      case 'level':
+        await openLevel();
+      case 'invite':
+        final url = inviteUrl;
+        if (url.isEmpty) {
+          AppToast.info('Coming soon');
+          return;
+        }
+        await AppJumper.toWeb(url: url, title: 'Invite & Earn');
+      default:
+        AppToast.info('Coming soon');
     }
   }
 

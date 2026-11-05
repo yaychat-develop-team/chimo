@@ -62,18 +62,22 @@ class _ActionSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.paddingOf(context).bottom;
+    final maxH = MediaQuery.sizeOf(context).height * 0.7;
 
     return DecoratedBox(
       decoration: const BoxDecoration(
         color: _bg,
         borderRadius: BorderRadius.vertical(top: Radius.circular(_topRadius)),
       ),
-      child: Padding(
-        padding: EdgeInsets.only(top: 28, bottom: 28 + bottom),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          spacing: _tileGap,
-          children: items.map((item) => _ActionTile(item: item)).toList(),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: maxH),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.only(top: 28, bottom: 28 + bottom),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            spacing: _tileGap,
+            children: items.map((item) => _ActionTile(item: item)).toList(),
+          ),
         ),
       ),
     );

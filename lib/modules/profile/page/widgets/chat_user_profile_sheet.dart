@@ -17,6 +17,7 @@ import '../../../../common/widgets/tag_chip.dart';
 import '../../../chat/logic/dm_entry.dart';
 import '../../../chat/model/chat_conversation.dart';
 import '../../../room/logic/mic_logic.dart';
+import '../../../room/page/widgets/room_user_more_sheet.dart';
 import '../../../room/service/room_service.dart';
 import '../../logic/chat_user_profile_sheet_logic.dart';
 import 'package:chimo/common/utils/chimo.dart';
@@ -88,6 +89,20 @@ class _ChatUserProfileSheetState extends State<ChatUserProfileSheet> {
   void _openReport() {
     AppJumper.back();
     AppJumper.toReport(reportedId: _profile.uid);
+  }
+
+  /// 房间内对齐 oumi `ic_more` → `RoomUserMoreBtns`；站外仍直接举报。
+  bool get _inRoom {
+    final service = RoomService.findOrNull();
+    return service != null && service.inRoom.value;
+  }
+
+  Future<void> _openMore() async {
+    if (!_inRoom) {
+      _openReport();
+      return;
+    }
+    await showRoomUserMoreSheet(profile: _profile);
   }
 
   void _openChat() {
@@ -231,34 +246,44 @@ class _ChatUserProfileSheetState extends State<ChatUserProfileSheet> {
                       ),
                       if (!logic.isSelf)
                         GestureDetector(
-                          onTap: _openReport,
+                          onTap: _openMore,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            padding: EdgeInsets.symmetric(
+                              horizontal: _inRoom ? 8 : 10,
+                              vertical: 5,
+                            ),
                             decoration: BoxDecoration(
                               color: AppColors.white10,
                               borderRadius: BorderRadius.circular(14),
                             ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Chimo.image(
-                                  AppAssets.reportIcon,
-                                  width: 12,
-                                  height: 12,
-                                  color: AppColors.white70,
-                                ),
-                                SizedBox(width: 4),
-                                Text(
-                                  'Report',
-                                  style: TextStyle(
+                            child: _inRoom
+                                ? Chimo.image(
+                                    AppAssets.roomUserMore,
+                                    width: 16,
+                                    height: 16,
                                     color: AppColors.white70,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    height: 1,
+                                  )
+                                : Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Chimo.image(
+                                        AppAssets.reportIcon,
+                                        width: 12,
+                                        height: 12,
+                                        color: AppColors.white70,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      const Text(
+                                        'Report',
+                                        style: TextStyle(
+                                          color: AppColors.white70,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          height: 1,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                ),
-                              ],
-                            ),
                           ),
                         ),
                     ],

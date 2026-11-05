@@ -21,6 +21,7 @@ class RoomTopBar extends StatelessWidget {
     required this.onRank,
     required this.onAudience,
     required this.onScale,
+    this.extraPills = const [],
   });
 
   final int roomId;
@@ -34,6 +35,9 @@ class RoomTopBar extends StatelessWidget {
   /// 在线人数 → Room Members。
   final VoidCallback onAudience;
   final VoidCallback onScale;
+
+  /// 插在「Room Bulletin」与热度之间（如 CP Heart List）。
+  final List<Widget> extraPills;
 
   static const double _chip = 22;
 
@@ -50,9 +54,7 @@ class RoomTopBar extends StatelessWidget {
         final hot = service?.hot.value ?? 0;
         // 读 length 保证 RxList 变更被订阅；再拷一份给 UI。
         final avatarCount = service?.audience.length ?? 0;
-        final avatars = avatarCount == 0
-            ? const <String>[]
-            : List<String>.from(service!.audience);
+        final avatars = avatarCount == 0 ? const <String>[] : List<String>.from(service!.audience);
         return Column(
           children: [
             Row(
@@ -76,22 +78,16 @@ class RoomTopBar extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Chimo.image(
-                        AppAssets.roomBulletin,
-                        width: 14,
-                        height: 14,
-                      ),
+                      Chimo.image(AppAssets.roomBulletin, width: 14, height: 14),
                       SizedBox(width: 4),
                       Text(
-                        'Room Bulletin',
-                        style: TextStyle(
-                          color: AppColors.white,
-                          fontSize: 11.sp,
-                        ),
+                        'Bulletin',
+                        style: TextStyle(color: AppColors.white, fontSize: 11.sp),
                       ),
                     ],
                   ),
                 ),
+                ..._spacedExtraPills(),
                 const SizedBox(width: 8),
                 _pill(
                   child: Row(
@@ -125,11 +121,7 @@ class RoomTopBar extends StatelessWidget {
                         ),
                       ),
                       SizedBox(width: 6),
-                      Chimo.image(
-                        AppAssets.roomArrowRight,
-                        width: 6,
-                        height: 12,
-                      ),
+                      Chimo.image(AppAssets.roomArrowRight, width: 6, height: 12),
                     ],
                   ),
                 ),
@@ -141,18 +133,11 @@ class RoomTopBar extends StatelessWidget {
     );
   }
 
-  Widget _roomChip({
-    required String title,
-    required String cover,
-    required bool saved,
-  }) {
+  Widget _roomChip({required String title, required String cover, required bool saved}) {
     return LayoutBuilder(
       builder: (context, constraints) {
         // 封面、间距、内边距和 Save 占掉的宽度，剩下的才给标题。
-        final titleMax = (constraints.maxWidth - 138).clamp(
-          48.0,
-          constraints.maxWidth,
-        );
+        final titleMax = (constraints.maxWidth - 138).clamp(48.0, constraints.maxWidth);
         return Align(
           alignment: Alignment.centerLeft,
           child: Container(
@@ -210,10 +195,7 @@ class RoomTopBar extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(10),
       child: cover.trim().isEmpty
-          ? const ColoredBox(
-              color: AppColors.white18,
-              child: SizedBox(width: 36, height: 36),
-            )
+          ? const ColoredBox(color: AppColors.white18, child: SizedBox(width: 36, height: 36))
           : Chimo.image(cover, width: 36, height: 36, fit: BoxFit.cover),
     );
   }
@@ -231,21 +213,14 @@ class RoomTopBar extends StatelessWidget {
         ),
         child: const Text(
           'Save',
-          style: TextStyle(
-            color: AppColors.black1F2518,
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-          ),
+          style: TextStyle(color: AppColors.black1F2518, fontSize: 13, fontWeight: FontWeight.w700),
         ),
       ),
     );
   }
 
   Widget _faces(List<String> avatars) {
-    final faces = avatars
-        .where((item) => item.trim().isNotEmpty)
-        .take(3)
-        .toList();
+    final faces = avatars.where((item) => item.trim().isNotEmpty).take(3).toList();
     if (faces.isEmpty) return const SizedBox.shrink();
     // 对齐设计稿：头像 24，约 20% 层叠；王冠挂在圈右上。
     const size = 24.0;
@@ -326,11 +301,7 @@ class RoomTopBar extends StatelessWidget {
       onTap: onAudience,
       child: Text(
         '$online',
-        style: const TextStyle(
-          color: AppColors.white,
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-        ),
+        style: const TextStyle(color: AppColors.white, fontSize: 13, fontWeight: FontWeight.w600),
       ),
     );
   }
@@ -345,10 +316,7 @@ class RoomTopBar extends StatelessWidget {
           width: _chip.w,
           height: _chip.w,
           alignment: Alignment.center,
-          decoration: const BoxDecoration(
-            color: AppColors.black30,
-            shape: BoxShape.circle,
-          ),
+          decoration: const BoxDecoration(color: AppColors.black30, shape: BoxShape.circle),
           child: Chimo.image(AppAssets.roomScale, width: 16, height: 16),
         ),
       ),
@@ -369,5 +337,15 @@ class RoomTopBar extends StatelessWidget {
         child: child,
       ),
     );
+  }
+
+  /// Bulletin 与热度之间的额外胶囊，前面各带 8 间距。
+  List<Widget> _spacedExtraPills() {
+    final widgets = <Widget>[];
+    for (final pill in extraPills) {
+      widgets.add(const SizedBox(width: 8));
+      widgets.add(pill);
+    }
+    return widgets;
   }
 }

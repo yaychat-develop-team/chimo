@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 
 import '../../../common/utils/app_toast.dart';
 import '../model/room_join_result.dart';
+import '../page/widgets/mic_queue_sheet.dart';
 import '../service/room_service.dart';
 
 enum RoomPhase { loading, needPassword, ready, failed }
@@ -64,6 +65,12 @@ class RoomLogic extends GetxController {
 
   Future<void> toggleMic({int? position}) async {
     final failure = await service.toggleMic(position: position);
+    if (failure == 'QUEUE') {
+      // 拍卖房：点艺人位默认艺人队列；其它空麦默认 Boss 队列。
+      final tab = service.isAuctionRoom && position != 1 ? 1 : 0;
+      await MicQueueSheet.show(tabIndex: tab);
+      return;
+    }
     if (failure != null) AppToast.error(failure);
   }
 

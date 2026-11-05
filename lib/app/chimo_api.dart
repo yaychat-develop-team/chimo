@@ -1,7 +1,9 @@
 import 'network/services/app_settings_api.dart';
+import 'network/services/auction_api.dart';
 import 'network/services/auth_api.dart';
 import 'network/services/cash_api.dart';
 import 'network/services/commodity_api.dart';
+import 'network/services/cp_api.dart';
 import 'network/services/emote_api.dart';
 import 'network/services/gift_wall_api.dart';
 import 'network/services/group_api.dart';
@@ -16,9 +18,11 @@ import 'network/services/user_api.dart';
 export 'network/http/api_result.dart';
 export 'network/http/http.dart';
 export 'network/services/app_settings_api.dart';
+export 'network/services/auction_api.dart';
 export 'network/services/auth_api.dart';
 export 'network/services/cash_api.dart';
 export 'network/services/commodity_api.dart';
+export 'network/services/cp_api.dart';
 export 'network/services/emote_api.dart';
 export 'network/services/gift_wall_api.dart';
 export 'network/services/group_api.dart';
@@ -47,5 +51,7 @@ abstract final class ChimoApis {
   static const emote = EmoteApi();
   static const report = ReportApi();
   static const room = RoomApi();
+  static const auction = AuctionApi();
+  static const cp = CpApi();
   static const upload = UploadApi();
 }

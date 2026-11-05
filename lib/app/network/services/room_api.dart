@@ -64,6 +64,11 @@ class RoomApi {
     return result;
   }
 
+  /// 房间扩展信息（拍卖 / CP / 心动 / 游戏等）。对齐 joyride `RtcApi.getExtInfo`。
+  Future<ApiResult<JoinChannelExtendRsp>> joinChannelExt(int rid) {
+    return Http.ins.getAndParse<JoinChannelExtendRsp>('/rtc/join-channel-ext?rid=$rid');
+  }
+
   Future<ApiResult<void>> leave(int rid) {
     return Http.ins.postAndParse(
       '/rtc/leave-channel',
@@ -78,6 +83,206 @@ class RoomApi {
       position: position,
     );
     return _update(ChannelUpdate(channel: Int64(rid), upMic: mic));
+  }
+
+  /// 排麦。对齐 joyride `UpMicMode.QUEUE_MIC`。
+  Future<ApiResult<void>> queueMic(int rid, QueueType queueType) {
+    return _update(
+      ChannelUpdate(
+        channel: Int64(rid),
+        upMic: ChannelUpMic(mode: UpMicMode.QUEUE_MIC, queueType: queueType),
+      ),
+    );
+  }
+
+  /// 取消排麦。
+  Future<ApiResult<void>> cancelQueueMic(int rid, QueueType queueType) {
+    return _update(
+      ChannelUpdate(
+        channel: Int64(rid),
+        cancelQueueMic: ChannelCancelQueueMic(queueType: queueType),
+      ),
+    );
+  }
+
+  /// 管理员抱上指定麦位。
+  Future<ApiResult<void>> grantUpMic({
+    required int rid,
+    required int uid,
+    required int position,
+  }) {
+    return _update(
+      ChannelUpdate(
+        channel: Int64(rid),
+        grantUpMic: ChannelGrantUpMic(uid: Int64(uid), position: position),
+      ),
+    );
+  }
+
+  /// 管理员抱下麦。
+  Future<ApiResult<void>> grantDownMic({required int rid, required int uid}) {
+    return _update(
+      ChannelUpdate(
+        channel: Int64(rid),
+        grantDownMic: ChannelGrantDownMic(uid: Int64(uid)),
+      ),
+    );
+  }
+
+  /// 踢出房间。对齐 joyride `ChannelKickUser`。
+  Future<ApiResult<void>> kickUser({
+    required int rid,
+    required int uid,
+    required int leaveSeconds,
+  }) {
+    return _update(
+      ChannelUpdate(
+        channel: Int64(rid),
+        kick: ChannelKickUser(uid: Int64(uid), leaveTimeInSeconds: leaveSeconds),
+      ),
+    );
+  }
+
+  /// 改角色。对齐 joyride `ChannelChangeRole`。
+  Future<ApiResult<void>> changeRole({
+    required int rid,
+    required int uid,
+    required RtcUserRole role,
+  }) {
+    return _update(
+      ChannelUpdate(
+        channel: Int64(rid),
+        changeRole: ChannelChangeRole(uid: Int64(uid), role: role),
+      ),
+    );
+  }
+
+  /// 禁麦。对齐 joyride `ChannelManagerCloseMic`。
+  Future<ApiResult<void>> managerCloseMic({required int rid, required int uid}) {
+    return _update(
+      ChannelUpdate(
+        channel: Int64(rid),
+        managerCloseMic: ChannelManagerCloseMic(uid: Int64(uid)),
+      ),
+    );
+  }
+
+  /// 取消禁麦。对齐 joyride `ChannelManagerOpenMic`。
+  Future<ApiResult<void>> managerOpenMic({required int rid, required int uid}) {
+    return _update(
+      ChannelUpdate(
+        channel: Int64(rid),
+        managerOpenMic: ChannelManagerOpenMic(uid: Int64(uid)),
+      ),
+    );
+  }
+
+  /// 禁言。对齐 joyride `ChannelForbidWord`。
+  Future<ApiResult<void>> forbidWord({required int rid, required int uid}) {
+    return _update(
+      ChannelUpdate(
+        channel: Int64(rid),
+        forbidWord: ChannelForbidWord(uid: Int64(uid)),
+      ),
+    );
+  }
+
+  /// 麦上倒计时。对齐 joyride `POST /rtc/mic_counter/op`。
+  Future<ApiResult<void>> micCounter({
+    required OpType type,
+    required int rid,
+    required int uid,
+    int seconds = 0,
+  }) {
+    return Http.ins.postAndParse(
+      '/rtc/mic_counter/op',
+      data: MicCounterReq(
+        opType: type,
+        opRid: rid,
+        opUid: uid,
+        durationSeconds: seconds,
+      ),
+      options: _jsonBody,
+    );
+  }
+
+  /// 房间倒计时。对齐 joyride `POST /rtc/room_counter/op`（CP 主持麦）。
+  Future<ApiResult<void>> roomCounter({
+    required OpType type,
+    required int rid,
+    int seconds = 0,
+  }) {
+    return Http.ins.postAndParse(
+      '/rtc/room_counter/op',
+      data: MicCounterReq(
+        opType: type,
+        opRid: rid,
+        durationSeconds: seconds,
+      ),
+      options: _jsonBody,
+    );
+  }
+
+  /// 更新房间字段（公屏 / 礼物统计等）。对齐 joyride `updateChannel` + `ChannelFields`。
+  Future<ApiResult<void>> updateFields(int rid, ChannelFields fields) {
+    return _update(ChannelUpdate(channel: Int64(rid), fields: fields));
+  }
+
+  /// 管理工具权限（含房间密码）。对齐 joyride `GET /rtc/button-permission`。
+  Future<ApiResult<ButtonPermissionData>> buttonPermission(int rid) {
+    return Http.ins.getAndParse<ButtonPermissionData>(
+      '/rtc/button-permission',
+      query: {'channelId': '$rid'},
+    );
+  }
+
+  /// 麦位布局列表。对齐 joyride `GET /rtc/mic-layouts`。
+  Future<ApiResult<MicLayoutData>> micLayouts(int rid) {
+    return Http.ins.getAndParse<MicLayoutData>(
+      '/rtc/mic-layouts',
+      query: {'channelId': '$rid'},
+    );
+  }
+
+  /// 房间背景资源。对齐 joyride `GET /rtc/background-resource`。
+  Future<ApiResult<BackgroundData>> backgrounds({
+    required RoomType roomType,
+    BackgroundType backgroundType = BackgroundType.STATIC,
+  }) {
+    return Http.ins.getAndParse<BackgroundData>(
+      '/rtc/background-resource',
+      query: {
+        'roomType': roomType.name,
+        'backgroundType': backgroundType.name,
+      },
+    );
+  }
+
+  /// 清除打赏统计。对齐 joyride `POST /rtc/mic_score/clear`。
+  Future<ApiResult<void>> clearMicScore({required int rid, required int uid}) {
+    return Http.ins.postAndParse(
+      '/rtc/mic_score/clear',
+      data: MicScoreClearReq(rid: Int64(rid), uid: Int64(uid)),
+      options: _jsonBody,
+    );
+  }
+
+  /// 警告指定用户。对齐 joyride `WarnType.SPECIFIC_USER`。
+  Future<ApiResult<void>> warnUser({
+    required int rid,
+    required int uid,
+    String reason = '',
+  }) {
+    return Http.ins.postAndParse(
+      '/super_admin/warn',
+      data: WarnReq(
+        channelId: Int64(rid),
+        userId: Int64(uid),
+        warnType: WarnType.SPECIFIC_USER,
+        reason: reason,
+      ),
+      options: _jsonBody,
+    );
   }
 
   Future<ApiResult<void>> downMic(int rid) {

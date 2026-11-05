@@ -95,7 +95,6 @@ class _AlmostInPageState extends State<AlmostInPage> {
       backgroundColor: AppColors.black111111,
       appBar: AppNavBar(
         title: "You're almost in!",
-        onBack: () => Get.back(),
         trailing: Chimo.s.skipButton(enabled: !logic.busy, onPressed: logic.skip),
       ),
       body: LayoutBuilder(

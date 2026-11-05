@@ -224,14 +224,10 @@ class _RoomGiftSheetState extends State<RoomGiftSheet> with SingleTickerProvider
     final service = RoomService.findOrNull();
     final senderUid = service?.myUid ?? 0;
     final receivers = [
-      for (final raw in logic.selectedUids)
-        int.tryParse(raw.trim()) ?? 0,
+      for (final raw in logic.selectedUids) int.tryParse(raw.trim()) ?? 0,
     ].where((id) => id > 0).toList();
     if (senderUid <= 0 || receivers.isEmpty) {
-      AppLog.w(
-        'GiftFly skip: bad uids',
-        body: {'sender': senderUid, 'receivers': receivers},
-      );
+      AppLog.w('GiftFly skip: bad uids', body: {'sender': senderUid, 'receivers': receivers});
       return;
     }
     final toName = [
@@ -348,7 +344,8 @@ class _RoomGiftSheetState extends State<RoomGiftSheet> with SingleTickerProvider
                     qty: logic.qty.value,
                     busy: !logic.canDispatch,
                     sending: logic.sending.value,
-                    canSend: !logic.isBagTab ||
+                    canSend:
+                        !logic.isBagTab ||
                         (logic.currentBagItem != null && logic.currentBagItem!.canSend),
                     onPickQty: _pickQty,
                     onSend: () => unawaited(_send()),
@@ -361,7 +358,6 @@ class _RoomGiftSheetState extends State<RoomGiftSheet> with SingleTickerProvider
       );
     });
   }
-
 
   Widget _tabBar() {
     final tabs = logic.tabs;

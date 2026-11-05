@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../../../../common/constants/app_assets.dart';
 import '../../../../common/theme/app_colors.dart';
@@ -17,122 +18,123 @@ class MeProfileHeader extends StatelessWidget {
   final VoidCallback? onProfileTap;
   final VoidCallback? onAvatarTap;
 
-  static const double avatarSize = 80;
-
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        GestureDetector(
-          onTap: onAvatarTap ?? onProfileTap,
-          child: Container(
-            width: avatarSize,
-            height: avatarSize,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 2),
-            ),
-            child: ClipOval(
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  AppImage.avatar(
-                    profile.shownAvatar,
-                    fallbackAsset: AppAssets.avatarPlace,
-                    size: avatarSize,
-                  ),
-                  if (profile.avatarAudit.trim().isNotEmpty)
-                    ColoredBox(
-                      color: Colors.black.withValues(alpha: 0.5),
-                      child: const Center(
-                        child: Text(
-                          'Under review',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.white, fontSize: 12, height: 1.1),
-                        ),
-                      ),
-                    ),
-                ],
+    return Padding(
+      padding: EdgeInsets.only(left: 8.w),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          GestureDetector(
+            onTap: onAvatarTap ?? onProfileTap,
+            child: Container(
+              width: 80.w,
+              height: 80.w,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 1),
               ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    profile.nickname.isEmpty ? 'User' : profile.nickname,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppColors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      height: 1.1,
+              child: ClipOval(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    AppImage.avatar(
+                      profile.shownAvatar,
+                      fallbackAsset: AppAssets.avatarPlace,
+                      size: 80.w,
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  GestureDetector(
-                    onTap: () => _copyId(context),
-                    behavior: HitTestBehavior.opaque,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'ID:${profile.uid}',
-                          style: const TextStyle(
-                            color: AppColors.gray9A9A9A,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            height: 1.2,
+                    if (profile.avatarAudit.trim().isNotEmpty)
+                      ColoredBox(
+                        color: Colors.black.withValues(alpha: 0.5),
+                        child: const Center(
+                          child: Text(
+                            'Under review',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.white, fontSize: 12, height: 1.1),
                           ),
                         ),
-                        const SizedBox(width: 4),
-                        Chimo.image(AppAssets.mineCopy, width: 12, height: 12),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Material(
-              color: AppColors.black2A2A2A,
-              borderRadius: BorderRadius.circular(12),
-              child: InkWell(
-                onTap: onProfileTap ?? onAvatarTap,
-                borderRadius: BorderRadius.circular(12),
-                child: const SizedBox(
-                  width: 84,
-                  height: 24,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'My Profile',
-                        style: TextStyle(
-                          color: AppColors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          height: 1,
-                        ),
                       ),
-                      SizedBox(width: 2),
-                      Icon(Icons.chevron_right_rounded, size: 14, color: AppColors.white),
-                    ],
-                  ),
+                  ],
                 ),
               ),
             ),
-          ],
-        ),
-      ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      profile.nickname.isEmpty ? 'User' : profile.nickname,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: AppColors.white,
+                        fontSize: 20.sp,
+                        fontWeight: FontWeight.w800,
+                        height: 1.1,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    GestureDetector(
+                      onTap: () => _copyId(context),
+                      behavior: HitTestBehavior.opaque,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'ID:${profile.uid}',
+                            style: const TextStyle(
+                              color: AppColors.gray9A9A9A,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              height: 1.2,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Chimo.image(AppAssets.mineCopy, width: 12, height: 12),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Material(
+                color: AppColors.black2A2A2A,
+                borderRadius: BorderRadius.circular(12),
+                child: InkWell(
+                  onTap: onProfileTap ?? onAvatarTap,
+                  borderRadius: BorderRadius.circular(12),
+                  child: const SizedBox(
+                    width: 84,
+                    height: 24,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'My Profile',
+                          style: TextStyle(
+                            color: AppColors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            height: 1,
+                          ),
+                        ),
+                        SizedBox(width: 2),
+                        Icon(Icons.chevron_right_rounded, size: 14, color: AppColors.white),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 

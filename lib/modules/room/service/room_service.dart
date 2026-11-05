@@ -1,12 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:fixnum/fixnum.dart';
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 
 import '../../../app/chimo_api.dart';
 import '../../../app/session_info.dart';
 import '../../../common/models/server_client/message.pb.dart';
+import '../../../common/models/server_client/mic_tool.pbenum.dart';
 import '../../../common/models/server_client/rtc.pb.dart';
 import '../../../common/utils/app_log.dart';
 import '../../../common/utils/app_permissions.dart';
@@ -36,6 +38,7 @@ class RoomService extends GetxService {
 
   int rid = 0;
   final title = ''.obs;
+  final theme = ''.obs;
   final online = 0.obs;
   final cover = ''.obs;
   final hot = 0.obs;
@@ -51,6 +54,27 @@ class RoomService extends GetxService {
   final role = RtcUserRole.Guest.obs;
   /// 房间开关状态，对齐 joyride `channel.status`（`NORMAL` / `CLOSED`）。
   final status = ''.obs;
+  /// 是否自由上麦。`false` 时非管理需排麦。对齐 joyride `channel.freePub`。
+  final freePub = true.obs;
+  /// 是否开放公屏。对齐 joyride `channel.freePublicChat`。
+  final freePublicChat = true.obs;
+  /// 是否展示麦上礼物统计。对齐 joyride `channel.giftValueCountSwitch`。
+  final giftValueCountSwitch = false.obs;
+  /// 是否设置了进房密码。对齐 joyride `channel.hasPassword`。
+  final hasPassword = false.obs;
+  /// 是否隐私模式。对齐 joyride `channel.isPrivacy`。
+  final isPrivacy = false.obs;
+  /// 当前麦位布局名。对齐 joyride `roomTypeObj.layoutName`。
+  final layoutName = ''.obs;
+  MicLayoutEnum? micLayout;
+  /// 普通排队 / Boss 排队。对齐 joyride `waitQueue` / `carOwnerMicQueue`。
+  final waitQueue = <SimpleChannelUserSlot>[].obs;
+  final carOwnerMicQueue = <SimpleChannelUserSlot>[].obs;
+  /// 进房扩展（拍卖 / CP 等）。由 [loadExt] 填充。
+  JoinChannelExtendRsp? channelExt;
+  RoomType? roomType;
+  /// 房间停留倒计时截止（unix 秒）。0 表示无。来自 `Channel.countDownTimestamp`。
+  final countDownAt = 0.obs;
   var _saving = false;
 
   bool get isOwner => role.value == RtcUserRole.Owner;
@@ -60,11 +84,45 @@ class RoomService extends GetxService {
       role.value == RtcUserRole.Receptionist ||
       role.value == RtcUserRole.Manager;
 
+  /// 房主 / 接待。对齐 joyride `isOwnerOrRec`。
+  bool get isOwnerOrReceptionist =>
+      isOwner || role.value == RtcUserRole.Receptionist;
+
+  /// 拍卖主持麦：仅房主 / 接待可上。对齐流程图。
+  bool get canTakeHostMic =>
+      isOwner || role.value == RtcUserRole.Receptionist;
+
   bool get isRoomClosed => status.value == RoomStatusEnum.CLOSED.name;
+
+  bool get isAuctionRoom =>
+      roomType == RoomType.AUCTION || (channelExt?.hasAuctionInfo() ?? false);
+
+  bool get isCpRoom =>
+      roomType == RoomType.CP || (channelExt?.hasCpInfo() ?? false);
+
+  /// 非管理且非自由上麦时需走排麦。对齐 joyride `micNeedQueue`。
+  bool get micNeedQueue => !isStaff && !freePub.value;
+
+  /// 麦位目标数量；拍卖房 5；CP 房 8（0 主持 / 1–6 嘉宾 / 7 嘉宾位）。
+  int? get preferredSeatCount {
+    if (isAuctionRoom) return 5;
+    if (isCpRoom) return 8;
+    return null;
+  }
 
   /// 房主可关/开；接待仅可关（对齐 joyride）。
   bool get canToggleClose =>
       isOwner || (role.value == RtcUserRole.Receptionist && !isRoomClosed);
+
+  /// 房间倒计时是否仍在进行。对齐 joyride `hasTimingInRoom`。
+  bool get hasRoomTimer {
+    final at = countDownAt.value;
+    if (at <= 0) return false;
+    return at > DateTime.now().millisecondsSinceEpoch ~/ 1000;
+  }
+
+  /// CP 房且本人在 0 号主持麦。对齐 joyride `showTimeAction`。
+  bool get showCpRoomTimer => isCpRoom && hostUid() == myUid;
 
   RoomSocket? _socket;
   RoomRtc? _rtc;
@@ -102,9 +160,23 @@ class RoomService extends GetxService {
 
     // 麦位和房间信息已经在 join 回包里。聊天和语音放后台，避免历史请求卡住整页。
     inRoom.value = true;
-    unawaited(_openSocket(result.data!));
-    unawaited(_openRtc(result.data!));
+    final joinRsp = result.data!;
+    unawaited(_openSocket(joinRsp));
+    unawaited(_openRtc(joinRsp));
+    unawaited(_maybeAutoMic(joinRsp));
     return const RoomJoinResult.ok();
+  }
+
+  /// 拉房间扩展信息。拍卖 / CP / 心动等玩法共用。
+  Future<JoinChannelExtendRsp?> loadExt() async {
+    if (rid <= 0) return null;
+    final result = await ChimoApis.room.joinChannelExt(rid);
+    if (!result.ok || result.data == null) {
+      AppLog.w('RoomService loadExt failed: ${result.message}');
+      return null;
+    }
+    channelExt = result.data;
+    return channelExt;
   }
 
   Future<String?> sendText(String raw) async {
@@ -188,6 +260,8 @@ class RoomService extends GetxService {
   }
 
   /// 未上麦则上麦；已上麦则下麦。点空麦位时带 [position]。
+  ///
+  /// 需排麦时返回 `'QUEUE'`，由页面打开 [MicQueueSheet]（避免 Service 依赖 UI）。
   Future<String?> toggleMic({int? position}) async {
     if (!inRoom.value) return null;
     final mic = Get.find<MicLogic>();
@@ -213,6 +287,11 @@ class RoomService extends GetxService {
         return null;
       }
     }
+    // 拍卖主持麦：仅房主 / 接待（流程图）；不进排麦。
+    if (!mic.onMic && isAuctionRoom && position == 0 && !canTakeHostMic) {
+      return 'Only owner or receptionist can take the host mic';
+    }
+    if (!mic.onMic && micNeedQueue) return 'QUEUE';
     final micPermission = await _ensureMicPermission();
     if (micPermission != null) return micPermission;
     final result = await ChimoApis.room.upMic(rid, position: position);
@@ -220,6 +299,74 @@ class RoomService extends GetxService {
     await _refreshSeats();
     _syncLocalAudio();
     return null;
+  }
+
+  Future<String?> queueMic(QueueType type) async {
+    if (!inRoom.value || rid <= 0) return null;
+    final micPermission = await _ensureMicPermission();
+    if (micPermission != null) return micPermission;
+    final result = await ChimoApis.room.queueMic(rid, type);
+    if (!result.ok) return result.message.isEmpty ? 'Unable to join the queue' : result.message;
+    return null;
+  }
+
+  Future<String?> cancelQueueMic(QueueType type) async {
+    if (!inRoom.value || rid <= 0) return null;
+    final result = await ChimoApis.room.cancelQueueMic(rid, type);
+    if (!result.ok) return result.message.isEmpty ? 'Unable to leave the queue' : result.message;
+    return null;
+  }
+
+  Future<String?> grantOnMic({required int uid, required int position}) async {
+    if (!inRoom.value || rid <= 0 || uid <= 0) return null;
+    if (!isStaff) return 'No permission';
+    final result = await ChimoApis.room.grantUpMic(rid: rid, uid: uid, position: position);
+    if (!result.ok) return result.message.isEmpty ? 'Unable to grant mic' : result.message;
+    await _refreshSeats();
+    return null;
+  }
+
+  /// 拍卖房按队列类型抱麦：艺人→1，Boss→2/3/4 空位。对齐 joyride `grantTypeOnMic`。
+  Future<String?> grantTypeOnMic({required int uid, required QueueType type}) async {
+    if (!isAuctionRoom) return 'Not an auction room';
+    if (type == QueueType.CAR_OWNER_QUEUE) {
+      if (_uidAt(1) > 0) return 'Artist mic is occupied';
+      return grantOnMic(uid: uid, position: 1);
+    }
+    if (type == QueueType.COMMON_QUEUE) {
+      final empty = [2, 3, 4].firstWhere((i) => _uidAt(i) == 0, orElse: () => -1);
+      if (empty < 0) return 'Boss mics are full';
+      return grantOnMic(uid: uid, position: empty);
+    }
+    return 'Unsupported queue';
+  }
+
+  int _uidAt(int index) {
+    if (!Get.isRegistered<MicLogic>()) return 0;
+    final seats = Get.find<MicLogic>().seats;
+    if (index < 0 || index >= seats.length) return 0;
+    return seats[index].uid ?? 0;
+  }
+
+  void applyMicQueues({
+    Iterable<SimpleChannelUserSlot>? wait,
+    Iterable<SimpleChannelUserSlot>? carOwner,
+  }) {
+    if (wait != null) {
+      waitQueue
+        ..assignAll(wait)
+        ..refresh();
+    }
+    if (carOwner != null) {
+      carOwnerMicQueue
+        ..assignAll(carOwner)
+        ..refresh();
+    }
+  }
+
+  bool inQueue(QueueType type) {
+    final list = type == QueueType.CAR_OWNER_QUEUE ? carOwnerMicQueue : waitQueue;
+    return list.any((slot) => slot.hasUser() && slot.user.id.toInt() == myUid);
   }
 
   Future<String?> toggleSave() async {
@@ -241,6 +388,305 @@ class RoomService extends GetxService {
     if (!result.ok) return result.message.isEmpty ? 'Warn failed' : result.message;
     return null;
   }
+
+  /// 警告指定用户。
+  Future<String?> warnUser(int uid, {String reason = ''}) async {
+    if (!inRoom.value || rid <= 0 || uid <= 0) return null;
+    if (!isStaff) return 'No permission';
+    final result = await ChimoApis.room.warnUser(rid: rid, uid: uid, reason: reason);
+    if (!result.ok) return result.message.isEmpty ? 'Warn failed' : result.message;
+    return null;
+  }
+
+  Future<String?> grantDownMic(int uid) async {
+    if (!inRoom.value || rid <= 0 || uid <= 0) return null;
+    if (!isStaff) return 'No permission';
+    final result = await ChimoApis.room.grantDownMic(rid: rid, uid: uid);
+    if (!result.ok) return result.message.isEmpty ? 'Unable to take off mic' : result.message;
+    await _refreshSeats();
+    return null;
+  }
+
+  /// 抱上第一个空麦；拍卖房优先表演麦(1)，否则 Boss 空位。
+  Future<String?> grantFirstEmptyMic(int uid) async {
+    if (!inRoom.value || rid <= 0 || uid <= 0) return null;
+    if (!isStaff) return 'No permission';
+    if (isAuctionRoom) {
+      if (_uidAt(1) == 0) return grantOnMic(uid: uid, position: 1);
+      final empty = [2, 3, 4].firstWhere((i) => _uidAt(i) == 0, orElse: () => -1);
+      if (empty < 0) return 'No empty mic';
+      return grantOnMic(uid: uid, position: empty);
+    }
+    if (!Get.isRegistered<MicLogic>()) return 'Mic unavailable';
+    final seats = Get.find<MicLogic>().seats;
+    final empty = seats.indexWhere((s) => !s.occupied);
+    if (empty < 0) return 'No empty mic';
+    return grantOnMic(uid: uid, position: empty);
+  }
+
+  Future<String?> kickUser({required int uid, required int leaveSeconds}) async {
+    if (!inRoom.value || rid <= 0 || uid <= 0) return null;
+    if (!isStaff) return 'No permission';
+    final result = await ChimoApis.room.kickUser(
+      rid: rid,
+      uid: uid,
+      leaveSeconds: leaveSeconds,
+    );
+    if (!result.ok) return result.message.isEmpty ? 'Kick failed' : result.message;
+    await _refreshSeats();
+    return null;
+  }
+
+  Future<String?> changeUserRole({required int uid, required RtcUserRole nextRole}) async {
+    if (!inRoom.value || rid <= 0 || uid <= 0) return null;
+    final me = role.value;
+    final canManage =
+        me == RtcUserRole.Owner || me == RtcUserRole.Receptionist;
+    if (!canManage) return 'No permission';
+    if (nextRole == RtcUserRole.Receptionist && me != RtcUserRole.Owner) {
+      return 'No permission';
+    }
+    final result = await ChimoApis.room.changeRole(rid: rid, uid: uid, role: nextRole);
+    if (!result.ok) return result.message.isEmpty ? 'Role update failed' : result.message;
+    return null;
+  }
+
+  /// 查在线用户（角色 / 禁麦等）。对齐 joyride 资料卡更多面板。
+  Future<SimpleChannelUser?> lookupChannelUser(int uid) async {
+    if (!inRoom.value || rid <= 0 || uid <= 0) return null;
+    final result = await ChimoApis.room.channelUsers(rid, count: 100);
+    if (!result.ok || result.data == null) return null;
+    for (final user in result.data!.users) {
+      if (user.id.toInt() == uid) return user;
+    }
+    if (result.data!.hasMyself() && result.data!.myself.id.toInt() == uid) {
+      return result.data!.myself;
+    }
+    return null;
+  }
+
+  Future<String?> setForceMic({required int uid, required bool forbid}) async {
+    if (!inRoom.value || rid <= 0 || uid <= 0) return null;
+    if (!isStaff) return 'No permission';
+    final result = forbid
+        ? await ChimoApis.room.managerCloseMic(rid: rid, uid: uid)
+        : await ChimoApis.room.managerOpenMic(rid: rid, uid: uid);
+    if (!result.ok) return result.message.isEmpty ? 'Mic ban failed' : result.message;
+    return null;
+  }
+
+  Future<String?> forbidWord(int uid) async {
+    if (!inRoom.value || rid <= 0 || uid <= 0) return null;
+    if (!isStaff) return 'No permission';
+    final result = await ChimoApis.room.forbidWord(rid: rid, uid: uid);
+    if (!result.ok) return result.message.isEmpty ? 'Mute failed' : result.message;
+    return null;
+  }
+
+  Future<String?> clearMicScore(int uid) async {
+    if (!inRoom.value || rid <= 0 || uid <= 0) return null;
+    if (!isStaff) return 'No permission';
+    final result = await ChimoApis.room.clearMicScore(rid: rid, uid: uid);
+    if (!result.ok) return result.message.isEmpty ? 'Clear failed' : result.message;
+    await _refreshSeats();
+    return null;
+  }
+
+  Future<String?> setMicTimer({
+    required int uid,
+    required bool open,
+    int seconds = 60,
+  }) async {
+    if (!inRoom.value || rid <= 0 || uid <= 0) return null;
+    if (!isStaff) return 'No permission';
+    final result = await ChimoApis.room.micCounter(
+      type: open ? OpType.OP_OPEN : OpType.OP_CLOSE,
+      rid: rid,
+      uid: uid,
+      seconds: open ? seconds : 0,
+    );
+    if (!result.ok) return result.message.isEmpty ? 'Timer failed' : result.message;
+    await _refreshSeats();
+    return null;
+  }
+
+  /// 开关公屏。对齐 joyride `switchPublicScreen`。
+  Future<String?> togglePublicChat() async {
+    if (!inRoom.value || rid <= 0) return null;
+    if (!isStaff) return 'No permission';
+    final next = !freePublicChat.value;
+    final result = await ChimoApis.room.updateFields(
+      rid,
+      ChannelFields(freePublicChat: next),
+    );
+    if (!result.ok) {
+      return result.message.isEmpty ? 'Public screen update failed' : result.message;
+    }
+    freePublicChat.value = next;
+    return null;
+  }
+
+  /// 开关麦上礼物统计。对齐 joyride `switchGiftValueCountSwitch`。
+  Future<String?> toggleGiftValueCount() async {
+    if (!inRoom.value || rid <= 0) return null;
+    if (!isOwnerOrReceptionist) return 'No permission';
+    final next = !giftValueCountSwitch.value;
+    final result = await ChimoApis.room.updateFields(
+      rid,
+      ChannelFields(giftValueCountSwitch: next),
+    );
+    if (!result.ok) {
+      return result.message.isEmpty ? 'Gift stats update failed' : result.message;
+    }
+    giftValueCountSwitch.value = next;
+    return null;
+  }
+
+  /// 房间倒计时（CP 主持麦）。对齐 joyride `managerShowRoomTime`。
+  Future<String?> setRoomTimer({required bool open, int seconds = 60}) async {
+    if (!inRoom.value || rid <= 0) return null;
+    if (!showCpRoomTimer) return 'No permission';
+    final result = await ChimoApis.room.roomCounter(
+      type: open ? OpType.OP_OPEN : OpType.OP_CLOSE,
+      rid: rid,
+      seconds: open ? seconds : 0,
+    );
+    if (!result.ok) return result.message.isEmpty ? 'Timer failed' : result.message;
+    if (!open) {
+      countDownAt.value = 0;
+    } else {
+      countDownAt.value = DateTime.now().millisecondsSinceEpoch ~/ 1000 + seconds;
+    }
+    return null;
+  }
+
+  /// 更新房间名称。对齐 joyride `updateTitle`。
+  Future<String?> updateTitle(String value) async {
+    if (!inRoom.value || rid <= 0) return null;
+    if (!isOwnerOrReceptionist) return 'No permission';
+    final next = value.trim();
+    if (next == title.value) return null;
+    final result = await ChimoApis.room.updateFields(rid, ChannelFields(title: next));
+    if (!result.ok) return result.message.isEmpty ? 'Update failed' : result.message;
+    title.value = next.isEmpty ? 'Room $rid' : next;
+    return null;
+  }
+
+  /// 更新房间主题。对齐 joyride `updateTheme`。
+  Future<String?> updateTheme(String value) async {
+    if (!inRoom.value || rid <= 0) return null;
+    if (!isOwnerOrReceptionist) return 'No permission';
+    final next = value.trim();
+    if (next == theme.value) return null;
+    final result = await ChimoApis.room.updateFields(rid, ChannelFields(theme: next));
+    if (!result.ok) return result.message.isEmpty ? 'Update failed' : result.message;
+    theme.value = next;
+    return null;
+  }
+
+  /// 更新房间公告。对齐 joyride `updateNotice`。
+  Future<String?> updateNotice(String value) async {
+    if (!inRoom.value || rid <= 0) return null;
+    if (!isOwnerOrReceptionist) return 'No permission';
+    if (value == notice.value) return null;
+    final result = await ChimoApis.room.updateFields(rid, ChannelFields(notice: value));
+    if (!result.ok) return result.message.isEmpty ? 'Update failed' : result.message;
+    notice.value = value;
+    return null;
+  }
+
+  /// 开关自由上麦。对齐 joyride `switchFreePub`。
+  Future<String?> toggleFreePub() async {
+    if (!inRoom.value || rid <= 0) return null;
+    if (!isOwnerOrReceptionist) return 'No permission';
+    final next = !freePub.value;
+    freePub.value = next;
+    final result = await ChimoApis.room.updateFields(rid, ChannelFields(freePub: next));
+    if (!result.ok) {
+      freePub.value = !next;
+      return result.message.isEmpty ? 'Update failed' : result.message;
+    }
+    return null;
+  }
+
+  /// 更新隐私设置。对齐 joyride `RoomMainToolPrivacyModel.confirm`。
+  Future<String?> updatePrivacy({
+    required bool lock,
+    required String password,
+    required bool privacy,
+  }) async {
+    if (!inRoom.value || rid <= 0) return null;
+    if (!isOwnerOrReceptionist) return 'No permission';
+    if (lock && password.length != 4) return 'Please enter a 4-digit password';
+    final result = await ChimoApis.room.updateFields(
+      rid,
+      ChannelFields(
+        isPrivacy: privacy,
+        password: lock ? password : '',
+      ),
+    );
+    if (!result.ok) return result.message.isEmpty ? 'Update failed' : result.message;
+    hasPassword.value = lock;
+    isPrivacy.value = privacy;
+    return null;
+  }
+
+  /// 更新麦位布局。对齐 joyride `updateMicLayout`。
+  Future<String?> updateMicLayout(MicLayoutItem item) async {
+    if (!inRoom.value || rid <= 0) return null;
+    if (!isOwnerOrReceptionist) return 'No permission';
+    if (micLayout == item.layout) return null;
+    final result = await ChimoApis.room.updateFields(
+      rid,
+      ChannelFields(layout: item.layout),
+    );
+    if (!result.ok) return result.message.isEmpty ? 'Update failed' : result.message;
+    micLayout = item.layout;
+    layoutName.value = item.layoutName;
+    hostOnTop.value = item.layout != MicLayoutEnum.TILED_4_4 &&
+        item.layout != MicLayoutEnum.TILED_3_3;
+    if (Get.isRegistered<MicLogic>()) {
+      await _refreshSeats();
+    }
+    return null;
+  }
+
+  /// 更新房间背景。对齐 joyride `ChooseBackgroundModel.confirm`。
+  Future<String?> updateBackground(BackgroundItem item) async {
+    if (!inRoom.value || rid <= 0) return null;
+    if (!isOwnerOrReceptionist) return 'No permission';
+    final result = await ChimoApis.room.updateFields(
+      rid,
+      ChannelFields(backgroundId: Int64(item.id.toInt())),
+    );
+    if (!result.ok) return result.message.isEmpty ? 'Update failed' : result.message;
+    if (item.url.isNotEmpty) background.value = item.url;
+    return null;
+  }
+
+  /// 读取当前房间密码（设置页用）。对齐 joyride `toolPermission`。
+  Future<String?> fetchRoomPassword() async {
+    if (!inRoom.value || rid <= 0) return null;
+    if (!isOwnerOrReceptionist) return null;
+    final result = await ChimoApis.room.buttonPermission(rid);
+    if (!result.ok || result.data == null) return null;
+    return result.data!.password;
+  }
+
+  bool userOnMic(int uid) {
+    if (uid <= 0 || !Get.isRegistered<MicLogic>()) return false;
+    return Get.find<MicLogic>().seats.any((s) => s.uid == uid);
+  }
+
+  bool userHasMicTimer(int uid) {
+    if (uid <= 0 || !Get.isRegistered<MicLogic>()) return false;
+    for (final seat in Get.find<MicLogic>().seats) {
+      if (seat.uid == uid && seat.downMicAt > 0 && seat.remainSeconds() > 0) return true;
+    }
+    return false;
+  }
+
+  int hostUid() => _uidAt(0);
 
   /// 房主/接待关闭房间。对齐 joyride `closeRoom`。
   Future<String?> closeRoom() async {
@@ -308,6 +754,19 @@ class RoomService extends GetxService {
       await play.onLeave();
     }
     plays.clear();
+    channelExt = null;
+    roomType = null;
+    waitQueue.clear();
+    carOwnerMicQueue.clear();
+    freePub.value = true;
+    freePublicChat.value = true;
+    giftValueCountSwitch.value = false;
+    hasPassword.value = false;
+    isPrivacy.value = false;
+    theme.value = '';
+    layoutName.value = '';
+    micLayout = null;
+    countDownAt.value = 0;
     await _rtc?.leave();
     _rtc = null;
     await _socket?.close();
@@ -388,7 +847,11 @@ class RoomService extends GetxService {
     final effect = _session<RoomEffectLogic>(RoomEffectLogic.new);
     mic.myUid = myUid;
     if (channel != null) {
-      mic.apply(channel.broadcaster, seatCount: _seatCount(channel));
+      // 拍卖 / CP 等模板房强制坑位数，避免进房瞬间 broadcaster 短列表裁掉空麦。
+      mic.apply(
+        channel.broadcaster,
+        seatCount: preferredSeatCount ?? _seatCount(channel),
+      );
     }
     barrage.clear();
     effect.reset();
@@ -412,6 +875,7 @@ class RoomService extends GetxService {
   List<RoomMsgHandler> _handlers() {
     return [
       topBarHandler(),
+      queueHandler(),
       Get.find<MicLogic>().handler(),
       Get.find<BarrageLogic>().handler(),
       Get.find<RoomEffectLogic>().handler(),
@@ -485,15 +949,23 @@ class RoomService extends GetxService {
   Future<void> _refreshSeats() async {
     final result = await ChimoApis.room.join(rid: rid, reconnect: 1);
     final channel = result.data?.channel;
-    if (!result.ok || channel == null) return;
+    if (!result.ok || channel == null) {
+      AppLog.w('RoomService _refreshSeats failed: ${result.message}');
+      return;
+    }
     _applyChannel(channel);
     if (!Get.isRegistered<MicLogic>()) return;
-    Get.find<MicLogic>().apply(channel.broadcaster, seatCount: _seatCount(channel));
+    // 拍卖房固定 5 麦，保证表演位(1)在列表变更后仍可刷新。
+    Get.find<MicLogic>().apply(
+      channel.broadcaster,
+      seatCount: preferredSeatCount ?? _seatCount(channel),
+    );
   }
 
   void _applyChannel(Channel channel) {
     rid = channel.channelId.toInt();
     title.value = channel.title.isEmpty ? 'Room $rid' : channel.title;
+    theme.value = channel.theme;
     online.value = channel.currentUserCount;
     cover.value = channel.icon;
     hot.value = channel.hotValue.toInt();
@@ -502,7 +974,22 @@ class RoomService extends GetxService {
     saved.value = channel.inMyCollection;
     role.value = channel.role;
     status.value = channel.status.trim();
+    freePub.value = channel.freePub;
+    freePublicChat.value = channel.freePublicChat;
+    giftValueCountSwitch.value = channel.giftValueCountSwitch;
+    hasPassword.value = channel.hasPassword;
+    isPrivacy.value = channel.isPrivacy;
     hostOnTop.value = _hostOnTop(channel);
+    roomType = channel.hasRoomTypeObj() ? channel.roomTypeObj.type : null;
+    if (channel.hasRoomTypeObj()) {
+      micLayout = channel.roomTypeObj.layout;
+      layoutName.value = channel.roomTypeObj.layoutName;
+    } else {
+      micLayout = null;
+      layoutName.value = '';
+    }
+    countDownAt.value = channel.hasCountDownTimestamp() ? channel.countDownTimestamp : 0;
+    applyMicQueues(wait: channel.waitQueue, carOwner: channel.carOwnerMicQueue);
     // 对齐 yaychat 顶栏：头像只吃 giftRank；进房瞬间若榜为空再退 userList。
     final rankFaces = _avatarsOf(channel.giftRank);
     audience.assignAll(
@@ -542,6 +1029,9 @@ class RoomService extends GetxService {
   /// 顶栏专用：不依赖公屏 / 特效 handler，避免那边解包失败时漏刷。
   RoomMsgHandler topBarHandler() => _TopBarMsgHandler(this);
 
+  /// 排麦队列 + 房间 meta（freePub）。
+  RoomMsgHandler queueHandler() => _QueueMsgHandler(this);
+
   List<String> _avatarsOf(Iterable<SimpleChannelUser> users) {
     return users
         .map((user) => user.avatar.trim())
@@ -553,16 +1043,43 @@ class RoomService extends GetxService {
   bool _hostOnTop(Channel channel) {
     if (!channel.hasRoomTypeObj()) return true;
     final type = channel.roomTypeObj;
-    if (type.layout == MicLayoutEnum.TILED_4_4 || type.layout == MicLayoutEnum.TILED_3_3)
+    if (type.layout == MicLayoutEnum.TILED_4_4 || type.layout == MicLayoutEnum.TILED_3_3) {
       return false;
+    }
     return true;
   }
 
   int _seatCount(Channel channel) {
+    if (channel.hasRoomTypeObj()) {
+      final type = channel.roomTypeObj.type;
+      if (type == RoomType.AUCTION) return 5;
+      if (type == RoomType.CP) return 8;
+    }
     if (!channel.hasRoomTypeObj() || channel.roomTypeObj.mics.isEmpty) {
       return hostOnTop.value ? 9 : 8;
     }
     return channel.roomTypeObj.mics.length;
+  }
+
+  Future<void> _maybeAutoMic(JoinChannelRsp rsp) async {
+    if (!inRoom.value) return;
+    int? position;
+    if (rsp.hasPosition() && rsp.position >= 0) {
+      position = rsp.position;
+    } else if (rsp.autoMic) {
+      position = isOwner ? 0 : 1;
+    }
+    if (position == null) return;
+    // 服务端指定自动上麦：直上固定位，不走排麦。
+    final micPermission = await _ensureMicPermission();
+    if (micPermission != null) return;
+    final result = await ChimoApis.room.upMic(rid, position: position);
+    if (!result.ok) {
+      AppLog.w('RoomService autoMic failed: ${result.message}');
+      return;
+    }
+    await _refreshSeats();
+    _syncLocalAudio();
   }
 
   void _syncLocalAudio() {
@@ -635,6 +1152,53 @@ class _TopBarMsgHandler implements RoomMsgHandler {
       }
     } catch (error) {
       AppLog.w('RoomTopBar socket frame skipped scene=${message.data.scene}', error: error);
+    }
+  }
+}
+
+class _QueueMsgHandler implements RoomMsgHandler {
+  _QueueMsgHandler(this.service);
+
+  final RoomService service;
+
+  @override
+  bool supports(Message message) {
+    final scene = message.data.scene;
+    return scene == Scene.MIC_QUEUE_CHANGE || scene == Scene.ROOM_META_DATA_CHANGE;
+  }
+
+  @override
+  void handle(Message message) {
+    try {
+      final scene = message.data.scene;
+      if (scene == Scene.MIC_QUEUE_CHANGE) {
+        final change = message.data.content.unpackInto(RoomMicQueueChange());
+        service.applyMicQueues(
+          wait: change.waitQueue,
+          carOwner: change.carOwnerMicQueue,
+        );
+        return;
+      }
+      if (scene == Scene.ROOM_META_DATA_CHANGE) {
+        final meta = message.data.content.unpackInto(RoomMetaDataChange());
+        service.freePub.value = meta.freePub;
+        if (meta.hasFreePublicChat()) {
+          service.freePublicChat.value = meta.freePublicChat;
+        }
+        if (meta.hasGiftValueCountSwitch()) {
+          service.giftValueCountSwitch.value = meta.giftValueCountSwitch;
+        }
+        if (meta.hasCountDownTimestamp()) {
+          service.countDownAt.value = meta.countDownTimestamp;
+        }
+        if (meta.notice.isNotEmpty) service.notice.value = meta.notice;
+        if (meta.backgroundUrl.isNotEmpty) {
+          service.background.value = meta.backgroundUrl;
+        }
+        if (meta.title.isNotEmpty) service.title.value = meta.title;
+      }
+    } catch (error) {
+      AppLog.w('QueueMsgHandler failed scene=${message.data.scene}', error: error);
     }
   }
 }

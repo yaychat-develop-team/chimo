@@ -416,6 +416,49 @@ abstract final class AppColors {
   /// 心动卡片角标渐变。
   static const LinearGradient roomHeartBadge = LinearGradient(colors: [purpleBF3AFC, purple7713FC]);
 
+  /// 拍卖「Place Bid」按钮。
+  static const LinearGradient auctionBidGradient = LinearGradient(
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+    colors: [pinkFC5CC6, purpleBF3AFC, purple9B6BFF],
+  );
+
+  /// 拍卖开拍价 / Host 角标。
+  static const LinearGradient auctionTagGradient = LinearGradient(
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+    colors: [pinkFF5BA8, purpleBF3AFC],
+  );
+
+  static const LinearGradient cpGradient = LinearGradient(
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+    colors: [Color(0xff5912EF), Color(0xffF911F9)],
+  );
+
+  /// 拍卖台座光晕。
+  static const Color auctionStageGlow = Color(0x664B2ADB);
+
+  /// 拍卖出价榜描边：金 / 银 / 铜。
+  static const Color auctionRankGold = Color(0xFFFFE35A);
+  static const Color auctionRankSilver = Color(0xFFB9BFD4);
+  static const Color auctionRankBronze = Color(0xFFEEC0A4);
+
+  /// 拍卖艺人贡献 pill。
+  static const LinearGradient auctionActorScore = LinearGradient(
+    colors: [Color(0xFFFC5CC6), Color(0xFFFC475F)],
+  );
+
+  /// 拍卖 Boss 贡献 pill。
+  static const LinearGradient auctionBossScore = LinearGradient(
+    colors: [Color(0xFF00ECFC), Color(0xFF0047FD)],
+  );
+
+  /// 拍卖出价金额 pill。
+  static const LinearGradient auctionBidAmount = LinearGradient(
+    colors: [Color(0xFF97087F), Color(0xFF3203CA)],
+  );
+
   /// 活动分享气泡渐变。
   static const LinearGradient roomActivityFill = LinearGradient(
     colors: [purple2EFF41FF, purple2E6922FF],

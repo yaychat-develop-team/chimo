@@ -10,12 +10,16 @@ abstract class CacheKeys {
   static const confRespKey = 'confRespKey';
   static const lastUserInfoKey = 'lastUserInfoKey';
 
-
   ///区域登录的缓存信息
   static String authInfoKey(String regionCode) {
     return 'authInfoKey$regionCode';
   }
 
+  /// 按用户 + 自然日隔离的计数 key（对齐 joyride `userDailyKey`）。
+  static String userDailyKey(int uid, String type) {
+    final now = DateTime.now();
+    return 'userDailyKey_${uid}_${now.year}_${now.month}_${now.day}_$type';
+  }
 }
 
 abstract class CacheUtil {
