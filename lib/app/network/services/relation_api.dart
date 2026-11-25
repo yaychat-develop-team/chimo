@@ -1,12 +1,29 @@
+import 'package:dio/dio.dart';
+import 'package:fixnum/fixnum.dart';
+
 import '../../../common/models/server_client/base.pbenum.dart';
 import '../../../common/models/server_client/common/app.pb.dart';
 import '../../../common/models/server_client/user.pb.dart';
+import '../../../common/models/server_client/user_realtion.pb.dart';
 import '../http/api_result.dart';
 import '../http/http.dart';
 
-/// 关注 / 搜索 / 黑名单 / 访客。
+/// 关注 / 搜索 / 黑名单 / 访客 / 关系墙。
 class RelationApi {
   const RelationApi();
+
+  static final _jsonBody = Options(
+    headers: {Headers.contentTypeHeader: Headers.jsonContentType},
+  );
+
+  /// 资料页关系列表。对齐 joyride `UserApi.getRelations`。
+  Future<ApiResult<UserRelationsRsp>> relations(int uid) {
+    return Http.ins.postAndParse<UserRelationsRsp>(
+      '/user-relation/relations',
+      data: UserRelationsReq(targetId: Int64(uid)),
+      options: _jsonBody,
+    );
+  }
 
   Future<ApiResult<List<User>>> searchUsers(String key) async {
     final res = await Http.ins.getAndParse<UserListRsp>(
@@ -16,13 +33,9 @@ class RelationApi {
     return res.map((data) => _users(data, RelationType.FAN));
   }
 
-  /// 首页 ID 搜索（`GET /search?no=`）。命中项是 [MsgListUserItem]。
-  Future<ApiResult<List<MsgListUserItem>>> homeSearch(String no) async {
-    final res = await Http.ins.getAndParse<SearchResp>(
-      '/search',
-      query: {'no': no},
-    );
-    return res.map((data) => data.users);
+  /// 首页 ID 搜索（`GET /search?no=`）。用户在 [SearchResp.users]，房间在 [SearchResp.channels]。
+  Future<ApiResult<SearchResp>> homeSearch(String no) {
+    return Http.ins.getAndParse<SearchResp>('/search', query: {'no': no});
   }
 
   Future<ApiResult<List<User>>> searchFollowing({

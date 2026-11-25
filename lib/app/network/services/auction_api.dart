@@ -51,4 +51,23 @@ class AuctionApi {
       options: _jsonBody,
     );
   }
+
+  /// 艺人签约信息。对齐 joyride `AuctionApi.artists`。
+  Future<ApiResult<ArtistContractInfo>> artists(int uid) {
+    return Http.ins.getAndParse<ArtistContractInfo>('/artist/getContractInfo', query: {'uid': uid});
+  }
+
+  /// 续约。对齐 joyride `AuctionApi.renew`。
+  Future<ApiResult<void>> renew(int uid) {
+    return Http.ins.postAndParse(
+      '/artist/renew',
+      data: ArtistRenewReq(artistId: Int64(uid)),
+      options: _jsonBody,
+    );
+  }
+
+  /// 经纪人页。对齐 proto `/artist/getAgentInfo`：我作为艺人看我的经纪人。
+  Future<ApiResult<AgentInfoRsp>> agentInfo() {
+    return Http.ins.getAndParse<AgentInfoRsp>('/artist/getAgentInfo');
+  }
 }

@@ -94,7 +94,7 @@ class MyTagsLogic extends AsyncListLogic<MakeFriendLabelRespEntry> {
     } catch (failure) {
       AppToast.info('Save failed: $failure');
     } finally {
-      if (!isClosed) saving.value = false;
+      saving.value = false;
     }
   }
 }

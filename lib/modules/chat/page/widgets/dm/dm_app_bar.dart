@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import '../../../../../common/constants/app_assets.dart';
 import '../../../../../common/theme/app_colors.dart';
 import '../../../../../common/utils/zodiac.dart';
-import '../../../model/chat_conversation.dart';
+import '../../../model/conversation_model.dart';
 import '../../../../profile/page/album_photo_viewer_page.dart';
 import 'package:chimo/common/utils/chimo.dart';
 
@@ -22,9 +22,10 @@ class DmAppBar extends StatelessWidget {
     required this.onAvatarTap,
     required this.onMoreTap,
     this.loading = false,
+    this.isHeartie = false,
   });
 
-  final ChatConversation conversation;
+  final ConversationModel conversation;
   final bool following;
 
   /// 0 = 展开，1 = 收起。
@@ -33,6 +34,7 @@ class DmAppBar extends StatelessWidget {
   final VoidCallback onAvatarTap;
   final VoidCallback onMoreTap;
   final bool loading;
+  final bool isHeartie;
 
   @override
   Widget build(BuildContext context) {
@@ -93,6 +95,26 @@ class DmAppBar extends StatelessWidget {
                               width: 16,
                               height: 16,
                             ),
+                            if (isHeartie) ...[
+                              const SizedBox(width: 4),
+                              Container(
+                                height: 16,
+                                padding: const EdgeInsets.symmetric(horizontal: 6),
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(8),
+                                  gradient: AppColors.auctionActorScore,
+                                ),
+                                child: const Text(
+                                  'Heartie',
+                                  style: TextStyle(
+                                    color: AppColors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                         // 对齐 forya：仅在线时展示在线状态。

@@ -7,11 +7,11 @@ import '../../../../../common/constants/app_assets.dart';
 import '../../../../../common/models/server_client/auction.pb.dart';
 import '../../../../../common/theme/app_colors.dart';
 import '../../../../../common/utils/chimo.dart';
+import '../../../../../common/utils/text_fmt.dart';
 import '../../../../../common/widgets/app_image.dart';
 import '../../../logic/mic_logic.dart';
 import '../../../logic/room_logic.dart';
 import '../../../model/mic_seat.dart';
-import '../../../model/room_format.dart';
 import '../../../page/widgets/room_mic_grid.dart';
 import '../logic/auction_logic.dart';
 
@@ -542,7 +542,7 @@ class _AuctionSeat extends StatelessWidget {
           ),
           SizedBox(width: 3.w),
           Text(
-            roomCount(seat.contribution),
+            TextFmt.roomCount(seat.contribution),
             style: TextStyle(
               color: AppColors.white,
               fontSize: 10.sp,

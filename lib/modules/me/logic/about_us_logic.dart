@@ -24,9 +24,9 @@ class AboutUsLogic extends GetxController {
   Future<void> loadVersion() async {
     try {
       final info = await PackageInfo.fromPlatform();
-      if (!isClosed) version.value = info.version;
+      version.value = info.version;
     } catch (_) {
-      if (!isClosed) version.value = fallbackVersion;
+      version.value = fallbackVersion;
     }
   }
 
@@ -50,7 +50,7 @@ class AboutUsLogic extends GetxController {
     } catch (_) {
       return 'Unable to check for updates';
     } finally {
-      if (!isClosed) checkingUpdate.value = false;
+      checkingUpdate.value = false;
     }
   }
 

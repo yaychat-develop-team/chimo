@@ -1,9 +1,7 @@
-import 'package:card_swiper/card_swiper.dart';
 import 'package:chimo/common/utils/chimo.dart';
 import 'package:chimo/common/widgets/app_image.dart';
 import 'package:chimo/common/widgets/app_pull_refresh.dart';
 import 'package:chimo/common/widgets/app_scaffold.dart';
-import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -14,6 +12,7 @@ import '../../../common/constants/app_assets.dart';
 import '../../../common/models/server_client/rtc.pb.dart';
 import '../../../common/theme/app_colors.dart';
 import '../logic/home_logic.dart';
+import 'widgets/home_banner_swiper.dart';
 import 'widgets/room_item_card.dart';
 import 'widgets/home_search_header.dart';
 import '../../../common/widgets/section_title_view.dart';
@@ -43,38 +42,8 @@ class RoomListPage extends GetView<HomeLogic> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          HomeSearchHeader(
-            onSearchTap: () {
-              AppJumper.toHomeSearch();
-            },
-          ),
-          Obx(() {
-            final banners = controller.banners.toList();
-            if (banners.isEmpty) {
-              return Visibility(
-                visible: banners.length > 1,
-                child: const SizedBox.shrink(),
-              );
-            } else {
-              return Container(
-                height: 100.w,
-                margin: const EdgeInsets.symmetric(horizontal: 16),
-                child: Swiper(
-                  autoplay: banners.length > 1,
-                  axisDirection: AxisDirection.up,
-                  scrollDirection: Axis.vertical,
-                  itemCount: banners.length,
-                  itemBuilder: (context, index) {
-                    final banner = banners[index];
-                    return Chimo.image(banner.img1, fit: BoxFit.cover);
-                  },
-                  onTap: (index) {
-                    AppJumper.openLink(controller.banners.toList()[index].link);
-                  },
-                ),
-              );
-            }
-          }),
+          HomeSearchHeader(onSearchTap: AppJumper.toHomeSearch),
+          Obx(() => HomeBannerSwiper(banners: controller.banners.toList())),
         ],
       ),
     );
@@ -120,7 +89,7 @@ class RoomListPage extends GetView<HomeLogic> {
                     ),
                     SizedBox(height: 16.w),
                     TextButton(
-                      onPressed: () => unawaited(controller.loadRooms()),
+                      onPressed: () => controller.loadRooms(),
                       child: const Text(
                         'Retry',
                         style: TextStyle(color: AppColors.green1BBA77),

@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:chimo/app/session_info.dart';
-import 'package:chimo/common/utils/app_utils.dart';
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 
@@ -13,14 +12,15 @@ import '../../../app/storage/app_storage.dart';
 import '../../../common/constants/app_assets.dart';
 import '../../../common/extensions/wire_view.dart';
 import '../../../common/models/server_client/base.pbenum.dart';
+import '../../../common/models/server_client/rtc.pb.dart';
 import '../../../common/models/server_client/user.pb.dart';
 import '../../../common/utils/app_toast.dart';
 import '../../../common/utils/zodiac.dart';
 import '../../chat/logic/dm_entry.dart';
-import '../../chat/model/chat_conversation.dart';
+import '../../chat/model/conversation_model.dart';
 import '../model/search_user.dart';
 
-/// 首页搜索（按 ID 搜人）的输入框、焦点、取数与历史记录。
+/// 首页搜索（按 ID 搜人和房间）的输入框、焦点、取数与历史记录。
 class UserSearchLogic extends GetxController {
   final TextEditingController input = TextEditingController();
   final FocusNode focusNode = FocusNode();
@@ -28,18 +28,18 @@ class UserSearchLogic extends GetxController {
   final RxList<String> history = <String>[].obs;
   final RxBool editingHistory = false.obs;
   final Rxn<SearchUser> result = Rxn<SearchUser>();
+  final Rxn<Channel> room = Rxn<Channel>();
   final RxBool hasSearched = false.obs;
   final RxBool searching = false.obs;
 
-  /// 清空按钮显隐。跟搜索结果无关，只看输入框里有没有字。
-  final RxBool hasText = false.obs;
-
-  String? get selfUserId => SessionInfo.uid.toString();
+  String get selfUserId => SessionInfo.uid.toString();
   Timer? _searchDebounce;
   int _searchSeq = 0;
 
   static const _historyKey = 'searchHistoryKey';
-  static final RegExp _idPattern = RegExp(r'^\d{5,}$');
+
+  /// 对齐 oumi：只要是纯数字即可，不限制位数（短 ID / 房间号也能搜）。
+  static final RegExp _idPattern = RegExp(r'^\d+$');
 
   @override
   void onInit() {
@@ -63,10 +63,7 @@ class UserSearchLogic extends GetxController {
     super.onClose();
   }
 
-  void _onInputChanged() {
-    hasText.value = input.text.isNotEmpty;
-    onInputChanged(input.text);
-  }
+  void _onInputChanged() => onInputChanged(input.text);
 
   void loadHistory() {
     final saved = AppStorage.settings?.get(_historyKey);
@@ -84,7 +81,7 @@ class UserSearchLogic extends GetxController {
     if (history.length > 20) {
       history.removeRange(20, history.length);
     }
-    unawaited(persistHistory());
+    persistHistory();
   }
 
   /// 输入框内容变化。
@@ -96,16 +93,16 @@ class UserSearchLogic extends GetxController {
       exitEditHistory();
     }
 
-    // 仅当 ID 看起来完整时才自动搜索。
+    // 仅当 ID 看起来完整时才自动搜索，停手 300ms 后再发，避免连打丢位。
     if (query.isEmpty || !isValidId(query)) {
-      result.value = null;
+      _clearHits();
       hasSearched.value = false;
       searching.value = false;
       return;
     }
 
-    AppUtils.throttle(() {
-      unawaited(onSearch(query, unfocus: false, showInvalidToast: false));
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+      onSearch(query, unfocus: false, showInvalidToast: false);
     });
   }
 
@@ -113,7 +110,7 @@ class UserSearchLogic extends GetxController {
     if (history.isEmpty) return;
     focusNode.unfocus();
     editingHistory.value = true;
-    result.value = null;
+    _clearHits();
     hasSearched.value = false;
   }
 
@@ -124,19 +121,19 @@ class UserSearchLogic extends GetxController {
   void clearAllHistory() {
     history.clear();
     editingHistory.value = false;
-    unawaited(persistHistory());
+    persistHistory();
   }
 
   void removeHistoryItem(String item) {
     history.remove(item);
     if (history.isEmpty) editingHistory.value = false;
-    unawaited(persistHistory());
+    persistHistory();
   }
 
   /// 清空输入并重新聚焦。`clear` 会再走一遍输入监听。
   void clearInput() {
     _searchDebounce?.cancel();
-    result.value = null;
+    _clearHits();
     hasSearched.value = false;
     editingHistory.value = false;
     searching.value = false;
@@ -145,6 +142,27 @@ class UserSearchLogic extends GetxController {
   }
 
   bool isValidId(String query) => _idPattern.hasMatch(query);
+
+  void _clearHits() {
+    result.value = null;
+    room.value = null;
+  }
+
+  SearchUser? _matchUser(List<MsgListUserItem> users, String query) {
+    if (users.isEmpty) return null;
+    for (final user in users) {
+      if (user.id.toString() == query) return fromMsg(user);
+    }
+    return fromMsg(users.first);
+  }
+
+  Channel? _matchRoom(List<Channel> channels, String query) {
+    if (channels.isEmpty) return null;
+    for (final channel in channels) {
+      if (channel.channelId.toString() == query) return channel;
+    }
+    return channels.first;
+  }
 
   SearchUser fromUser(User u) {
     return SearchUser(
@@ -172,38 +190,13 @@ class UserSearchLogic extends GetxController {
       userId: id,
       avatarAsset: AppAssets.avatarPlace,
       avatarUrl: u.avatar.trim().isEmpty ? null : u.avatar,
-      isMale: _male(u.gender),
+      isMale: normalizeGender(u.gender) != 'female',
       age: u.age,
       relation: u.isFollow ? SearchRelation.following : SearchRelation.notFollowing,
       emUsername: u.emUsername,
       zodiac: u.birthday.trim().isEmpty ? '' : Zodiac.fromBirthday(u.birthday),
-      hasGender: _genderKnown(u.gender),
+      hasGender: normalizeGender(u.gender) != null,
     );
-  }
-
-  bool _genderKnown(String gender) {
-    switch (gender.toLowerCase()) {
-      case 'female':
-      case 'f':
-      case '2':
-      case 'male':
-      case 'm':
-      case '1':
-        return true;
-      default:
-        return false;
-    }
-  }
-
-  bool _male(String gender) {
-    switch (gender.toLowerCase()) {
-      case 'female':
-      case 'f':
-      case '2':
-        return false;
-      default:
-        return true;
-    }
   }
 
   Future<void> submit(String raw) async {
@@ -223,7 +216,7 @@ class UserSearchLogic extends GetxController {
     }
 
     if (!isValidId(query)) {
-      result.value = null;
+      _clearHits();
       hasSearched.value = false;
       searching.value = false;
       if (showInvalidToast) {
@@ -241,23 +234,20 @@ class UserSearchLogic extends GetxController {
     final seq = ++_searchSeq;
     searching.value = true;
     hasSearched.value = true;
-    result.value = null;
+    _clearHits();
 
     try {
-      // forya：首页用 `/search?no=`；`searchUser` 搜自己会 System error。
+      // 首页用 `/search?no=`，一次带回用户和房间。`searchUser` 搜自己会 System error。
       final homeRes = await ChimoApis.relation.homeSearch(query);
       if (isClosed || seq != _searchSeq) return;
 
       SearchUser? hit;
+      Channel? roomHit;
       if (homeRes.ok) {
-        final users = homeRes.data ?? const <MsgListUserItem>[];
-        for (final u in users) {
-          if (u.id.toString() == query) {
-            hit = fromMsg(u);
-            break;
-          }
-        }
-        hit ??= users.isEmpty ? null : fromMsg(users.first);
+        final users = homeRes.data?.users ?? const <MsgListUserItem>[];
+        final channels = homeRes.data?.channels ?? const <Channel>[];
+        hit = _matchUser(users, query);
+        roomHit = _matchRoom(channels, query);
       } else {
         final legacy = await ChimoApis.relation.searchUsers(query);
         if (isClosed || seq != _searchSeq) return;
@@ -281,16 +271,17 @@ class UserSearchLogic extends GetxController {
         }
       }
 
-      if (hit != null && selfUserId != null && hit.userId == selfUserId) {
+      if (hit != null && hit.userId == selfUserId) {
         hit = hit.copyWith(relation: SearchRelation.self);
       }
 
-      // forya：仅在搜索有命中时写入历史。
-      if (hit != null) {
+      // 用户或房间有命中才写入历史。
+      if (hit != null || roomHit != null) {
         addHistory(query);
       }
 
       result.value = hit;
+      room.value = roomHit;
       searching.value = false;
     } catch (error) {
       if (isClosed || seq != _searchSeq) return;
@@ -308,7 +299,7 @@ class UserSearchLogic extends GetxController {
       selection: TextSelection.collapsed(offset: item.length),
     );
     _searchDebounce?.cancel();
-    unawaited(onSearch(item, unfocus: true, showInvalidToast: true));
+    onSearch(item, unfocus: true, showInvalidToast: true);
   }
 
   Future<void> follow(SearchUser user) async {
@@ -343,10 +334,15 @@ class UserSearchLogic extends GetxController {
     AppJumper.toProfile(user.userId, preview: profile);
   }
 
+  void openRoom(Channel channel) {
+    focusNode.unfocus();
+    AppJumper.toRoom(channel.channelId.toInt());
+  }
+
   void openChat(SearchUser user) {
     focusNode.unfocus();
     final em = user.emUsername.trim();
-    final conversation = ChatConversation(
+    final conversation = ConversationModel(
       id: em.isNotEmpty ? 'dm_$em' : (user.id.startsWith('dm_') ? user.id : 'dm_${user.id}'),
       title: user.nickname,
       avatarAsset: user.avatarAsset,

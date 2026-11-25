@@ -51,10 +51,6 @@ class _AboutUsPageState extends State<AboutUsPage> {
   Future<void> _checkUpdate() async {
     final message = await logic.checkUpdateMessage();
     if (!mounted || message.isEmpty) return;
-    _toast(message);
-  }
-
-  void _toast(String message) {
     AppToast.error(message);
   }
 

@@ -91,97 +91,99 @@ class _AlmostInPageState extends State<AlmostInPage> {
     final bottom = MediaQuery.paddingOf(context).bottom;
     final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
 
-    return AppScaffold(
-      backgroundColor: AppColors.black111111,
-      appBar: AppNavBar(
-        title: "You're almost in!",
-        trailing: Chimo.s.skipButton(enabled: !logic.busy, onPressed: logic.skip),
-      ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          return SingleChildScrollView(
-            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            padding: EdgeInsets.fromLTRB(30, 16, 30, 16 + bottom),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: constraints.maxHeight),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  SizedBox(height: 12),
-                  const Text(
-                    "You're almost in!",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 26,
-                      fontWeight: FontWeight.w700,
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'A great profile picture and nickname help you stand out.',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w400,
-                      height: 1.5,
-                    ),
-                  ),
-                  SizedBox(height: keyboardOpen ? 20 : 40),
-                  Center(
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: _pickAvatar,
-                        customBorder: const CircleBorder(),
-                        child: _buildAvatar(),
+    return Obx(
+      () => AppScaffold(
+        backgroundColor: AppColors.black111111,
+        appBar: AppNavBar(
+          title: "You're almost in!",
+          trailing: Chimo.s.skipButton(enabled: !logic.busy, onPressed: logic.skip),
+        ),
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              padding: EdgeInsets.fromLTRB(30, 16, 30, 16 + bottom),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SizedBox(height: 12),
+                    const Text(
+                      "You're almost in!",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 26,
+                        fontWeight: FontWeight.w700,
+                        height: 1.5,
                       ),
                     ),
-                  ),
-                  SizedBox(height: keyboardOpen ? 20 : 36),
-                  Container(
-                    height: 54,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: AppColors.black2A2A2A,
-                      borderRadius: BorderRadius.circular(27),
-                    ),
-                    child: TextField(
-                      controller: _nickController,
-                      enabled: !logic.submitting.value,
-                      textAlign: TextAlign.center,
-                      style: AppText.field,
-                      cursorColor: AppColors.green00F875,
-                      inputFormatters: [LengthLimitingTextInputFormatter(20)],
-                      decoration: const AppInputDecoration(
-                        isCollapsed: true,
-                        hintText: 'Enter a nickname',
-                        hintStyle: TextStyle(color: AppColors.gray8A8A8A, fontSize: 14),
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: keyboardOpen ? 28 : 48),
-                  Center(
-                    child: Chimo.s.gradientButton(
-                      label: logic.submitting.value ? 'Saving…' : "Let's Go!",
-                      onTap: logic.submitting.value
-                          ? null
-                          : () => logic.letsGo(_nickController.text),
-                      enabled: !logic.submitting.value,
-                      width: 134,
-                      labelStyle: TextStyle(
-                        color: AppColors.black1C1C1E,
+                    const SizedBox(height: 4),
+                    const Text(
+                      'A great profile picture and nickname help you stand out.',
+                      style: TextStyle(
+                        color: Colors.white,
                         fontSize: 14,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w400,
+                        height: 1.5,
                       ),
                     ),
-                  ),
-                ],
+                    SizedBox(height: keyboardOpen ? 20 : 40),
+                    Center(
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: _pickAvatar,
+                          customBorder: const CircleBorder(),
+                          child: _buildAvatar(),
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: keyboardOpen ? 20 : 36),
+                    Container(
+                      height: 54,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: AppColors.black2A2A2A,
+                        borderRadius: BorderRadius.circular(27),
+                      ),
+                      child: TextField(
+                        controller: _nickController,
+                        enabled: !logic.submitting.value,
+                        textAlign: TextAlign.center,
+                        style: AppText.field,
+                        cursorColor: AppColors.green00F875,
+                        inputFormatters: [LengthLimitingTextInputFormatter(20)],
+                        decoration: const AppInputDecoration(
+                          isCollapsed: true,
+                          hintText: 'Enter a nickname',
+                          hintStyle: TextStyle(color: AppColors.gray8A8A8A, fontSize: 14),
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: keyboardOpen ? 28 : 48),
+                    Center(
+                      child: Chimo.s.gradientButton(
+                        label: logic.submitting.value ? 'Saving…' : "Let's Go!",
+                        onTap: logic.submitting.value
+                            ? null
+                            : () => logic.letsGo(_nickController.text),
+                        enabled: !logic.submitting.value,
+                        width: 134,
+                        labelStyle: TextStyle(
+                          color: AppColors.black1C1C1E,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }

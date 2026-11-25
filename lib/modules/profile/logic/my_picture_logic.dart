@@ -47,8 +47,13 @@ class MyPictureLogic extends GetxController {
     }
 
     startUpload(file.path);
-    final remote = await MediaUpload.uploadImage(file.path);
-    if (isClosed) return null;
+    final String? remote;
+    try {
+      remote = await MediaUpload.uploadImage(file.path);
+    } catch (error) {
+      cancelUpload();
+      return (ok: false, message: 'Avatar upload failed: $error');
+    }
     if (remote == null || remote.isEmpty) {
       cancelUpload();
       return (ok: false, message: 'Avatar upload failed. Try again.');
@@ -64,11 +69,14 @@ class MyPictureLogic extends GetxController {
 
   /// 返回 `null` 表示头像已写回。
   Future<String?> commit(String remote) async {
-    final res = await ChimoApis.user.update({'avatarUrl': remote});
-    if (!res.ok) {
-      return res.message.isEmpty ? 'Unable to update avatar' : res.message;
+    try {
+      final res = await ChimoApis.user.update({'avatarUrl': remote});
+      if (!res.ok) {
+        return res.message.isEmpty ? 'Unable to update avatar' : res.message;
+      }
+    } catch (error) {
+      return 'Unable to update avatar: $error';
     }
-    if (isClosed) return null;
     avatarUrl.value = remote;
     localPath.value = null;
     uploading.value = false;

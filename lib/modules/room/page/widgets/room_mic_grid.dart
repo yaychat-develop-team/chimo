@@ -3,13 +3,14 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 
 import '../../../../common/constants/app_assets.dart';
+import '../../../../common/models/server_client/rtc.pbenum.dart';
 import '../../../../common/theme/app_colors.dart';
+import '../../../../common/utils/chimo.dart';
+import '../../../../common/utils/text_fmt.dart';
 import '../../../../common/widgets/app_image.dart';
 import '../../logic/mic_logic.dart';
 import '../../model/mic_seat.dart';
-import '../../model/room_format.dart';
 import '../../service/room_service.dart';
-import 'package:chimo/common/utils/chimo.dart';
 
 class RoomMicGrid extends StatelessWidget {
   const RoomMicGrid({super.key, required this.onTap});
@@ -24,38 +25,58 @@ class RoomMicGrid extends StatelessWidget {
       logic.clock.value;
       // 必须在 Obx 回调里读完整 map，否则只改 value、length 不变时不会刷新。
       final emotes = Map<int, String>.from(logic.micEmotes);
-      final hostOnTop = RoomService.findOrNull()?.hostOnTop.value ?? true;
-      RoomService.findOrNull()?.giftValueCountSwitch.value;
+      final service = RoomService.findOrNull();
+      service?.giftValueCountSwitch.value;
+      service?.hostOnTop.value;
+      final layout = service?.micLayout;
       final seats = logic.seats.toList();
       if (seats.isEmpty) return const SizedBox(height: 220);
-      if (!hostOnTop || seats.length < 5) {
-        return _grid(seats, host: false, logic: logic, emotes: emotes);
+
+      final ctx = _MicLayoutCtx(seats: seats, logic: logic, emotes: emotes, onTap: onTap);
+      switch (layout) {
+        case MicLayoutEnum.ROUND_TABLE_6:
+          return _buildRoundTable6(ctx);
+        case MicLayoutEnum.TILED_4_4:
+          return _buildTiledRows(ctx, const [4, 4]);
+        case MicLayoutEnum.TILED_3_5:
+          return _buildTiled35(ctx);
+        case MicLayoutEnum.TILED_3_3_3:
+          return _buildTiledRows(ctx, const [3, 3, 3], seatWidth: 50);
+        case MicLayoutEnum.TILED_2:
+          return _buildTiled2(ctx);
+        case MicLayoutEnum.TILED_1_4_4:
+          return _buildTiled144(ctx);
+        case MicLayoutEnum.TILED_3_3:
+          return _buildTiledRows(ctx, const [3, 3]);
+        case MicLayoutEnum.ROUND_TABLE_7:
+        case MicLayoutEnum.TILED_1_1_3_3:
+        case MicLayoutEnum.LUCKY_GAME_6:
+        case null:
+        default:
+          // 7 座等沿用现有 hostOnTop 网格，不改动。
+          return _buildLegacyHostGrid(ctx);
       }
-      final host = seats.first;
-      final guests = seats.skip(1).toList();
-      return Column(
-        children: [
-          RoomMicSeat(
-            seat: host,
-            host: true,
-            anchor: logic.anchorFor(host),
-            emoteUrl: _emoteOf(emotes, host.uid),
-            onTap: () => onTap(host),
-          ),
-          const SizedBox(height: 6),
-          _grid(guests, host: false, logic: logic, emotes: emotes),
-        ],
-      );
     });
   }
 
-  /// 用 children 全量构建，避免 builder 懒加载导致接收者 GlobalKey 尚未挂上。
-  Widget _grid(
-    List<MicSeat> seats, {
-    required bool host,
-    required MicLogic logic,
-    required Map<int, String> emotes,
-  }) {
+  /// 7 座 / 未识别布局：主持置顶 + 4 列网格。对齐原行为。
+  Widget _buildLegacyHostGrid(_MicLayoutCtx ctx) {
+    final hostOnTop = RoomService.findOrNull()?.hostOnTop.value ?? true;
+    if (!hostOnTop || ctx.seats.length < 5) {
+      return _flatGrid(ctx, ctx.seats, host: false);
+    }
+    final host = ctx.seats.first;
+    final guests = ctx.seats.skip(1).toList();
+    return Column(
+      children: [
+        ctx.seat(host, host: true),
+        const SizedBox(height: 6),
+        _flatGrid(ctx, guests, host: false),
+      ],
+    );
+  }
+
+  Widget _flatGrid(_MicLayoutCtx ctx, List<MicSeat> seats, {required bool host}) {
     return GridView(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -64,21 +85,214 @@ class RoomMicGrid extends StatelessWidget {
         crossAxisCount: 4,
         mainAxisExtent: 108,
       ),
-      children: seats
-          .map(
-            (seat) => RoomMicSeat(
-              seat: seat,
-              host: host,
-              anchor: logic.anchorFor(seat),
-              emoteUrl: _emoteOf(emotes, seat.uid),
-              onTap: () => onTap(seat),
-            ),
-          )
-          .toList(),
+      children: [for (final seat in seats) ctx.seat(seat, host: host)],
     );
   }
 
-  static String _emoteOf(Map<int, String> emotes, int? uid) {
+  /// 6 麦环形。对齐 joyride `MicSeatWidget6`。
+  Widget _buildRoundTable6(_MicLayoutCtx ctx) {
+    Widget pair(int a, int b, double gap) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ctx.seat(ctx.at(a)),
+          SizedBox(width: gap),
+          ctx.seat(ctx.at(b)),
+        ],
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 20, bottom: 8),
+      child: Column(
+        children: [
+          pair(0, 5, 68),
+          const SizedBox(height: 16),
+          pair(1, 4, 181),
+          const SizedBox(height: 16),
+          pair(2, 3, 68),
+        ],
+      ),
+    );
+  }
+
+  /// 按行平铺。
+  Widget _buildTiledRows(
+    _MicLayoutCtx ctx,
+    List<int> rows, {
+    double? seatWidth,
+  }) {
+    final children = <Widget>[];
+    var index = 0;
+    for (var r = 0; r < rows.length; r++) {
+      if (r > 0) children.add(SizedBox(height: rows.length >= 3 ? 15 : 16));
+      final count = rows[r];
+      final rowSeats = <Widget>[];
+      for (var i = 0; i < count; i++) {
+        final seat = ctx.at(index++);
+        rowSeats.add(
+          seatWidth == null
+              ? Expanded(child: ctx.seat(seat))
+              : SizedBox(width: seatWidth + 20, child: ctx.seat(seat)),
+        );
+      }
+      children.add(
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: rowSeats,
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 8),
+      child: Column(children: children),
+    );
+  }
+
+  /// 1+4+4。对齐 joyride `MicSeatWidget144`。
+  Widget _buildTiled144(_MicLayoutCtx ctx) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 8),
+      child: Column(
+        children: [
+          ctx.seat(ctx.at(0), host: true),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              for (var i = 1; i <= 4; i++) Expanded(child: ctx.seat(ctx.at(i))),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              for (var i = 5; i <= 8; i++) Expanded(child: ctx.seat(ctx.at(i))),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 双麦。对齐 joyride `DoufengMicSeatWidget`。
+  Widget _buildTiled2(_MicLayoutCtx ctx) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 20, bottom: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          SizedBox(width: 100, child: ctx.seat(ctx.at(0), host: true)),
+          SizedBox(width: 100, child: ctx.seat(ctx.at(1), host: true)),
+        ],
+      ),
+    );
+  }
+
+  /// 3+5（上区 2+1，下排 5）。对齐 joyride `MicSeatWidget35` 座位结构，车位装饰简化。
+  Widget _buildTiled35(_MicLayoutCtx ctx) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 8),
+      child: Column(
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Container(
+                  height: 122,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      stops: const [0, 0.73, 1],
+                      colors: [
+                        const Color(0xFF9A4BE6).withValues(alpha: 0.1),
+                        const Color(0xFF666FF4).withValues(alpha: 0.1),
+                        const Color(0xFF537BFE).withValues(alpha: 0.1),
+                      ],
+                    ),
+                    borderRadius: const BorderRadius.only(
+                      topRight: Radius.circular(8),
+                      bottomRight: Radius.circular(8),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      ctx.seat(ctx.at(0)),
+                      const SizedBox(width: 32),
+                      ctx.seat(ctx.at(1)),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Container(
+                  height: 122,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        const Color(0xFFFFDE85).withValues(alpha: 0.05),
+                        const Color(0xFFFFA050).withValues(alpha: 0.05),
+                      ],
+                    ),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(8),
+                      bottomLeft: Radius.circular(8),
+                    ),
+                  ),
+                  child: ctx.seat(ctx.at(2)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              for (var i = 3; i < 8; i++)
+                SizedBox(width: 60, child: ctx.seat(ctx.at(i))),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MicLayoutCtx {
+  const _MicLayoutCtx({
+    required this.seats,
+    required this.logic,
+    required this.emotes,
+    required this.onTap,
+  });
+
+  final List<MicSeat> seats;
+  final MicLogic logic;
+  final Map<int, String> emotes;
+  final void Function(MicSeat seat) onTap;
+
+  MicSeat at(int index) {
+    if (index < 0 || index >= seats.length) return MicSeat(index: index);
+    return seats[index];
+  }
+
+  Widget seat(MicSeat seat, {bool host = false}) {
+    return RoomMicSeat(
+      seat: seat,
+      host: host,
+      anchor: logic.anchorFor(seat),
+      emoteUrl: _emoteUrl(seat.uid),
+      onTap: () => onTap(seat),
+    );
+  }
+
+  String _emoteUrl(int? uid) {
     if (uid == null || uid <= 0) return '';
     return emotes[uid]?.trim() ?? '';
   }
@@ -128,7 +342,7 @@ class RoomMicSeat extends StatelessWidget {
                     Chimo.image(AppAssets.roomLove, width: 11, height: 10),
                     const SizedBox(width: 2),
                     Text(
-                      roomCount(seat.contribution),
+                      TextFmt.roomCount(seat.contribution),
                       style: const TextStyle(
                         color: AppColors.white,
                         fontSize: 10,
@@ -191,7 +405,7 @@ class RoomMicSeat extends StatelessWidget {
               width: 18.w,
               height: 18.w,
               alignment: Alignment.center,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: Colors.white,
                 shape: BoxShape.circle,
               ),

@@ -23,15 +23,44 @@ class MeStatItem {
 
 /// Me 页菜单与玩法入口（静态 UI 配置，非用户数据）。
 abstract final class MeMenuData {
-  /// 左上角菜单：设置类入口。正式包不展示 Debug。
-  static List<QuickAccessItem> get menuItems {
+  /// More Features 抽屉。正式包不展示 Debug。
+  static List<QuickAccessItem> get features {
     return List.unmodifiable([
+      const QuickAccessItem(
+        id: 'reveal_card',
+        label: 'Reveal Card',
+        iconAsset: AppAssets.mineDrawerInfo,
+      ),
+      const QuickAccessItem(
+        id: 'magic',
+        label: 'Create Magic Photo',
+        iconAsset: AppAssets.mineDrawerMagic,
+      ),
+      const QuickAccessItem(
+        id: 'verify',
+        label: 'Verification Center',
+        iconAsset: AppAssets.mineDrawerVerify,
+      ),
+      const QuickAccessItem(
+        id: 'workbench',
+        label: 'Guest Workbench',
+        iconAsset: AppAssets.mineDrawerWorkbench,
+      ),
+      const QuickAccessItem(
+        id: 'information',
+        label: 'Complete Information',
+        iconAsset: AppAssets.mineDrawerInfo,
+      ),
+      const QuickAccessItem(id: 'settings', label: 'Settings', iconAsset: AppAssets.mineSetting),
+      const QuickAccessItem(
+        id: 'feedback',
+        label: 'Feedback',
+        iconAsset: AppAssets.mineDrawerFeedback,
+      ),
+      const QuickAccessItem(id: 'help', label: 'Help', iconAsset: AppAssets.mineDrawerHelp),
+      const QuickAccessItem(id: 'about', label: 'About Us', iconAsset: AppAssets.mineAbout),
       if (AppConfig.isDebug)
         const QuickAccessItem(id: 'debug', label: 'Debug Page', iconAsset: AppAssets.mineInfo),
-      const QuickAccessItem(id: 'bind_email', label: 'Bind Email', iconAsset: AppAssets.mineBind),
-      const QuickAccessItem(id: 'settings', label: 'Settings', iconAsset: AppAssets.mineSetting),
-      const QuickAccessItem(id: 'help', label: 'Help', iconAsset: AppAssets.mineHelp),
-      const QuickAccessItem(id: 'about', label: 'About Us', iconAsset: AppAssets.mineAbout),
     ]);
   }
 

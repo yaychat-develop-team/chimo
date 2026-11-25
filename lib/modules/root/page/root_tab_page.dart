@@ -6,15 +6,19 @@ import 'package:get/get.dart';
 
 import '../../../common/theme/app_colors.dart';
 import '../../chat/logic/chats_list_logic.dart';
+import '../../chat/page/message_list_page.dart';
 import '../../home/logic/home_logic.dart';
+import '../../home/page/home_page.dart';
+import '../../home/page/room_list_page.dart';
 import '../../me/logic/me_logic.dart';
+import '../../me/page/me_page.dart';
 
 /// 主壳层：承载四个 Tab（Home / Room / Chats / Me）。
-///
-/// Tab 页是 `const`，`IndexedStack` 重建时 Flutter 认出同一个实例并跳过子树。
-/// **别给它们加参数**，一加就退回全量重建。
 class RootTabPage extends StatefulWidget {
   const RootTabPage({super.key});
+
+  /// Tab 页是 `const`，`IndexedStack` 重建时 Flutter 认出同一个实例并跳过子树。
+  /// 别给它们加参数，一加就退回全量重建。
 
   @override
   State<RootTabPage> createState() => _RootTabPageState();
@@ -22,6 +26,7 @@ class RootTabPage extends StatefulWidget {
 
 class _RootTabPageState extends State<RootTabPage> {
   late final RootTabLogic logic;
+  static const pages = [HomePage(), RoomListPage(), MessageListPage(), MePage()];
 
   @override
   void initState() {
@@ -44,7 +49,7 @@ class _RootTabPageState extends State<RootTabPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       // IndexedStack 保活各 Tab，状态（如滚动位置、已加入群组）切换后仍保留。
-      body: Obx(() => IndexedStack(index: logic.index.value, children: RootTabLogic.tabPages)),
+      body: Obx(() => IndexedStack(index: logic.index.value, children: pages)),
       // 未读角标是唯一跟着 IM 消息重建的东西（`update(['unread'])`）。
       bottomNavigationBar: GetBuilder<ConversationListLogic>(
         id: 'unread',
@@ -125,10 +130,9 @@ class _RootTabItem extends StatelessWidget {
     }
 
     return Expanded(
-      child: InkWell(
+      child: GestureDetector(
         onTap: onTap,
-        splashColor: Colors.transparent,
-        highlightColor: Colors.transparent,
+        behavior: HitTestBehavior.opaque,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [

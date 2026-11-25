@@ -32,6 +32,7 @@ class RoomSenderTagsView extends StatelessWidget {
           ),
         if (!tags.secret) ...[
           _gender(tags.gender),
+          if (tags.heartie) _heartie(),
           _icon(tags.novaIcon),
           _icon(tags.vipIcon),
           _chip(tags.carLevel),
@@ -54,6 +55,25 @@ class RoomSenderTagsView extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(right: 4, top: 3, bottom: 3),
       child: Chimo.image(male ? AppAssets.roomMale : AppAssets.roomFemale, width: 16, height: 16),
+    );
+  }
+
+  Widget _heartie() {
+    return UnconstrainedBox(
+      child: Container(
+        height: 18,
+        margin: const EdgeInsets.only(right: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(9),
+          gradient: AppColors.auctionActorScore,
+        ),
+        child: const Text(
+          'Heartie',
+          style: TextStyle(color: AppColors.white, fontSize: 10, fontWeight: FontWeight.w700),
+        ),
+      ),
     );
   }
 

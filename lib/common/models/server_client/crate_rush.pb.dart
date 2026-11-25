@@ -2204,6 +2204,374 @@ class RedemptionExchangeRsp extends $pb.GeneratedMessage {
   void clearShardsRemaining() => $_clearField(2);
 }
 
+/// 当前生效的套装倍率。未穿齐任何套装时三个倍率均为 1
+class CrateOutfitMultiplierRsp extends $pb.GeneratedMessage {
+  factory CrateOutfitMultiplierRsp({
+    $core.String? prizeMultiplier,
+    $core.int? milestoneMultiplier,
+    $core.int? specialGiftMultiplier,
+  }) {
+    final result = create();
+    if (prizeMultiplier != null) result.prizeMultiplier = prizeMultiplier;
+    if (milestoneMultiplier != null)
+      result.milestoneMultiplier = milestoneMultiplier;
+    if (specialGiftMultiplier != null)
+      result.specialGiftMultiplier = specialGiftMultiplier;
+    return result;
+  }
+
+  CrateOutfitMultiplierRsp._();
+
+  factory CrateOutfitMultiplierRsp.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory CrateOutfitMultiplierRsp.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CrateOutfitMultiplierRsp',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'crate_rush'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'prizeMultiplier')
+    ..aI(2, _omitFieldNames ? '' : 'milestoneMultiplier')
+    ..aI(3, _omitFieldNames ? '' : 'specialGiftMultiplier')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CrateOutfitMultiplierRsp clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CrateOutfitMultiplierRsp copyWith(
+          void Function(CrateOutfitMultiplierRsp) updates) =>
+      super.copyWith((message) => updates(message as CrateOutfitMultiplierRsp))
+          as CrateOutfitMultiplierRsp;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static CrateOutfitMultiplierRsp create() => CrateOutfitMultiplierRsp._();
+  @$core.override
+  CrateOutfitMultiplierRsp createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static CrateOutfitMultiplierRsp getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CrateOutfitMultiplierRsp>(create);
+  static CrateOutfitMultiplierRsp? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get prizeMultiplier => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set prizeMultiplier($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPrizeMultiplier() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPrizeMultiplier() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get milestoneMultiplier => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set milestoneMultiplier($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasMilestoneMultiplier() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearMilestoneMultiplier() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get specialGiftMultiplier => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set specialGiftMultiplier($core.int value) => $_setSignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasSpecialGiftMultiplier() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearSpecialGiftMultiplier() => $_clearField(3);
+}
+
+class CrateOutfitListRsp extends $pb.GeneratedMessage {
+  factory CrateOutfitListRsp({
+    $core.Iterable<CrateOutfit>? outfits,
+  }) {
+    final result = create();
+    if (outfits != null) result.outfits.addAll(outfits);
+    return result;
+  }
+
+  CrateOutfitListRsp._();
+
+  factory CrateOutfitListRsp.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory CrateOutfitListRsp.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CrateOutfitListRsp',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'crate_rush'),
+      createEmptyInstance: create)
+    ..pPM<CrateOutfit>(1, _omitFieldNames ? '' : 'outfits',
+        subBuilder: CrateOutfit.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CrateOutfitListRsp clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CrateOutfitListRsp copyWith(void Function(CrateOutfitListRsp) updates) =>
+      super.copyWith((message) => updates(message as CrateOutfitListRsp))
+          as CrateOutfitListRsp;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static CrateOutfitListRsp create() => CrateOutfitListRsp._();
+  @$core.override
+  CrateOutfitListRsp createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static CrateOutfitListRsp getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CrateOutfitListRsp>(create);
+  static CrateOutfitListRsp? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<CrateOutfit> get outfits => $_getList(0);
+}
+
+class CrateOutfit extends $pb.GeneratedMessage {
+  factory CrateOutfit({
+    $fixnum.Int64? outfitId,
+    $core.String? name,
+    $core.String? prizeMultiplier,
+    $core.int? milestoneMultiplier,
+    $core.int? specialGiftMultiplier,
+    $core.bool? equipped,
+    $core.bool? inEffect,
+    $core.Iterable<CrateOutfitItem>? items,
+  }) {
+    final result = create();
+    if (outfitId != null) result.outfitId = outfitId;
+    if (name != null) result.name = name;
+    if (prizeMultiplier != null) result.prizeMultiplier = prizeMultiplier;
+    if (milestoneMultiplier != null)
+      result.milestoneMultiplier = milestoneMultiplier;
+    if (specialGiftMultiplier != null)
+      result.specialGiftMultiplier = specialGiftMultiplier;
+    if (equipped != null) result.equipped = equipped;
+    if (inEffect != null) result.inEffect = inEffect;
+    if (items != null) result.items.addAll(items);
+    return result;
+  }
+
+  CrateOutfit._();
+
+  factory CrateOutfit.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory CrateOutfit.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CrateOutfit',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'crate_rush'),
+      createEmptyInstance: create)
+    ..aInt64(1, _omitFieldNames ? '' : 'outfitId')
+    ..aOS(2, _omitFieldNames ? '' : 'name')
+    ..aOS(3, _omitFieldNames ? '' : 'prizeMultiplier')
+    ..aI(4, _omitFieldNames ? '' : 'milestoneMultiplier')
+    ..aI(5, _omitFieldNames ? '' : 'specialGiftMultiplier')
+    ..aOB(6, _omitFieldNames ? '' : 'equipped')
+    ..aOB(7, _omitFieldNames ? '' : 'inEffect')
+    ..pPM<CrateOutfitItem>(8, _omitFieldNames ? '' : 'items',
+        subBuilder: CrateOutfitItem.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CrateOutfit clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CrateOutfit copyWith(void Function(CrateOutfit) updates) =>
+      super.copyWith((message) => updates(message as CrateOutfit))
+          as CrateOutfit;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static CrateOutfit create() => CrateOutfit._();
+  @$core.override
+  CrateOutfit createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static CrateOutfit getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CrateOutfit>(create);
+  static CrateOutfit? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get outfitId => $_getI64(0);
+  @$pb.TagNumber(1)
+  set outfitId($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasOutfitId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearOutfitId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get name => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set name($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasName() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearName() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get prizeMultiplier => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set prizeMultiplier($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasPrizeMultiplier() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearPrizeMultiplier() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get milestoneMultiplier => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set milestoneMultiplier($core.int value) => $_setSignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasMilestoneMultiplier() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearMilestoneMultiplier() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.int get specialGiftMultiplier => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set specialGiftMultiplier($core.int value) => $_setSignedInt32(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasSpecialGiftMultiplier() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearSpecialGiftMultiplier() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.bool get equipped => $_getBF(5);
+  @$pb.TagNumber(6)
+  set equipped($core.bool value) => $_setBool(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasEquipped() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearEquipped() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.bool get inEffect => $_getBF(6);
+  @$pb.TagNumber(7)
+  set inEffect($core.bool value) => $_setBool(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasInEffect() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearInEffect() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $pb.PbList<CrateOutfitItem> get items => $_getList(7);
+}
+
+class CrateOutfitItem extends $pb.GeneratedMessage {
+  factory CrateOutfitItem({
+    $core.int? commodityType,
+    $fixnum.Int64? commodityId,
+    $core.String? name,
+    $core.String? icon,
+    $core.bool? equipped,
+  }) {
+    final result = create();
+    if (commodityType != null) result.commodityType = commodityType;
+    if (commodityId != null) result.commodityId = commodityId;
+    if (name != null) result.name = name;
+    if (icon != null) result.icon = icon;
+    if (equipped != null) result.equipped = equipped;
+    return result;
+  }
+
+  CrateOutfitItem._();
+
+  factory CrateOutfitItem.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory CrateOutfitItem.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CrateOutfitItem',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'crate_rush'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'commodityType')
+    ..aInt64(2, _omitFieldNames ? '' : 'commodityId')
+    ..aOS(3, _omitFieldNames ? '' : 'name')
+    ..aOS(4, _omitFieldNames ? '' : 'icon')
+    ..aOB(5, _omitFieldNames ? '' : 'equipped')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CrateOutfitItem clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CrateOutfitItem copyWith(void Function(CrateOutfitItem) updates) =>
+      super.copyWith((message) => updates(message as CrateOutfitItem))
+          as CrateOutfitItem;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static CrateOutfitItem create() => CrateOutfitItem._();
+  @$core.override
+  CrateOutfitItem createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static CrateOutfitItem getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CrateOutfitItem>(create);
+  static CrateOutfitItem? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get commodityType => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set commodityType($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasCommodityType() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearCommodityType() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $fixnum.Int64 get commodityId => $_getI64(1);
+  @$pb.TagNumber(2)
+  set commodityId($fixnum.Int64 value) => $_setInt64(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasCommodityId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearCommodityId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get name => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set name($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasName() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearName() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get icon => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set icon($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasIcon() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearIcon() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.bool get equipped => $_getBF(4);
+  @$pb.TagNumber(5)
+  set equipped($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasEquipped() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearEquipped() => $_clearField(5);
+}
+
 const $core.bool _omitFieldNames =
     $core.bool.fromEnvironment('protobuf.omit_field_names');
 const $core.bool _omitMessageNames =

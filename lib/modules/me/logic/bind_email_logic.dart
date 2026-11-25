@@ -73,12 +73,12 @@ class BindEmailLogic extends GetxController {
         email: email.value,
         forLogin: forLogin,
       );
-      if (isClosed || bound != true || forLogin) return;
+      if (bound != true || forLogin) return;
       AppJumper.back(result: true);
     } catch (error) {
-      if (!isClosed) AppToast.info('Failed to continue: $error');
+      AppToast.info('Failed to continue: $error');
     } finally {
-      if (!isClosed) sending.value = false;
+      sending.value = false;
     }
   }
 }
@@ -122,7 +122,7 @@ class EmailCodeLogic extends GetxController {
     super.onReady();
     focusNode.requestFocus();
     if (sendOnOpen) {
-      unawaited(deliver(initial: true));
+      deliver(initial: true);
     } else {
       startCountdown();
     }
@@ -163,7 +163,6 @@ class EmailCodeLogic extends GetxController {
 
   Future<void> deliver({bool initial = false}) async {
     final failure = await sendCode(email);
-    if (isClosed) return;
     if (failure != null) {
       AppToast.info(failure);
       if (initial) resendLeft.value = 0;
@@ -183,18 +182,23 @@ class EmailCodeLogic extends GetxController {
     final code = input.text.trim();
     if (!canVerify) return;
     if (forLogin) {
-      final rsp = await ChimoApis.auth.emailAuth(email: email, code: code);
-      if (isClosed) return;
-      if (rsp.ok) {
-        eventCenter.emit(Event(EventConstant.loginGetAuthRsp, data: rsp.data));
-      } else {
-        AppToast.info(rsp.message);
+      verifying.value = true;
+      try {
+        final rsp = await ChimoApis.auth.emailAuth(email: email, code: code);
+        if (rsp.ok) {
+          eventCenter.emit(Event(EventConstant.loginGetAuthRsp, data: rsp.data));
+        } else {
+          AppToast.info(rsp.message);
+        }
+      } catch (error) {
+        AppToast.info('Verification failed: $error');
+      } finally {
+        idle();
       }
       return;
     }
 
     final failure = await bind(email: email, code: code);
-    if (isClosed) return;
     if (failure != null) {
       AppToast.info(failure);
       clear();
@@ -244,13 +248,9 @@ class EmailCodeLogic extends GetxController {
     }
   }
 
-  void idle() {
-    if (!isClosed) verifying.value = false;
-  }
+  void idle() => verifying.value = false;
 
-  void idleResend() {
-    if (!isClosed) resending.value = false;
-  }
+  void idleResend() => resending.value = false;
 }
 
 /// 把邮箱认证 / 绑定接口的 message key 映射成给用户看的文案。

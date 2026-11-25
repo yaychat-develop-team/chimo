@@ -377,8 +377,8 @@ class ChatInputBarState extends State<ChatInputBar> {
   void dispose() {
     AppVoiceExclusive.release(_stopPreviewExclusive);
     _voiceTimer?.cancel();
-    unawaited(_recorder.dispose());
-    unawaited(_previewPlayer.dispose());
+    _recorder.dispose();
+    _previewPlayer.dispose();
     _inputFocus.removeListener(_onInputFocusChanged);
     _inputFocus.dispose();
     widget.controller.removeListener(_onChanged);
@@ -412,11 +412,11 @@ class ChatInputBarState extends State<ChatInputBar> {
   void _closeFunctionPanel() {
     if (_panel == ChatPanelKind.none) return;
     AppVoiceExclusive.release(_stopPreviewExclusive);
-    unawaited(_stopRecorderIfNeeded(deleteFile: true));
+    _stopRecorderIfNeeded(deleteFile: true);
     _voiceTimer?.cancel();
     _voiceTimer = null;
     _voiceStartedAt = null;
-    unawaited(_previewPlayer.stop());
+    _previewPlayer.stop();
     setState(() {
       _panel = ChatPanelKind.none;
       _voicePhase = ChatVoicePhase.idle;
@@ -437,7 +437,7 @@ class ChatInputBarState extends State<ChatInputBar> {
   /// 三个 toggle 的公共前半段：收键盘、停录音、清相位。
   void _openPanel(ChatPanelKind kind, {VoidCallback? extra}) {
     _dismissKeyboard();
-    unawaited(_stopRecorderIfNeeded(deleteFile: true));
+    _stopRecorderIfNeeded(deleteFile: true);
     _voiceTimer?.cancel();
     setState(() {
       _panel = kind;
@@ -466,7 +466,7 @@ class ChatInputBarState extends State<ChatInputBar> {
 
   void _toggleVoicePanel() {
     if (_panel == ChatPanelKind.voice) {
-      unawaited(_closeVoicePanel());
+      _closeVoicePanel();
       return;
     }
     _openPanel(ChatPanelKind.voice);
@@ -488,7 +488,7 @@ class ChatInputBarState extends State<ChatInputBar> {
         _albumError = null;
       },
     );
-    unawaited(_loadAlbumPhotos());
+    _loadAlbumPhotos();
   }
 
   // ------------------------------------------------------------ 文本发送
@@ -634,7 +634,7 @@ class ChatInputBarState extends State<ChatInputBar> {
             _voiceSeconds = _maxVoiceSeconds;
             _voiceProgress = 1;
           });
-          unawaited(_finishRecording());
+          _finishRecording();
           return;
         }
         setState(() {
@@ -705,7 +705,7 @@ class ChatInputBarState extends State<ChatInputBar> {
   }
 
   void _stopPreviewExclusive() {
-    unawaited(_previewPlayer.stop());
+    _previewPlayer.stop();
   }
 
   Future<void> _resetVoice() async {
@@ -1033,9 +1033,9 @@ class ChatInputBarState extends State<ChatInputBar> {
               timeLabel: _voiceTimeLabel,
               phase: _voicePhase,
               progress: _voiceProgress,
-              onMainTap: () => unawaited(_onVoiceMainTap()),
-              onReset: () => unawaited(_resetVoice()),
-              onConfirm: () => unawaited(_confirmVoice()),
+              onMainTap: () => _onVoiceMainTap(),
+              onReset: () => _resetVoice(),
+              onConfirm: () => _confirmVoice(),
             ),
           ),
         );
@@ -1048,14 +1048,14 @@ class ChatInputBarState extends State<ChatInputBar> {
           error: _albumError,
           bottomInset: widget.bottomInset,
           onTogglePhoto: _togglePhotoAt,
-          onCamera: () => unawaited(_pickFromCamera()),
-          onPreview: () => unawaited(_previewSelectedPhotos()),
-          onAlbum: () => unawaited(_pickFromAlbum()),
+          onCamera: () => _pickFromCamera(),
+          onPreview: () => _previewSelectedPhotos(),
+          onAlbum: () => _pickFromAlbum(),
           onToggleOriginal: () {
             setState(() => _originalPhoto = !_originalPhoto);
           },
-          onSend: () => unawaited(_sendSelectedPhotos()),
-          onRetry: () => unawaited(_loadAlbumPhotos(openSettingsIfDenied: true)),
+          onSend: () => _sendSelectedPhotos(),
+          onRetry: () => _loadAlbumPhotos(openSettingsIfDenied: true),
         );
       case ChatPanelKind.emoji:
         return ChatEmojiPanel(

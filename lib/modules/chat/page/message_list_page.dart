@@ -1,4 +1,3 @@
-import 'dart:async';
 
 import 'package:chimo/common/widgets/app_image.dart';
 import 'package:chimo/common/widgets/app_scaffold.dart';
@@ -11,6 +10,7 @@ import '../../../common/constants/app_assets.dart';
 import '../../../common/theme/app_colors.dart';
 import '../../../common/widgets/app_pull_refresh.dart';
 import '../../../common/widgets/line_loading_bar.dart';
+import '../../heart_link/widgets/heart_link_relation_section.dart';
 import '../logic/chats_list_logic.dart';
 import 'widgets/chats_app_bar.dart';
 import 'widgets/chats_empty_state.dart';
@@ -27,7 +27,7 @@ class MessageListPage extends StatefulWidget {
   /// 房间消息入口：底部弹窗样式对齐 Cosmic Lounge 设计稿。
   static Future<void> showAsSheet() {
     if (Get.isRegistered<ConversationListLogic>()) {
-      unawaited(Get.find<ConversationListLogic>().refreshFromApi());
+      Get.find<ConversationListLogic>().refreshFromApi();
     }
     return Get.bottomSheet(
       const MessageListPage(asSheet: true),
@@ -67,7 +67,7 @@ class _MessageListPageState extends State<MessageListPage> {
 
         return AppScaffold(
           backgroundColor: AppColors.black0F0F0F,
-          backdrop: _MsgHeaderBg(),
+          backdrop: const _MsgHeaderBg(),
           appBar: ChatsAppBar(
             onContactsTap: () {
               AppJumper.toFriends();
@@ -86,37 +86,14 @@ class _MessageListPageState extends State<MessageListPage> {
                   },
                   onClose: () => setState(() => _showPromo = false),
                 ),
+              if (!_sheet) const HeartLinkChatsStrip(),
               if (logic.loading) const LineLoadingBar(),
               Expanded(
                 child: SlidableAutoCloseBehavior(
                   child: AppPullRefresh(
                     onRefresh: logic.refreshFromApi,
                     slivers: [
-                      if (isEmpty)
-                        SliverFillRemaining(
-                          hasScrollBody: false,
-                          child: logic.loadError != null
-                              ? Center(
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(24),
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          logic.loadError!,
-                                          textAlign: TextAlign.center,
-                                          style: const TextStyle(color: AppColors.gray9A9A9A),
-                                        ),
-                                        TextButton(
-                                          onPressed: () => unawaited(logic.refreshFromApi()),
-                                          child: const Text('Retry'),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                )
-                              : const ChatsEmptyState(),
-                        ),
+                      if (isEmpty) SliverFillRemaining(hasScrollBody: false, child: _empty(logic)),
                       SliverList.builder(
                         itemCount: conversations.length,
                         itemBuilder: (context, index) {
@@ -141,6 +118,30 @@ class _MessageListPageState extends State<MessageListPage> {
       },
     );
   }
+}
+
+Widget _empty(ConversationListLogic logic) {
+  final error = logic.loadError;
+  if (error == null) return const ChatsEmptyState();
+  return Center(
+    child: Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            error,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: AppColors.gray9A9A9A),
+          ),
+          TextButton(
+            onPressed: () => logic.refreshFromApi(),
+            child: const Text('Retry'),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 /// 消息列表顶部光晕。按原图 1024×546 撑开，避免被拉满整屏。

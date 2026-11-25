@@ -449,8 +449,6 @@ class RoomUsage extends $pb.ProtobufEnum {
       RoomUsage._(3, _omitEnumNames ? '' : 'BUSINESS');
   static const RoomUsage GS_TRAIN =
       RoomUsage._(4, _omitEnumNames ? '' : 'GS_TRAIN');
-  static const RoomUsage LUCKY_GAME_ROOM =
-      RoomUsage._(5, _omitEnumNames ? '' : 'LUCKY_GAME_ROOM');
 
   static const $core.List<RoomUsage> values = <RoomUsage>[
     UNKNOWN,
@@ -458,11 +456,10 @@ class RoomUsage extends $pb.ProtobufEnum {
     COMMON,
     BUSINESS,
     GS_TRAIN,
-    LUCKY_GAME_ROOM,
   ];
 
   static final $core.List<RoomUsage?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 5);
+      $pb.ProtobufEnum.$_initByValueList(values, 4);
   static RoomUsage? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

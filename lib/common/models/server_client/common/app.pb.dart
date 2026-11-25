@@ -414,6 +414,7 @@ class GetSettingsResp extends $pb.GeneratedMessage {
     $core.int? currencyDailyRemain,
     $core.bool? showGameCurrencySwitch,
     $core.bool? showMerch,
+    $core.String? goldCoupleGameUrl,
   }) {
     final result = create();
     if (success != null) result.success = success;
@@ -492,6 +493,7 @@ class GetSettingsResp extends $pb.GeneratedMessage {
     if (showGameCurrencySwitch != null)
       result.showGameCurrencySwitch = showGameCurrencySwitch;
     if (showMerch != null) result.showMerch = showMerch;
+    if (goldCoupleGameUrl != null) result.goldCoupleGameUrl = goldCoupleGameUrl;
     return result;
   }
 
@@ -589,6 +591,7 @@ class GetSettingsResp extends $pb.GeneratedMessage {
     ..aI(63, _omitFieldNames ? '' : 'currencyDailyRemain')
     ..aOB(64, _omitFieldNames ? '' : 'showGameCurrencySwitch')
     ..aOB(65, _omitFieldNames ? '' : 'showMerch')
+    ..aOS(66, _omitFieldNames ? '' : 'goldCoupleGameUrl')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1174,6 +1177,15 @@ class GetSettingsResp extends $pb.GeneratedMessage {
   $core.bool hasShowMerch() => $_has(64);
   @$pb.TagNumber(65)
   void clearShowMerch() => $_clearField(65);
+
+  @$pb.TagNumber(66)
+  $core.String get goldCoupleGameUrl => $_getSZ(65);
+  @$pb.TagNumber(66)
+  set goldCoupleGameUrl($core.String value) => $_setString(65, value);
+  @$pb.TagNumber(66)
+  $core.bool hasGoldCoupleGameUrl() => $_has(65);
+  @$pb.TagNumber(66)
+  void clearGoldCoupleGameUrl() => $_clearField(66);
 }
 
 class LuckyChallengeCfg extends $pb.GeneratedMessage {
@@ -1182,12 +1194,14 @@ class LuckyChallengeCfg extends $pb.GeneratedMessage {
     $core.bool? superLuckyDay,
     $fixnum.Int64? prizePool,
     $core.int? giftPackThreshold,
+    $core.String? dailyStartUrl,
   }) {
     final result = create();
     if (url != null) result.url = url;
     if (superLuckyDay != null) result.superLuckyDay = superLuckyDay;
     if (prizePool != null) result.prizePool = prizePool;
     if (giftPackThreshold != null) result.giftPackThreshold = giftPackThreshold;
+    if (dailyStartUrl != null) result.dailyStartUrl = dailyStartUrl;
     return result;
   }
 
@@ -1211,6 +1225,7 @@ class LuckyChallengeCfg extends $pb.GeneratedMessage {
         defaultOrMaker: $fixnum.Int64.ZERO)
     ..aI(4, _omitFieldNames ? '' : 'giftPackThreshold',
         fieldType: $pb.PbFieldType.OU3)
+    ..aOS(5, _omitFieldNames ? '' : 'dailyStartUrl')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1267,6 +1282,15 @@ class LuckyChallengeCfg extends $pb.GeneratedMessage {
   $core.bool hasGiftPackThreshold() => $_has(3);
   @$pb.TagNumber(4)
   void clearGiftPackThreshold() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get dailyStartUrl => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set dailyStartUrl($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasDailyStartUrl() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearDailyStartUrl() => $_clearField(5);
 }
 
 class SearchResp extends $pb.GeneratedMessage {

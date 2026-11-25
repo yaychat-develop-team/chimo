@@ -19,13 +19,11 @@ class AccountSecurityLogic extends GetxController {
     loading.value = true;
     try {
       final res = await ChimoApis.user.hasApplyForCancel();
-      if (!isClosed) {
-        hasPendingCancellation.value = res.ok && res.data == true;
-      }
+      hasPendingCancellation.value = res.ok && res.data == true;
     } catch (_) {
       // 保留 [hasPendingCancellation]。
     } finally {
-      if (!isClosed) loading.value = false;
+      loading.value = false;
     }
   }
 
@@ -35,6 +33,6 @@ class AccountSecurityLogic extends GetxController {
     } else {
       await AppJumper.toAccountCancellation();
     }
-    if (!isClosed) await load();
+    await load();
   }
 }

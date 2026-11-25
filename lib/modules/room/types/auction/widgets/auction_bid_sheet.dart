@@ -1,3 +1,4 @@
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -10,6 +11,7 @@ import '../../../../../common/models/server_client/auction.pb.dart';
 import '../../../../../common/theme/app_colors.dart';
 import '../../../../../common/utils/app_toast.dart';
 import '../../../../../common/utils/chimo.dart';
+import '../../../../../common/utils/text_fmt.dart';
 import '../../../../../common/widgets/app_blur_backdrop.dart';
 import '../../../model/mic_seat.dart';
 
@@ -53,17 +55,6 @@ class _AuctionBidSheetState extends State<AuctionBidSheet> {
 
   bool get _hasLastBid => (_info?.lastBid.toInt() ?? 0) > 0;
 
-  static String _fmt(int value) {
-    final raw = value.abs().toString();
-    final buf = StringBuffer();
-    for (var i = 0; i < raw.length; i++) {
-      final fromEnd = raw.length - i;
-      if (i > 0 && fromEnd % 3 == 0) buf.write(',');
-      buf.write(raw[i]);
-    }
-    return value < 0 ? '-$buf' : buf.toString();
-  }
-
   @override
   void initState() {
     super.initState();
@@ -89,8 +80,7 @@ class _AuctionBidSheetState extends State<AuctionBidSheet> {
     final info = _info;
     if (info == null || _addBid <= 0 || _bidding) return;
     if (info.balance.toInt() < _addBid) {
-      AppToast.info('Insufficient balance');
-      await AppJumper.toWallet();
+      await AppJumper.showRechargeSheet(price: _addBid, onSuccess: () => _refresh());
       return;
     }
     setState(() => _bidding = true);
@@ -102,8 +92,7 @@ class _AuctionBidSheetState extends State<AuctionBidSheet> {
       return;
     }
     if (result.code == AuctionBidSheet.balanceShortCode) {
-      AppToast.info('Insufficient balance');
-      await AppJumper.toWallet();
+      await AppJumper.showRechargeSheet(price: _addBid, onSuccess: () => _refresh());
       return;
     }
     AppToast.error(result.message.isEmpty ? 'Bid failed' : result.message);
@@ -227,7 +216,7 @@ class _AuctionBidSheetState extends State<AuctionBidSheet> {
                     Chimo.image(AppAssets.auctionCoin, width: 14.w, height: 14.w),
                     SizedBox(width: 2.w),
                     Text(
-                      _fmt(info.currentValue.toInt()),
+                      TextFmt.toCommaValue(info.currentValue.toInt()),
                       style: TextStyle(color: AppColors.yellowFDE42B, fontSize: 12.sp, height: 1.2),
                     ),
                   ],
@@ -245,7 +234,7 @@ class _AuctionBidSheetState extends State<AuctionBidSheet> {
                   Chimo.image(AppAssets.auctionCoin, width: 14.w, height: 14.w),
                   SizedBox(width: 2.w),
                   Text(
-                    _fmt(info.lastBid.toInt()),
+                    TextFmt.toCommaValue(info.lastBid.toInt()),
                     style: TextStyle(
                       color: AppColors.yellowFDE42B,
                       fontSize: 12.sp,
@@ -272,7 +261,7 @@ class _AuctionBidSheetState extends State<AuctionBidSheet> {
   }
 
   Widget _balanceRow(AuctionBidInfo info) {
-    final raise = _fmt(_raiseTo);
+    final raise = TextFmt.toCommaValue(_raiseTo);
     return Row(
       children: [
         Text(
@@ -286,7 +275,7 @@ class _AuctionBidSheetState extends State<AuctionBidSheet> {
         Chimo.image(AppAssets.auctionCoin, width: 14.w, height: 14.w),
         SizedBox(width: 2.w),
         Text(
-          _fmt(info.balance.toInt()),
+          TextFmt.toCommaValue(info.balance.toInt()),
           style: TextStyle(color: AppColors.yellowFDE42B, fontSize: 12.sp, height: 1.2),
         ),
         const Spacer(),
@@ -350,7 +339,7 @@ class _AuctionBidSheetState extends State<AuctionBidSheet> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  '${_hasLastBid ? '+' : ''}${_fmt(amount)}',
+                  '${_hasLastBid ? '+' : ''}${TextFmt.toCommaValue(amount)}',
                   style: TextStyle(
                     color: AppColors.white,
                     fontSize: 18.sp,

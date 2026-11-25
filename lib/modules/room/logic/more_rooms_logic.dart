@@ -57,7 +57,6 @@ class MoreRoomsLogic extends GetxController {
 
     try {
       final tagsRes = await ChimoApis.room.channelTags();
-      if (isClosed) return;
       final tags = tagsRes.data?.tag ?? const <ChannelTagItem>[];
       final savedTag = _pickSavedTag(tags);
       final forYouTag = _pickForYouTag(tags, savedTag);
@@ -67,15 +66,15 @@ class MoreRoomsLogic extends GetxController {
         if (forYouTag != null) _loadForYou(forYouTag, reset: true),
       ]);
 
-      if (forYouTag == null && forYou.isEmpty && !isClosed) {
+      if (forYouTag == null && forYou.isEmpty) {
         error.value = tagsRes.ok
             ? (tagsRes.message.isEmpty ? null : tagsRes.message)
             : (tagsRes.message.isEmpty ? 'Failed to load rooms' : tagsRes.message);
       }
     } catch (e) {
-      if (!isClosed) error.value = '$e';
+      error.value = '$e';
     } finally {
-      if (!isClosed) loading.value = false;
+      loading.value = false;
     }
   }
 
@@ -85,13 +84,12 @@ class MoreRoomsLogic extends GetxController {
     try {
       await _loadForYou(ChannelTagItem(tagId: _forYouTagId), reset: false);
     } finally {
-      if (!isClosed) loadingMore.value = false;
+      loadingMore.value = false;
     }
   }
 
   Future<void> _loadSaved(ChannelTagItem? savedTag) async {
     final collectRes = await ChimoApis.room.collectList();
-    if (isClosed) return;
     if (collectRes.ok && collectRes.data != null) {
       final channels = [
         for (final item in collectRes.data!.contentList)
@@ -104,7 +102,7 @@ class MoreRoomsLogic extends GetxController {
     }
     if (savedTag == null || savedTag.tagId.isEmpty) return;
     final res = await ChimoApis.room.sidebar(tagId: savedTag.tagId, pageSize: 30);
-    if (isClosed || !res.ok || res.data == null) return;
+    if (!res.ok || res.data == null) return;
     saved.assignAll([
       for (final c in res.data!.sidebar.channelList)
         if (c.channelId.toInt() > 0) c,
@@ -122,7 +120,6 @@ class MoreRoomsLogic extends GetxController {
       pageSize: pageSize,
       snapshotId: reset ? null : _snapshotId,
     );
-    if (isClosed) return;
     if (!res.ok || res.data == null) {
       if (reset) {
         error.value = res.message.isEmpty ? 'Failed to load rooms' : res.message;

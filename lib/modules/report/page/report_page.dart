@@ -1,4 +1,3 @@
-import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -75,7 +74,6 @@ class _ReportPageState extends State<ReportPage> {
       final picking = logic.picking.value;
       final submitting = logic.submitting.value;
       final selectedType = logic.selectedType.value;
-      final feedbackLen = logic.feedbackLength.value;
       final busy = submitting || picking;
       return AppScaffold(
         appBar: AppNavBar(title: 'Report'),
@@ -117,7 +115,7 @@ class _ReportPageState extends State<ReportPage> {
                       }),
                       if (images.length < ReportLogic.maxImages)
                         _AddImageButton(
-                          onTap: busy ? null : () => unawaited(_addImage()),
+                          onTap: busy ? null : () => _addImage(),
                           loading: picking,
                         ),
                     ],
@@ -128,9 +126,7 @@ class _ReportPageState extends State<ReportPage> {
                   _FeedbackField(
                     controller: _feedbackController,
                     maxLength: ReportLogic.maxFeedbackLength,
-                    length: feedbackLen,
                     enabled: !submitting,
-                    onChanged: logic.onFeedbackChanged,
                   ),
                 ],
               ),
@@ -143,7 +139,7 @@ class _ReportPageState extends State<ReportPage> {
                   color: AppColors.green1BBA77,
                   borderRadius: BorderRadius.circular(26),
                   child: InkWell(
-                    onTap: busy ? null : () => unawaited(_submit()),
+                    onTap: busy ? null : () => _submit(),
                     borderRadius: BorderRadius.circular(26),
                     child: Center(
                       child: Text(
@@ -312,15 +308,11 @@ class _FeedbackField extends StatelessWidget {
   const _FeedbackField({
     required this.controller,
     required this.maxLength,
-    required this.length,
-    required this.onChanged,
     this.enabled = true,
   });
 
   final TextEditingController controller;
   final int maxLength;
-  final int length;
-  final ValueChanged<String> onChanged;
   final bool enabled;
 
   @override
@@ -336,7 +328,6 @@ class _FeedbackField extends StatelessWidget {
         children: [
           TextField(
             controller: controller,
-            onChanged: onChanged,
             enabled: enabled,
             maxLength: maxLength,
             maxLines: null,
@@ -354,9 +345,12 @@ class _FeedbackField extends StatelessWidget {
           Positioned(
             right: 0,
             bottom: 0,
-            child: Text(
-              '$length/$maxLength',
-              style: const TextStyle(color: AppColors.gray6E6E6E, fontSize: 12),
+            child: ValueListenableBuilder<TextEditingValue>(
+              valueListenable: controller,
+              builder: (context, value, _) => Text(
+                '${value.text.length}/$maxLength',
+                style: const TextStyle(color: AppColors.gray6E6E6E, fontSize: 12),
+              ),
             ),
           ),
         ],

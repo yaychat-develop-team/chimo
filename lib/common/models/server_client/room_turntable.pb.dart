@@ -12,6 +12,7 @@
 
 import 'dart:core' as $core;
 
+import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
@@ -22,11 +23,13 @@ class TurntableItem extends $pb.GeneratedMessage {
     $core.int? id,
     $core.String? name,
     $core.String? desc,
+    $core.String? title,
   }) {
     final result = create();
     if (id != null) result.id = id;
     if (name != null) result.name = name;
     if (desc != null) result.desc = desc;
+    if (title != null) result.title = title;
     return result;
   }
 
@@ -46,6 +49,7 @@ class TurntableItem extends $pb.GeneratedMessage {
     ..aI(1, _omitFieldNames ? '' : 'id')
     ..aOS(2, _omitFieldNames ? '' : 'name')
     ..aOS(3, _omitFieldNames ? '' : 'desc')
+    ..aOS(4, _omitFieldNames ? '' : 'title')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -93,16 +97,27 @@ class TurntableItem extends $pb.GeneratedMessage {
   $core.bool hasDesc() => $_has(2);
   @$pb.TagNumber(3)
   void clearDesc() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get title => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set title($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasTitle() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearTitle() => $_clearField(4);
 }
 
 class TurntableInfo extends $pb.GeneratedMessage {
   factory TurntableInfo({
     $core.int? stopId,
     $core.Iterable<TurntableItem>? items,
+    $fixnum.Int64? userId,
   }) {
     final result = create();
     if (stopId != null) result.stopId = stopId;
     if (items != null) result.items.addAll(items);
+    if (userId != null) result.userId = userId;
     return result;
   }
 
@@ -122,6 +137,7 @@ class TurntableInfo extends $pb.GeneratedMessage {
     ..aI(1, _omitFieldNames ? '' : 'stopId')
     ..pPM<TurntableItem>(2, _omitFieldNames ? '' : 'items',
         subBuilder: TurntableItem.create)
+    ..aInt64(3, _omitFieldNames ? '' : 'userId')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -154,6 +170,15 @@ class TurntableInfo extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(2)
   $pb.PbList<TurntableItem> get items => $_getList(1);
+
+  @$pb.TagNumber(3)
+  $fixnum.Int64 get userId => $_getI64(2);
+  @$pb.TagNumber(3)
+  set userId($fixnum.Int64 value) => $_setInt64(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasUserId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearUserId() => $_clearField(3);
 }
 
 const $core.bool _omitFieldNames =

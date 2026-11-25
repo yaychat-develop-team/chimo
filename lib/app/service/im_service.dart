@@ -3,14 +3,18 @@ import 'dart:io';
 
 import 'package:chimo/app/session_info.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:im_flutter_sdk/im_flutter_sdk.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../chimo_api.dart';
 import '../../common/utils/app_log.dart';
 import '../../common/im/im_custom_events.dart';
+import '../../common/im/im_custom_payload.dart';
 import '../../common/im/im_models.dart';
 import '../../common/im/im_message_codec.dart';
+import '../../modules/heart_link/widgets/heart_link_invite_notice.dart';
+import 'im_cmd_push_handler.dart';
 
 export '../../common/im/im_models.dart';
 
@@ -111,9 +115,9 @@ abstract final class ImService {
   /// CDN / 公开 http 可直接播；环信附件必须走 [downloadAttachment]。
   static bool isDirectPlayableUrl(String url) => ImPaths.isDirectPlayableUrl(url);
 
-  static String? _localOf(EMMessage m) {
+  static String? _localOf(ChatMessage m) {
     final body = m.body;
-    if (body is! EMFileMessageBody) return null;
+    if (body is! ChatFileMessageBody) return null;
     return _existingPath(body.localPath);
   }
 
@@ -123,9 +127,9 @@ abstract final class ImService {
     if (id.isEmpty) return null;
     final cached = await _cachedVoice(id);
     if (cached != null) return cached;
-    if (!_sdkInited) await connectFromServer();
+    await ensureLoggedIn();
     try {
-      var msg = await EMClient.getInstance.chatManager.loadMessage(id);
+      var msg = await ChatClient.getInstance.chatManager.loadMessage(id);
       if (msg == null) return null;
       final existing = _localOf(msg);
       if (existing != null) {
@@ -133,7 +137,7 @@ abstract final class ImService {
       }
 
       final body = msg.body;
-      if (body is EMFileMessageBody) {
+      if (body is ChatFileMessageBody) {
         // 自己发出的语音：SDK 标 SUCCESS 但 tmp 文件已不在，必须强制再下。
         if (body.fileStatus == DownloadStatus.SUCCESS || body.fileStatus == DownloadStatus.FAILED) {
           body.fileStatus = DownloadStatus.PENDING;
@@ -141,8 +145,8 @@ abstract final class ImService {
       }
 
       final eventId = 'chimo_att_$id';
-      final done = Completer<EMMessage?>();
-      EMClient.getInstance.chatManager.addMessageEvent(
+      final done = Completer<ChatMessage?>();
+      ChatClient.getInstance.chatManager.addMessageEvent(
         eventId,
         ChatMessageEvent(
           onSuccess: (mid, message) {
@@ -158,8 +162,8 @@ abstract final class ImService {
         ),
       );
       try {
-        await EMClient.getInstance.chatManager.downloadAttachment(msg);
-        final quick = _localOf(await EMClient.getInstance.chatManager.loadMessage(id) ?? msg);
+        await ChatClient.getInstance.chatManager.downloadAttachment(msg);
+        final quick = _localOf(await ChatClient.getInstance.chatManager.loadMessage(id) ?? msg);
         if (quick != null) {
           return await _copyToVoiceCache(id, quick) ?? quick;
         }
@@ -169,9 +173,9 @@ abstract final class ImService {
           return await _copyToVoiceCache(id, path) ?? path;
         }
       } finally {
-        EMClient.getInstance.chatManager.removeMessageEvent(eventId);
+        ChatClient.getInstance.chatManager.removeMessageEvent(eventId);
       }
-      msg = await EMClient.getInstance.chatManager.loadMessage(id) ?? msg;
+      msg = await ChatClient.getInstance.chatManager.loadMessage(id) ?? msg;
       final last = _localOf(msg);
       if (last != null) return await _copyToVoiceCache(id, last) ?? last;
       return null;
@@ -202,8 +206,17 @@ abstract final class ImService {
     return _existingPath(src);
   }
 
+  /// 发消息 / 拉历史前调用：保证环信已登录，不只是 SDK 已 init。
+  static Future<bool> ensureLoggedIn() async {
+    await connectFromServer();
+    if (await _isLoggedInAsCurrentUser()) return true;
+    // 凭证刚刷到 / 上次 login 失败：再试一次。
+    await connectFromServer(forceLogin: true);
+    return _isLoggedInAsCurrentUser();
+  }
+
   /// 加载配置 + 凭证并连接。可安全多次调用。
-  static Future<void> connectFromServer() async {
+  static Future<void> connectFromServer({bool forceLogin = false}) async {
     try {
       await _ensureAppKey();
       await _initSdk();
@@ -212,10 +225,33 @@ abstract final class ImService {
         AppLog.w('ImService: missing emUsername/emPwd');
         return;
       }
+      if (!forceLogin && await _isLoggedInAs(creds.$1)) return;
       await _login(creds.$1, creds.$2);
     } catch (error, stack) {
       AppLog.e('ImService.connectFromServer failed', error: error, stack: stack);
     }
+  }
+
+  static Future<bool> _isLoggedInAsCurrentUser() async {
+    final em = SessionInfo.currentUser?.emUsername.trim() ?? '';
+    if (em.isEmpty) return false;
+    return _isLoggedInAs(em);
+  }
+
+  static Future<bool> _isLoggedInAs(String user) async {
+    if (user.isEmpty) return false;
+    try {
+      final logged = await ChatClient.getInstance.isLoginBefore();
+      final current = await sdkUserId();
+      if (logged && current == user) {
+        _currentEmUser = user;
+        _connected = true;
+        return true;
+      }
+    } catch (_) {
+      // SDK 未就绪：当作未登录。
+    }
+    return false;
   }
 
   static Future<void> _ensureAppKey() async {
@@ -229,10 +265,17 @@ abstract final class ImService {
     AppLog.d('ImService appKey loaded (${key.length} chars)');
   }
 
+  /// 新注册用户资料里可能暂时没有 em 凭证，缺则刷新一次 `/user/info`。
   static Future<(String, String)?> _loadCredentials() async {
-    var emUser = SessionInfo.currentUser?.emUsername;
-    var emPwd = SessionInfo.currentUser?.emPwd;
-    return (emUser??'', emPwd??'');
+    var emUser = SessionInfo.currentUser?.emUsername.trim() ?? '';
+    var emPwd = SessionInfo.currentUser?.emPwd.trim() ?? '';
+    if (emUser.isEmpty || emPwd.isEmpty) {
+      await SessionInfo.refreshUserInfo();
+      emUser = SessionInfo.currentUser?.emUsername.trim() ?? '';
+      emPwd = SessionInfo.currentUser?.emPwd.trim() ?? '';
+    }
+    if (emUser.isEmpty || emPwd.isEmpty) return null;
+    return (emUser, emPwd);
   }
 
   static Future<void> _initSdk() async {
@@ -241,7 +284,7 @@ abstract final class ImService {
     if (key == null || key.isEmpty) {
       throw StateError('ImService: appKey required before init');
     }
-    final options = EMOptions.withAppKey(
+    final options = ChatOptions.withAppKey(
       key,
       autoLogin: false,
       debugMode: kDebugMode,
@@ -250,12 +293,12 @@ abstract final class ImService {
       acceptInvitationAlways: true,
       autoAcceptGroupInvitation: true,
     );
-    await EMClient.getInstance.init(options);
-    await EMClient.getInstance.startCallback();
+    await ChatClient.getInstance.init(options);
+    await ChatClient.getInstance.startCallback();
 
-    EMClient.getInstance.addConnectionEventHandler(
+    ChatClient.getInstance.addConnectionEventHandler(
       _handlerId,
-      EMConnectionEventHandler(
+      ConnectionEventHandler(
         onConnected: () {
           _connected = true;
           AppLog.i('ImService onConnected as $_currentEmUser');
@@ -281,13 +324,16 @@ abstract final class ImService {
       ),
     );
 
-    EMClient.getInstance.chatManager.addEventHandler(
+    ChatClient.getInstance.chatManager.addEventHandler(
       _handlerId,
-      EMChatEventHandler(
+      ChatEventHandler(
         onMessagesReceived: (messages) {
           for (final m in messages) {
             _emitEmMessage(m);
           }
+        },
+        onCmdMessagesReceived: (messages) {
+          ImCmdPushHandler.handleMessages(messages);
         },
         onMessagesRecalledInfo: (infos) {
           for (final info in infos) {
@@ -305,11 +351,11 @@ abstract final class ImService {
     if (user.isEmpty || password.isEmpty) return;
     try {
       await _ensureLoggedOutOfOthers(user);
-      await EMClient.getInstance.loginWithPassword(user, password);
+      await ChatClient.getInstance.loginWithPassword(user, password);
       _currentEmUser = user;
       _connected = true;
       AppLog.d('ImService loginWithPassword ok: $user');
-    } on EMError catch (e) {
+    } on ChatError catch (e) {
       AppLog.w('ImService login failed code=${e.code} desc=${e.description}');
       final already = e.code == 200 || e.description.contains('already');
       if (!already) return;
@@ -321,7 +367,7 @@ abstract final class ImService {
       }
       AppLog.d('ImService already login as $current, switching to $user');
       await _forceLogout();
-      await EMClient.getInstance.loginWithPassword(user, password);
+      await ChatClient.getInstance.loginWithPassword(user, password);
       _currentEmUser = user;
       _connected = true;
     }
@@ -329,12 +375,12 @@ abstract final class ImService {
 
   static Future<String?> sdkUserId() async {
     try {
-      final id = await EMClient.getInstance.getCurrentUserId();
+      final id = await ChatClient.getInstance.getCurrentUserId();
       if (id != null && id.trim().isNotEmpty) return id.trim();
     } catch (_) {
       // SDK 还没初始化完：当作未登录，调用方会再问一次。
     }
-    final cached = EMClient.getInstance.currentUserId?.trim();
+    final cached = ChatClient.getInstance.currentUserId?.trim();
     return (cached != null && cached.isNotEmpty) ? cached : _currentEmUser;
   }
 
@@ -342,7 +388,7 @@ abstract final class ImService {
     final current = await sdkUserId();
     var logged = false;
     try {
-      logged = await EMClient.getInstance.isLoginBefore();
+      logged = await ChatClient.getInstance.isLoginBefore();
     } catch (_) {
       // 同上：拿不到就按「没登录过」走完整登录流程。
     }
@@ -354,10 +400,10 @@ abstract final class ImService {
 
   static Future<void> _forceLogout() async {
     try {
-      await EMClient.getInstance.logout(true).timeout(const Duration(seconds: 2));
+      await ChatClient.getInstance.logout(true).timeout(const Duration(seconds: 2));
     } catch (_) {
       try {
-        await EMClient.getInstance.logout(false).timeout(const Duration(seconds: 1));
+        await ChatClient.getInstance.logout(false).timeout(const Duration(seconds: 1));
       } catch (error) {
         AppLog.d('ImService forceLogout', error: error);
       }
@@ -383,8 +429,8 @@ abstract final class ImService {
   }) async {
     final text = content.trim();
     if (text.isEmpty || peerEmUsername.isEmpty) return null;
-    if (!_sdkInited) await connectFromServer();
-    final msg = EMMessage.createTxtSendMessage(targetId: peerEmUsername, content: text);
+    await ensureLoggedIn();
+    final msg = ChatMessage.createTxtSendMessage(targetId: peerEmUsername, content: text);
     msg.chatType = isGroup ? ChatType.GroupChat : ChatType.Chat;
     try {
       await _applyCommonAttrs(msg, peer: peer);
@@ -400,7 +446,22 @@ abstract final class ImService {
       }
       final sent = await _sendMessageAwaitSuccess(msg);
       return _emitAndReturn(sent, forceSelf: true);
-    } on EMError catch (e) {
+    } on ChatError catch (e) {
+      // 201 Not login：补登一次再发（新注册后凭证晚到 / SDK 假在线）。
+      if (e.code == 201) {
+        AppLog.w('ImService sendText 201, re-login and retry');
+        await connectFromServer(forceLogin: true);
+        try {
+          final sent = await _sendMessageAwaitSuccess(msg);
+          return _emitAndReturn(sent, forceSelf: true);
+        } on ChatError catch (retryError) {
+          AppLog.w(
+            'ImService sendText retry failed ${retryError.code} ${retryError.description}',
+          );
+          await _persistFailed(msg, peerEmUsername, isGroup: isGroup);
+          rethrow;
+        }
+      }
       AppLog.w('ImService sendText failed ${e.code} ${e.description}');
       await _persistFailed(msg, peerEmUsername, isGroup: isGroup);
       rethrow;
@@ -439,8 +500,8 @@ abstract final class ImService {
   }) async {
     final text = content.trim();
     if (text.isEmpty || peerEmUsername.isEmpty) return null;
-    if (!_sdkInited) await connectFromServer();
-    final msg = EMMessage.createTxtSendMessage(targetId: peerEmUsername, content: text);
+    await ensureLoggedIn();
+    final msg = ChatMessage.createTxtSendMessage(targetId: peerEmUsername, content: text);
     msg.chatType = isGroup ? ChatType.GroupChat : ChatType.Chat;
     await _applyCommonAttrs(msg, peer: peer);
     if (extra != null && extra.isNotEmpty) {
@@ -460,12 +521,12 @@ abstract final class ImService {
   }) async {
     final path = filePath.trim();
     if (path.isEmpty || peerEmUsername.isEmpty) return null;
-    if (!_sdkInited) await connectFromServer();
+    await ensureLoggedIn();
     var local = path;
     if (local.startsWith('file://')) local = local.substring(7);
     final file = File(local);
     if (!file.existsSync()) return null;
-    final msg = EMMessage.createImageSendMessage(
+    final msg = ChatMessage.createImageSendMessage(
       targetId: peerEmUsername,
       filePath: local,
       sendOriginalImage: true,
@@ -487,12 +548,12 @@ abstract final class ImService {
   }) async {
     final path = filePath.trim();
     if (path.isEmpty || peerEmUsername.isEmpty) return null;
-    if (!_sdkInited) await connectFromServer();
+    await ensureLoggedIn();
     var local = path;
     if (local.startsWith('file://')) local = local.substring(7);
     final file = File(local);
     if (!file.existsSync()) return null;
-    final msg = EMMessage.createVoiceSendMessage(
+    final msg = ChatMessage.createVoiceSendMessage(
       targetId: peerEmUsername,
       filePath: local,
       duration: durationSecs < 1 ? 1 : durationSecs,
@@ -506,14 +567,14 @@ abstract final class ImService {
   }
 
   static Future<void> _persistFailed(
-    EMMessage msg,
+    ChatMessage msg,
     String peerEmUsername, {
     bool isGroup = false,
   }) async {
     msg.status = MessageStatus.FAIL;
-    final convType = isGroup ? EMConversationType.GroupChat : EMConversationType.Chat;
+    final convType = isGroup ? ChatConversationType.GroupChat : ChatConversationType.Chat;
     try {
-      final conv = await EMClient.getInstance.chatManager.getConversation(
+      final conv = await ChatClient.getInstance.chatManager.getConversation(
         peerEmUsername,
         type: convType,
         createIfNeed: true,
@@ -541,10 +602,10 @@ abstract final class ImService {
   }) async {
     final id = msgId.trim();
     if (peerEmUsername.isEmpty || id.isEmpty) return null;
-    if (!_sdkInited) await connectFromServer();
-    final convType = isGroup ? EMConversationType.GroupChat : EMConversationType.Chat;
+    await ensureLoggedIn();
+    final convType = isGroup ? ChatConversationType.GroupChat : ChatConversationType.Chat;
     try {
-      final conv = await EMClient.getInstance.chatManager.getConversation(
+      final conv = await ChatClient.getInstance.chatManager.getConversation(
         peerEmUsername,
         type: convType,
         createIfNeed: true,
@@ -553,10 +614,10 @@ abstract final class ImService {
       if (local == null) return null;
       final sent = await _awaitMessageSendAck(
         local,
-        () => EMClient.getInstance.chatManager.resendMessage(local),
+        () => ChatClient.getInstance.chatManager.resendMessage(local),
       );
       return _emitAndReturn(sent, forceSelf: true);
-    } on EMError catch (e) {
+    } on ChatError catch (e) {
       AppLog.w('ImService resendFailed ${e.code} ${e.description}');
       rethrow;
     }
@@ -569,9 +630,9 @@ abstract final class ImService {
     ImPeerAttrs? peer,
   }) async {
     if (peerEmUsername.isEmpty) return null;
-    if (!_sdkInited) await connectFromServer();
+    await ensureLoggedIn();
     try {
-      final msg = EMMessage.createCustomSendMessage(
+      final msg = ChatMessage.createCustomSendMessage(
         targetId: peerEmUsername,
         event: 'im_follow_message',
         params: {'follow': followed ? '1' : '0'},
@@ -580,7 +641,7 @@ abstract final class ImService {
       await _applyCommonAttrs(msg, peer: peer);
       final sent = await _sendMessageAwaitSuccess(msg);
       return _emitAndReturn(sent, forceSelf: true);
-    } on EMError catch (e) {
+    } on ChatError catch (e) {
       AppLog.w('ImService sendFollowTip failed ${e.code} ${e.description}');
       rethrow;
     }
@@ -603,9 +664,9 @@ abstract final class ImService {
     ImPeerAttrs? peer,
   }) async {
     if (peerEmUsername.isEmpty || channelId <= 0) return null;
-    if (!_sdkInited) await connectFromServer();
+    await ensureLoggedIn();
     try {
-      final msg = EMMessage.createCustomSendMessage(
+      final msg = ChatMessage.createCustomSendMessage(
         targetId: peerEmUsername,
         event: ImCustomEvents.roomInvite,
         params: {
@@ -623,7 +684,7 @@ abstract final class ImService {
       await _applyCommonAttrs(msg, peer: peer);
       final sent = await _sendMessageAwaitSuccess(msg);
       return _emitAndReturn(sent, forceSelf: true);
-    } on EMError catch (e) {
+    } on ChatError catch (e) {
       AppLog.w('ImService sendRoomInvite failed ${e.code} ${e.description}');
       rethrow;
     }
@@ -642,14 +703,14 @@ abstract final class ImService {
     if (durationSecs < 1) {
       throw StateError('Voice too short');
     }
-    if (!_sdkInited) await connectFromServer();
+    await ensureLoggedIn();
     var local = stripFileUri(path);
     local = await persistOutgoingVoice(local);
     final file = File(local);
     if (!file.existsSync()) {
       throw StateError('Voice file missing: $local');
     }
-    final msg = EMMessage.createVoiceSendMessage(
+    final msg = ChatMessage.createVoiceSendMessage(
       targetId: peerEmUsername,
       filePath: local,
       duration: durationSecs,
@@ -663,10 +724,10 @@ abstract final class ImService {
       final sent = await _sendMessageAwaitSuccess(msg);
       final out = _emitAndReturn(sent, forceSelf: true);
       if (out != null && out.id.isNotEmpty) {
-        unawaited(_copyToVoiceCache(out.id, local));
+        _copyToVoiceCache(out.id, local);
       }
       return out;
-    } on EMError catch (e) {
+    } on ChatError catch (e) {
       AppLog.w('ImService sendVoice failed ${e.code} ${e.description}');
       await _persistFailed(msg, peerEmUsername, isGroup: isGroup);
       rethrow;
@@ -683,7 +744,7 @@ abstract final class ImService {
   }) async {
     final path = filePath.trim();
     if (path.isEmpty || peerEmUsername.isEmpty) return null;
-    if (!_sdkInited) await connectFromServer();
+    await ensureLoggedIn();
     var local = path;
     if (local.startsWith('file://')) {
       local = local.substring(7);
@@ -692,7 +753,7 @@ abstract final class ImService {
     if (!file.existsSync()) {
       throw StateError('Image file missing: $local');
     }
-    final msg = EMMessage.createImageSendMessage(
+    final msg = ChatMessage.createImageSendMessage(
       targetId: peerEmUsername,
       filePath: local,
       sendOriginalImage: sendOriginalImage,
@@ -704,7 +765,7 @@ abstract final class ImService {
       await _applyCommonAttrs(msg, peer: peer);
       final sent = await _sendMessageAwaitSuccess(msg);
       return _emitAndReturn(sent, forceSelf: true);
-    } on EMError catch (e) {
+    } on ChatError catch (e) {
       AppLog.w('ImService sendImage failed ${e.code} ${e.description}');
       await _persistFailed(msg, peerEmUsername, isGroup: isGroup);
       rethrow;
@@ -721,7 +782,7 @@ abstract final class ImService {
   /// 对齐 forya 消息公共 attributes：
   /// `name` / `avatar` / `userid` / `gender` / `emID` /
   /// `toName` / `toAvatar` / `toUserid` / `toGender` / `category`。
-  static Future<void> _applyCommonAttrs(EMMessage msg, {ImPeerAttrs? peer}) async {
+  static Future<void> _applyCommonAttrs(ChatMessage msg, {ImPeerAttrs? peer}) async {
     final self = _currentEmUser ?? SessionInfo.currentUser?.emUsername ?? '';
     if (self.isEmpty) return;
     final attrs = Map<String, dynamic>.from(msg.attributes ?? const {});
@@ -750,7 +811,7 @@ abstract final class ImService {
     msg.attributes = attrs;
   }
 
-  static ImChatMessage? _emitAndReturn(EMMessage sent, {bool forceSelf = false}) {
+  static ImChatMessage? _emitAndReturn(ChatMessage sent, {bool forceSelf = false}) {
     final out = _fromEm(sent, forceSelf: forceSelf);
     if (out != null && !_messagesController.isClosed) {
       _messagesController.add(out);
@@ -760,22 +821,22 @@ abstract final class ImService {
 
   /// 环信 [sendMessage] 返回时 `_msgId` 可能尚未赋值（仍是本地 id），
   /// 撤回/删除需等服务端 ack 后的 msgId。
-  static Future<EMMessage> _sendMessageAwaitSuccess(EMMessage message) {
+  static Future<ChatMessage> _sendMessageAwaitSuccess(ChatMessage message) {
     return _awaitMessageSendAck(
       message,
-      () => EMClient.getInstance.chatManager.sendMessage(message),
+      () => ChatClient.getInstance.chatManager.sendMessage(message),
     );
   }
 
-  static Future<EMMessage> _awaitMessageSendAck(
-    EMMessage message,
-    Future<EMMessage> Function() send,
+  static Future<ChatMessage> _awaitMessageSendAck(
+    ChatMessage message,
+    Future<ChatMessage> Function() send,
   ) async {
     final localId = message.msgId;
     final eventId = 'chimo_send_${localId}_${DateTime.now().microsecondsSinceEpoch}';
-    final done = Completer<EMMessage>();
+    final done = Completer<ChatMessage>();
 
-    EMClient.getInstance.chatManager.addMessageEvent(
+    ChatClient.getInstance.chatManager.addMessageEvent(
       eventId,
       ChatMessageEvent(
         onSuccess: (mid, msg) {
@@ -799,7 +860,7 @@ abstract final class ImService {
         },
       );
     } finally {
-      EMClient.getInstance.chatManager.removeMessageEvent(eventId);
+      ChatClient.getInstance.chatManager.removeMessageEvent(eventId);
     }
   }
 
@@ -816,10 +877,10 @@ abstract final class ImService {
     if (conversationId.isEmpty) {
       return const ImHistoryPage(messages: [], hasMore: false);
     }
-    if (!_sdkInited) await connectFromServer();
-    final convType = isGroup ? EMConversationType.GroupChat : EMConversationType.Chat;
+    await ensureLoggedIn();
+    final convType = isGroup ? ChatConversationType.GroupChat : ChatConversationType.Chat;
     try {
-      final conv = await EMClient.getInstance.chatManager.getConversation(
+      final conv = await ChatClient.getInstance.chatManager.getConversation(
         conversationId,
         type: convType,
         createIfNeed: true,
@@ -831,21 +892,25 @@ abstract final class ImService {
       var list = await conv.loadMessages(
         startMsgId: startMsgId,
         loadCount: count,
-        direction: EMSearchDirection.Up,
+        direction: ChatSearchDirection.Up,
       );
 
-      // 本地不足时从服务端补齐，但必须与本地合并，避免冲掉 FAIL 失败消息。
-      if (startMsgId.isNotEmpty || list.length < count) {
+      // 对齐 joyride：本地够用就别打漫游。
+      // 首屏本地 >1 条直接展示；上拉本地不足才补服务端。
+      final needRemote = startMsgId.isEmpty
+          ? list.length <= 1
+          : list.length < count;
+      if (needRemote) {
         try {
-          final cursorResult = await EMClient.getInstance.chatManager.fetchHistoryMessagesByOption(
+          final cursorResult = await ChatClient.getInstance.chatManager.fetchHistoryMessagesByOption(
             conversationId,
             convType,
-            options: FetchMessageOptions(direction: EMSearchDirection.Up, needSave: true),
+            options: FetchMessageOptions(direction: ChatSearchDirection.Up, needSave: true),
             cursor: startMsgId.isEmpty ? null : startMsgId,
             pageSize: count,
           );
           final remote = cursorResult.data.reversed.toList();
-          final byId = <String, EMMessage>{
+          final byId = <String, ChatMessage>{
             for (final m in list)
               if (m.msgId.isNotEmpty) m.msgId: m,
           };
@@ -863,7 +928,7 @@ abstract final class ImService {
             byId[id] = m;
           }
           // 保留本地独有（含失败）+ 合并后的 id 集合。
-          final merged = <EMMessage>[
+          final merged = <ChatMessage>[
             ...byId.values,
             for (final m in list)
               if (m.msgId.isEmpty) m,
@@ -893,18 +958,18 @@ abstract final class ImService {
   static Future<void> markConversationRead(String peerEmUsername, {bool isGroup = false}) async {
     final id = peerEmUsername.trim();
     if (id.isEmpty) return;
-    if (!_sdkInited) await connectFromServer();
+    await ensureLoggedIn();
     try {
-      final conv = await EMClient.getInstance.chatManager.getConversation(
+      final conv = await ChatClient.getInstance.chatManager.getConversation(
         id,
-        type: isGroup ? EMConversationType.GroupChat : EMConversationType.Chat,
+        type: isGroup ? ChatConversationType.GroupChat : ChatConversationType.Chat,
         createIfNeed: false,
       );
       if (conv == null) return;
       await conv.markAllMessagesAsRead();
       if (!isGroup) {
         try {
-          await EMClient.getInstance.chatManager.sendConversationReadAck(id);
+          await ChatClient.getInstance.chatManager.sendConversationReadAck(id);
         } catch (error) {
           AppLog.w('ImService sendConversationReadAck', error: error);
         }
@@ -918,9 +983,9 @@ abstract final class ImService {
   static Future<bool> recallMessage(String messageId, {String? ext}) async {
     final id = messageId.trim();
     if (id.isEmpty) return false;
-    if (!_sdkInited) await connectFromServer();
+    await ensureLoggedIn();
     try {
-      await EMClient.getInstance.chatManager.recallMessage(id, ext: ext);
+      await ChatClient.getInstance.chatManager.recallMessage(id, ext: ext);
       return true;
     } catch (error) {
       AppLog.w('ImService recallMessage failed', error: error);
@@ -936,14 +1001,14 @@ abstract final class ImService {
   }) async {
     final target = conversationId.trim();
     if (target.isEmpty) return null;
-    if (!_sdkInited) await connectFromServer();
+    await ensureLoggedIn();
     try {
-      final msg = EMMessage.createCustomSendMessage(targetId: target, event: 'im_recall_message');
+      final msg = ChatMessage.createCustomSendMessage(targetId: target, event: 'im_recall_message');
       msg.chatType = isGroup ? ChatType.GroupChat : ChatType.Chat;
       await _applyCommonAttrs(msg, peer: peer);
       final sent = await _sendMessageAwaitSuccess(msg);
       return _emitAndReturn(sent, forceSelf: true);
-    } on EMError catch (e) {
+    } on ChatError catch (e) {
       AppLog.w('ImService sendRecallNotice failed ${e.code} ${e.description}');
       return null;
     } catch (error) {
@@ -961,11 +1026,11 @@ abstract final class ImService {
     final convId = conversationId.trim();
     final msgId = messageId.trim();
     if (convId.isEmpty || msgId.isEmpty) return;
-    if (!_sdkInited) await connectFromServer();
+    await ensureLoggedIn();
 
-    final type = isGroup ? EMConversationType.GroupChat : EMConversationType.Chat;
+    final type = isGroup ? ChatConversationType.GroupChat : ChatConversationType.Chat;
     try {
-      final conv = await EMClient.getInstance.chatManager.getConversation(
+      final conv = await ChatClient.getInstance.chatManager.getConversation(
         convId,
         type: type,
         createIfNeed: false,
@@ -984,10 +1049,10 @@ abstract final class ImService {
   }) async {
     final id = conversationId.trim();
     if (id.isEmpty) return;
-    if (!_sdkInited) await connectFromServer();
-    final type = isGroup ? EMConversationType.GroupChat : EMConversationType.Chat;
+    await ensureLoggedIn();
+    final type = isGroup ? ChatConversationType.GroupChat : ChatConversationType.Chat;
     try {
-      final conv = await EMClient.getInstance.chatManager.getConversation(
+      final conv = await ChatClient.getInstance.chatManager.getConversation(
         id,
         type: type,
         createIfNeed: false,
@@ -999,9 +1064,9 @@ abstract final class ImService {
           AppLog.w('ImService deleteAllMessages', error: error);
         }
       }
-      await EMClient.getInstance.chatManager.deleteConversation(id, deleteMessages: deleteMessages);
+      await ChatClient.getInstance.chatManager.deleteConversation(id, deleteMessages: deleteMessages);
       try {
-        await EMClient.getInstance.chatManager.deleteRemoteConversation(
+        await ChatClient.getInstance.chatManager.deleteRemoteConversation(
           id,
           conversationType: type,
           isDeleteMessage: deleteMessages,
@@ -1015,13 +1080,13 @@ abstract final class ImService {
   }
 
   /// 打开环信会话供列表合并（1v1 Chat + GroupChat）。
-  static Future<List<EMConversation>> loadListConversations() async {
-    if (!_sdkInited) await connectFromServer();
+  static Future<List<ChatConversation>> loadListConversations() async {
+    await ensureLoggedIn();
     try {
-      final all = await EMClient.getInstance.chatManager.loadAllConversations();
+      final all = await ChatClient.getInstance.chatManager.loadAllConversations();
       return [
         for (final c in all)
-          if (c.type == EMConversationType.Chat || c.type == EMConversationType.GroupChat) c,
+          if (c.type == ChatConversationType.Chat || c.type == ChatConversationType.GroupChat) c,
       ];
     } catch (error) {
       AppLog.w('ImService.loadListConversations', error: error);
@@ -1030,15 +1095,15 @@ abstract final class ImService {
   }
 
   /// 打开 Chat 类型环信会话供列表预览。
-  static Future<List<EMConversation>> loadDmConversations() async {
+  static Future<List<ChatConversation>> loadDmConversations() async {
     final all = await loadListConversations();
     return [
       for (final c in all)
-        if (c.type == EMConversationType.Chat) c,
+        if (c.type == ChatConversationType.Chat) c,
     ];
   }
 
-  static Future<String> previewFor(EMConversation conv) async {
+  static Future<String> previewFor(ChatConversation conv) async {
     try {
       final latest = await conv.latestMessage();
       if (latest == null) return '';
@@ -1048,7 +1113,7 @@ abstract final class ImService {
     }
   }
 
-  static Future<int> latestTimeMs(EMConversation conv) async {
+  static Future<int> latestTimeMs(ChatConversation conv) async {
     try {
       final latest = await conv.latestMessage();
       return latest?.serverTime ?? 0;
@@ -1057,16 +1122,39 @@ abstract final class ImService {
     }
   }
 
-  static String previewText(EMMessage message) => ImMessageCodec.previewText(message);
+  static String previewText(ChatMessage message) => ImMessageCodec.previewText(message);
 
-  static ImChatMessage? _fromEm(EMMessage message, {bool forceSelf = false}) =>
+  static ImChatMessage? _fromEm(ChatMessage message, {bool forceSelf = false}) =>
       ImMessageCodec.fromEm(message, forceSelf: forceSelf, selfEmUser: _currentEmUser ?? '');
 
-  static void _emitEmMessage(EMMessage message) {
+  static void _emitEmMessage(ChatMessage message) {
     final out = _fromEm(message);
     if (out == null) return;
     if (!_messagesController.isClosed) {
       _messagesController.add(out);
+    }
+    // 服务端除 CMD 外还会发私聊 CUSTOM；CMD 丢失时用消息兜底弹全局邀请浮层。
+    _maybeShowHeartLinkInvite(out);
+  }
+
+  static void _maybeShowHeartLinkInvite(ImChatMessage msg) {
+    if (msg.isSelf) return;
+    if (!ImCustomEvents.isHeartLinkInvite(msg.customEvent)) return;
+    final payload = ImCustomPayload.tryHeartLinkInvite(msg.customPayload);
+    if (payload == null) return;
+    void show() {
+      if (payload.forGs) {
+        HeartLinkInviteNotice.showGsInvite(payload.info);
+      } else {
+        HeartLinkInviteNotice.showUserInvite(payload.info);
+      }
+    }
+
+    final phase = SchedulerBinding.instance.schedulerPhase;
+    if (phase == SchedulerPhase.idle || phase == SchedulerPhase.postFrameCallbacks) {
+      show();
+    } else {
+      SchedulerBinding.instance.addPostFrameCallback((_) => show());
     }
   }
 

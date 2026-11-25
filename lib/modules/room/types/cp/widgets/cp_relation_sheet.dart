@@ -11,8 +11,8 @@ import '../../../../../common/theme/app_bottom_sheet.dart';
 import '../../../../../common/theme/app_colors.dart';
 import '../../../../../common/utils/app_toast.dart';
 import '../../../../../common/utils/chimo.dart';
+import '../../../../../common/utils/text_fmt.dart';
 import '../../../../../common/widgets/app_image.dart';
-import '../../../model/room_format.dart';
 import '../logic/cp_logic.dart';
 
 /// 授关系弹层。像素对齐 Cosmic Lounge「Assign Relationship」。
@@ -190,7 +190,7 @@ class _CpRelationSheetState extends State<CpRelationSheet> {
           right: 0,
           child: Center(
             child: Text(
-              roomCount(score),
+              TextFmt.roomCount(score),
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: AppColors.rgba(178, 86, 50, 1),

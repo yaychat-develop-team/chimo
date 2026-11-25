@@ -1,30 +1,14 @@
-import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../common/constants/app_assets.dart';
 import '../../../common/extensions/wire_view.dart';
+import '../../../common/models/server_client/group/group.pb.dart';
 import '../../../common/theme/app_colors.dart';
 import '../logic/popular_tribes_logic.dart';
 import '../../../common/widgets/app_scaffold.dart';
 import 'package:chimo/common/utils/chimo.dart';
-
-class _TribeOption {
-  const _TribeOption({
-    required this.id,
-    required this.name,
-    required this.subtitle,
-    required this.avatarAsset,
-    this.avatarUrl,
-  });
-
-  final String id;
-  final String name;
-  final String subtitle;
-  final String avatarAsset;
-  final String? avatarUrl;
-}
 
 /// 注册流程：按所选行业调用 `/chat/group/listByType`（forya），
 /// 未选行业时 typeList 为空表示全部；失败时回退 `/chat/group/list`。
@@ -53,18 +37,71 @@ class _PopularTribesPageState extends State<PopularTribesPage> {
     super.dispose();
   }
 
-  List<_TribeOption> get _tribes => logic.groups
-      .where((g) => g.gid.trim().isNotEmpty)
-      .map(
-        (g) => _TribeOption(
-          id: g.gid,
-          name: g.name.trim().isEmpty ? 'Tribe' : g.name.trim(),
-          subtitle: g.type.trim().isNotEmpty ? g.type.trim() : g.desc.trim(),
-          avatarAsset: AppAssets.avatarPlace,
-          avatarUrl: g.avatar.trim().isEmpty ? null : g.avatar,
+  Widget _list(List<String> picked) {
+    if (logic.loading.value) {
+      return const Center(child: CircularProgressIndicator(color: AppColors.greenB6FF2E));
+    }
+    final groups = [
+      for (final group in logic.groups)
+        if (group.gid.trim().isNotEmpty) group,
+    ];
+    final error = logic.error.value;
+    if (error != null && groups.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                error,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.gray9A9A9A, fontSize: 14),
+              ),
+              const SizedBox(height: 12),
+              TextButton(onPressed: () => logic.load(), child: const Text('Retry')),
+            ],
+          ),
         ),
-      )
-      .toList();
+      );
+    }
+    if (groups.isEmpty) {
+      return const Center(
+        child: Text(
+          'No tribes available',
+          style: TextStyle(color: AppColors.gray9A9A9A, fontSize: 14),
+        ),
+      );
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const cardW = 150.0;
+        const cardH = 105.0;
+        const avatarHang = 18.0;
+        const tileH = cardH + avatarHang;
+        const gapX = 15.0;
+        final sidePad = ((constraints.maxWidth - cardW * 2 - gapX) / 2).clamp(12.0, 30.0);
+        return GridView.builder(
+          padding: EdgeInsets.fromLTRB(sidePad, 8, sidePad, 12),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            mainAxisSpacing: 38,
+            crossAxisSpacing: gapX,
+            mainAxisExtent: tileH,
+          ),
+          itemCount: groups.length,
+          itemBuilder: (context, index) {
+            final group = groups[index];
+            return _TribeCard(
+              group: group,
+              selected: picked.contains(group.gid),
+              onTap: () => logic.toggle(group.gid),
+            );
+          },
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -97,81 +134,7 @@ class _PopularTribesPageState extends State<PopularTribesPage> {
                 ),
               ),
             ),
-            Expanded(
-              child: logic.loading.value
-                  ? const Center(
-                      child: CircularProgressIndicator(
-                        color: AppColors.greenB6FF2E,
-                      ),
-                    )
-                  : logic.error.value != null && _tribes.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              logic.error.value!,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: AppColors.gray9A9A9A,
-                                fontSize: 14,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            TextButton(
-                              onPressed: () => unawaited(logic.load()),
-                              child: const Text('Retry'),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
-                  : _tribes.isEmpty
-                  ? const Center(
-                      child: Text(
-                        'No tribes available',
-                        style: TextStyle(
-                          color: AppColors.gray9A9A9A,
-                          fontSize: 14,
-                        ),
-                      ),
-                    )
-                  : LayoutBuilder(
-                      builder: (context, constraints) {
-                        const cardW = 150.0;
-                        const cardH = 105.0;
-                        const avatarHang = 18.0;
-                        const tileH = cardH + avatarHang;
-                        const gapX = 15.0;
-                        final sidePad =
-                            ((constraints.maxWidth - cardW * 2 - gapX) / 2)
-                                .clamp(12.0, 30.0);
-
-                        return GridView.builder(
-                          padding: EdgeInsets.fromLTRB(sidePad, 8, sidePad, 12),
-                          gridDelegate:
-                              const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 2,
-                                mainAxisSpacing: 38,
-                                crossAxisSpacing: gapX,
-                                mainAxisExtent: tileH,
-                              ),
-                          itemCount: _tribes.length,
-                          itemBuilder: (context, index) {
-                            final tribe = _tribes[index];
-                            final selected = picked.contains(tribe.id);
-                            return _TribeCard(
-                              tribe: tribe,
-                              selected: selected,
-                              onTap: () => logic.toggle(tribe.id),
-                            );
-                          },
-                        );
-                      },
-                    ),
-            ),
+            Expanded(child: _list(picked)),
             Padding(
               padding: EdgeInsets.fromLTRB(30, 8, 30, bottom + 16),
               child: Chimo.s.gradientButton(
@@ -189,15 +152,21 @@ class _PopularTribesPageState extends State<PopularTribesPage> {
 }
 
 class _TribeCard extends StatelessWidget {
-  const _TribeCard({
-    required this.tribe,
-    required this.selected,
-    required this.onTap,
-  });
+  const _TribeCard({required this.group, required this.selected, required this.onTap});
 
-  final _TribeOption tribe;
+  final GroupInfo group;
   final bool selected;
   final VoidCallback onTap;
+
+  String get _name {
+    final name = group.name.trim();
+    return name.isEmpty ? 'Tribe' : name;
+  }
+
+  String get _subtitle {
+    final type = group.type.trim();
+    return type.isNotEmpty ? type : group.desc.trim();
+  }
 
   static const double cardW = 150;
   static const double cardH = 105;
@@ -267,8 +236,8 @@ class _TribeCard extends StatelessWidget {
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: Chimo.image(
-                  tribe.avatarUrl!,
-                  fallbackAsset: tribe.avatarAsset,
+                  group.avatar.trim().isEmpty ? null : group.avatar,
+                  fallbackAsset: AppAssets.avatarPlace,
                   fit: BoxFit.cover,
                   fadeIn: Duration.zero,
                 ),
@@ -282,7 +251,7 @@ class _TribeCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    tribe.name,
+                    _name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -294,7 +263,7 @@ class _TribeCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    tribe.subtitle,
+                    _subtitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(

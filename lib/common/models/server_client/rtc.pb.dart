@@ -107,6 +107,86 @@ class LuckyGameRoomAccessRsp extends $pb.GeneratedMessage {
   void clearCanCreate() => $_clearField(3);
 }
 
+/// 房间 Flik 模式状态，不改变房间 usage。
+class RoomFlikState extends $pb.GeneratedMessage {
+  factory RoomFlikState({
+    $core.bool? enabled,
+    $core.String? gameId,
+    $core.bool? businessFlikEnabled,
+  }) {
+    final result = create();
+    if (enabled != null) result.enabled = enabled;
+    if (gameId != null) result.gameId = gameId;
+    if (businessFlikEnabled != null)
+      result.businessFlikEnabled = businessFlikEnabled;
+    return result;
+  }
+
+  RoomFlikState._();
+
+  factory RoomFlikState.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory RoomFlikState.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RoomFlikState',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'rtc'),
+      createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'enabled')
+    ..aOS(2, _omitFieldNames ? '' : 'gameId')
+    ..aOB(3, _omitFieldNames ? '' : 'businessFlikEnabled')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RoomFlikState clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RoomFlikState copyWith(void Function(RoomFlikState) updates) =>
+      super.copyWith((message) => updates(message as RoomFlikState))
+          as RoomFlikState;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RoomFlikState create() => RoomFlikState._();
+  @$core.override
+  RoomFlikState createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static RoomFlikState getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RoomFlikState>(create);
+  static RoomFlikState? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get enabled => $_getBF(0);
+  @$pb.TagNumber(1)
+  set enabled($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasEnabled() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearEnabled() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get gameId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set gameId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasGameId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearGameId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.bool get businessFlikEnabled => $_getBF(2);
+  @$pb.TagNumber(3)
+  set businessFlikEnabled($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasBusinessFlikEnabled() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearBusinessFlikEnabled() => $_clearField(3);
+}
+
 class RoomInteractionDetailRsp extends $pb.GeneratedMessage {
   factory RoomInteractionDetailRsp({
     $fixnum.Int64? id,
@@ -9140,6 +9220,7 @@ class JoinChannelExtendRsp extends $pb.GeneratedMessage {
     RoomStoryInfo? storyInfo,
     $5.PetHangOutInfo? petInfo,
     $core.bool? quizRoom,
+    RoomFlikState? flikState,
   }) {
     final result = create();
     if (gameInfo != null) result.gameInfo = gameInfo;
@@ -9153,6 +9234,7 @@ class JoinChannelExtendRsp extends $pb.GeneratedMessage {
     if (storyInfo != null) result.storyInfo = storyInfo;
     if (petInfo != null) result.petInfo = petInfo;
     if (quizRoom != null) result.quizRoom = quizRoom;
+    if (flikState != null) result.flikState = flikState;
     return result;
   }
 
@@ -9190,6 +9272,8 @@ class JoinChannelExtendRsp extends $pb.GeneratedMessage {
     ..aOM<$5.PetHangOutInfo>(10, _omitFieldNames ? '' : 'petInfo',
         subBuilder: $5.PetHangOutInfo.create)
     ..aOB(11, _omitFieldNames ? '' : 'quizRoom')
+    ..aOM<RoomFlikState>(12, _omitFieldNames ? '' : 'flikState',
+        subBuilder: RoomFlikState.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -9329,6 +9413,17 @@ class JoinChannelExtendRsp extends $pb.GeneratedMessage {
   $core.bool hasQuizRoom() => $_has(10);
   @$pb.TagNumber(11)
   void clearQuizRoom() => $_clearField(11);
+
+  @$pb.TagNumber(12)
+  RoomFlikState get flikState => $_getN(11);
+  @$pb.TagNumber(12)
+  set flikState(RoomFlikState value) => $_setField(12, value);
+  @$pb.TagNumber(12)
+  $core.bool hasFlikState() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearFlikState() => $_clearField(12);
+  @$pb.TagNumber(12)
+  RoomFlikState ensureFlikState() => $_ensure(11);
 }
 
 class RoomStoryInfo extends $pb.GeneratedMessage {

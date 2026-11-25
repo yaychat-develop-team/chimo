@@ -1,4 +1,3 @@
-import 'dart:async';
 
 import 'app_storage.dart';
 
@@ -20,7 +19,7 @@ abstract final class EffectStore {
     final now = DateTime.now().millisecondsSinceEpoch;
     final last = _lastShownMs(uid);
     if (last > 0 && now - last < _cooldownMs) return false;
-    unawaited(AppStorage.cache?.put('$_prefix$uid', now) ?? Future.value());
+    AppStorage.cache?.put('$_prefix$uid', now) ?? Future.value();
     return true;
   }
 
@@ -28,7 +27,7 @@ abstract final class EffectStore {
   static void clear(String userId) {
     final uid = userId.trim();
     if (uid.isEmpty) return;
-    unawaited(AppStorage.cache?.delete('$_prefix$uid') ?? Future.value());
+    AppStorage.cache?.delete('$_prefix$uid') ?? Future.value();
   }
 
   static int _lastShownMs(String uid) {

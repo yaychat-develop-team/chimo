@@ -12,7 +12,7 @@ import '../../../../common/theme/app_colors.dart';
 import '../../../../common/utils/app_toast.dart';
 import '../../../../common/widgets/app_image.dart';
 import '../../../chat/logic/chats_list_logic.dart';
-import '../../../chat/model/chat_conversation.dart';
+import '../../../chat/model/conversation_model.dart';
 import '../../service/room_service.dart';
 import 'package:chimo/common/utils/chimo.dart';
 
@@ -71,7 +71,7 @@ class _RoomShareSheetState extends State<_RoomShareSheet> {
   }
 
   /// 会话 id 多为 `dm_<环信账号>`，邀请接口要业务数字 uid。
-  Future<int> _resolveShareUid(ChatConversation c) async {
+  Future<int> _resolveShareUid(ConversationModel c) async {
     final parsed = c.parsedAppUid;
     if (parsed > 0) return parsed;
     final em = c.emUserName.trim().isNotEmpty ? c.emUserName.trim() : _emFromConversationId(c.id);

@@ -7,10 +7,10 @@ import '../../../../app/app_jumper.dart';
 import '../../../../common/constants/app_assets.dart';
 import '../../../../common/models/server_client/rtc.pb.dart';
 import '../../../../common/theme/app_colors.dart';
+import '../../../../common/utils/chimo.dart';
+import '../../../../common/utils/text_fmt.dart';
 import '../../../../common/widgets/app_pull_refresh.dart';
 import '../../logic/more_rooms_logic.dart';
-import '../../model/room_format.dart';
-import 'package:chimo/common/utils/chimo.dart';
 
 /// 房间内 More Rooms 右侧抽屉。像素对齐 Cosmic Lounge 设计稿。
 class MoreRoomsDrawer extends StatefulWidget {
@@ -425,7 +425,7 @@ class _ForYouCard extends StatelessWidget {
                       Chimo.image(AppAssets.roomFire, width: 12, height: 12),
                       const SizedBox(width: 3),
                       Text(
-                        roomCount(hot),
+                        TextFmt.roomCount(hot),
                         style: const TextStyle(
                           color: AppColors.gray9A9A9A,
                           fontSize: 12,

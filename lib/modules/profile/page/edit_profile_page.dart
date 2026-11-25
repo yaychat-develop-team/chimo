@@ -16,20 +16,20 @@ import 'package:chimo/common/utils/chimo.dart';
 import '../../../common/widgets/app_scaffold.dart';
 import '../../../app/auth/onboarding_state.dart';
 import '../../../common/extensions/wire_view.dart';
-import '../../../common/models/server_client/user.pb.dart';
 import 'album_photo_viewer_page.dart';
 import '../logic/edit_profile_logic.dart';
 import 'widgets/photo_pick_sheet.dart';
 import '../../../common/utils/time_fmt.dart';
+import '../../../common/utils/zodiac.dart';
 import '../../../common/theme/app_bottom_sheet.dart';
 import '../../../common/utils/app_toast.dart';
 
-/// 编辑资料页（forya MineDataEditPage）。
+/// 编辑资料页（forya MineDataEditPage）。进入后自行拉资料，不接收外部 seed。
 class EditProfilePage extends StatefulWidget {
-  const EditProfilePage({super.key, this.profile});
+  const EditProfilePage({super.key, this.fromOnboarding = false});
 
-  /// 首帧资料（列表点进来的那份）；只作预填，logic 会再拉全。
-  final User? profile;
+  /// 邮箱注册引导里进来：保存后回首页而不是 pop。
+  final bool fromOnboarding;
 
   @override
   State<EditProfilePage> createState() => _EditProfilePageState();
@@ -41,7 +41,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   @override
   void initState() {
     super.initState();
-    logic = Get.put(EditProfileLogic(seed: widget.profile ?? User()));
+    logic = Get.put(EditProfileLogic(fromOnboarding: widget.fromOnboarding));
   }
 
   @override
@@ -66,7 +66,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   /// 离开页面：引导流程回首页，普通流程带结果 pop。
   void _leave(BuildContext context) {
     if (logic.fromOnboarding) {
-      unawaited(OnboardingState.finishToHome(context));
+      OnboardingState.finishToHome(context);
       return;
     }
     AppJumper.back(result: logic.buildResult());
@@ -81,12 +81,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   Future<void> _openAvatar() async {
-    final url = await AppJumper.toEditPicture(
-      avatarAsset: AppAssets.avatarPlace,
-      avatarUrl: logic.profile.value.shownAvatar,
-    );
-    if (url == null || url.isEmpty) return;
-    logic.applyAvatar(url);
+    await logic.openAvatar(avatarAsset: AppAssets.avatarPlace);
   }
 
   /// 底部弹层要 BuildContext。选完来源后的挑图、落盘和上传在 Logic。
@@ -109,9 +104,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   Future<void> _openBirthday(BuildContext context) async {
-    var temp = DateTime.tryParse(logic.birthday.value) ?? DateTime(1995, 1, 1);
+    var temp = logic.birthdayInitial;
     final now = DateTime.now();
-    if (temp.isAfter(now)) temp = now;
 
     final picked = await AppBottomSheet.show<DateTime>(
       backgroundColor: AppColors.black1C1C1E,
@@ -186,17 +180,25 @@ class _EditProfilePageState extends State<EditProfilePage> {
       child: FocusOnIt(
         onFocus: logic.onPageFocused,
         child: Obx(() {
+          if (logic.loading.value && logic.nickname.value.isEmpty) {
+            return AppScaffold(
+              backgroundColor: AppColors.black111111,
+              appBar: _EditProfileAppBar(
+                onBack: () => _leave(context),
+                completionPercent: 0,
+                onSkip: logic.fromOnboarding ? () => OnboardingState.finishToHome(context) : null,
+              ),
+              body: const Center(child: CircularProgressIndicator()),
+            );
+          }
           final profile = logic.profile.value;
           final signature = logic.signature.value;
           return AppScaffold(
             backgroundColor: AppColors.black111111,
-            // loading: logic.loading.value || logic.albumUploading.value,
             appBar: _EditProfileAppBar(
               onBack: () => _leave(context),
               completionPercent: logic.completionPercent,
-              onSkip: logic.fromOnboarding
-                  ? () => unawaited(OnboardingState.finishToHome(context))
-                  : null,
+              onSkip: logic.fromOnboarding ? () => OnboardingState.finishToHome(context) : null,
             ),
             body: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -209,16 +211,15 @@ class _EditProfilePageState extends State<EditProfilePage> {
                         avatarAsset: AppAssets.avatarPlace,
                         avatarUrl: profile.shownAvatar,
                         underReview: profile.avatarAudit.trim().isNotEmpty,
-                        onTap: () => unawaited(_openAvatar()),
+                        onTap: () => _openAvatar(),
                       ),
                       const SizedBox(height: 16),
                       _PhotoCard(
                         paths: logic.photoPaths.toList(),
                         underReview: logic.photoUnderReview,
                         busy: logic.albumUploading.value,
-                        onAdd: () => unawaited(_pickAlbumPhoto(context)),
-                        onRemove: (index) =>
-                            unawaited(_run(context, () => logic.removeAlbumPhoto(index))),
+                        onAdd: () => _pickAlbumPhoto(context),
+                        onRemove: (index) => _run(context, () => logic.removeAlbumPhoto(index)),
                         onOpen: (index) {
                           AlbumPhotoViewerPage.open(
                             context,
@@ -234,32 +235,32 @@ class _EditProfilePageState extends State<EditProfilePage> {
                             ? "Don't be shy! Drop a fun line about yourself!"
                             : signature,
                         hintAsValue: signature.isNotEmpty,
-                        onTap: () => unawaited(_run(context, logic.openSignature)),
+                        onTap: () => _run(context, logic.openSignature),
                       ),
                       const SizedBox(height: 16),
                       _VoiceNoteCard(
                         seconds: logic.voiceSeconds.value,
                         source: logic.voiceUrl.value,
-                        onTap: () => unawaited(_run(context, logic.openVoiceNote)),
-                        onDelete: () => unawaited(_run(context, logic.deleteVoiceNote)),
+                        onTap: () => _run(context, logic.openVoiceNote),
+                        onDelete: () => _run(context, logic.deleteVoiceNote),
                       ),
                       const SizedBox(height: 16),
                       _TagsCard(
                         tags: logic.tags.toList(),
-                        onTap: () => unawaited(_run(context, logic.openTags)),
+                        onTap: () => _run(context, logic.openTags),
                       ),
                       const SizedBox(height: 16),
                       _BasicInfoCard(
                         nickname: logic.nickname.value,
-                        gender: logic.gender.value,
+                        gender: logic.genderLabel,
                         birthday: logic.birthday.value,
                         height: logic.height.value,
                         weight: logic.weight.value,
-                        onNicknameTap: () => unawaited(_run(context, logic.openNickname)),
-                        onGenderTap: () => unawaited(_openGender(context)),
-                        onBirthdayTap: () => unawaited(_openBirthday(context)),
-                        onHeightTap: () => unawaited(_run(context, logic.openHeight)),
-                        onWeightTap: () => unawaited(_run(context, logic.openWeight)),
+                        onNicknameTap: () => _run(context, logic.openNickname),
+                        onGenderTap: () => _openGender(context),
+                        onBirthdayTap: () => _openBirthday(context),
+                        onHeightTap: () => _run(context, logic.openHeight),
+                        onWeightTap: () => _run(context, logic.openWeight),
                       ),
                     ],
                   ),
@@ -269,7 +270,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     padding: EdgeInsets.fromLTRB(16, 8, 16, 12 + bottom),
                     child: Chimo.s.gradientButton(
                       label: 'Save',
-                      onTap: () => unawaited(_save(context)),
+                      onTap: () => _save(context),
                       height: 48,
                       borderRadius: 24,
                       loading: logic.saving.value,
@@ -294,8 +295,9 @@ class _EditProfileAppBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SafeArea(
+      bottom: false,
       child: SizedBox(
-        height: 48,
+        height: 44,
         child: Stack(
           alignment: Alignment.center,
           children: [
@@ -682,7 +684,7 @@ class _VoiceNoteCardState extends State<_VoiceNoteCard> {
   void didUpdateWidget(covariant _VoiceNoteCard oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.seconds != widget.seconds || oldWidget.source != widget.source) {
-      unawaited(_stopPlay());
+      _stopPlay();
     }
   }
 
@@ -691,12 +693,12 @@ class _VoiceNoteCardState extends State<_VoiceNoteCard> {
     AppVoiceExclusive.release(_exclusiveStop);
     _playTimer?.cancel();
     _completeSub?.cancel();
-    unawaited(_player.dispose());
+    _player.dispose();
     super.dispose();
   }
 
   void _exclusiveStop() {
-    unawaited(_stopPlay());
+    _stopPlay();
   }
 
   Future<void> _stopPlay({bool resetOnly = false}) async {
@@ -746,7 +748,7 @@ class _VoiceNoteCardState extends State<_VoiceNoteCard> {
         if (_remaining <= 1) {
           timer.cancel();
           _playTimer = null;
-          unawaited(_stopPlay());
+          _stopPlay();
           return;
         }
         setState(() => _remaining -= 1);
@@ -804,7 +806,7 @@ class _VoiceNoteCardState extends State<_VoiceNoteCard> {
             Row(
               children: [
                 GestureDetector(
-                  onTap: () => unawaited(_togglePlay()),
+                  onTap: () => _togglePlay(),
                   behavior: HitTestBehavior.opaque,
                   child: Container(
                     width: 140,
@@ -855,7 +857,7 @@ class _VoiceNoteCardState extends State<_VoiceNoteCard> {
                 ),
                 const Spacer(),
                 GestureDetector(
-                  onTap: () => unawaited(_onDelete()),
+                  onTap: () => _onDelete(),
                   child: Chimo.image(
                     AppAssets.voiceDeleteIcon,
                     width: 28,
@@ -958,10 +960,8 @@ class _BasicInfoCard extends StatelessWidget {
   final VoidCallback? onWeightTap;
 
   String get _birthdayDisplay {
-    final raw = birthday.trim();
-    if (raw.isEmpty) return '';
-    final parsed = DateTime.tryParse(raw);
-    if (parsed == null) return raw;
+    final parsed = Zodiac.parseBirthday(birthday);
+    if (parsed == null) return birthday.trim();
     return TimeFmt.slashDate(parsed);
   }
 
@@ -1060,7 +1060,7 @@ class _GenderPickerSheetState extends State<_GenderPickerSheet> {
   @override
   void initState() {
     super.initState();
-    _selected = widget.initialGender;
+    _selected = genderDisplayLabel(widget.initialGender);
   }
 
   @override

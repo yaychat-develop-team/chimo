@@ -1,4 +1,3 @@
-import 'dart:async';
 
 import 'package:flutter/material.dart';
 
@@ -134,8 +133,8 @@ class _ChatEmojiPanelState extends State<ChatEmojiPanel> {
   @override
   void initState() {
     super.initState();
-    unawaited(_loadGlyphs());
-    if (widget.stickers != null) unawaited(_loadPacks());
+    _loadGlyphs();
+    if (widget.stickers != null) _loadPacks();
   }
 
   Future<void> _loadGlyphs() async {
@@ -173,7 +172,7 @@ class _ChatEmojiPanelState extends State<ChatEmojiPanel> {
         }
       });
       if (tab > 0 && tab <= packs.length) {
-        unawaited(_ensureStickers(packs[tab - 1]));
+        _ensureStickers(packs[tab - 1]);
       }
     } catch (error) {
       if (!mounted) return;
@@ -213,7 +212,7 @@ class _ChatEmojiPanelState extends State<ChatEmojiPanel> {
     if (index == _tab) return;
     setState(() => _tab = index);
     if (index > 0 && index <= _packs.length) {
-      unawaited(_ensureStickers(_packs[index - 1]));
+      _ensureStickers(_packs[index - 1]);
     }
   }
 

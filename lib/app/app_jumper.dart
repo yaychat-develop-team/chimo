@@ -1,6 +1,6 @@
-import 'dart:async';
 import 'dart:convert';
 
+import 'package:chimo/app/global_config.dart';
 import 'package:chimo/app/session_info.dart';
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +8,7 @@ import 'package:get/get.dart';
 import 'package:photo_manager/photo_manager.dart' show AssetEntity;
 
 import '../common/models/server_client/group/group.pb.dart';
+import '../common/models/server_client/rtc.pbenum.dart';
 import '../common/models/server_client/user.pb.dart';
 
 import '../common/constants/app_assets.dart';
@@ -39,14 +40,17 @@ import '../modules/debug/page/proxy_config_page.dart';
 import '../modules/friends/logic/friends_logic.dart';
 import '../modules/friends/page/add_user_page.dart';
 import '../modules/friends/page/friends_page.dart';
-import '../modules/profile/logic/chat_user_profile_sheet_logic.dart';
-import '../modules/profile/page/chat_user_profile_page.dart';
+import '../modules/profile/logic/user_profile_sheet_logic.dart';
+import '../modules/profile/page/user_profile_page.dart';
+import '../modules/echo_hall/page/echo_hall_page.dart';
+import '../modules/dress/page/my_frame_page.dart';
 import '../modules/honor/page/my_honor_page.dart';
+import '../modules/my_agent/page/my_agent_page.dart';
+import '../modules/profile/page/gift_wall_card_detail_page.dart';
 import '../modules/profile/page/gift_wall_page.dart';
-import '../modules/profile/page/widgets/chat_user_profile_sheet.dart';
+import '../modules/profile/page/widgets/user_profile_sheet.dart';
 import '../modules/search/logic/user_search_logic.dart';
 import '../modules/search/page/user_search_page.dart';
-import 'chimo_api.dart';
 import '../modules/me/page/level_page.dart';
 import '../modules/me/page/about_us_page.dart';
 import '../modules/me/page/account_cancel_result_page.dart';
@@ -69,14 +73,17 @@ import '../modules/profile/page/edit_profile_page.dart';
 import '../modules/profile/page/my_picture_page.dart';
 import '../modules/profile/page/my_tags_page.dart';
 import '../modules/profile/page/nickname_page.dart';
-import '../modules/profile/page/personal_signature_page.dart';
-import '../modules/profile/page/voice_note_page.dart';
-import '../modules/profile/page/personal_profile_page.dart';
+import '../modules/profile/page/user_signature_page.dart';
+import '../common/widgets/voice_note_sheet.dart';
+import '../modules/heart_link/page/edit_reveal_card_page.dart';
+import '../modules/heart_link/page/reveal_card_preview_page.dart';
+import '../common/models/server_client/heart_link.pb.dart';
 import '../modules/report/page/report_page.dart';
 import '../modules/root/page/root_tab_page.dart';
 import '../modules/wallet/page/coins_details_page.dart';
+import '../modules/wallet/page/recharge_sheet.dart' as wallet_recharge;
 import '../modules/wallet/page/wallet_page.dart';
-import '../modules/chat/model/chat_conversation.dart';
+import '../modules/chat/model/conversation_model.dart';
 import '../modules/report/model/report_target.dart';
 
 abstract class AppJumper {
@@ -141,7 +148,7 @@ abstract class AppJumper {
   }
 
   /// 会话详情。[preview] 只作首帧预填，为 `null` 是正常路径（深链 / 冷启动）。
-  static Future toChat(String id, {ChatConversation? preview}) async {
+  static Future toChat(String id, {ConversationModel? preview}) async {
     if (!_requireAuth()) return;
     // 深链没带预填时按 id 从会话列表找，找不到拼空骨架，由 Controller 拉全。
     final seed = _chatSeed(id, preview);
@@ -184,15 +191,15 @@ abstract class AppJumper {
   static Future toProfile(String id, {User? preview}) async {
     if (!_requireAuth()) return;
     final seed = preview ?? (User()..id = Int64(int.tryParse(id) ?? 0));
-    await Get.to(() => ChatUserProfilePage(seed: seed));
+    await Get.to(() => UserProfilePage(seed: seed));
   }
 
   static var _openingUserProfileSheet = false;
 
-  /// 通用用户资料底栏。对齐群聊 [ChatUserProfileSheet]。
+  /// 通用用户资料底栏。对齐群聊 [UserProfileSheet]。
   ///
-  /// 有 [preview] 直接展示；否则按 [uid] 拉 `/user/info`，失败则用 name/avatar 占位。
-  /// 礼物墙 / 关注由 [ChatUserProfileSheetLogic] 对齐 joyride 接口拉取。
+  /// 先用 [preview] / name+avatar 立刻 show；无 [preview] 时 sheet 内再拉 `/user/info`。
+  /// 礼物墙 / 关注由 [UserProfileSheetLogic] 对齐 joyride 接口拉取。
   static Future<void> showUserProfileSheet({
     required String uid,
     String name = '',
@@ -202,41 +209,38 @@ abstract class AppJumper {
     if (!_requireAuth()) return;
     final id = uid.trim();
     if (id.isEmpty || id == '0') return;
+    // Romance 房：麦下 GS（非超管/非房主）不可看他人资料。对齐 joyride。
+    final room = RoomService.findOrNull();
+    final me = SessionInfo.currentUser;
+    if (room != null &&
+        room.isRomanceRoom &&
+        me != null &&
+        me.gsGroupId.toInt() > 0 &&
+        !(me.superAdmin) &&
+        !room.isOwner &&
+        !(GlobalConfig.settingsResp?.viewUser ?? false)) {
+      final onMic = room.userMicPosition(me.id.toInt()) >= 0;
+      if (!onMic) return;
+    }
     if (_openingUserProfileSheet) return;
     _openingUserProfileSheet = true;
     try {
-      late User profile;
-      if (preview != null) {
-        profile = preview;
-      } else {
-        profile = User()
-          ..id = Int64(int.tryParse(id) ?? 0)
-          ..nickname = name.trim().isEmpty ? 'User' : name.trim()
-          ..avatar = avatar.trim();
-        try {
-          final res = await ChimoApis.user.profileByUid(id);
-          if (res.ok && res.data != null) {
-            profile = res.data!.user;
-            final apiAvatar = profile.avatar.trim();
-            final seedAvatar = avatar.trim();
-            if (apiAvatar.isEmpty && seedAvatar.isNotEmpty) {
-              profile = profile.deepCopy()..avatar = seedAvatar;
-            }
-            final seedName = name.trim();
-            if (profile.nickname.trim().isEmpty && seedName.isNotEmpty) {
-              profile = profile.deepCopy()..nickname = seedName;
-            }
-          }
-        } catch (_) {}
+      final seed = preview ?? UserProfileSheetLogic.seedUser(uid: id, name: name, avatar: avatar);
+      if (Get.isRegistered<UserProfileSheetLogic>()) {
+        Get.delete<UserProfileSheetLogic>(force: true);
       }
-      if (Get.isRegistered<ChatUserProfileSheetLogic>()) {
-        Get.delete<ChatUserProfileSheetLogic>(force: true);
-      }
-      Get.put(ChatUserProfileSheetLogic(profile));
-      await ChatUserProfileSheet.show(profile: profile);
+      Get.put(
+        UserProfileSheetLogic(
+          seed,
+          fetchProfile: preview == null,
+          seedName: name,
+          seedAvatar: avatar,
+        ),
+      );
+      await UserProfileSheet.show(profile: seed);
     } finally {
-      if (Get.isRegistered<ChatUserProfileSheetLogic>()) {
-        Get.delete<ChatUserProfileSheetLogic>(force: true);
+      if (Get.isRegistered<UserProfileSheetLogic>()) {
+        Get.delete<UserProfileSheetLogic>(force: true);
       }
       _openingUserProfileSheet = false;
     }
@@ -249,12 +253,39 @@ abstract class AppJumper {
     await Get.to(() => GiftWallPage(targetId: uid));
   }
 
+  /// 礼物墙卡片详情。对齐 joyride `GWCardInfoPage` / scheme `gift_card_page`。
+  static Future<void> toGiftWallCard({required int uid, required int cardId}) async {
+    if (!_requireAuth()) return;
+    if (uid <= 0 || cardId <= 0) return;
+    await Get.to(() => GiftWallCardDetailPage(targetId: uid, cardId: cardId));
+  }
+
   /// 我的荣誉。对齐 joyride `MineHonorPage`；[uid] 缺省为自己。
   static Future<void> toMyHonor({int? uid}) async {
     if (!_requireAuth()) return;
     final target = uid ?? SessionInfo.uid;
     if (target <= 0) return;
     await Get.to(() => MyHonorPage(targetUid: target));
+  }
+
+  /// 我的装扮（My Frame）。对齐 joyride `MineDressPage`。
+  static Future<void> toMyFrame({int initIndex = -1}) async {
+    if (!_requireAuth()) return;
+    await Get.to(() => MyFramePage(initIndex: initIndex));
+  }
+
+  /// EchoHall。对齐 joyride `EchoHallPage`；[uid] 缺省为自己。
+  static Future<void> toEchoHall({int? uid}) async {
+    if (!_requireAuth()) return;
+    final target = uid ?? SessionInfo.uid;
+    if (target <= 0) return;
+    await Get.to(() => EchoHallPage(targetUid: target));
+  }
+
+  /// My Agent。艺人视角看经纪人与合同期内送礼；对齐 `/artist/getAgentInfo`。
+  static Future<void> toMyAgent() async {
+    if (!_requireAuth()) return;
+    await Get.to(() => const MyAgentPage());
   }
 
   /// 通讯录。[initialTab] 是好友页 tabs 下标，0 好友、1 关注、2 粉丝。
@@ -278,16 +309,16 @@ abstract class AppJumper {
     await Get.to(() => const SettingsPage());
   }
 
-  /// 编辑资料；改动后回传新的 [User]（没改 / 直接返回则是 `null`）。
-  static Future toEditProfile({User? profile}) async {
+  /// 编辑资料；页内自行拉资料。改动后回传新的 [User]（没改 / 直接返回则是 `null`）。
+  static Future toEditProfile({bool fromOnboarding = false}) async {
     if (!_requireAuth()) return;
-    return Get.to(() => EditProfilePage(profile: profile));
+    return Get.to(() => EditProfilePage(fromOnboarding: fromOnboarding));
   }
 
-  /// 个人主页（自己的名片）。
+  /// 个人主页（自己）。与 [toProfile] 共用 [UserProfilePage]，对齐 oumi。
   static Future<User?> toPersonalProfile({required User profile}) async {
     if (!_requireAuth()) return null;
-    return await Get.to(() => PersonalProfilePage(profile: profile));
+    return await Get.to(() => UserProfilePage(seed: profile));
   }
 
   static Future toVisits() async {
@@ -325,7 +356,7 @@ abstract class AppJumper {
   /// 个性签名。接口成功后才返回结果，直接返回是 `null`。
   static Future toEditSignature({String initialText = ''}) async {
     if (!_requireAuth()) return;
-    return Get.to(() => PersonalSignaturePage(initialText: initialText));
+    return Get.to(() => UserSignaturePage(initialText: initialText));
   }
 
   /// 昵称；确认后回传新昵称。
@@ -337,13 +368,25 @@ abstract class AppJumper {
   /// 语音签名；确认后回传录音路径与时长。
   static Future toEditVoiceNote() async {
     if (!_requireAuth()) return;
-    return Get.to(() => const VoiceNotePage());
+    return VoiceNoteSheet.show();
   }
 
   /// 交友标签；回传选中的标签名（页面自己已经存过一次，调用方通常只是刷新）。
   static Future toEditTags({List<String> initialSelected = const []}) async {
     if (!_requireAuth()) return;
     return Get.to(() => MyTagsPage(initialSelected: initialSelected));
+  }
+
+  /// Reveal Card 编辑。对齐 joyride `UploadSecretCardPage`。
+  static Future toEditRevealCard() async {
+    if (!_requireAuth()) return;
+    return Get.to(() => const EditRevealCardPage());
+  }
+
+  /// Reveal Card 预览。
+  static Future toRevealCardPreview(HeartLinkCard data) async {
+    if (!_requireAuth()) return;
+    return Get.to(() => RevealCardPreviewPage(data: data));
   }
 
   /// 身高 / 体重数值输入；回传新数值。
@@ -384,7 +427,7 @@ abstract class AppJumper {
 
   /// Banner / 外部入口：解析后直接跳，不等结果。
   static void openLink(String raw) {
-    unawaited(handleScheme(raw));
+    handleScheme(raw);
   }
 
   /// 解析 banner / 深链（`chimo://`、`yqdf://`）以及 http(s)。
@@ -460,6 +503,17 @@ abstract class AppJumper {
         return true;
       case 'go_message_page':
         return true;
+      case 'gift_wall_page':
+        final uid = int.tryParse(params['uid']?.trim() ?? '') ?? 0;
+        if (uid <= 0) return false;
+        await toGiftWall(uid);
+        return true;
+      case 'gift_card_page':
+        final uid = int.tryParse(params['uid']?.trim() ?? '') ?? 0;
+        final cardId = int.tryParse(params['cardId']?.trim() ?? '') ?? 0;
+        if (uid <= 0 || cardId <= 0) return false;
+        await toGiftWallCard(uid: uid, cardId: cardId);
+        return true;
       default:
         return false;
     }
@@ -482,7 +536,7 @@ abstract class AppJumper {
     await MoreRoomsDrawer.show();
   }
 
-  static Future<void> toRoom(int rid) async {
+  static Future<void> toRoom(int rid, {JoinSource? joinSource}) async {
     if (!_requireAuth() || rid <= 0) return;
     final service = RoomService.findOrNull();
     final showing =
@@ -494,7 +548,7 @@ abstract class AppJumper {
       if (showing) return;
     }
     if (Get.isRegistered<RoomLogic>() && !showing) RoomLogic.release();
-    await Get.to(() => RoomPage(rid: rid));
+    await Get.to(() => RoomPage(rid: rid, joinSource: joinSource));
   }
 
   static Future toDebug() async => await Get.to(() => const DebugPage());
@@ -506,6 +560,12 @@ abstract class AppJumper {
   static Future toWallet() async {
     if (!_requireAuth()) return;
     await Get.to(() => const WalletPage());
+  }
+
+  /// 金币不足充值半屏。对齐 oumi `RechargeDialog.showWithBottomSheet`。
+  static Future showRechargeSheet({int? price, int? diffCoin, VoidCallback? onSuccess}) async {
+    if (!_requireAuth()) return;
+    await wallet_recharge.showRechargeSheet(price: price, diffCoin: diffCoin, onSuccess: onSuccess);
   }
 
   static Future toCoinsDetails() async {
@@ -564,7 +624,7 @@ abstract class AppJumper {
   }
 
   /// 消息搜索；[scopeConversation] 非空表示只搜这一个会话。
-  static Future toImSearch({ChatConversation? scopeConversation}) async {
+  static Future toImSearch({ConversationModel? scopeConversation}) async {
     if (!_requireAuth()) return;
     await Get.to(() => ImSearchPage(scopeConversation: scopeConversation));
   }
@@ -636,7 +696,7 @@ abstract class AppJumper {
   /// 语义（代码主动退、绕过 `PopScope`）。三个 `PopScope(canPop: false)` 的
   /// 页面正是靠「手势被拦住 → 代码带结果退」这个组合工作的。
   static void maybeBack() {
-    unawaited(Get.key.currentState?.maybePop() ?? Future.value());
+    Get.key.currentState?.maybePop();
   }
 
   // -------------------------------------------------------------------- 私有
@@ -662,12 +722,12 @@ abstract class AppJumper {
   /// 都没有就只按 id 拼一个**空骨架** —— 页面 `initState` 会按 id 拉对端资料
   /// 并把标题换成真实昵称（`DmChatLogic.loadFromApi`），
   /// 所以深链进来看到的是「空 → 真实」，不是伪造的「Chat」。
-  static ChatConversation _chatSeed(String id, ChatConversation? preview) {
+  static ConversationModel _chatSeed(String id, ConversationModel? preview) {
     if (preview != null) return preview;
     for (final c in Get.find<ConversationListLogic>().conversations) {
       if (c.id == id) return c;
     }
-    return ChatConversation(
+    return ConversationModel(
       id: id,
       title: '',
       avatarAsset: AppAssets.avatarPlace,

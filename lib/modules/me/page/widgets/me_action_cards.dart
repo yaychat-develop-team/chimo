@@ -24,7 +24,6 @@ class MeActionCards extends StatelessWidget {
   final VoidCallback? onLevelTap;
   final VoidCallback? onPeerageTap;
 
-  static const double cardHeight = 72;
   static const _gold = Color(0xFFFFD54A);
   static const _peerageSub = Color(0xFFD7C4FF);
 
@@ -33,6 +32,7 @@ class MeActionCards extends StatelessWidget {
     return SizedBox(
       height: 62.w,
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
             child: _Card(
@@ -148,15 +148,12 @@ class _Card extends StatelessWidget {
       onTap: onTap,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(14),
-        child: SizedBox(
-          height: MeActionCards.cardHeight,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Chimo.image(asset, fit: BoxFit.cover),
-              Padding(padding: const EdgeInsets.fromLTRB(10, 8, 8, 8), child: child),
-            ],
-          ),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Chimo.image(asset, fit: BoxFit.cover),
+            Padding(padding: const EdgeInsets.fromLTRB(10, 8, 8, 8), child: child),
+          ],
         ),
       ),
     );

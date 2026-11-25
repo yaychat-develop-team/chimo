@@ -148,7 +148,14 @@ class AppDialog extends StatelessWidget {
             if (contentWidget != null)
               Padding(padding: const EdgeInsets.only(top: 14), child: contentWidget),
             const SizedBox(height: 22),
-            if (buttons == DialogLoyoutStyle.confirmOnly) _confirmButton(),
+            if (buttons == DialogLoyoutStyle.confirmOnly)
+              _GradientButton(
+                label: confirmLabel,
+                onTap: () {
+                  if (autoPop) AppJumper.back(result: true);
+                  onConfirm?.call();
+                },
+              ),
             if (buttons == DialogLoyoutStyle.horizontal)
               Row(
                 children: [
@@ -193,6 +200,34 @@ class AppDialog extends StatelessWidget {
   }
 }
 
+class _GradientButton extends StatelessWidget {
+  const _GradientButton({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(22),
+      child: Container(
+        height: 44,
+        width: double.infinity,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(22),
+          gradient: AppColors.primaryGradient,
+        ),
+        child: Text(
+          label,
+          style: TextStyle(color: AppColors.black1F2518, fontSize: 15, fontWeight: FontWeight.w600),
+        ),
+      ),
+    );
+  }
+}
+
 class _DialogButton extends StatelessWidget {
   const _DialogButton({
     required this.label,
@@ -208,21 +243,17 @@ class _DialogButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: background,
+    return InkWell(
+      onTap: onTap,
       borderRadius: BorderRadius.circular(22),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(22),
-        child: SizedBox(
-          height: 44,
-          width: double.infinity,
-          child: Center(
-            child: Text(
-              label,
-              style: TextStyle(color: foreground, fontSize: 15, fontWeight: FontWeight.w600),
-            ),
-          ),
+      child: Container(
+        height: 44,
+        width: double.infinity,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(borderRadius: BorderRadius.circular(22), color: background),
+        child: Text(
+          label,
+          style: TextStyle(color: foreground, fontSize: 15, fontWeight: FontWeight.w600),
         ),
       ),
     );

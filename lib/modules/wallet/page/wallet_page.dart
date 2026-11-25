@@ -1,5 +1,5 @@
-import 'dart:async';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -55,10 +55,9 @@ class _WalletPageState extends State<WalletPage> {
           children: [
             Expanded(
               child: AppPullRefresh(
-                style: AppPullRefreshStyle.bar,
                 onRefresh: logic.load,
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                slivers: [
+                topSlivers: [
                   SliverToBoxAdapter(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -80,6 +79,15 @@ class _WalletPageState extends State<WalletPage> {
                       ],
                     ),
                   ),
+                ],
+                slivers: [
+                  if (options.isEmpty)
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: Center(
+                        child: CupertinoActivityIndicator(color: AppColors.green00D68F),
+                      ),
+                    ),
                   SliverGrid(
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
@@ -103,7 +111,7 @@ class _WalletPageState extends State<WalletPage> {
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               child: Chimo.s.primaryButton(
                 label: selected == null ? 'Top Up' : 'Top Up ${chargePriceLabel(selected)} Now',
-                onTap: () => unawaited(logic.topUp()),
+                onTap: () => logic.topUp(),
               ),
             ),
           ],

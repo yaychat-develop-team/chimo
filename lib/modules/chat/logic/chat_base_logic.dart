@@ -156,7 +156,7 @@ abstract class ChatBaseLogic extends GetxController {
   /// 这个会话在环信那边算不算群聊。
   ///
   /// ⚠️ **私聊侧不是常量 false**：会话列表里的群会话也能落到私聊详情页
-  /// （`ChatConversation.badge == group`），撤回 / 删除要按它原本的会话类型走。
+  /// （`ConversationModel.badge == group`），撤回 / 删除要按它原本的会话类型走。
   bool get isGroupConversation;
 
   /// 撤回一条自己发的消息：环信撤回 → 本地移除 → 给对面发一条撤回提示。
@@ -168,9 +168,7 @@ abstract class ChatBaseLogic extends GetxController {
     final ok = await ImService.recallMessage(id);
     if (!ok) return false;
     removeByMsgId(id);
-    unawaited(
-      ImService.sendRecallNotice(conversationId: imConversationId, isGroup: isGroupConversation),
-    );
+    ImService.sendRecallNotice(conversationId: imConversationId, isGroup: isGroupConversation);
     return true;
   }
 

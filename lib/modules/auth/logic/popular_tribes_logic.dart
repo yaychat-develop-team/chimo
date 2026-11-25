@@ -31,7 +31,6 @@ class PopularTribesLogic extends GetxController {
       if (typeList.isEmpty && (!res.ok || (res.data?.isEmpty ?? true))) {
         res = await ChimoApis.group.list(pageNum: 1, pageSize: 50);
       }
-      if (isClosed) return;
       if (!res.ok) {
         groups.clear();
         error.value = res.message.isEmpty ? 'Failed to load tribes' : res.message;
@@ -40,11 +39,10 @@ class PopularTribesLogic extends GetxController {
       groups.assignAll(res.data ?? const []);
       error.value = null;
     } catch (e) {
-      if (isClosed) return;
       groups.clear();
       error.value = '$e';
     } finally {
-      if (!isClosed) loading.value = false;
+      loading.value = false;
     }
   }
 
@@ -72,7 +70,7 @@ class PopularTribesLogic extends GetxController {
     } catch (error) {
       AppToast.info('Failed: $error');
     } finally {
-      if (!isClosed) submitting.value = false;
+      submitting.value = false;
     }
   }
 }

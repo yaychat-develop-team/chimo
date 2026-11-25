@@ -1,11 +1,10 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../../../app/app_jumper.dart';
 import '../../../common/constants/app_assets.dart';
+import '../../../common/models/server_client/rtc.pb.dart';
 import '../../../common/theme/app_colors.dart';
 import '../../../common/theme/app_input.dart';
 import '../../../common/theme/app_text.dart';
@@ -27,6 +26,7 @@ class HomeSearchPage extends GetView<UserSearchLogic> {
         // 提交后显示结果 / 空态 / 加载；清空输入回到 History。
         final showResults = controller.hasSearched.value;
         final result = controller.result.value;
+        final room = controller.room.value;
         final editingHistory = controller.editingHistory.value;
         final history = controller.history.toList();
 
@@ -34,27 +34,10 @@ class HomeSearchPage extends GetView<UserSearchLogic> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (showResults)
-              Expanded(
-                child: controller.searching.value
-                    ? const Center(
-                        child: SizedBox(
-                          width: 28,
-                          height: 28,
-                          child: CircularProgressIndicator(strokeWidth: 2.4),
-                        ),
-                      )
-                    : result == null
-                    ? const _SearchEmptyState()
-                    : _UsersResult(
-                        user: result,
-                        onFollow: () => unawaited(controller.follow(result)),
-                        onChat: () => controller.openChat(result),
-                        onProfile: () => controller.openProfile(result),
-                      ),
-              )
+              Expanded(child: _results(result, room))
             else ...[
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+              Container(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                 child: Row(
                   children: [
                     const Expanded(
@@ -137,9 +120,35 @@ class HomeSearchPage extends GetView<UserSearchLogic> {
     );
   }
 
+  Widget _results(SearchUser? user, Channel? room) {
+    if (controller.searching.value) {
+      return const Center(
+        child: SizedBox(width: 28, height: 28, child: CircularProgressIndicator(strokeWidth: 2.4)),
+      );
+    }
+    if (user == null && room == null) return const _SearchEmptyState();
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
+      children: [
+        if (user != null)
+          _UsersResult(
+            user: user,
+            onFollow: () => controller.follow(user),
+            onChat: () => controller.openChat(user),
+            onProfile: () => controller.openProfile(user),
+          ),
+        if (room != null) ...[
+          if (user != null) const SizedBox(height: 28),
+          _RoomResult(room: room, onJoin: () => controller.openRoom(room)),
+        ],
+      ],
+    );
+  }
+
   Widget _buildAppBar() {
     return SafeArea(
-      child: Padding(
+      bottom: false,
+      child: Container(
         padding: const EdgeInsets.fromLTRB(16, 8, 8, 0),
         child: Row(
           children: [
@@ -148,7 +157,7 @@ class HomeSearchPage extends GetView<UserSearchLogic> {
                 height: 40,
                 padding: const EdgeInsets.symmetric(horizontal: 14),
                 decoration: BoxDecoration(
-                  color: AppColors.black2A2A2A,
+                  color: AppColors.white10,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
@@ -174,7 +183,7 @@ class HomeSearchPage extends GetView<UserSearchLogic> {
                           FilteringTextInputFormatter.digitsOnly,
                           LengthLimitingTextInputFormatter(64),
                         ],
-                        onSubmitted: (value) => unawaited(controller.submit(value)),
+                        onSubmitted: (value) => controller.submit(value),
                         decoration: const AppInputDecoration(
                           isDense: true,
                           hintText: 'Search contacts or mess...',
@@ -182,19 +191,24 @@ class HomeSearchPage extends GetView<UserSearchLogic> {
                         ),
                       ),
                     ),
-                    Obx(() {
-                      if (!controller.hasText.value) {
-                        return const SizedBox.shrink();
-                      }
-                      return GestureDetector(
-                        onTap: controller.clearInput,
-                        behavior: HitTestBehavior.opaque,
-                        child: const Padding(
-                          padding: EdgeInsets.only(left: 6),
-                          child: Icon(Icons.cancel_rounded, size: 18, color: AppColors.gray6E6E6E),
-                        ),
-                      );
-                    }),
+                    ValueListenableBuilder<TextEditingValue>(
+                      valueListenable: controller.input,
+                      builder: (context, value, _) {
+                        if (value.text.isEmpty) return const SizedBox.shrink();
+                        return GestureDetector(
+                          onTap: controller.clearInput,
+                          behavior: HitTestBehavior.opaque,
+                          child: const Padding(
+                            padding: EdgeInsets.only(left: 6),
+                            child: Icon(
+                              Icons.cancel_rounded,
+                              size: 18,
+                              color: AppColors.gray6E6E6E,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
                   ],
                 ),
               ),
@@ -259,8 +273,8 @@ class _UsersResult extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const Text(
           'Users',
@@ -330,6 +344,105 @@ class _UsersResult extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+class _RoomResult extends StatelessWidget {
+  const _RoomResult({required this.room, required this.onJoin});
+
+  final Channel room;
+  final VoidCallback onJoin;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = room.title.trim().isEmpty ? 'Room' : room.title.trim();
+    final theme = room.theme.trim();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          'Rooms',
+          style: TextStyle(color: AppColors.white, fontSize: 17, fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            GestureDetector(
+              onTap: onJoin,
+              behavior: HitTestBehavior.opaque,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Chimo.image(
+                  room.icon,
+                  fallbackAsset: AppAssets.avatarPlace,
+                  width: 52,
+                  height: 52,
+                  fit: BoxFit.cover,
+                  fadeIn: Duration.zero,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: GestureDetector(
+                onTap: onJoin,
+                behavior: HitTestBehavior.opaque,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.title),
+                    const SizedBox(height: 6),
+                    Text(
+                      theme.isEmpty ? 'ID:${room.channelId}' : theme,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.gray9A9A9A,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            _JoinAction(onTap: onJoin),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _JoinAction extends StatelessWidget {
+  const _JoinAction({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Ink(
+          height: 32,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: AppColors.green1CFF8A,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: const Center(
+            child: Text(
+              'Join',
+              style: TextStyle(color: Colors.black, fontSize: 14, fontWeight: FontWeight.w800),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

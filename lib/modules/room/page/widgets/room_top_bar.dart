@@ -4,13 +4,13 @@ import 'package:get/get.dart';
 
 import '../../../../common/constants/app_assets.dart';
 import '../../../../common/theme/app_colors.dart';
-import '../../model/room_format.dart';
+import '../../../../common/utils/chimo.dart';
+import '../../../../common/utils/text_fmt.dart';
 import '../../service/room_service.dart';
-import 'package:chimo/common/utils/chimo.dart';
 
-/// 房间顶栏。名称条、在线数、缩小，以及下方公告 / 热度 / 更多房间，都是同一套半透明胶囊。
+/// 房间顶栏。名称条、热度、缩小，以及下方公告 / 更多房间，都是同一套半透明胶囊。
 ///
-/// 头像 / 人数 / 热度等会随 socket 变，这里自己 [Obx]，不依赖外层快照传值。
+/// 头像 / 热度等会随 socket 变，这里自己 [Obx]，不依赖外层快照传值。
 class RoomTopBar extends StatelessWidget {
   const RoomTopBar({
     super.key,
@@ -32,11 +32,11 @@ class RoomTopBar extends StatelessWidget {
   /// giftRank 头像 → Top Givers。
   final VoidCallback onRank;
 
-  /// 在线人数 → Room Members。
+  /// 热度胶囊 → Room Members（保留原人数位点击入口）。
   final VoidCallback onAudience;
   final VoidCallback onScale;
 
-  /// 插在「Room Bulletin」与热度之间（如 CP Heart List）。
+  /// 插在「Room Bulletin」与 More Rooms 之间（如 CP Heart List）。
   final List<Widget> extraPills;
 
   static const double _chip = 22;
@@ -50,7 +50,6 @@ class RoomTopBar extends StatelessWidget {
         final title = service?.title.value ?? '';
         final cover = service?.cover.value ?? '';
         final saved = service?.saved.value ?? false;
-        final online = service?.online.value ?? 0;
         final hot = service?.hot.value ?? 0;
         // 读 length 保证 RxList 变更被订阅；再拷一份给 UI。
         final avatarCount = service?.audience.length ?? 0;
@@ -65,7 +64,7 @@ class RoomTopBar extends StatelessWidget {
                 const SizedBox(width: 8),
                 _faces(avatars),
                 const SizedBox(width: 6),
-                _count(online),
+                _hot(hot),
                 const SizedBox(width: 6),
                 _scale(),
               ],
@@ -88,24 +87,6 @@ class RoomTopBar extends StatelessWidget {
                   ),
                 ),
                 ..._spacedExtraPills(),
-                const SizedBox(width: 8),
-                _pill(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Chimo.image(AppAssets.roomFire, width: 14, height: 14),
-                      const SizedBox(width: 4),
-                      Text(
-                        roomCount(hot),
-                        style: const TextStyle(
-                          color: AppColors.white,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
                 const Spacer(),
                 _pill(
                   onTap: onMoreRooms,
@@ -296,12 +277,24 @@ class RoomTopBar extends StatelessWidget {
     }
   }
 
-  Widget _count(int online) {
+  /// 热度值放在原在线人数位置。
+  Widget _hot(int hot) {
     return _pill(
       onTap: onAudience,
-      child: Text(
-        '$online',
-        style: const TextStyle(color: AppColors.white, fontSize: 13, fontWeight: FontWeight.w600),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Chimo.image(AppAssets.roomFire, width: 14, height: 14),
+          const SizedBox(width: 4),
+          Text(
+            TextFmt.roomCount(hot),
+            style: const TextStyle(
+              color: AppColors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -339,7 +332,7 @@ class RoomTopBar extends StatelessWidget {
     );
   }
 
-  /// Bulletin 与热度之间的额外胶囊，前面各带 8 间距。
+  /// Bulletin 与 More Rooms 之间的额外胶囊，前面各带 8 间距。
   List<Widget> _spacedExtraPills() {
     final widgets = <Widget>[];
     for (final pill in extraPills) {

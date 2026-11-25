@@ -9,6 +9,7 @@ import '../../../../../common/models/server_client/auction.pb.dart';
 import '../../../../../common/utils/app_log.dart';
 import '../../../../../common/utils/app_toast.dart';
 import '../../../../../common/utils/cache_util.dart';
+import '../../../../../common/utils/time_fmt.dart';
 import '../../../logic/mic_logic.dart';
 import '../../../model/mic_seat.dart';
 import '../../../service/room_service.dart';
@@ -104,10 +105,7 @@ class AuctionLogic extends GetxController {
       final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
       remain = end - now;
     }
-    remain = math.max(remain, 0);
-    final m = remain ~/ 60;
-    final s = remain % 60;
-    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+    return TimeFmt.duration(math.max(remain, 0));
   }
 
   @override

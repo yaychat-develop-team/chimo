@@ -15,6 +15,7 @@ class RoomEffectLogic extends GetxController {
   final lyric = ''.obs;
   final banner = Rxn<RoomGiftFx>();
   final join = Rxn<RoomJoinFx>();
+  final entranceBanner = Rxn<RoomEntranceBannerFx>();
 
   /// 全屏礼物队列（含麦位飞入飞出）。对齐 joyride GiftDisplay。
   final playingGifts = <RoomGiftDisplay>[].obs;
@@ -24,6 +25,7 @@ class RoomEffectLogic extends GetxController {
 
   final List<RoomGiftFx> _gifts = [];
   final List<RoomJoinFx> _joins = [];
+  final List<RoomEntranceBannerFx> _entranceBanners = [];
   final List<RoomGiftDisplay> _giftBuffer = [];
   int _seq = 0;
   static const _maxPlaying = 1;
@@ -52,10 +54,12 @@ class RoomEffectLogic extends GetxController {
   void clearPlayback() {
     _gifts.clear();
     _joins.clear();
+    _entranceBanners.clear();
     _giftBuffer.clear();
     _recentFly.clear();
     banner.value = null;
     join.value = null;
+    entranceBanner.value = null;
     playingGifts.clear();
     flyEpoch.value++;
   }
@@ -74,6 +78,16 @@ class RoomEffectLogic extends GetxController {
     join.value = null;
     if (_joins.isNotEmpty && _joins.first.id == playing.id) _joins.removeAt(0);
     _advanceJoin();
+  }
+
+  void finishEntranceBanner() {
+    final playing = entranceBanner.value;
+    if (playing == null) return;
+    entranceBanner.value = null;
+    if (_entranceBanners.isNotEmpty && _entranceBanners.first.id == playing.id) {
+      _entranceBanners.removeAt(0);
+    }
+    _advanceEntranceBanner();
   }
 
   void finishGiftDisplay(RoomGiftDisplay config) {
@@ -151,6 +165,18 @@ class RoomEffectLogic extends GetxController {
         carName: _carName(user),
         carImage: _carImage(user),
         level: _carLevel(user),
+      ));
+      return;
+    }
+    if (message.data.scene == Scene.ENTRANCE_BANNER) {
+      final effect = message.data.content.unpackInto(RoomEffect());
+      final url = effect.url.trim();
+      if (url.isEmpty) return;
+      _enqueueEntranceBanner(RoomEntranceBannerFx(
+        id: 'entrance-${_seq++}',
+        bgUrl: url,
+        avatars: effect.imgList.toList(),
+        names: effect.textList.toList(),
       ));
       return;
     }
@@ -327,6 +353,11 @@ class RoomEffectLogic extends GetxController {
     _advanceJoin();
   }
 
+  void _enqueueEntranceBanner(RoomEntranceBannerFx fx) {
+    _entranceBanners.add(fx);
+    _advanceEntranceBanner();
+  }
+
   void _enqueueGiftDisplay(RoomGiftDisplay config) {
     if (playingGifts.length < _maxPlaying) {
       playingGifts.add(config);
@@ -357,6 +388,11 @@ class RoomEffectLogic extends GetxController {
   void _advanceJoin() {
     if (join.value != null || _joins.isEmpty) return;
     join.value = _joins.first;
+  }
+
+  void _advanceEntranceBanner() {
+    if (entranceBanner.value != null || _entranceBanners.isEmpty) return;
+    entranceBanner.value = _entranceBanners.first;
   }
 }
 
@@ -409,6 +445,7 @@ class _EffectMsgHandler implements RoomMsgHandler {
   bool supports(Message message) {
     final scene = message.data.scene;
     return scene == Scene.USER_JOIN ||
+        scene == Scene.ENTRANCE_BANNER ||
         scene == Scene.REAL_TIME_RANK_CHANGE ||
         scene == Scene.GIFT_VALUE_CHANGE ||
         scene == Scene.SEND_GIFT;

@@ -3,7 +3,6 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:protobuf/protobuf.dart';
-import 'package:protobuf/well_known_types/google/protobuf/any.pb.dart';
 
 import '../../../common/models/any_parser.dart';
 import '../../../common/models/server_client/base.pb.dart';
@@ -76,19 +75,18 @@ extension ResponseExt on Response {
       );
     }
 
-    // 优先尝试从 Protobuf Any 解析目标类型 T
+    // 优先从 Protobuf Any 解析目标类型 T。
+    // value 为空仍是合法空 message（如 queryApply 未填资料时只有 @type），
+    // 不能因 isEmpty 跳过，否则会误报 data type is unmatched。
     if (hasProtoData) {
-      final Any any = envelope.baseRsp!.data;
-      if (any.value.isNotEmpty) {
-        final parsed = AnyParser.parse(any);
-        if (parsed is T) {
-          return ApiResult.ok(
-            parsed as T,
-            envelope.message,
-            envelope.code,
-            sysTimeStr,
-          );
-        }
+      final parsed = AnyParser.parse(envelope.baseRsp!.data);
+      if (parsed is T) {
+        return ApiResult.ok(
+          parsed as T,
+          envelope.message,
+          envelope.code,
+          sysTimeStr,
+        );
       }
     }
 

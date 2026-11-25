@@ -81,7 +81,9 @@ class RoomMessageParser {
       sender: sender?.nickname ?? '',
       senderUid: '${sender?.id.toInt() ?? 0}',
       text: '',
-      showSender: _visible(sender) && chat.style != ChatStyle.JoinRoom,
+      showSender: _visible(sender) &&
+          chat.style != ChatStyle.JoinRoom &&
+          chat.style != ChatStyle.ROOM_TURNTABLE_CHAT,
       avatar: profile.avatar,
       avatarFrame: profile.frame,
       carIcon: profile.carIcon,
@@ -152,6 +154,21 @@ class RoomMessageParser {
           cover: card.cardImageUrl,
           link: card.jumpLink,
         );
+      case ChatStyle.ROOM_TURNTABLE_CHAT:
+        final result = chat.turntableResult;
+        return RoomMessage(
+          id: base.id,
+          sender: base.sender,
+          senderUid: base.senderUid,
+          text: '',
+          type: RoomMessageType.turntable,
+          showSender: false,
+          avatar: base.avatar,
+          avatarFrame: base.avatarFrame,
+          carIcon: base.carIcon,
+          tags: base.tags,
+          turntable: RoomTurntableBody(title: result.title, desc: result.desc),
+        );
       case ChatStyle.NONE:
         return null;
     }
@@ -212,6 +229,7 @@ class RoomMessageParser {
         name: _clip(user?.nickname ?? '', 10),
         gender: user?.gender ?? '',
         age: user?.age ?? 0,
+        gsUid: user?.id.toInt() ?? info.uid.toInt(),
       ),
     );
   }

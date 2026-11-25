@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:fixnum/fixnum.dart';
 
 import '../../../common/models/server_client/commodity.pb.dart';
@@ -17,7 +18,31 @@ class CommodityApi {
     return res.map((data) => data.list.toList());
   }
 
-  /// 从背包赠送。
+  /// 装扮分类 Tab。对齐 joyride `/commodity/tabs`。
+  Future<ApiResult<CommodityTabListResp>> tabs() {
+    return Http.ins.getAndParse<CommodityTabListResp>('/commodity/tabs');
+  }
+
+  /// 某分类下我的装扮列表。对齐 joyride `/commodity/mine/list`。
+  Future<ApiResult<List<CommodityItem>>> mineList({required int typeId}) async {
+    final res = await Http.ins.getAndParse<CommodityListResp>(
+      '/commodity/mine/list',
+      query: {'type_id': '$typeId'},
+    );
+    return res.map((data) => data.list.toList());
+  }
+
+  /// 佩戴。对齐 joyride `/commodity/use`。
+  Future<ApiResult<void>> use(Int64 id) {
+    return Http.ins.getAndParse('/commodity/use', query: {'id': '$id'});
+  }
+
+  /// 取消佩戴。对齐 joyride `/commodity/cancel-use`。
+  Future<ApiResult<void>> cancelUse(Int64 id) {
+    return Http.ins.getAndParse('/commodity/cancel-use', query: {'id': '$id'});
+  }
+
+  /// 从背包赠送。对齐 joyride：请求体走 JSON `bizParam`，响应仍按 protobuf。
   Future<ApiResult<void>> give({
     required List<String> receiverIds,
     required Int64 knapsackId,
@@ -36,6 +61,10 @@ class CommodityApi {
         count: count,
         type: type,
         channel: channel > 0 ? Int64(channel) : null,
+      ),
+      // 覆盖默认 protobuf Content-Type，走拦截器 JSON bizParam 分支。
+      options: Options(
+        headers: {Headers.contentTypeHeader: Headers.jsonContentType},
       ),
     );
   }

@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import '../models/any_parser.dart';
+import '../models/server_client/heart_link.pb.dart';
 import '../utils/app_log.dart';
 import '../utils/json_read.dart';
 import '../utils/type_util.dart';
@@ -14,6 +16,7 @@ abstract final class ImCustomPayload {
   static const String keyKind = '_kind';
 
   static const String kindRoomInvite = 'room_invite';
+  static const String kindHeartLinkInvite = 'heart_link_invite';
 
   /// 从 CUSTOM event + params 解析成可序列化 map；无法识别返回 `null`
   ///（调用方仍可走 generic `msgType: custom` 兜底）。
@@ -29,6 +32,9 @@ abstract final class ImCustomPayload {
         attributes: attributes,
       )?.toMap();
     }
+    if (ImCustomEvents.isHeartLinkInvite(event)) {
+      return ImHeartLinkInvitePayload.tryParse(event: event, params: params)?.toMap();
+    }
     return null;
   }
 
@@ -36,6 +42,76 @@ abstract final class ImCustomPayload {
     if (raw == null || raw.isEmpty) return null;
     if (JsonRead.str(raw, keyKind) != kindRoomInvite) return null;
     return ImRoomInvitePayload.fromMap(raw);
+  }
+
+  static ImHeartLinkInvitePayload? tryHeartLinkInvite(Map<String, dynamic>? raw) {
+    if (raw == null || raw.isEmpty) return null;
+    if (JsonRead.str(raw, keyKind) != kindHeartLinkInvite) return null;
+    return ImHeartLinkInvitePayload.fromMap(raw);
+  }
+}
+
+/// Heart Link IM 邀请卡片（`params.content` = HeartLinkInfo JSON）。
+class ImHeartLinkInvitePayload {
+  const ImHeartLinkInvitePayload({
+    required this.forGs,
+    required this.info,
+  });
+
+  final bool forGs;
+  final HeartLinkInfo info;
+
+  Map<String, dynamic> toMap() => {
+        ImCustomPayload.keyKind: ImCustomPayload.kindHeartLinkInvite,
+        'forGs': forGs,
+        'content': info.toProto3Json(typeRegistry: AnyParser.typeRegistry),
+      };
+
+  static ImHeartLinkInvitePayload? fromMap(Map<String, dynamic> map) {
+    final content = map['content'];
+    if (content is! Map) return null;
+    try {
+      final info = HeartLinkInfo.create()
+        ..mergeFromProto3Json(
+          content,
+          ignoreUnknownFields: true,
+          typeRegistry: AnyParser.typeRegistry,
+        );
+      if (info.rid.toInt() <= 0) return null;
+      return ImHeartLinkInvitePayload(
+        forGs: map['forGs'] == true,
+        info: info,
+      );
+    } catch (error) {
+      AppLog.d('ImHeartLinkInvitePayload fromMap failed', error: error);
+      return null;
+    }
+  }
+
+  static ImHeartLinkInvitePayload? tryParse({
+    required String event,
+    required Map<String, String> params,
+  }) {
+    final raw = (params['content'] ?? '').trim();
+    if (raw.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return null;
+      final info = HeartLinkInfo.create()
+        ..mergeFromProto3Json(
+          decoded,
+          ignoreUnknownFields: true,
+          typeRegistry: AnyParser.typeRegistry,
+        );
+      if (info.rid.toInt() <= 0) return null;
+      return ImHeartLinkInvitePayload(
+        forGs: event == ImCustomEvents.heartLinkInviteGs,
+        info: info,
+      );
+    } catch (error) {
+      AppLog.d('ImHeartLinkInvitePayload parse failed', error: error);
+      return null;
+    }
   }
 }
 

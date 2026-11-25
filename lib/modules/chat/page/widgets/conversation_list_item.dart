@@ -6,7 +6,8 @@ import 'package:flutter_slidable/flutter_slidable.dart';
 import '../../../../common/constants/app_assets.dart';
 import '../../../../common/theme/app_colors.dart';
 import '../../../../common/theme/app_emoji.dart';
-import '../../model/chat_conversation.dart';
+import '../../../room/types/romance/widgets/romance_level_tag.dart';
+import '../../model/conversation_model.dart';
 
 /// 列表行：胶囊卡片、徽章、在线点、未读；左滑置顶/删除。
 /// 规格来自 Figma 39:428 — 高 72，圆角 36，头像 54。
@@ -22,7 +23,7 @@ class ConversationListItem extends StatelessWidget {
     this.onDelete,
   });
 
-  final ChatConversation conversation;
+  final ConversationModel conversation;
 
   final VoidCallback? onTap;
 
@@ -125,6 +126,7 @@ class ConversationListItem extends StatelessWidget {
                                       solidColor: conversation.titleColor,
                                     ),
                                   ),
+                                  RomanceLevelTag(conversation.coupleRelationLevel),
                                   const SizedBox(width: 4),
                                   _TitleBadge(type: conversation.badge),
                                 ],

@@ -2,6 +2,10 @@ import 'package:dio/dio.dart';
 import 'package:fixnum/fixnum.dart';
 import 'package:protobuf/protobuf.dart';
 
+import '../../../common/models/server_client/activity_share.pb.dart';
+import '../../../common/models/server_client/ban.pb.dart';
+import '../../../common/models/server_client/knight.pb.dart';
+import '../../../common/models/server_client/mass.pb.dart';
 import '../../../common/models/server_client/message.pb.dart';
 import '../../../common/models/server_client/message_api.pb.dart';
 import '../../../common/models/server_client/mic_tool.pb.dart';
@@ -47,6 +51,7 @@ class RoomApi {
     required int rid,
     String password = '',
     int reconnect = 0,
+    JoinSource? joinSource,
   }) async {
     final result = await Http.ins.postAndParse<JoinChannelRsp>(
       '/rtc/join-channel',
@@ -54,6 +59,7 @@ class RoomApi {
         channelId: Int64(rid),
         password: password,
         reconnect: reconnect,
+        joinSource: joinSource,
       ),
       options: _jsonBody,
     );
@@ -116,6 +122,18 @@ class RoomApi {
         channel: Int64(rid),
         grantUpMic: ChannelGrantUpMic(uid: Int64(uid), position: position),
       ),
+    );
+  }
+
+  /// 用户处理上麦邀请。对齐 joyride `RomanceApi.handleUpMic` → `POST /mass/handle/up_mic`。
+  Future<ApiResult<void>> handleUpMic({
+    required int result,
+    ChannelGrantUpMic? grantUpMic,
+  }) {
+    return Http.ins.postAndParse(
+      '/mass/handle/up_mic',
+      data: HandleUpMicReq(result: result, grantUpMic: grantUpMic),
+      options: _jsonBody,
     );
   }
 
@@ -371,11 +389,12 @@ class RoomApi {
     );
   }
 
-  /// 麦上表情。对齐 joyride `RtcApi.sendMicImage` → `POST /rtc/mic_img/show`。
+  /// 麦上表情 / 数字卡。对齐 joyride `RtcApi.sendMicImage` → `POST /rtc/mic_img/show`。
+  /// type=2 数字卡可不传 url。
   Future<ApiResult<void>> sendMicImage({
     required int rid,
     required int uid,
-    required String url,
+    String url = '',
     int type = 3,
   }) {
     return Http.ins.postAndParse(
@@ -384,7 +403,69 @@ class RoomApi {
         rid: Int64(rid),
         uid: Int64(uid),
         type: type,
-        url: url,
+        url: url.isEmpty ? null : url,
+      ),
+      options: _jsonBody,
+    );
+  }
+
+  /// 超管封禁用户 / 房间。对齐 joyride `RtcApi.banUser` → `POST /ban`。
+  Future<ApiResult<void>> ban(BanReq req) {
+    return Http.ins.postAndParse('/ban', data: req, options: _jsonBody);
+  }
+
+  /// 超管关房（带原因）。对齐 joyride `RtcApi.closeRoom` → `POST /super_admin/close-room`。
+  Future<ApiResult<void>> superCloseRoom(CloseRoomReq req) {
+    return Http.ins.postAndParse(
+      '/super_admin/close-room',
+      data: req,
+      options: _jsonBody,
+    );
+  }
+
+  /// 爵位加热房间。对齐 joyride `RtcApi.addHotValue` → `POST /knight/add_room_hot`。
+  Future<ApiResult<void>> addHotValue(int rid) {
+    return Http.ins.postAndParse(
+      '/knight/add_room_hot',
+      data: KnightAddHotReq(roomId: Int64(rid)),
+      options: _jsonBody,
+    );
+  }
+
+  /// 可分享活动列表。对齐 joyride `RtcApi.shareActivityList`。
+  Future<ApiResult<ShareableActivityListRsp>> shareActivityList() {
+    return Http.ins.getAndParse<ShareableActivityListRsp>('/activity/share/list');
+  }
+
+  /// 分享活动到房内公屏。对齐 joyride `RtcApi.shareActivityRoom`。
+  Future<ApiResult<void>> shareActivityToRoom({
+    required int activityId,
+    required int rid,
+    String position = 'room_tools',
+  }) {
+    return Http.ins.postAndParse(
+      '/activity/share/room',
+      data: ActivityShareToRoomReq(
+        activityId: Int64(activityId),
+        rid: Int64(rid),
+        shareButtonPosition: position,
+      ),
+      options: _jsonBody,
+    );
+  }
+
+  /// 分享活动到私聊。对齐 joyride `RtcApi.shareActivityChat`。
+  Future<ApiResult<void>> shareActivityToChat({
+    required int activityId,
+    required int toUid,
+    String position = 'chat',
+  }) {
+    return Http.ins.postAndParse(
+      '/activity/share/chat',
+      data: ActivityShareToChatReq(
+        activityId: Int64(activityId),
+        toUid: Int64(toUid),
+        shareButtonPosition: position,
       ),
       options: _jsonBody,
     );
@@ -424,6 +505,21 @@ class RoomApi {
   /// 房间 Tab 顶部热门故事。
   Future<ApiResult<HotStoryRsp>> hotStories() {
     return Http.ins.getAndParse<HotStoryRsp>('/rtc/getHotStory');
+  }
+
+  /// 开启房间转盘。对齐 joyride `TurntableApi.enable`。
+  Future<ApiResult<void>> enableTurntable(int rid) {
+    return Http.ins.postAndParse('/room-turntable/enable?rid=$rid');
+  }
+
+  /// 关闭房间转盘。对齐 joyride `TurntableApi.disable`。
+  Future<ApiResult<void>> disableTurntable(int rid) {
+    return Http.ins.postAndParse('/room-turntable/disable?rid=$rid');
+  }
+
+  /// 开始转动转盘。对齐 joyride `TurntableApi.start`。
+  Future<ApiResult<void>> startTurntable(int rid) {
+    return Http.ins.postAndParse('/room-turntable/start?rid=$rid');
   }
 
   Future<ApiResult<void>> _verb(String method, String path) async {

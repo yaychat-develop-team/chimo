@@ -47,12 +47,9 @@ class ReportLogic extends GetxController {
   final RxString selectedType;
   final RxBool submitting = false.obs;
   final RxBool picking = false.obs;
-  final RxInt feedbackLength = 0.obs;
   final RxList<ReportImage> images = <ReportImage>[].obs;
 
   void select(String type) => selectedType.value = type;
-
-  void onFeedbackChanged(String value) => feedbackLength.value = value.length;
 
   /// 返回 `null` 表示已加入或用户取消。非空是给页面的提示。
   Future<String?> addImage({required bool fromCamera}) async {
@@ -87,7 +84,7 @@ class ReportLogic extends GetxController {
       images[index] = ReportImage(localPath: file.path, remoteUrl: remote);
       return null;
     } finally {
-      if (!isClosed) picking.value = false;
+      picking.value = false;
     }
   }
 
@@ -114,7 +111,7 @@ class ReportLogic extends GetxController {
 
     final id = reportedId.trim();
     if (id.isEmpty) {
-      return const ReportSubmitResult(ok: true, message: 'Report submitted');
+      return const ReportSubmitResult(ok: false, message: 'Submit failed');
     }
 
     submitting.value = true;
@@ -147,7 +144,5 @@ class ReportLogic extends GetxController {
     }
   }
 
-  void idle() {
-    if (!isClosed) submitting.value = false;
-  }
+  void idle() => submitting.value = false;
 }

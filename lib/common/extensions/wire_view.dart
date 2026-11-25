@@ -6,34 +6,31 @@ import '../models/server_client/common/app.pbenum.dart';
 import '../models/server_client/group/group.pb.dart';
 import '../models/server_client/user.pb.dart';
 
+/// 归一化为 `male` / `female`；未设置返回 `null`。
+String? normalizeGender(String? raw) {
+  final g = (raw ?? '').trim().toLowerCase();
+  if (g == 'male' || g == 'm' || g == '1' || g == 'man') return 'male';
+  if (g == 'female' || g == 'f' || g == '2' || g == 'woman') return 'female';
+  return null;
+}
+
+/// 展示用 `Male` / `Female`；未知返回空串。
+String genderDisplayLabel(String? raw) {
+  return switch (normalizeGender(raw)) {
+    'male' => 'Male',
+    'female' => 'Female',
+    _ => '',
+  };
+}
+
 /// 页面读生成模型时反复用到的换算。字段本身仍在 proto 上。
 extension WireUser on User {
   String get uid => id.toString();
 
-  bool get genderKnown {
-    switch (gender.toLowerCase()) {
-      case 'female':
-      case 'f':
-      case '2':
-      case 'male':
-      case 'm':
-      case '1':
-        return true;
-      default:
-        return false;
-    }
-  }
+  bool get genderKnown => normalizeGender(gender) != null;
 
-  bool get male {
-    switch (gender.toLowerCase()) {
-      case 'female':
-      case 'f':
-      case '2':
-        return false;
-      default:
-        return true;
-    }
-  }
+  /// 未知性别时按男处理，与历史展示一致。
+  bool get male => normalizeGender(gender) != 'female';
 
   List<String> get approvedPics => [
     for (final item in picList)
@@ -51,6 +48,9 @@ extension WireUser on User {
       relationType == RelationType.FOLLOW || relationType == RelationType.FRIEND;
 
   bool get online => onlineStatus == 1 && !isHidden;
+
+  /// 对齐 joyride `User.isGsGroupUser`。
+  bool get isGsGroupUser => job != Job.BOSS && gsGroupId.toInt() > 0;
 }
 
 extension WireGroup on GroupInfo {

@@ -1,4 +1,3 @@
-import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -48,7 +47,7 @@ class BlacklistPage extends GetView<BlacklistLogic> {
               nickname: user.nickname,
               avatar: user.avatar,
               onUnblock: () =>
-                  unawaited(controller.unblock(user.id.toString())),
+                  controller.unblock(user.id.toString()),
             );
           },
         ),

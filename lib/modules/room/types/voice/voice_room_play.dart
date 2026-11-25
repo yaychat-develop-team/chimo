@@ -7,7 +7,8 @@ import '../../socket/room_msg_handler.dart';
 
 /// 普通语音房。不画玩法区，也不注册额外消息。
 ///
-/// 短期仍兼容 [RoomType.HOT_HALL]；[RoomType.NEWBIE] 交给浪漫房。
+/// 短期仍兼容 [RoomType.HOT_HALL]；[RoomType.NEWBIE] 暂当普通语音房
+///（Romance 只走私聊触发，不挂新人房玩法）。
 class VoiceRoomPlay implements RoomPlay {
   @override
   String get id => 'voice';
@@ -21,6 +22,7 @@ class VoiceRoomPlay implements RoomPlay {
     switch (channel.roomTypeObj.type) {
       case RoomType.MAKE_FRIENDS:
       case RoomType.HOT_HALL:
+      case RoomType.NEWBIE:
         return true;
       default:
         return false;

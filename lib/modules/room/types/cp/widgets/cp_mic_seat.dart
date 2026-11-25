@@ -7,11 +7,11 @@ import '../../../../../app/app_jumper.dart';
 import '../../../../../common/constants/app_assets.dart';
 import '../../../../../common/theme/app_colors.dart';
 import '../../../../../common/utils/chimo.dart';
+import '../../../../../common/utils/text_fmt.dart';
 import '../../../../../common/widgets/app_image.dart';
 import '../../../logic/mic_logic.dart';
 import '../../../logic/room_logic.dart';
 import '../../../model/mic_seat.dart';
-import '../../../model/room_format.dart';
 import '../../../page/widgets/room_mic_grid.dart';
 import '../logic/cp_logic.dart';
 import 'cp_util.dart';
@@ -230,7 +230,7 @@ class CpMicSeat extends StatelessWidget {
         alignment: Alignment.center,
         decoration: const ShapeDecoration(shape: StadiumBorder(), color: Color(0xFFFF5780)),
         child: Text(
-          roomCount(seat.contribution),
+          TextFmt.roomCount(seat.contribution),
           maxLines: 1,
           style: TextStyle(
             fontSize: 10.sp,

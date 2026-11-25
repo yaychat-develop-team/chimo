@@ -23,6 +23,18 @@ abstract final class Zodiac {
     return null;
   }
 
+  /// 由生日算周岁。解析失败时用 [fallback]。
+  static int age(String birthday, {int fallback = 0}) {
+    final birth = parseBirthday(birthday);
+    if (birth == null) return fallback;
+    final now = DateTime.now();
+    var years = now.year - birth.year;
+    if (now.month < birth.month || (now.month == birth.month && now.day < birth.day)) {
+      years -= 1;
+    }
+    return years.clamp(0, 120);
+  }
+
   /// 由生日得到西方星座名；无效 / 空生日返回空串（不展示假星座）。
   static String fromBirthday(String birthday) {
     final date = parseBirthday(birthday);

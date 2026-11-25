@@ -1,4 +1,3 @@
-import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -140,7 +139,7 @@ class VerificationCodePage extends GetView<VerificationLogic> {
                     ),
                   ),
                   GestureDetector(
-                    onTap: canResend ? () => unawaited(controller.send()) : null,
+                    onTap: canResend ? () => controller.send() : null,
                     child: Text(
                       canResend ? 'Resend code' : 'Resend code (${controller.resendLeft.value}s)',
                       style: TextStyle(

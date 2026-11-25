@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:io';
 
 import 'package:app_tracking_transparency/app_tracking_transparency.dart';
@@ -34,7 +33,7 @@ Future<void> main() async {
   await IapService.init();
   await CacheUtil.init();
   binding.addPostFrameCallback((_) {
-    unawaited(_requestTrackingAuthorization());
+    _requestTrackingAuthorization();
   });
 
   runApp(const ChimoApp());

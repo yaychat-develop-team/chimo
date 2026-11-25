@@ -27,6 +27,13 @@ abstract final class TimeFmt {
   /// `Sep 3`
   static String monthDay(DateTime dt) => '${monthAbbr(dt.month)} ${dt.day}';
 
+  /// `Nov 6, 2026 · 11:21 AM`（毫秒时间戳）。
+  static String monthDayYearClock(int ms) {
+    if (ms <= 0) return '';
+    final time = DateTime.fromMillisecondsSinceEpoch(ms);
+    return '${monthDay(time)}, ${time.year} · ${clock(time)}';
+  }
+
   /// 会话列表右侧（原 `ChatTimeLabel.forList`，forya `TimeAgo.timeForMsg`）。
   static String chatListPreview(int ms, {DateTime? now}) {
     if (ms <= 0) return '';

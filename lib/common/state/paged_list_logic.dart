@@ -42,7 +42,7 @@ abstract class PagedListLogic<T> extends AsyncListLogic<T> {
     loadingMore.value = true;
     try {
       final res = await fetchPage(pageNum: _nextPage, pageSize: pageSize);
-      if (isClosed || !res.ok) return;
+      if (!res.ok) return;
       final list = res.data ?? const [];
       items.addAll(list);
       _nextPage += 1;
@@ -50,7 +50,7 @@ abstract class PagedListLogic<T> extends AsyncListLogic<T> {
     } catch (_) {
       return;
     } finally {
-      if (!isClosed) loadingMore.value = false;
+      loadingMore.value = false;
     }
   }
 }

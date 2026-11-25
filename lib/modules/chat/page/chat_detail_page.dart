@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -13,10 +11,11 @@ import '../../../common/theme/app_bottom_sheet.dart';
 import '../../../common/utils/app_toast.dart';
 import '../../../common/widgets/app_scaffold.dart';
 import '../../../common/widgets/chat_action_pop_menu.dart';
-import '../model/chat_conversation.dart';
+import '../model/conversation_model.dart';
 import 'chat_scroll_anchor.dart';
 import '../logic/dm_chat_logic.dart';
 import '../model/chat_line.dart';
+import '../../room/types/romance/widgets/romance_progress_bar.dart';
 import 'widgets/chat_input_bar.dart';
 import 'widgets/dm/dm_app_bar.dart';
 import 'widgets/dm/dm_chat_body.dart';
@@ -25,7 +24,7 @@ import 'widgets/dm/dm_chat_body.dart';
 class ChatDetailPage extends StatefulWidget {
   const ChatDetailPage({super.key, required this.conversation});
 
-  final ChatConversation conversation;
+  final ConversationModel conversation;
 
   @override
   State<ChatDetailPage> createState() => _ChatDetailPageState();
@@ -69,7 +68,7 @@ class _ChatDetailPageState extends State<ChatDetailPage> with SingleTickerProvid
       _ownsController = true;
     }
     // ⚠️ 三个 hook 要第一时间挂上：`_c` 上面刚 put 出来，
-    // 那一刻 Controller 的 `onInit`（内含 `unawaited(loadFromApi())`）就已经跑了。
+    // 那一刻 Controller 的 `onInit`（内含 `loadFromApi()`）就已经跑了。
     // 那条链在第一个 `await` 处让出，所以这里挂得上 —— 但别往后挪。
     logic.onScrollToBottom = _scrollToBottom;
     logic.onHistoryAnchorSave = _anchor.saveHistoryAnchor;
@@ -115,7 +114,7 @@ class _ChatDetailPageState extends State<ChatDetailPage> with SingleTickerProvid
     if (peerEm.isEmpty) return;
     // 接近顶部 → 加载更早消息。
     if (_anchor.controller.position.pixels <= 64) {
-      unawaited(logic.loadImHistory(peerEm, loadMore: true));
+      logic.loadImHistory(peerEm, loadMore: true);
     }
   }
 
@@ -274,11 +273,11 @@ class _ChatDetailPageState extends State<ChatDetailPage> with SingleTickerProvid
   /// （[DmChatLogic.refreshBlocked]）。
   void _openPeerProfile() {
     final profile = logic.previewProfile();
-    unawaited(() async {
+    () async {
       await AppJumper.toProfile(profile.uid, preview: profile);
       if (!mounted) return;
       await logic.refreshBlocked();
-    }());
+    }();
   }
 
   @override
@@ -303,9 +302,10 @@ class _ChatDetailPageState extends State<ChatDetailPage> with SingleTickerProvid
                   following: logic.following.value,
                   collapse: _introCollapse.value,
                   loading: logic.loadingPeer.value,
-                  onFollowTap: () => unawaited(logic.toggleFollow()),
+                  isHeartie: logic.isHeartie.value,
+                  onFollowTap: () => logic.toggleFollow(),
                   onAvatarTap: _openPeerProfile,
-                  onMoreTap: () => unawaited(_openMoreMenu()),
+                  onMoreTap: () => _openMoreMenu(),
                 ),
               );
             },
@@ -316,6 +316,7 @@ class _ChatDetailPageState extends State<ChatDetailPage> with SingleTickerProvid
                 // `.toList()` 不是多余的：`DmChatBody` 的 build 在 Obx 的
                 // builder 之外跑，光把 RxList 传下去登记不到依赖，消息变化
                 // 不会重建。在 builder 里读一次列表才算订阅。
+                // 进度条另用 [_DmRomanceTopSlot] 内层 Obx，避免亲密分刷新整表重建。
                 messages: logic.messages.toList(),
                 peerAvatar: logic.conversation.value.avatarAsset,
                 peerAvatarUrl: logic.conversation.value.avatarUrl,
@@ -326,10 +327,11 @@ class _ChatDetailPageState extends State<ChatDetailPage> with SingleTickerProvid
                 onHandleDragUpdate: _onIntroDragUpdate,
                 onHandleDragEnd: _onIntroDragEnd,
                 onBlankTap: () => _inputBarKey.currentState?.dismissComposer(),
-                onFailedTap: (index) => unawaited(logic.onFailedTap(index)),
-                onMessageLongPress: (line, anchor) => unawaited(_onMessageLongPress(line, anchor)),
+                onFailedTap: (index) => logic.onFailedTap(index),
+                onMessageLongPress: (line, anchor) => _onMessageLongPress(line, anchor),
                 onQuoteTap: (msgId) => _anchor.scrollToMessage(msgId, logic.messages),
                 messageKeyFor: _anchor.keyFor,
+                banner: _DmRomanceTopSlot(logic: logic),
               ),
             ),
           ),
@@ -342,10 +344,10 @@ class _ChatDetailPageState extends State<ChatDetailPage> with SingleTickerProvid
               controller: _inputController,
               quote: logic.quote.value,
               onClearQuote: logic.clearQuote,
-              onSendText: (text) => unawaited(_sendMessage(text)),
+              onSendText: (text) => _sendMessage(text),
               onSendVoice: logic.sendVoice,
               onSendImages: logic.sendImages,
-              onGiftTap: () => unawaited(_showGiftSheet()),
+              onGiftTap: () => _showGiftSheet(),
               // 贴纸包（私聊独有）。取数在 Controller 上 —— 面板是公共组件，
               stickers: ChatStickerSource(
                 loadPacks: logic.loadEmotePacks,
@@ -357,6 +359,42 @@ class _ChatDetailPageState extends State<ChatDetailPage> with SingleTickerProvid
         ],
       ),
     );
+  }
+}
+
+/// 白底顶部：有活动显示进度条，否则灰条把手。独立 Obx，不拖累消息列表。
+class _DmRomanceTopSlot extends StatelessWidget {
+  const _DmRomanceTopSlot({required this.logic});
+
+  final DmChatLogic logic;
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      final info = logic.romanceActivity.value;
+      if (!logic.showRomance || info == null) {
+        return const Padding(
+          padding: EdgeInsets.only(top: 10, bottom: 10),
+          child: Center(
+            child: SizedBox(
+              width: 36,
+              height: 4,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: AppColors.grayD5D5D5,
+                  borderRadius: BorderRadius.all(Radius.circular(2)),
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+      // 略上移，贴紧黑底资料区（对齐设计稿）。
+      return Transform.translate(
+        offset: const Offset(0, -6),
+        child: RomanceProgressBar(info: info, onClaim: logic.receiveRomanceReward),
+      );
+    });
   }
 }
 

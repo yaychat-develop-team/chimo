@@ -28,8 +28,15 @@ class MicLogic extends GetxController {
   /// 自己麦上剩余 ≤30 秒时置 true 一次，页面弹「Insufficient On-mic Time」。
   final insufficientPrompt = false.obs;
 
+  /// 服务端指定麦位自动上麦后的「Toggle the mic」气泡。对齐 joyride `needShowMicOffAlarm`。
+  final showOpenMicTip = false.obs;
+
+  /// 底栏麦钮锚点，供开麦气泡定位。
+  final micButtonKey = GlobalKey();
+
   int myUid = 0;
   Timer? _timer;
+  Timer? _openMicTipTimer;
   var _shownInsufficient = false;
 
   bool get onMic => seats.any((seat) => seat.uid == myUid);
@@ -68,8 +75,11 @@ class MicLogic extends GetxController {
           speaking: speaking[uid] == true,
           contribution: slot?.contributionValue.toInt() ?? 0,
           frame: frame,
+          micEffect: (user?.micEffect ?? '').trim(),
           boss: (count == 0 ? 9 : count) == 9 && i == (count == 0 ? 8 : count - 1),
           downMicAt: slot?.downMicTimestamp ?? 0,
+          counterAt: slot?.counterTimestamp ?? 0,
+          heartLinkCardStatus: slot?.heartLinkCardStatus ?? 0,
         ),
       );
     }
@@ -105,6 +115,21 @@ class MicLogic extends GetxController {
   }
 
   RoomMsgHandler handler() => _MicMsgHandler(this);
+
+  /// 指定麦位自动上麦成功后延迟弹出开麦提示。
+  void scheduleOpenMicTip() {
+    _openMicTipTimer?.cancel();
+    _openMicTipTimer = Timer(const Duration(seconds: 1), () {
+      if (isClosed) return;
+      showOpenMicTip.value = true;
+    });
+  }
+
+  void dismissOpenMicTip() {
+    _openMicTipTimer?.cancel();
+    _openMicTipTimer = null;
+    if (showOpenMicTip.value) showOpenMicTip.value = false;
+  }
 
   /// 展示麦上表情；约 3 秒后清除（无多帧回调时的兜底）。
   void showMicEmote({required int uid, required String url, int type = 3}) {
@@ -193,6 +218,7 @@ class MicLogic extends GetxController {
     micEmotes.clear();
     _seatKeys.clear();
     _uidKeys.clear();
+    dismissOpenMicTip();
     super.onClose();
   }
 
@@ -211,7 +237,9 @@ class MicLogic extends GetxController {
   bool get _needsTimer {
     final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
     for (final seat in seats) {
-      if (seat.occupied && seat.downMicAt > now) return true;
+      if (!seat.occupied) continue;
+      // downMic：普通限时麦；counter：资料卡 Timer / HT Boss 倒计时。
+      if (seat.downMicAt > now || seat.counterAt > now) return true;
     }
     return false;
   }
@@ -267,7 +295,7 @@ class _MicMsgHandler implements RoomMsgHandler {
         // 对齐 joyride：公屏只用 offMicImgUrl；为空则不发（避免拿 seat 动图 URL 去 send-to-room）。
         final offUrl = img.offMicImgUrl.trim();
         if (img.type == 3 && uid == logic.myUid && offUrl.isNotEmpty) {
-          unawaited(RoomService.findOrNull()?.sendMicIconBarrage(offUrl) ?? Future.value());
+          RoomService.findOrNull()?.sendMicIconBarrage(offUrl) ?? Future.value();
         }
         return;
       }

@@ -20,21 +20,26 @@ class BlacklistLogic extends GetxController {
     loading.value = true;
     try {
       final res = await ChimoApis.relation.blackList();
-      if (!isClosed) users.assignAll(res.data ?? const []);
+      if (!res.ok) return;
+      users.assignAll(res.data ?? const []);
     } catch (_) {
       // 保留 [users]。
     } finally {
-      if (!isClosed) loading.value = false;
+      loading.value = false;
     }
   }
 
   /// 取消拉黑。失败 toast。
   Future<void> unblock(String userId) async {
-    final res = await ChimoApis.relation.setBlackList(userId: userId, isCancel: true);
-    if (!res.ok) {
-      AppToast.error(res.message.isEmpty ? 'Failed' : res.message);
-      return;
+    try {
+      final res = await ChimoApis.relation.setBlackList(userId: userId, isCancel: true);
+      if (!res.ok) {
+        AppToast.error(res.message.isEmpty ? 'Failed' : res.message);
+        return;
+      }
+      users.removeWhere((user) => user.id.toString() == userId);
+    } catch (error) {
+      AppToast.error('Failed: $error');
     }
-    users.removeWhere((user) => user.id.toString() == userId);
   }
 }

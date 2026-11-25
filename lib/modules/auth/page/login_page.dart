@@ -64,7 +64,7 @@ class _LoginPageState extends State<LoginPage> {
     if (logic.agreed.value) return true;
     final accepted = await AppBottomSheet.show<bool>(
       isScrollControlled: true,
-      child: _WelcomeAgreementSheet(onOpenAgreement: (title) => unawaited(_openAgreement(title))),
+      child: _WelcomeAgreementSheet(onOpenAgreement: (title) => _openAgreement(title)),
     );
     if (!mounted || accepted != true) return false;
     logic.acceptAgreement();
@@ -124,55 +124,64 @@ class _LoginPageState extends State<LoginPage> {
           SafeArea(
             child: Padding(
               padding: EdgeInsets.fromLTRB(32, screenH * 0.06, 32, 16 + bottom),
-              child: Obx(
-                () => Column(
-                  children: [
-                    Chimo.image(AppAssets.splashLogo, width: 120, height: 120, fit: BoxFit.contain),
-                    const SizedBox(height: 20),
-                    Chimo.image(AppAssets.splashTitle, height: 36, fit: BoxFit.contain),
-                    const SizedBox(height: 10),
-                    Chimo.image(AppAssets.splashSlogan, height: 16, fit: BoxFit.contain),
-                    const Spacer(flex: 3),
-                    // 正式环境固定入口；非正式环境按登录平台接口控制显隐。
-                    if (logic.showAppleLogin) ...[
-                      _AppleLoginButton(
-                        onTap: _openAppleLogin,
-                        loading: logic.appleSigningIn.value,
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                    if (logic.showEmailLogin.value) _EmailLoginButton(onTap: _openEmailLogin),
-                    if (logic.showEmailLogin.value) const SizedBox(height: 18),
-                    _AgreementRow(
-                      agreed: logic.agreed.value,
-                      onToggle: logic.toggleAgreed,
-                      onTermsTap: () => _openAgreement('User Service Agreement'),
-                      onPrivacyTap: () => _openAgreement('Privacy Agreement'),
-                    ),
-                    const SizedBox(height: 20),
-                    if (AppConfig.isDebug)
-                      GestureDetector(
-                        onTap: () {
-                          AppJumper.toDebug();
-                        },
-                        child: const Text(
-                          'Debug Page',
-                          style: TextStyle(
-                            color: AppColors.white,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
+              child: Column(
+                children: [
+                  Chimo.image(AppAssets.splashLogo, width: 120, height: 120, fit: BoxFit.contain),
+                  const SizedBox(height: 20),
+                  Chimo.image(AppAssets.splashTitle, height: 36, fit: BoxFit.contain),
+                  const SizedBox(height: 10),
+                  Chimo.image(AppAssets.splashSlogan, height: 16, fit: BoxFit.contain),
+                  const Spacer(flex: 3),
+                  Obx(
+                    () => Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // 正式环境固定入口；非正式环境按登录平台接口控制显隐。
+                        if (logic.showAppleLogin) ...[
+                          _AppleLoginButton(
+                            onTap: _openAppleLogin,
+                            loading: logic.appleSigningIn.value,
                           ),
+                          const SizedBox(height: 16),
+                        ],
+                        if (logic.showEmailLogin.value) _EmailLoginButton(onTap: _openEmailLogin),
+                        if (logic.showEmailLogin.value) const SizedBox(height: 18),
+                        _AgreementRow(
+                          agreed: logic.agreed.value,
+                          onToggle: logic.toggleAgreed,
+                          onTermsTap: () => _openAgreement('User Service Agreement'),
+                          onPrivacyTap: () => _openAgreement('Privacy Agreement'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  if (AppConfig.isDebug)
+                    GestureDetector(
+                      onTap: AppJumper.toDebug,
+                      child: const Text(
+                        'Debug Page',
+                        style: TextStyle(
+                          color: AppColors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                    if (AppConfig.isDebug) const Spacer(flex: 2) else const Spacer(flex: 3),
-                    if (logic.showPhoneLogin.value) ...[
-                      const _OrContinueDivider(),
-                      const SizedBox(height: 20),
-                      _PhoneLoginButton(onTap: _openPhoneLogin),
-                      const SizedBox(height: 8),
-                    ],
-                  ],
-                ),
+                    ),
+                  if (AppConfig.isDebug) const Spacer(flex: 2) else const Spacer(flex: 3),
+                  Obx(() {
+                    if (!logic.showPhoneLogin.value) return const SizedBox.shrink();
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const _OrContinueDivider(),
+                        const SizedBox(height: 20),
+                        _PhoneLoginButton(onTap: _openPhoneLogin),
+                        const SizedBox(height: 8),
+                      ],
+                    );
+                  }),
+                ],
               ),
             ),
           ),

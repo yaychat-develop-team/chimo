@@ -70,15 +70,14 @@ class ProfileSetupLogic extends GetxController {
         'register': true,
       });
       if (!res.ok) {
-        saving.value = false;
         AppToast.error(res.message.isEmpty ? 'Unable to save profile' : res.message);
         return;
       }
       AppJumper.toAlmostIn();
-      saving.value = false;
     } catch (error) {
-      saving.value = false;
       AppToast.error('Unable to save profile: $error');
+    } finally {
+      saving.value = false;
     }
   }
 }

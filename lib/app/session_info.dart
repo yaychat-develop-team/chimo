@@ -70,6 +70,8 @@ abstract class SessionInfo {
     if (!result) return false;
     await GlobalConfig.refreshConfInfo();
     await GlobalConfig.refreshSettings(force: true);
+    // 新注册用户立刻进聊天时，环信必须已登录，否则发消息 201 Not login。
+    await ImService.connectFromServer();
     return true;
   }
 

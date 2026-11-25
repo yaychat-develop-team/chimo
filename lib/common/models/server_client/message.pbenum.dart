@@ -212,6 +212,8 @@ class ChatStyle extends $pb.ProtobufEnum {
       ChatStyle._(3, _omitEnumNames ? '' : 'PET_CHAT');
   static const ChatStyle ACTIVITY_SHARE_CHAT =
       ChatStyle._(4, _omitEnumNames ? '' : 'ACTIVITY_SHARE_CHAT');
+  static const ChatStyle ROOM_TURNTABLE_CHAT =
+      ChatStyle._(5, _omitEnumNames ? '' : 'ROOM_TURNTABLE_CHAT');
 
   static const $core.List<ChatStyle> values = <ChatStyle>[
     NONE,
@@ -219,10 +221,11 @@ class ChatStyle extends $pb.ProtobufEnum {
     JoinRoom,
     PET_CHAT,
     ACTIVITY_SHARE_CHAT,
+    ROOM_TURNTABLE_CHAT,
   ];
 
   static final $core.List<ChatStyle?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 4);
+      $pb.ProtobufEnum.$_initByValueList(values, 5);
   static ChatStyle? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

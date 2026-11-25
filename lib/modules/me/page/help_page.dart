@@ -1,4 +1,3 @@
-import 'dart:async';
 
 import 'package:flutter/material.dart';
 
@@ -20,7 +19,7 @@ class _HelpPageState extends State<HelpPage> {
   @override
   void initState() {
     super.initState();
-    unawaited(_prefetch());
+    _prefetch();
   }
 
   Future<void> _prefetch() async {

@@ -231,29 +231,24 @@ class _GenderCard extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
-        child: SizedBox(
-          // width: 148,
-          // height: 148,
-          child: Stack(
-            // fit: StackFit.expand,
-            children: [
-              Positioned.fill(child: Chimo.image(image, fit: BoxFit.contain)),
-              Positioned(
-                top: 6,
-                left: 0,
-                right: 0,
-                child: Text(
-                  label,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: selected ? AppColors.green00F875 : AppColors.grayB0B0B0,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
+        child: Stack(
+          children: [
+            Positioned.fill(child: Chimo.image(image, fit: BoxFit.contain)),
+            Positioned(
+              top: 6,
+              left: 0,
+              right: 0,
+              child: Text(
+                label,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: selected ? AppColors.green00F875 : AppColors.grayB0B0B0,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

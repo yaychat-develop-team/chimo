@@ -1,14 +1,15 @@
+import 'package:chimo/common/utils/chimo.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:get/get.dart';
 
+import '../../../app/app_jumper.dart';
 import '../../../common/constants/app_assets.dart';
 import '../../../common/theme/app_colors.dart';
 import '../../../common/theme/app_input.dart';
 import '../../../common/theme/app_text.dart';
-import '../logic/phone_login_logic.dart';
+import '../../../common/utils/app_toast.dart';
+import '../../../common/utils/phone_utils.dart';
 import '../../../common/widgets/app_scaffold.dart';
-import 'package:chimo/common/utils/chimo.dart';
 
 /// 手机登录页（与邮箱登录同款背景）。
 class PhoneLoginPage extends StatefulWidget {
@@ -19,24 +20,38 @@ class PhoneLoginPage extends StatefulWidget {
 }
 
 class _PhoneLoginPageState extends State<PhoneLoginPage> {
-  final TextEditingController _phoneController = TextEditingController();
-  late final PhoneLoginLogic logic;
+  static final RegExp _phonePattern = RegExp(r'^1[3-9]\d{9}$');
 
-  @override
-  void initState() {
-    super.initState();
-    logic = Get.put(PhoneLoginLogic());
-  }
+  final TextEditingController _phoneController = TextEditingController();
 
   @override
   void dispose() {
     _phoneController.dispose();
-    Get.delete<PhoneLoginLogic>();
     super.dispose();
+  }
+
+  bool get _valid => _phonePattern.hasMatch(_phoneController.text.trim());
+
+  String? get _errorText {
+    final value = _phoneController.text.trim();
+    if (value.isEmpty || value.length < 11) return null;
+    if (!_valid) return 'Please enter a valid phone number';
+    return null;
+  }
+
+  void _login() {
+    final value = _phoneController.text.trim();
+    if (!_valid) {
+      AppToast.error('Please enter a valid phone number');
+      return;
+    }
+    // 先进入验证码页。测试服短信通道不可用时仍可输入验证码。
+    AppJumper.toVerify(PhoneUtils.digitsOnly(value));
   }
 
   @override
   Widget build(BuildContext context) {
+    final errorText = _errorText;
     return AppScaffold(
       backgroundColor: AppColors.black111111,
       appBar: AppNavBar(),
@@ -107,7 +122,7 @@ class _PhoneLoginPageState extends State<PhoneLoginPage> {
                         FilteringTextInputFormatter.digitsOnly,
                         LengthLimitingTextInputFormatter(11),
                       ],
-                      onChanged: (value) => logic.phone.value = value,
+                      onChanged: (_) => setState(() {}),
                       style: AppText.field,
                       cursorColor: AppColors.green1CFF8A,
                       decoration: const AppInputDecoration(
@@ -124,35 +139,27 @@ class _PhoneLoginPageState extends State<PhoneLoginPage> {
                 ),
               ],
             ),
-            Obx(() {
-              final errorText = logic.errorText;
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (errorText != null) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      errorText,
-                      style: const TextStyle(
-                        color: AppColors.redE44E50,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 20),
-                  Chimo.s.primaryButton(
-                    label: 'Get Verification Code',
-                    onTap: logic.login,
-                    enabled: logic.canLogin,
-                    color: AppColors.green1CFF8A,
-                    disabledColor: AppColors.gray333333,
-                    disabledLabelColor: AppColors.gray8A8A8A,
-                    borderRadius: 27,
-                  ),
-                ],
-              );
-            }),
+            if (errorText != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                errorText,
+                style: const TextStyle(
+                  color: AppColors.redE44E50,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+            ],
+            const SizedBox(height: 20),
+            Chimo.s.primaryButton(
+              label: 'Get Verification Code',
+              onTap: _login,
+              enabled: _valid,
+              color: AppColors.green1CFF8A,
+              disabledColor: AppColors.gray333333,
+              disabledLabelColor: AppColors.gray8A8A8A,
+              borderRadius: 27,
+            ),
           ],
         ),
       ),

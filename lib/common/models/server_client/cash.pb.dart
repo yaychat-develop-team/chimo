@@ -2218,6 +2218,7 @@ class CashChargeProductListItem extends $pb.GeneratedMessage {
     $core.String? localPrice,
     $core.String? countryCode,
     $core.String? currency,
+    $0.PayItemType? supportedPayType,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -2232,6 +2233,7 @@ class CashChargeProductListItem extends $pb.GeneratedMessage {
     if (localPrice != null) result.localPrice = localPrice;
     if (countryCode != null) result.countryCode = countryCode;
     if (currency != null) result.currency = currency;
+    if (supportedPayType != null) result.supportedPayType = supportedPayType;
     return result;
   }
 
@@ -2260,6 +2262,8 @@ class CashChargeProductListItem extends $pb.GeneratedMessage {
     ..aOS(10, _omitFieldNames ? '' : 'localPrice')
     ..aOS(11, _omitFieldNames ? '' : 'countryCode')
     ..aOS(12, _omitFieldNames ? '' : 'currency')
+    ..aE<$0.PayItemType>(13, _omitFieldNames ? '' : 'supportedPayType',
+        enumValues: $0.PayItemType.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2389,6 +2393,15 @@ class CashChargeProductListItem extends $pb.GeneratedMessage {
   $core.bool hasCurrency() => $_has(11);
   @$pb.TagNumber(12)
   void clearCurrency() => $_clearField(12);
+
+  @$pb.TagNumber(13)
+  $0.PayItemType get supportedPayType => $_getN(12);
+  @$pb.TagNumber(13)
+  set supportedPayType($0.PayItemType value) => $_setField(13, value);
+  @$pb.TagNumber(13)
+  $core.bool hasSupportedPayType() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearSupportedPayType() => $_clearField(13);
 }
 
 class CashChargeProductListRsp extends $pb.GeneratedMessage {

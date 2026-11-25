@@ -18,9 +18,13 @@ class RoomGiftDispatch {
     this.micRes = '',
     this.qty = 0,
     this.cost = 0,
+    this.needPrice = 0,
   });
 
   const RoomGiftDispatch.fail(String message) : this._(error: message);
+
+  const RoomGiftDispatch.insufficient(int needPrice)
+      : this._(error: 'Insufficient balance.', needPrice: needPrice);
 
   final String? error;
   final int giftId;
@@ -31,7 +35,12 @@ class RoomGiftDispatch {
   final int qty;
   final int cost;
 
+  /// 金币不足时本次送礼所需总额。>0 表示应弹出充值半屏。
+  final int needPrice;
+
   bool get ok => error == null;
+
+  bool get insufficient => needPrice > 0;
 }
 
 /// 房间礼物目录、麦位收礼人、数量与送出。
@@ -41,6 +50,7 @@ class RoomGiftLogic extends GetxController {
     required this.channelId,
     required this.receivers,
     this.preferredUid = '',
+    this.preferredGiftId = 0,
   });
 
   static const qtyOptions = [1, 3, 10, 40, 100, 999];
@@ -49,6 +59,9 @@ class RoomGiftLogic extends GetxController {
   final String channelId;
   final List<RoomGiftReceiver> receivers;
   final String preferredUid;
+
+  /// >0 时加载完成后自动选中该礼物（Romance 资料卡快捷条）。
+  final int preferredGiftId;
 
   final tabs = <ItemTab>[].obs;
   final bagItems = <CommodityItem>[].obs;
@@ -131,7 +144,6 @@ class RoomGiftLogic extends GetxController {
       final balanceFuture = ChimoApis.cash.balance();
       final tabsRes = await tabsFuture;
       final balanceRes = await balanceFuture;
-      if (isClosed) return;
       final next = [...?tabsRes.data];
       if (!next.any((tab) => tab.tabType.trim() == 'bag')) {
         next.add(ItemTab(name: 'Package', tabType: 'bag'));
@@ -141,14 +153,30 @@ class RoomGiftLogic extends GetxController {
       tabIndex.value = _hotIndex(tabs);
       giftIndex.value = 0;
       bagIndex.value = 0;
+      _selectPreferredGiftIfNeed();
       loadError.value = tabs.isEmpty && !tabsRes.ok
           ? (tabsRes.message.isEmpty ? 'Failed to load gifts' : tabsRes.message)
           : null;
       if (isBagTab) await loadBag();
     } catch (error) {
-      if (!isClosed) loadError.value = '$error';
+      loadError.value = '$error';
     } finally {
-      if (!isClosed) loading.value = false;
+      loading.value = false;
+    }
+  }
+
+  void _selectPreferredGiftIfNeed() {
+    final want = preferredGiftId;
+    if (want <= 0 || tabs.isEmpty) return;
+    for (var t = 0; t < tabs.length; t++) {
+      final tab = tabs[t];
+      if (tab.tabType.trim() == 'bag') continue;
+      final g = tab.item.indexWhere((item) => item.id.toInt() == want);
+      if (g >= 0) {
+        tabIndex.value = t;
+        giftIndex.value = g;
+        return;
+      }
     }
   }
 
@@ -157,7 +185,6 @@ class RoomGiftLogic extends GetxController {
     bagLoading.value = true;
     try {
       final res = await ChimoApis.commodity.bag();
-      if (isClosed) return;
       final list = res.data ?? const <CommodityItem>[];
       bagItems.assignAll(list);
       if (list.isEmpty) {
@@ -167,9 +194,9 @@ class RoomGiftLogic extends GetxController {
       }
     } catch (error) {
       AppLog.w('RoomGift bag load failed', error: error);
-      if (!isClosed) bagItems.clear();
+      bagItems.clear();
     } finally {
-      if (!isClosed) bagLoading.value = false;
+      bagLoading.value = false;
     }
   }
 
@@ -225,7 +252,7 @@ class RoomGiftLogic extends GetxController {
     final count = qty.value;
     final total = gift.price.toInt() * count * selectedUids.length;
     if (balance.value < total) {
-      return const RoomGiftDispatch.fail('Insufficient balance.');
+      return RoomGiftDispatch.insufficient(total);
     }
     sending.value = true;
     try {
@@ -246,9 +273,7 @@ class RoomGiftLogic extends GetxController {
 
     try {
       final bal = await ChimoApis.cash.balance();
-      if (!isClosed) {
-        balance.value = bal.data == null ? balance.value : cashCoins(bal.data!);
-      }
+      if (bal.data != null) balance.value = cashCoins(bal.data!);
     } catch (error) {
       AppLog.w('RoomGift balance refresh failed', error: error);
     }
@@ -302,7 +327,5 @@ class RoomGiftLogic extends GetxController {
     );
   }
 
-  void idle() {
-    if (!isClosed) sending.value = false;
-  }
+  void idle() => sending.value = false;
 }

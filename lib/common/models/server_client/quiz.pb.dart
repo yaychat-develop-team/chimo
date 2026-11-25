@@ -2172,12 +2172,14 @@ class QuizExchangeItem extends $pb.GeneratedMessage {
     $core.String? name,
     $core.String? icon,
     $fixnum.Int64? pointCost,
+    $core.String? type,
   }) {
     final result = create();
     if (itemId != null) result.itemId = itemId;
     if (name != null) result.name = name;
     if (icon != null) result.icon = icon;
     if (pointCost != null) result.pointCost = pointCost;
+    if (type != null) result.type = type;
     return result;
   }
 
@@ -2198,6 +2200,7 @@ class QuizExchangeItem extends $pb.GeneratedMessage {
     ..aOS(2, _omitFieldNames ? '' : 'name')
     ..aOS(3, _omitFieldNames ? '' : 'icon')
     ..aInt64(4, _omitFieldNames ? '' : 'pointCost')
+    ..aOS(5, _omitFieldNames ? '' : 'type')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2254,6 +2257,15 @@ class QuizExchangeItem extends $pb.GeneratedMessage {
   $core.bool hasPointCost() => $_has(3);
   @$pb.TagNumber(4)
   void clearPointCost() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get type => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set type($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasType() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearType() => $_clearField(5);
 }
 
 /// 座驾抽奖兑换项
@@ -2423,10 +2435,12 @@ class QuizExchangeReq extends $pb.GeneratedMessage {
   factory QuizExchangeReq({
     $fixnum.Int64? itemId,
     QuizExchangeType? exchangeType,
+    $core.String? type,
   }) {
     final result = create();
     if (itemId != null) result.itemId = itemId;
     if (exchangeType != null) result.exchangeType = exchangeType;
+    if (type != null) result.type = type;
     return result;
   }
 
@@ -2446,6 +2460,7 @@ class QuizExchangeReq extends $pb.GeneratedMessage {
     ..aInt64(1, _omitFieldNames ? '' : 'itemId')
     ..aE<QuizExchangeType>(2, _omitFieldNames ? '' : 'exchangeType',
         enumValues: QuizExchangeType.values)
+    ..aOS(3, _omitFieldNames ? '' : 'type')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2484,6 +2499,15 @@ class QuizExchangeReq extends $pb.GeneratedMessage {
   $core.bool hasExchangeType() => $_has(1);
   @$pb.TagNumber(2)
   void clearExchangeType() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get type => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set type($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasType() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearType() => $_clearField(3);
 }
 
 class QuizExchangeLogItem extends $pb.GeneratedMessage {

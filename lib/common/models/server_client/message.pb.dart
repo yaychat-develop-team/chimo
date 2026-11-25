@@ -17,11 +17,12 @@ import 'package:protobuf/protobuf.dart' as $pb;
 import 'package:protobuf/well_known_types/google/protobuf/any.pb.dart' as $0;
 
 import 'activity_share.pb.dart' as $4;
-import 'cash.pb.dart' as $6;
-import 'common/car.pbenum.dart' as $7;
+import 'cash.pb.dart' as $7;
+import 'common/car.pbenum.dart' as $8;
 import 'fleet/hang_out.pb.dart' as $3;
 import 'message.pbenum.dart';
-import 'rtc.pb.dart' as $5;
+import 'room_turntable.pb.dart' as $5;
+import 'rtc.pb.dart' as $6;
 import 'user.pb.dart' as $1;
 import 'user_realtion.pb.dart' as $2;
 
@@ -437,6 +438,7 @@ class CommonChatContent extends $pb.GeneratedMessage {
     $2.RelationBadge? relationBadge,
     $3.PetChatMsgInfo? petChatMsgInfo,
     $4.ActivityShareCardContent? activityShareCard,
+    $5.TurntableItem? turntableResult,
   }) {
     final result = create();
     if (sender != null) result.sender = sender;
@@ -445,6 +447,7 @@ class CommonChatContent extends $pb.GeneratedMessage {
     if (relationBadge != null) result.relationBadge = relationBadge;
     if (petChatMsgInfo != null) result.petChatMsgInfo = petChatMsgInfo;
     if (activityShareCard != null) result.activityShareCard = activityShareCard;
+    if (turntableResult != null) result.turntableResult = turntableResult;
     return result;
   }
 
@@ -474,6 +477,8 @@ class CommonChatContent extends $pb.GeneratedMessage {
     ..aOM<$4.ActivityShareCardContent>(
         6, _omitFieldNames ? '' : 'activityShareCard',
         subBuilder: $4.ActivityShareCardContent.create)
+    ..aOM<$5.TurntableItem>(7, _omitFieldNames ? '' : 'turntableResult',
+        subBuilder: $5.TurntableItem.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -559,6 +564,17 @@ class CommonChatContent extends $pb.GeneratedMessage {
   void clearActivityShareCard() => $_clearField(6);
   @$pb.TagNumber(6)
   $4.ActivityShareCardContent ensureActivityShareCard() => $_ensure(5);
+
+  @$pb.TagNumber(7)
+  $5.TurntableItem get turntableResult => $_getN(6);
+  @$pb.TagNumber(7)
+  set turntableResult($5.TurntableItem value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasTurntableResult() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearTurntableResult() => $_clearField(7);
+  @$pb.TagNumber(7)
+  $5.TurntableItem ensureTurntableResult() => $_ensure(6);
 }
 
 class QuestionAndAnswer extends $pb.GeneratedMessage {
@@ -1172,11 +1188,11 @@ class CardChatContent extends $pb.GeneratedMessage {
 class RoomSendGift extends $pb.GeneratedMessage {
   factory RoomSendGift({
     $fixnum.Int64? channel,
-    $5.SimpleChannelUser? send,
-    $5.SimpleChannelUser? receiver,
-    $6.ItemInfo? item,
+    $6.SimpleChannelUser? send,
+    $6.SimpleChannelUser? receiver,
+    $7.ItemInfo? item,
     $core.int? itemCount,
-    $core.Iterable<$5.SimpleChannelUser>? receivers,
+    $core.Iterable<$6.SimpleChannelUser>? receivers,
     BoxItem? boxItem,
     $core.bool? showPrice,
     $core.Iterable<$core.String>? images,
@@ -1211,15 +1227,15 @@ class RoomSendGift extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'channel', $pb.PbFieldType.OU6,
         defaultOrMaker: $fixnum.Int64.ZERO)
-    ..aOM<$5.SimpleChannelUser>(2, _omitFieldNames ? '' : 'send',
-        subBuilder: $5.SimpleChannelUser.create)
-    ..aOM<$5.SimpleChannelUser>(3, _omitFieldNames ? '' : 'receiver',
-        subBuilder: $5.SimpleChannelUser.create)
-    ..aOM<$6.ItemInfo>(4, _omitFieldNames ? '' : 'item',
-        subBuilder: $6.ItemInfo.create)
+    ..aOM<$6.SimpleChannelUser>(2, _omitFieldNames ? '' : 'send',
+        subBuilder: $6.SimpleChannelUser.create)
+    ..aOM<$6.SimpleChannelUser>(3, _omitFieldNames ? '' : 'receiver',
+        subBuilder: $6.SimpleChannelUser.create)
+    ..aOM<$7.ItemInfo>(4, _omitFieldNames ? '' : 'item',
+        subBuilder: $7.ItemInfo.create)
     ..aI(5, _omitFieldNames ? '' : 'itemCount', fieldType: $pb.PbFieldType.OU3)
-    ..pPM<$5.SimpleChannelUser>(6, _omitFieldNames ? '' : 'receivers',
-        subBuilder: $5.SimpleChannelUser.create)
+    ..pPM<$6.SimpleChannelUser>(6, _omitFieldNames ? '' : 'receivers',
+        subBuilder: $6.SimpleChannelUser.create)
     ..aOM<BoxItem>(7, _omitFieldNames ? '' : 'boxItem',
         subBuilder: BoxItem.create)
     ..aOB(8, _omitFieldNames ? '' : 'showPrice')
@@ -1256,37 +1272,37 @@ class RoomSendGift extends $pb.GeneratedMessage {
   void clearChannel() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $5.SimpleChannelUser get send => $_getN(1);
+  $6.SimpleChannelUser get send => $_getN(1);
   @$pb.TagNumber(2)
-  set send($5.SimpleChannelUser value) => $_setField(2, value);
+  set send($6.SimpleChannelUser value) => $_setField(2, value);
   @$pb.TagNumber(2)
   $core.bool hasSend() => $_has(1);
   @$pb.TagNumber(2)
   void clearSend() => $_clearField(2);
   @$pb.TagNumber(2)
-  $5.SimpleChannelUser ensureSend() => $_ensure(1);
+  $6.SimpleChannelUser ensureSend() => $_ensure(1);
 
   @$pb.TagNumber(3)
-  $5.SimpleChannelUser get receiver => $_getN(2);
+  $6.SimpleChannelUser get receiver => $_getN(2);
   @$pb.TagNumber(3)
-  set receiver($5.SimpleChannelUser value) => $_setField(3, value);
+  set receiver($6.SimpleChannelUser value) => $_setField(3, value);
   @$pb.TagNumber(3)
   $core.bool hasReceiver() => $_has(2);
   @$pb.TagNumber(3)
   void clearReceiver() => $_clearField(3);
   @$pb.TagNumber(3)
-  $5.SimpleChannelUser ensureReceiver() => $_ensure(2);
+  $6.SimpleChannelUser ensureReceiver() => $_ensure(2);
 
   @$pb.TagNumber(4)
-  $6.ItemInfo get item => $_getN(3);
+  $7.ItemInfo get item => $_getN(3);
   @$pb.TagNumber(4)
-  set item($6.ItemInfo value) => $_setField(4, value);
+  set item($7.ItemInfo value) => $_setField(4, value);
   @$pb.TagNumber(4)
   $core.bool hasItem() => $_has(3);
   @$pb.TagNumber(4)
   void clearItem() => $_clearField(4);
   @$pb.TagNumber(4)
-  $6.ItemInfo ensureItem() => $_ensure(3);
+  $7.ItemInfo ensureItem() => $_ensure(3);
 
   @$pb.TagNumber(5)
   $core.int get itemCount => $_getIZ(4);
@@ -1298,7 +1314,7 @@ class RoomSendGift extends $pb.GeneratedMessage {
   void clearItemCount() => $_clearField(5);
 
   @$pb.TagNumber(6)
-  $pb.PbList<$5.SimpleChannelUser> get receivers => $_getList(5);
+  $pb.PbList<$6.SimpleChannelUser> get receivers => $_getList(5);
 
   @$pb.TagNumber(7)
   BoxItem get boxItem => $_getN(6);
@@ -1332,8 +1348,8 @@ class RoomSendGift extends $pb.GeneratedMessage {
 class RoomMicChange extends $pb.GeneratedMessage {
   factory RoomMicChange({
     $fixnum.Int64? channel,
-    $core.Iterable<$5.SimpleChannelUserSlot>? broadcaster,
-    $5.MicLayoutEnum? micLayout,
+    $core.Iterable<$6.SimpleChannelUserSlot>? broadcaster,
+    $6.MicLayoutEnum? micLayout,
     $core.String? layoutName,
     $core.bool? showRoomOwner,
   }) {
@@ -1361,10 +1377,10 @@ class RoomMicChange extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'channel', $pb.PbFieldType.OU6,
         defaultOrMaker: $fixnum.Int64.ZERO)
-    ..pPM<$5.SimpleChannelUserSlot>(2, _omitFieldNames ? '' : 'broadcaster',
-        subBuilder: $5.SimpleChannelUserSlot.create)
-    ..aE<$5.MicLayoutEnum>(3, _omitFieldNames ? '' : 'micLayout',
-        enumValues: $5.MicLayoutEnum.values)
+    ..pPM<$6.SimpleChannelUserSlot>(2, _omitFieldNames ? '' : 'broadcaster',
+        subBuilder: $6.SimpleChannelUserSlot.create)
+    ..aE<$6.MicLayoutEnum>(3, _omitFieldNames ? '' : 'micLayout',
+        enumValues: $6.MicLayoutEnum.values)
     ..aOS(4, _omitFieldNames ? '' : 'layoutName')
     ..aOB(5, _omitFieldNames ? '' : 'showRoomOwner')
     ..hasRequiredFields = false;
@@ -1398,12 +1414,12 @@ class RoomMicChange extends $pb.GeneratedMessage {
   void clearChannel() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $pb.PbList<$5.SimpleChannelUserSlot> get broadcaster => $_getList(1);
+  $pb.PbList<$6.SimpleChannelUserSlot> get broadcaster => $_getList(1);
 
   @$pb.TagNumber(3)
-  $5.MicLayoutEnum get micLayout => $_getN(2);
+  $6.MicLayoutEnum get micLayout => $_getN(2);
   @$pb.TagNumber(3)
-  set micLayout($5.MicLayoutEnum value) => $_setField(3, value);
+  set micLayout($6.MicLayoutEnum value) => $_setField(3, value);
   @$pb.TagNumber(3)
   $core.bool hasMicLayout() => $_has(2);
   @$pb.TagNumber(3)
@@ -1436,16 +1452,16 @@ class RoomMetaDataChange extends $pb.GeneratedMessage {
     $core.String? title,
     $core.String? theme,
     $core.bool? isPrivacy,
-    $5.RoomType? type,
-    $5.ChannelLabel? label,
-    $5.RoomStatusEnum? status,
+    $6.RoomType? type,
+    $6.ChannelLabel? label,
+    $6.RoomStatusEnum? status,
     $core.String? notice,
     $core.String? backgroundUrl,
     $core.bool? freePub,
     $core.bool? giftValueCountSwitch,
     $core.bool? hasPassword,
     $fixnum.Int64? auditionUid,
-    $5.MicLayoutEnum? micLayout,
+    $6.MicLayoutEnum? micLayout,
     $core.String? layoutName,
     $core.String? labelDesc,
     $core.bool? freePublicChat,
@@ -1493,12 +1509,12 @@ class RoomMetaDataChange extends $pb.GeneratedMessage {
     ..aOS(2, _omitFieldNames ? '' : 'title')
     ..aOS(3, _omitFieldNames ? '' : 'theme')
     ..aOB(4, _omitFieldNames ? '' : 'isPrivacy')
-    ..aE<$5.RoomType>(5, _omitFieldNames ? '' : 'type',
-        enumValues: $5.RoomType.values)
-    ..aE<$5.ChannelLabel>(6, _omitFieldNames ? '' : 'label',
-        enumValues: $5.ChannelLabel.values)
-    ..aE<$5.RoomStatusEnum>(7, _omitFieldNames ? '' : 'status',
-        enumValues: $5.RoomStatusEnum.values)
+    ..aE<$6.RoomType>(5, _omitFieldNames ? '' : 'type',
+        enumValues: $6.RoomType.values)
+    ..aE<$6.ChannelLabel>(6, _omitFieldNames ? '' : 'label',
+        enumValues: $6.ChannelLabel.values)
+    ..aE<$6.RoomStatusEnum>(7, _omitFieldNames ? '' : 'status',
+        enumValues: $6.RoomStatusEnum.values)
     ..aOS(8, _omitFieldNames ? '' : 'notice')
     ..aOS(9, _omitFieldNames ? '' : 'backgroundUrl')
     ..aOB(10, _omitFieldNames ? '' : 'freePub')
@@ -1507,8 +1523,8 @@ class RoomMetaDataChange extends $pb.GeneratedMessage {
     ..a<$fixnum.Int64>(
         13, _omitFieldNames ? '' : 'auditionUid', $pb.PbFieldType.OU6,
         defaultOrMaker: $fixnum.Int64.ZERO)
-    ..aE<$5.MicLayoutEnum>(14, _omitFieldNames ? '' : 'micLayout',
-        enumValues: $5.MicLayoutEnum.values)
+    ..aE<$6.MicLayoutEnum>(14, _omitFieldNames ? '' : 'micLayout',
+        enumValues: $6.MicLayoutEnum.values)
     ..aOS(15, _omitFieldNames ? '' : 'layoutName')
     ..aOS(16, _omitFieldNames ? '' : 'labelDesc')
     ..aOB(17, _omitFieldNames ? '' : 'freePublicChat')
@@ -1572,27 +1588,27 @@ class RoomMetaDataChange extends $pb.GeneratedMessage {
   void clearIsPrivacy() => $_clearField(4);
 
   @$pb.TagNumber(5)
-  $5.RoomType get type => $_getN(4);
+  $6.RoomType get type => $_getN(4);
   @$pb.TagNumber(5)
-  set type($5.RoomType value) => $_setField(5, value);
+  set type($6.RoomType value) => $_setField(5, value);
   @$pb.TagNumber(5)
   $core.bool hasType() => $_has(4);
   @$pb.TagNumber(5)
   void clearType() => $_clearField(5);
 
   @$pb.TagNumber(6)
-  $5.ChannelLabel get label => $_getN(5);
+  $6.ChannelLabel get label => $_getN(5);
   @$pb.TagNumber(6)
-  set label($5.ChannelLabel value) => $_setField(6, value);
+  set label($6.ChannelLabel value) => $_setField(6, value);
   @$pb.TagNumber(6)
   $core.bool hasLabel() => $_has(5);
   @$pb.TagNumber(6)
   void clearLabel() => $_clearField(6);
 
   @$pb.TagNumber(7)
-  $5.RoomStatusEnum get status => $_getN(6);
+  $6.RoomStatusEnum get status => $_getN(6);
   @$pb.TagNumber(7)
-  set status($5.RoomStatusEnum value) => $_setField(7, value);
+  set status($6.RoomStatusEnum value) => $_setField(7, value);
   @$pb.TagNumber(7)
   $core.bool hasStatus() => $_has(6);
   @$pb.TagNumber(7)
@@ -1653,9 +1669,9 @@ class RoomMetaDataChange extends $pb.GeneratedMessage {
   void clearAuditionUid() => $_clearField(13);
 
   @$pb.TagNumber(14)
-  $5.MicLayoutEnum get micLayout => $_getN(13);
+  $6.MicLayoutEnum get micLayout => $_getN(13);
   @$pb.TagNumber(14)
-  set micLayout($5.MicLayoutEnum value) => $_setField(14, value);
+  set micLayout($6.MicLayoutEnum value) => $_setField(14, value);
   @$pb.TagNumber(14)
   $core.bool hasMicLayout() => $_has(13);
   @$pb.TagNumber(14)
@@ -1703,7 +1719,7 @@ class RoomMetaDataChange extends $pb.GeneratedMessage {
 class RoomRealTimeRankChange extends $pb.GeneratedMessage {
   factory RoomRealTimeRankChange({
     $fixnum.Int64? channel,
-    $core.Iterable<$5.SimpleChannelUser>? rank,
+    $core.Iterable<$6.SimpleChannelUser>? rank,
   }) {
     final result = create();
     if (channel != null) result.channel = channel;
@@ -1726,8 +1742,8 @@ class RoomRealTimeRankChange extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'channel', $pb.PbFieldType.OU6,
         defaultOrMaker: $fixnum.Int64.ZERO)
-    ..pPM<$5.SimpleChannelUser>(2, _omitFieldNames ? '' : 'rank',
-        subBuilder: $5.SimpleChannelUser.create)
+    ..pPM<$6.SimpleChannelUser>(2, _omitFieldNames ? '' : 'rank',
+        subBuilder: $6.SimpleChannelUser.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1760,7 +1776,7 @@ class RoomRealTimeRankChange extends $pb.GeneratedMessage {
   void clearChannel() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $pb.PbList<$5.SimpleChannelUser> get rank => $_getList(1);
+  $pb.PbList<$6.SimpleChannelUser> get rank => $_getList(1);
 }
 
 /// *
@@ -1839,8 +1855,8 @@ class RoomGiftValueChange extends $pb.GeneratedMessage {
 class RoomMicQueueChange extends $pb.GeneratedMessage {
   factory RoomMicQueueChange({
     $fixnum.Int64? channel,
-    $core.Iterable<$5.SimpleChannelUserSlot>? waitQueue,
-    $core.Iterable<$5.SimpleChannelUserSlot>? carOwnerMicQueue,
+    $core.Iterable<$6.SimpleChannelUserSlot>? waitQueue,
+    $core.Iterable<$6.SimpleChannelUserSlot>? carOwnerMicQueue,
   }) {
     final result = create();
     if (channel != null) result.channel = channel;
@@ -1865,11 +1881,11 @@ class RoomMicQueueChange extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'channel', $pb.PbFieldType.OU6,
         defaultOrMaker: $fixnum.Int64.ZERO)
-    ..pPM<$5.SimpleChannelUserSlot>(2, _omitFieldNames ? '' : 'waitQueue',
-        subBuilder: $5.SimpleChannelUserSlot.create)
-    ..pPM<$5.SimpleChannelUserSlot>(
+    ..pPM<$6.SimpleChannelUserSlot>(2, _omitFieldNames ? '' : 'waitQueue',
+        subBuilder: $6.SimpleChannelUserSlot.create)
+    ..pPM<$6.SimpleChannelUserSlot>(
         3, _omitFieldNames ? '' : 'carOwnerMicQueue',
-        subBuilder: $5.SimpleChannelUserSlot.create)
+        subBuilder: $6.SimpleChannelUserSlot.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1901,10 +1917,10 @@ class RoomMicQueueChange extends $pb.GeneratedMessage {
   void clearChannel() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $pb.PbList<$5.SimpleChannelUserSlot> get waitQueue => $_getList(1);
+  $pb.PbList<$6.SimpleChannelUserSlot> get waitQueue => $_getList(1);
 
   @$pb.TagNumber(3)
-  $pb.PbList<$5.SimpleChannelUserSlot> get carOwnerMicQueue => $_getList(2);
+  $pb.PbList<$6.SimpleChannelUserSlot> get carOwnerMicQueue => $_getList(2);
 }
 
 /// *
@@ -1912,7 +1928,7 @@ class RoomMicQueueChange extends $pb.GeneratedMessage {
 class RoomVipParkChange extends $pb.GeneratedMessage {
   factory RoomVipParkChange({
     $fixnum.Int64? channel,
-    $core.Iterable<$5.SimpleChannelUser>? vipPark,
+    $core.Iterable<$6.SimpleChannelUser>? vipPark,
   }) {
     final result = create();
     if (channel != null) result.channel = channel;
@@ -1935,8 +1951,8 @@ class RoomVipParkChange extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'channel', $pb.PbFieldType.OU6,
         defaultOrMaker: $fixnum.Int64.ZERO)
-    ..pPM<$5.SimpleChannelUser>(2, _omitFieldNames ? '' : 'vipPark',
-        subBuilder: $5.SimpleChannelUser.create)
+    ..pPM<$6.SimpleChannelUser>(2, _omitFieldNames ? '' : 'vipPark',
+        subBuilder: $6.SimpleChannelUser.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1968,7 +1984,7 @@ class RoomVipParkChange extends $pb.GeneratedMessage {
   void clearChannel() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $pb.PbList<$5.SimpleChannelUser> get vipPark => $_getList(1);
+  $pb.PbList<$6.SimpleChannelUser> get vipPark => $_getList(1);
 }
 
 /// *
@@ -1977,7 +1993,7 @@ class RoomRoleChange extends $pb.GeneratedMessage {
   factory RoomRoleChange({
     $fixnum.Int64? channel,
     $fixnum.Int64? userId,
-    $5.RtcUserRole? role,
+    $6.RtcUserRole? role,
   }) {
     final result = create();
     if (channel != null) result.channel = channel;
@@ -2003,8 +2019,8 @@ class RoomRoleChange extends $pb.GeneratedMessage {
         defaultOrMaker: $fixnum.Int64.ZERO)
     ..a<$fixnum.Int64>(2, _omitFieldNames ? '' : 'userId', $pb.PbFieldType.OU6,
         defaultOrMaker: $fixnum.Int64.ZERO)
-    ..aE<$5.RtcUserRole>(3, _omitFieldNames ? '' : 'role',
-        enumValues: $5.RtcUserRole.values)
+    ..aE<$6.RtcUserRole>(3, _omitFieldNames ? '' : 'role',
+        enumValues: $6.RtcUserRole.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2045,9 +2061,9 @@ class RoomRoleChange extends $pb.GeneratedMessage {
   void clearUserId() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  $5.RtcUserRole get role => $_getN(2);
+  $6.RtcUserRole get role => $_getN(2);
   @$pb.TagNumber(3)
-  set role($5.RtcUserRole value) => $_setField(3, value);
+  set role($6.RtcUserRole value) => $_setField(3, value);
   @$pb.TagNumber(3)
   $core.bool hasRole() => $_has(2);
   @$pb.TagNumber(3)
@@ -2195,7 +2211,7 @@ class RoomFlyingScreen extends $pb.GeneratedMessage {
     $1.SimpleUser? trigger,
     $core.String? icon,
     $core.Iterable<$core.String>? receivers,
-    $7.CarLevel? carLevel,
+    $8.CarLevel? carLevel,
     $core.String? carName,
     $core.String? effectUrl,
     BoxItem? boxItem,
@@ -2240,8 +2256,8 @@ class RoomFlyingScreen extends $pb.GeneratedMessage {
         subBuilder: $1.SimpleUser.create)
     ..aOS(4, _omitFieldNames ? '' : 'icon')
     ..pPS(5, _omitFieldNames ? '' : 'receivers')
-    ..aE<$7.CarLevel>(6, _omitFieldNames ? '' : 'carLevel',
-        enumValues: $7.CarLevel.values)
+    ..aE<$8.CarLevel>(6, _omitFieldNames ? '' : 'carLevel',
+        enumValues: $8.CarLevel.values)
     ..aOS(7, _omitFieldNames ? '' : 'carName')
     ..aOS(8, _omitFieldNames ? '' : 'effectUrl')
     ..aOM<BoxItem>(9, _omitFieldNames ? '' : 'boxItem',
@@ -2315,9 +2331,9 @@ class RoomFlyingScreen extends $pb.GeneratedMessage {
   $pb.PbList<$core.String> get receivers => $_getList(4);
 
   @$pb.TagNumber(6)
-  $7.CarLevel get carLevel => $_getN(5);
+  $8.CarLevel get carLevel => $_getN(5);
   @$pb.TagNumber(6)
-  set carLevel($7.CarLevel value) => $_setField(6, value);
+  set carLevel($8.CarLevel value) => $_setField(6, value);
   @$pb.TagNumber(6)
   $core.bool hasCarLevel() => $_has(5);
   @$pb.TagNumber(6)
@@ -2657,7 +2673,7 @@ class CrateFlyingScreenItem extends $pb.GeneratedMessage {
 class RoomManage extends $pb.GeneratedMessage {
   factory RoomManage({
     $fixnum.Int64? channel,
-    $5.ManagerOperation? operation,
+    $6.ManagerOperation? operation,
     $fixnum.Int64? managerId,
     $fixnum.Int64? userId,
     $core.String? text,
@@ -2686,8 +2702,8 @@ class RoomManage extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'channel', $pb.PbFieldType.OU6,
         defaultOrMaker: $fixnum.Int64.ZERO)
-    ..aE<$5.ManagerOperation>(2, _omitFieldNames ? '' : 'operation',
-        enumValues: $5.ManagerOperation.values)
+    ..aE<$6.ManagerOperation>(2, _omitFieldNames ? '' : 'operation',
+        enumValues: $6.ManagerOperation.values)
     ..a<$fixnum.Int64>(
         3, _omitFieldNames ? '' : 'managerId', $pb.PbFieldType.OU6,
         defaultOrMaker: $fixnum.Int64.ZERO)
@@ -2724,9 +2740,9 @@ class RoomManage extends $pb.GeneratedMessage {
   void clearChannel() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $5.ManagerOperation get operation => $_getN(1);
+  $6.ManagerOperation get operation => $_getN(1);
   @$pb.TagNumber(2)
-  set operation($5.ManagerOperation value) => $_setField(2, value);
+  set operation($6.ManagerOperation value) => $_setField(2, value);
   @$pb.TagNumber(2)
   $core.bool hasOperation() => $_has(1);
   @$pb.TagNumber(2)
@@ -2765,10 +2781,10 @@ class RoomManage extends $pb.GeneratedMessage {
 class RoomUserJoin extends $pb.GeneratedMessage {
   factory RoomUserJoin({
     $fixnum.Int64? channel,
-    $5.SimpleChannelUser? user,
+    $6.SimpleChannelUser? user,
     $core.int? count,
-    $5.JoinSource? joinSource,
-    $5.SimpleChannelUser? anotherUser,
+    $6.JoinSource? joinSource,
+    $6.SimpleChannelUser? anotherUser,
     RoomEffect? effect,
   }) {
     final result = create();
@@ -2796,13 +2812,13 @@ class RoomUserJoin extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'channel', $pb.PbFieldType.OU6,
         defaultOrMaker: $fixnum.Int64.ZERO)
-    ..aOM<$5.SimpleChannelUser>(2, _omitFieldNames ? '' : 'user',
-        subBuilder: $5.SimpleChannelUser.create)
+    ..aOM<$6.SimpleChannelUser>(2, _omitFieldNames ? '' : 'user',
+        subBuilder: $6.SimpleChannelUser.create)
     ..aI(3, _omitFieldNames ? '' : 'count', fieldType: $pb.PbFieldType.OU3)
-    ..aE<$5.JoinSource>(4, _omitFieldNames ? '' : 'joinSource',
-        enumValues: $5.JoinSource.values)
-    ..aOM<$5.SimpleChannelUser>(5, _omitFieldNames ? '' : 'anotherUser',
-        subBuilder: $5.SimpleChannelUser.create)
+    ..aE<$6.JoinSource>(4, _omitFieldNames ? '' : 'joinSource',
+        enumValues: $6.JoinSource.values)
+    ..aOM<$6.SimpleChannelUser>(5, _omitFieldNames ? '' : 'anotherUser',
+        subBuilder: $6.SimpleChannelUser.create)
     ..aOM<RoomEffect>(6, _omitFieldNames ? '' : 'effect',
         subBuilder: RoomEffect.create)
     ..hasRequiredFields = false;
@@ -2836,15 +2852,15 @@ class RoomUserJoin extends $pb.GeneratedMessage {
   void clearChannel() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $5.SimpleChannelUser get user => $_getN(1);
+  $6.SimpleChannelUser get user => $_getN(1);
   @$pb.TagNumber(2)
-  set user($5.SimpleChannelUser value) => $_setField(2, value);
+  set user($6.SimpleChannelUser value) => $_setField(2, value);
   @$pb.TagNumber(2)
   $core.bool hasUser() => $_has(1);
   @$pb.TagNumber(2)
   void clearUser() => $_clearField(2);
   @$pb.TagNumber(2)
-  $5.SimpleChannelUser ensureUser() => $_ensure(1);
+  $6.SimpleChannelUser ensureUser() => $_ensure(1);
 
   @$pb.TagNumber(3)
   $core.int get count => $_getIZ(2);
@@ -2856,24 +2872,24 @@ class RoomUserJoin extends $pb.GeneratedMessage {
   void clearCount() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  $5.JoinSource get joinSource => $_getN(3);
+  $6.JoinSource get joinSource => $_getN(3);
   @$pb.TagNumber(4)
-  set joinSource($5.JoinSource value) => $_setField(4, value);
+  set joinSource($6.JoinSource value) => $_setField(4, value);
   @$pb.TagNumber(4)
   $core.bool hasJoinSource() => $_has(3);
   @$pb.TagNumber(4)
   void clearJoinSource() => $_clearField(4);
 
   @$pb.TagNumber(5)
-  $5.SimpleChannelUser get anotherUser => $_getN(4);
+  $6.SimpleChannelUser get anotherUser => $_getN(4);
   @$pb.TagNumber(5)
-  set anotherUser($5.SimpleChannelUser value) => $_setField(5, value);
+  set anotherUser($6.SimpleChannelUser value) => $_setField(5, value);
   @$pb.TagNumber(5)
   $core.bool hasAnotherUser() => $_has(4);
   @$pb.TagNumber(5)
   void clearAnotherUser() => $_clearField(5);
   @$pb.TagNumber(5)
-  $5.SimpleChannelUser ensureAnotherUser() => $_ensure(4);
+  $6.SimpleChannelUser ensureAnotherUser() => $_ensure(4);
 
   @$pb.TagNumber(6)
   RoomEffect get effect => $_getN(5);
@@ -3011,7 +3027,7 @@ class RoomMicLink extends $pb.GeneratedMessage {
 ///  麦下列表变动消息
 class RoomOffMicChange extends $pb.GeneratedMessage {
   factory RoomOffMicChange({
-    $core.Iterable<$5.OffMicUser>? offMicUser,
+    $core.Iterable<$6.OffMicUser>? offMicUser,
   }) {
     final result = create();
     if (offMicUser != null) result.offMicUser.addAll(offMicUser);
@@ -3031,8 +3047,8 @@ class RoomOffMicChange extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'RoomOffMicChange',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'message'),
       createEmptyInstance: create)
-    ..pPM<$5.OffMicUser>(1, _omitFieldNames ? '' : 'offMicUser',
-        subBuilder: $5.OffMicUser.create)
+    ..pPM<$6.OffMicUser>(1, _omitFieldNames ? '' : 'offMicUser',
+        subBuilder: $6.OffMicUser.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -3055,7 +3071,7 @@ class RoomOffMicChange extends $pb.GeneratedMessage {
   static RoomOffMicChange? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $pb.PbList<$5.OffMicUser> get offMicUser => $_getList(0);
+  $pb.PbList<$6.OffMicUser> get offMicUser => $_getList(0);
 }
 
 /// *
@@ -3595,7 +3611,7 @@ class RoomInvite extends $pb.GeneratedMessage {
     $core.Iterable<$core.String>? tagColors,
     $core.String? tagIcon,
     $core.String? roomIcon,
-    $5.GameInfo? gameInfo,
+    $6.GameInfo? gameInfo,
     $fixnum.Int64? fromUid,
     $fixnum.Int64? toUid,
     UserInfoItem? fromUserInfo,
@@ -3639,8 +3655,8 @@ class RoomInvite extends $pb.GeneratedMessage {
     ..pPS(6, _omitFieldNames ? '' : 'tagColors')
     ..aOS(7, _omitFieldNames ? '' : 'tagIcon')
     ..aOS(8, _omitFieldNames ? '' : 'roomIcon')
-    ..aOM<$5.GameInfo>(9, _omitFieldNames ? '' : 'gameInfo',
-        subBuilder: $5.GameInfo.create)
+    ..aOM<$6.GameInfo>(9, _omitFieldNames ? '' : 'gameInfo',
+        subBuilder: $6.GameInfo.create)
     ..aInt64(10, _omitFieldNames ? '' : 'fromUid')
     ..aInt64(11, _omitFieldNames ? '' : 'toUid')
     ..aOM<UserInfoItem>(12, _omitFieldNames ? '' : 'fromUserInfo',
@@ -3734,15 +3750,15 @@ class RoomInvite extends $pb.GeneratedMessage {
   void clearRoomIcon() => $_clearField(8);
 
   @$pb.TagNumber(9)
-  $5.GameInfo get gameInfo => $_getN(8);
+  $6.GameInfo get gameInfo => $_getN(8);
   @$pb.TagNumber(9)
-  set gameInfo($5.GameInfo value) => $_setField(9, value);
+  set gameInfo($6.GameInfo value) => $_setField(9, value);
   @$pb.TagNumber(9)
   $core.bool hasGameInfo() => $_has(8);
   @$pb.TagNumber(9)
   void clearGameInfo() => $_clearField(9);
   @$pb.TagNumber(9)
-  $5.GameInfo ensureGameInfo() => $_ensure(8);
+  $6.GameInfo ensureGameInfo() => $_ensure(8);
 
   @$pb.TagNumber(10)
   $fixnum.Int64 get fromUid => $_getI64(9);
@@ -3790,7 +3806,7 @@ class RoomInvite extends $pb.GeneratedMessage {
 class RoomFloatMsgCmd extends $pb.GeneratedMessage {
   factory RoomFloatMsgCmd({
     $fixnum.Int64? channel,
-    $5.SimpleChannelUser? sender,
+    $6.SimpleChannelUser? sender,
     $core.String? content,
   }) {
     final result = create();
@@ -3815,8 +3831,8 @@ class RoomFloatMsgCmd extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'channel', $pb.PbFieldType.OU6,
         defaultOrMaker: $fixnum.Int64.ZERO)
-    ..aOM<$5.SimpleChannelUser>(2, _omitFieldNames ? '' : 'sender',
-        subBuilder: $5.SimpleChannelUser.create)
+    ..aOM<$6.SimpleChannelUser>(2, _omitFieldNames ? '' : 'sender',
+        subBuilder: $6.SimpleChannelUser.create)
     ..aOS(3, _omitFieldNames ? '' : 'content')
     ..hasRequiredFields = false;
 
@@ -3849,15 +3865,15 @@ class RoomFloatMsgCmd extends $pb.GeneratedMessage {
   void clearChannel() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $5.SimpleChannelUser get sender => $_getN(1);
+  $6.SimpleChannelUser get sender => $_getN(1);
   @$pb.TagNumber(2)
-  set sender($5.SimpleChannelUser value) => $_setField(2, value);
+  set sender($6.SimpleChannelUser value) => $_setField(2, value);
   @$pb.TagNumber(2)
   $core.bool hasSender() => $_has(1);
   @$pb.TagNumber(2)
   void clearSender() => $_clearField(2);
   @$pb.TagNumber(2)
-  $5.SimpleChannelUser ensureSender() => $_ensure(1);
+  $6.SimpleChannelUser ensureSender() => $_ensure(1);
 
   @$pb.TagNumber(3)
   $core.String get content => $_getSZ(2);

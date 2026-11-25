@@ -17,7 +17,16 @@ abstract final class ImCustomEvents {
   static const String recallAlt = 'recallMessage';
   static const String joinGroup = 'JoinGroupMessage';
 
+  /// Heart Link 用户邀请（增长/匹配）。
+  static const String heartLinkInvite = 'heart_link_invite';
+
+  /// Heart Link 嘉宾邀请（Host 邀 GS）。
+  static const String heartLinkInviteGs = 'heart_link_invite_gs';
+
   /// 是否为房间邀请（V1 / V2）。
   static bool isRoomInvite(String event) =>
       event == roomInvite || event == roomInviteV2;
+
+  static bool isHeartLinkInvite(String event) =>
+      event == heartLinkInvite || event == heartLinkInviteGs;
 }

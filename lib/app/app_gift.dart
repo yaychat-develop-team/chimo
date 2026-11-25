@@ -31,6 +31,7 @@ abstract final class AppGift {
     String receiverUid = '',
     String receiverName = '',
     String receiverAvatar = '',
+    int preferredGiftId = 0,
     bool popCurrent = false,
   }) async {
     if (popCurrent) {
@@ -51,6 +52,7 @@ abstract final class AppGift {
         preferredUid: receiverUid,
         preferredName: receiverName,
         preferredAvatar: receiverAvatar,
+        preferredGiftId: preferredGiftId,
       );
       return null;
     }
@@ -75,6 +77,7 @@ abstract final class AppGift {
         channelId: '',
         receivers: receivers,
         preferredUid: uid,
+        preferredGiftId: preferredGiftId,
         returnResult: scene == AppGiftScene.chat,
       ),
     );

@@ -15,29 +15,29 @@ import 'im_system_accounts.dart';
 /// 只做解析和预览文案，不连接、不发送、不持有会话流。
 /// 当前登录的环信用户 id 由调用方传入，避免这里回头依赖 IM 门面。
 abstract final class ImMessageCodec {
-  static String previewText(EMMessage message) {
+  static String previewText(ChatMessage message) {
     final body = message.body;
-    if (body is EMTextMessageBody) {
+    if (body is ChatTextMessageBody) {
       final emote = _emoteFromAttributes(message.attributes);
       if (emote != null) {
         return emote.name.isEmpty ? '[Sticker]' : '[${emote.name}]';
       }
       return AppEmoji.normalize(body.content);
     }
-    if (body is EMImageMessageBody) return '[Image]';
-    if (body is EMVoiceMessageBody) {
+    if (body is ChatImageMessageBody) return '[Image]';
+    if (body is ChatVoiceMessageBody) {
       final d = body.duration;
       return d > 0 ? '[Voice] $d"' : '[Voice]';
     }
-    if (body is EMCustomMessageBody) {
+    if (body is ChatCustomMessageBody) {
       return _customPreview(body, message: message);
     }
     return '[Message]';
   }
 
   static String _customPreview(
-    EMCustomMessageBody body, {
-    required EMMessage message,
+    ChatCustomMessageBody body, {
+    required ChatMessage message,
   }) {
     final event = body.event;
     final params = body.params;
@@ -53,6 +53,9 @@ abstract final class ImMessageCodec {
       case ImCustomEvents.roomInvite:
       case ImCustomEvents.roomInviteV2:
         return '[Room Invitation]';
+      case ImCustomEvents.heartLinkInvite:
+      case ImCustomEvents.heartLinkInviteGs:
+        return '[Heart Link Invitation]';
       case 'share_user_msg':
         return '[Friend Referral]';
       case 'im_prick_message':
@@ -145,7 +148,7 @@ abstract final class ImMessageCodec {
   }
 
   static ImChatMessage? fromEm(
-    EMMessage message, {
+    ChatMessage message, {
     bool forceSelf = false,
     String selfEmUser = '',
   }) {
@@ -157,7 +160,7 @@ abstract final class ImMessageCodec {
     var thumb = '';
     var durationSecs = 0;
 
-    if (body is EMTextMessageBody) {
+    if (body is ChatTextMessageBody) {
       text = AppEmoji.normalize(body.content);
       final emote = _emoteFromAttributes(message.attributes);
       if (emote != null) {
@@ -175,7 +178,7 @@ abstract final class ImMessageCodec {
           emoteName: emote.name,
         );
       }
-    } else if (body is EMImageMessageBody) {
+    } else if (body is ChatImageMessageBody) {
       type = 'image';
       local = _pickLocal(body.localPath);
       remote = _pickRemote(body.remotePath);
@@ -183,13 +186,13 @@ abstract final class ImMessageCodec {
       final thumbLocal = _pickLocal(body.thumbnailLocalPath);
       thumb = thumbRemote.isNotEmpty ? thumbRemote : thumbLocal;
       text = '[Image]';
-    } else if (body is EMVoiceMessageBody) {
+    } else if (body is ChatVoiceMessageBody) {
       type = 'voice';
       local = _pickLocal(body.localPath);
       remote = _pickRemote(body.remotePath);
       durationSecs = body.duration;
       text = durationSecs > 0 ? '[Voice] $durationSecs"' : '[Voice]';
-    } else if (body is EMCustomMessageBody) {
+    } else if (body is ChatCustomMessageBody) {
       final mapped = _mapCustomBody(
         body,
         message: message,
@@ -236,7 +239,7 @@ abstract final class ImMessageCodec {
   }
 
   static ImChatMessage _finishEm(
-    EMMessage message, {
+    ChatMessage message, {
     required bool forceSelf,
     required String selfEmUser,
     required String text,
@@ -300,7 +303,7 @@ abstract final class ImMessageCodec {
     );
   }
 
-  static ImChatMessage _attachQuote(ImChatMessage msg, EMMessage message) {
+  static ImChatMessage _attachQuote(ImChatMessage msg, ChatMessage message) {
     final quote = ImQuoteMsg.fromAttributes(message.attributes);
     if (quote == null) return msg;
     return ImChatMessage(
@@ -365,8 +368,8 @@ abstract final class ImMessageCodec {
   }
 
   static ImChatMessage? _mapCustomBody(
-    EMCustomMessageBody body, {
-    required EMMessage message,
+    ChatCustomMessageBody body, {
+    required ChatMessage message,
     bool forceSelf = false,
     String selfEmUser = '',
   }) {

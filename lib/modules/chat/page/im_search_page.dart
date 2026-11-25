@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:chimo/common/widgets/line_loading_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -13,7 +11,7 @@ import 'package:chimo/common/utils/chimo.dart';
 import '../../../common/widgets/app_scaffold.dart';
 import '../../../common/utils/time_fmt.dart';
 import '../logic/im_search_logic.dart';
-import '../model/chat_conversation.dart';
+import '../model/conversation_model.dart';
 import '../model/im_search_hit.dart';
 
 /// IM 搜索：会话昵称 + 近 30 天文本消息（对齐 forya ImSearchPage 逻辑，页面样式不追求还原）。
@@ -21,7 +19,7 @@ class ImSearchPage extends StatefulWidget {
   const ImSearchPage({super.key, this.scopeConversation});
 
   /// 搜索范围：非空 = 只搜这一个会话（私聊「更多 → Search」）。
-  final ChatConversation? scopeConversation;
+  final ConversationModel? scopeConversation;
 
   @override
   State<ImSearchPage> createState() => _ImSearchPageState();
@@ -45,7 +43,6 @@ class _ImSearchPageState extends State<ImSearchPage> {
       logic = Get.put(ImSearchLogic(scopeConversation: widget.scopeConversation));
       _ownsController = true;
     }
-    _controller.addListener(() => setState(() {}));
     // 历史记录由 Controller 的 onReady（首帧后）读，这里只抢焦点。
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _focusNode.requestFocus();
@@ -129,17 +126,22 @@ class _ImSearchPageState extends State<ImSearchPage> {
                           hintStyle: const TextStyle(color: AppColors.gray6E6E6E, fontSize: 15),
                         ),
                         onChanged: logic.onChanged,
-                        onSubmitted: (v) => unawaited(logic.submit(v)),
+                        onSubmitted: (v) => logic.submit(v),
                       ),
                     ),
-                    if (_controller.text.isNotEmpty)
-                      GestureDetector(
-                        onTap: () {
-                          _controller.clear();
-                          logic.onChanged('');
-                        },
-                        child: const Icon(Icons.close, size: 18, color: AppColors.gray6E6E6E),
-                      ),
+                    ValueListenableBuilder<TextEditingValue>(
+                      valueListenable: _controller,
+                      builder: (context, value, _) {
+                        if (value.text.isEmpty) return const SizedBox.shrink();
+                        return GestureDetector(
+                          onTap: () {
+                            _controller.clear();
+                            logic.onChanged('');
+                          },
+                          child: const Icon(Icons.close, size: 18, color: AppColors.gray6E6E6E),
+                        );
+                      },
+                    ),
                   ],
                 ),
               ),
@@ -205,7 +207,7 @@ class _ImSearchPageState extends State<ImSearchPage> {
               onTap: () {
                 _controller.text = h;
                 _controller.selection = TextSelection.collapsed(offset: h.length);
-                unawaited(logic.search(h));
+                logic.search(h);
               },
               onLongPress: () => logic.removeHistory(h),
               child: Container(
@@ -278,7 +280,7 @@ class _ImSearchPageState extends State<ImSearchPage> {
 class _ContactRow extends StatelessWidget {
   const _ContactRow({required this.conversation, required this.onChat});
 
-  final ChatConversation conversation;
+  final ConversationModel conversation;
   final VoidCallback onChat;
 
   @override

@@ -7,7 +7,7 @@ import '../../../../common/theme/app_colors.dart';
 /// 青绿昵称 + 灰色 `joined the community`，点昵称与点头像一样弹资料层）。
 ///
 /// 没有样式包：这一行两边**只有群聊有**，没有第二套设计值可对照。
-class ChatJoinTip extends StatelessWidget {
+class ChatJoinTip extends StatefulWidget {
   const ChatJoinTip({super.key, required this.name, this.onNameTap});
 
   /// 入群者昵称（`ChatLine.joinName`）。空串显示 `Someone`。
@@ -16,12 +16,49 @@ class ChatJoinTip extends StatelessWidget {
   /// 点昵称。为 null 时昵称不可点。
   final VoidCallback? onNameTap;
 
+  @override
+  State<ChatJoinTip> createState() => _ChatJoinTipState();
+}
+
+class _ChatJoinTipState extends State<ChatJoinTip> {
   static const _nameColor = AppColors.green00D68F;
   static const _restColor = AppColors.grayC8C8C8;
 
+  TapGestureRecognizer? _nameTap;
+
+  @override
+  void initState() {
+    super.initState();
+    _bindTap();
+  }
+
+  @override
+  void didUpdateWidget(ChatJoinTip oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.onNameTap != widget.onNameTap) _bindTap();
+  }
+
+  @override
+  void dispose() {
+    _nameTap?.dispose();
+    super.dispose();
+  }
+
+  void _bindTap() {
+    final tap = widget.onNameTap;
+    if (tap == null) {
+      _nameTap?.dispose();
+      _nameTap = null;
+      return;
+    }
+    _nameTap ??= TapGestureRecognizer();
+    _nameTap!.onTap = tap;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final display = name.trim().isEmpty ? 'Someone' : name.trim();
+    final name = widget.name.trim();
+    final display = name.isEmpty ? 'Someone' : name;
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -36,9 +73,7 @@ class ChatJoinTip extends StatelessWidget {
                   fontWeight: FontWeight.w500,
                   height: 1.3,
                 ),
-                recognizer: onNameTap == null
-                    ? null
-                    : (TapGestureRecognizer()..onTap = onNameTap),
+                recognizer: _nameTap,
               ),
               const TextSpan(
                 text: '  joined the community',

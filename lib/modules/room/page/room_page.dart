@@ -1,4 +1,3 @@
-import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -8,6 +7,7 @@ import 'package:forya_pag/pag.dart';
 import '../../../app/app_gift.dart';
 import '../../../app/app_jumper.dart';
 import '../../../common/constants/app_assets.dart';
+import '../../../common/models/server_client/rtc.pbenum.dart';
 import '../../../common/theme/app_colors.dart';
 import '../../../common/theme/app_dialog.dart';
 import 'package:chimo/common/utils/chimo.dart';
@@ -22,20 +22,23 @@ import '../types/auction/logic/auction_logic.dart';
 import '../types/auction/widgets/auction_bid_bar.dart';
 import 'widgets/room_barrage_list.dart';
 import 'widgets/room_bulletin_dialog.dart';
+import 'widgets/room_entrance_banner_layer.dart';
 import 'widgets/room_gift_layer.dart';
 import 'widgets/room_input_bar.dart';
 import 'widgets/room_join_layer.dart';
 import 'widgets/room_lyric_layer.dart';
 import 'widgets/room_mic_grid.dart';
 import 'widgets/room_mic_remain_dialog.dart';
+import 'widgets/room_open_mic_tip.dart';
 import 'widgets/room_rank_sheet.dart';
 import 'widgets/room_tools_sheet.dart';
 import 'widgets/room_top_bar.dart';
 
 class RoomPage extends StatefulWidget {
-  const RoomPage({super.key, required this.rid});
+  const RoomPage({super.key, required this.rid, this.joinSource});
 
   final int rid;
+  final JoinSource? joinSource;
 
   @override
   State<RoomPage> createState() => _RoomPageState();
@@ -58,7 +61,7 @@ class _RoomPageState extends State<RoomPage> {
     if (Get.isRegistered<RoomLogic>() && !Get.find<RoomLogic>().pageMounted) {
       RoomLogic.release();
     }
-    logic = Get.put(RoomLogic(widget.rid));
+    logic = Get.put(RoomLogic(widget.rid, joinSource: widget.joinSource));
     logic.pageMounted = true;
     _phaseWorker = ever(logic.phase, _onPhase);
   }
@@ -90,9 +93,9 @@ class _RoomPageState extends State<RoomPage> {
     if (!Get.isRegistered<MicLogic>()) return;
     final mic = Get.find<MicLogic>();
     _micAlertWorker = ever(mic.insufficientPrompt, (show) {
-      if (show == true) unawaited(_insufficientMic());
+      if (show == true) _insufficientMic();
     });
-    if (mic.insufficientPrompt.value) unawaited(_insufficientMic());
+    if (mic.insufficientPrompt.value) _insufficientMic();
   }
 
   /// 麦上剩余 ≤30 秒弹一次；点 Send Gift 打开礼物面板。
@@ -319,6 +322,12 @@ class _RoomPageState extends State<RoomPage> {
                                   child: RoomJoinLayer(),
                                 ),
                                 Positioned(
+                                  top: 0,
+                                  left: 0,
+                                  right: 0,
+                                  child: RoomEntranceBannerLayer(),
+                                ),
+                                Positioned(
                                   right: 8,
                                   bottom: 8,
                                   child: _GamesButton(),
@@ -348,6 +357,8 @@ class _RoomPageState extends State<RoomPage> {
             // 歌词在上便于拖动；空态 shrink，不挡 PAG。礼物层保持可被 VisibilityDetector 看见。
             const Positioned.fill(child: RoomLyricLayer()),
             Positioned.fill(child: RoomGiftPag(key: _giftPagKey)),
+            // 开麦气泡用麦钮 GlobalKey 全局坐标，挂在最外层 Stack。
+            const RoomOpenMicTip(),
           ],
         ),
       ),

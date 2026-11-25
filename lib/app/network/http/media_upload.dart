@@ -20,6 +20,23 @@ abstract final class MediaUpload {
   static const cdnDomain = 'https://cdn.echimo.com';
   static const _maxAttempts = 3;
 
+  /// 相册 / 媒体 URL → 服务端存的 key（去掉 CDN 域名，保证以 `/` 开头）。
+  static String storedKey(String url) {
+    var text = url.trim();
+    if (text.startsWith(cdnDomain)) {
+      text = text.substring(cdnDomain.length);
+    } else {
+      try {
+        final uri = Uri.parse(text);
+        if (uri.hasScheme && uri.host.isNotEmpty) text = uri.path;
+      } catch (_) {
+        // 不是合法 URI（服务端偶尔给相对 key）：按原样当 key 用。
+      }
+    }
+    if (text.isEmpty) return url.trim();
+    return text.startsWith('/') ? text : '/$text';
+  }
+
   /// 单张图上传的并发上限（多图时用）。
   static const _maxConcurrent = 3;
 
@@ -40,6 +57,42 @@ abstract final class MediaUpload {
     UploadProgress? onProgress,
   }) =>
       uploadFile(path, sceneCode: videoScene, onProgress: onProgress);
+
+  /// 上传内存字节（视频封面等）。对齐 joyride `S3UploadApi.uploadBytes`。
+  static Future<String?> uploadBytes(
+    List<int> bytes, {
+    int sceneCode = imageScene,
+    String filename = 'image.jpg',
+    UploadProgress? onProgress,
+  }) async {
+    if (bytes.isEmpty) {
+      AppLog.w('MediaUpload bytes is empty');
+      return null;
+    }
+    final name = _filenameForScene(filename, sceneCode);
+    final signedUrl = await ChimoApis.upload.getUploadUrl(
+      filename: name,
+      sceneCode: sceneCode,
+    );
+    if (signedUrl == null || signedUrl.isEmpty) {
+      AppLog.w('MediaUpload signedUrl is null (bytes)');
+      return null;
+    }
+    var contentType = (sceneCode == voiceScene || sceneCode == videoScene)
+        ? 'application/octet-stream'
+        : _guessMime(name);
+    if (sceneCode == imageScene && contentType == 'application/octet-stream') {
+      contentType = 'image/jpeg';
+    }
+    final ok = await _putBytesWithDioRetry(
+      signedUrl: signedUrl,
+      bytes: bytes,
+      contentType: contentType,
+      onProgress: onProgress,
+    );
+    if (!ok) return null;
+    return _toCdnUrl(signedUrl);
+  }
 
   /// 批量上传图片。保持原本并发限制。
   static Future<List<String>> uploadImages(
@@ -131,6 +184,37 @@ abstract final class MediaUpload {
     required int length,
     required String contentType,
     UploadProgress? onProgress,
+  }) {
+    return _putStreamWithDioRetry(
+      signedUrl: signedUrl,
+      streamBuilder: file.openRead,
+      length: length,
+      contentType: contentType,
+      onProgress: onProgress,
+    );
+  }
+
+  static Future<bool> _putBytesWithDioRetry({
+    required String signedUrl,
+    required List<int> bytes,
+    required String contentType,
+    UploadProgress? onProgress,
+  }) {
+    return _putStreamWithDioRetry(
+      signedUrl: signedUrl,
+      streamBuilder: () => Stream<List<int>>.value(bytes),
+      length: bytes.length,
+      contentType: contentType,
+      onProgress: onProgress,
+    );
+  }
+
+  static Future<bool> _putStreamWithDioRetry({
+    required String signedUrl,
+    required Stream<List<int>> Function() streamBuilder,
+    required int length,
+    required String contentType,
+    UploadProgress? onProgress,
   }) async {
     final uploadDio = Dio(
       BaseOptions(
@@ -144,10 +228,9 @@ abstract final class MediaUpload {
     Object? lastError;
     for (var attempt = 1; attempt <= _maxAttempts; attempt++) {
       try {
-        final stream = file.openRead();
         final response = await uploadDio.put(
           signedUrl,
-          data: stream,
+          data: streamBuilder(),
           options: Options(
             headers: {
               Headers.contentTypeHeader: contentType,

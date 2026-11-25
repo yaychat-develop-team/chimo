@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:fixnum/fixnum.dart';
 import 'package:get/get.dart';
 import 'package:im_flutter_sdk/im_flutter_sdk.dart';
@@ -8,35 +6,28 @@ import '../../../app/service/im_service.dart';
 import '../../../app/chimo_api.dart';
 import '../../../common/extensions/wire_view.dart';
 import '../../../common/models/server_client/base.pbenum.dart';
+import '../../../common/models/server_client/couple.pb.dart';
 import '../../../common/models/server_client/emote.pb.dart';
 import '../../../common/models/server_client/user.pb.dart';
 import '../../../common/theme/app_dialog.dart';
 import '../../../common/utils/app_log.dart';
 import '../../../common/utils/app_toast.dart';
+import '../../../common/utils/cache_util.dart';
 import '../../../common/utils/zodiac.dart';
-import '../model/chat_conversation.dart';
+import '../../room/types/romance/widgets/romance_success_dialog.dart';
+import '../../room/types/romance/widgets/send_gift_dialog.dart';
+import '../model/conversation_model.dart';
 import '../model/chat_line.dart';
 import 'chat_base_logic.dart';
 
 /// 私聊会话的状态与动作。
-///
-/// **两刀都已落地**：第一刀搬数据（消息流、去重集合、历史游标、对端资料），
-/// 第二刀搬动作（取资料、拉历史、收发、重试、关注、拉黑）。
-///
-/// 留在 View 里的只有 widget 自己的东西，判据是「需要 `BuildContext` 或
-/// widget 句柄」：滚动位置、`GlobalKey`、输入框 `TextEditingController`、
-/// 长按气泡的 `Rect` 锚点、面板相位与动画。
-///
-/// 这些东西 Controller 碰不到，所以走**钩子**：View 在 `initState` 里注册
-/// [onScrollToBottom] / [onHistoryAnchorSave] / [onHistoryAnchorRestore]，
-/// Controller 只在该滚的时候喊一声，不认识 `ScrollController`
 class DmChatLogic extends ChatBaseLogic {
   DmChatLogic({required this.seed});
 
   /// `ChatDetailPage` 构造参数传进来的首帧会话（可能只是个空骨架）。
-  final ChatConversation seed;
+  final ConversationModel seed;
 
-  late final Rx<ChatConversation> conversation = seed.obs;
+  late final Rx<ConversationModel> conversation = seed.obs;
   final Rxn<User> peerProfile = Rxn<User>();
   final RxBool following = false.obs;
   final RxBool blocked = false.obs;
@@ -48,6 +39,29 @@ class DmChatLogic extends ChatBaseLogic {
 
   /// 后端数字用户 id（关注 / 拉黑 / 礼物）。与环信 id 不同。
   final RxString peerAppUid = ''.obs;
+
+  /// 对端是否 Heartie（私聊顶栏标签）。
+  final RxBool isHeartie = false.obs;
+
+  /// 21 日情侣活动数据。对齐 joyride `ChatController.activityInfo`。
+  final Rxn<ActivityBaseInfo> romanceActivity = Rxn<ActivityBaseInfo>();
+
+  bool get showRomance {
+    final info = romanceActivity.value;
+    return info != null && info.id.toInt() > 0;
+  }
+
+  bool get hasRomanceClaim {
+    final info = romanceActivity.value;
+    return info != null && info.hasClaimItem() && info.claimItem.id.toInt() > 0;
+  }
+
+  Worker? _romanceMsgWorker;
+  var _romanceCheckInFlight = false;
+
+  /// 本会话已请求过 check，避免消息变更反复打接口（不写「永久失败」缓存）。
+  var _romanceCheckedThisSession = false;
+  var _romanceClaiming = false;
 
   /// 滚到底部。`force` 走「首帧连续多次 jump」那条路径（见 View 里的实现）。
   void Function({bool force, bool animated})? onScrollToBottom;
@@ -69,13 +83,17 @@ class DmChatLogic extends ChatBaseLogic {
     final em = imConversationId;
     chats.setActiveConversation(em.isNotEmpty ? em : seed.id);
     if (em.isNotEmpty) {
-      unawaited(ImService.markConversationRead(em));
+      ImService.markConversationRead(em);
+      // 历史与资料并行：不要等 profile / 拉黑接口完再拉消息。
+      loadImHistory(em);
     }
-    unawaited(loadFromApi());
+    _romanceMsgWorker = ever(messages, (_) => _showRomanceDialogIfNeed());
+    loadFromApi();
   }
 
   @override
   void onClose() {
+    _romanceMsgWorker?.dispose();
     chats.setActiveConversation(null);
     super.onClose();
   }
@@ -185,7 +203,6 @@ class DmChatLogic extends ChatBaseLogic {
       final selfFuture = ChimoApis.user.profile();
       final peerRes = await peerFuture;
       final selfRes = await selfFuture;
-      await ImService.connectFromServer();
       if (isClosed) return;
 
       final peer = peerRes.data?.user;
@@ -193,11 +210,10 @@ class DmChatLogic extends ChatBaseLogic {
       if (peer != null && peer.id > Int64.ZERO) {
         appUid = peer.uid;
       }
-      var isBlocked = false;
-      if (appUid.isNotEmpty) {
-        final blackRes = await ChimoApis.relation.isBlocked(appUid);
-        isBlocked = blackRes.data ?? false;
-      }
+      // 拉黑状态不挡历史：与资料刷新并行即可。
+      final blockedFuture = appUid.isNotEmpty
+          ? ChimoApis.relation.isBlocked(appUid)
+          : Future.value(ApiResult<bool>.ok(false));
 
       if (peer != null) {
         final em = peer.emUsername.isNotEmpty
@@ -218,11 +234,14 @@ class DmChatLogic extends ChatBaseLogic {
           momentUrls: peer.approvedPics,
           momentAssets: peer.approvedPics.isEmpty ? conversation.value.momentAssets : const [],
           emUserName: em,
+          appUid: appUid,
+          coupleRelationLevel: peer.coupleRelationLevel > 0
+              ? peer.coupleRelationLevel
+              : conversation.value.coupleRelationLevel,
         );
         peerProfile.value = peer;
         conversation.value = updated;
         following.value = peer.following;
-        blocked.value = isBlocked;
         blockedByPeer.value = peerBlockedYou;
         selfAvatarUrl.value = _avatarOrNull(self);
         peerEmUser.value = em;
@@ -230,25 +249,188 @@ class DmChatLogic extends ChatBaseLogic {
         loadingPeer.value = false;
         chats.setActiveConversation(em);
         chats.upsertPrivateChat(updated);
-        if (em.isNotEmpty) unawaited(loadImHistory(em));
+        // 环信号可能在 msgUser / profile 后才解析出来；首屏没拉过才补一次。
+        if (em.isNotEmpty && messages.isEmpty && !historyLoading.value) {
+          loadImHistory(em);
+        }
+        _refreshHeartie(appUid);
+        _requestRomanceInfo();
+        // 历史可能早于资料到位；资料就绪后再扫一遍回合数。
+        _showRomanceDialogIfNeed();
       } else {
         peerAppUid.value = appUid;
-        blocked.value = isBlocked;
         blockedByPeer.value = peerBlockedYou;
         selfAvatarUrl.value = _avatarOrNull(self);
         if (emHint.isNotEmpty) peerEmUser.value = emHint;
         loadingPeer.value = false;
         if (emHint.isNotEmpty) {
           chats.setActiveConversation(emHint);
-          unawaited(loadImHistory(emHint));
+          if (messages.isEmpty && !historyLoading.value) {
+            loadImHistory(emHint);
+          }
         }
+        _refreshHeartie(appUid);
+        _requestRomanceInfo();
+        _showRomanceDialogIfNeed();
       }
+
+      final blackRes = await blockedFuture;
+      if (!isClosed) blocked.value = blackRes.data ?? false;
     } catch (error) {
       AppLog.w('load chat profile failed', error: error);
       if (isClosed) return;
       loadingPeer.value = false;
       final em = imConversationId;
-      if (em.isNotEmpty) unawaited(loadImHistory(em));
+      if (em.isNotEmpty && messages.isEmpty && !historyLoading.value) {
+        loadImHistory(em);
+      }
+    }
+  }
+
+  Future<void> _requestRomanceInfo() async {
+    final uid = int.tryParse(relationUid) ?? 0;
+    if (uid <= 0) return;
+    final peer = peerProfile.value;
+    final hasActivity = (romanceActivity.value?.id.toInt() ?? 0) > 0;
+    // 未解锁时只对 GS 拉活动信息，避免普通私聊打无效接口。
+    if (!hasActivity && (peer == null || !peer.isGsGroupUser)) return;
+    try {
+      final rsp = await ChimoApis.romance.activityBaseInfo(uid);
+      if (isClosed || !rsp.ok || rsp.data == null) return;
+      romanceActivity.value = rsp.data;
+      // 活动尚未解锁：清掉旧版误写的「已弹过」缓存，否则永远不会再打 check。
+      // 成功窗只走 CMD `UNLOCK_COUPLE_ACTIVITY` / 送礼解锁成功，避免进会话误弹。
+      if (rsp.data!.id.toInt() <= 0) {
+        final tid = peerProfile.value?.id.toString() ?? '$uid';
+        final key = CacheKeys.romanceActivityHasShowKey(tid);
+        if (CacheUtil.getBool(key)) {
+          CacheUtil.delete(key);
+          _romanceCheckedThisSession = false;
+          AppLog.d('romance cleared stale unlock cache tid=$tid');
+        }
+        _showRomanceDialogIfNeed();
+      }
+    } catch (error) {
+      AppLog.d('romance activityBaseInfo failed', error: error);
+    }
+  }
+
+  /// 与 GS 来回满 5 回合后检查是否可弹送礼解锁。
+  ///
+  /// 对齐 joyride：对端须为 GS（`isGsGroupUser`）。
+  /// 用 `>= 5`：历史一次灌入时回合数可能已超过 5，`== 5` 会永远错过。
+  void _showRomanceDialogIfNeed() {
+    // 已解锁活动：只刷新进度，不再走 check / 送礼窗。
+    if ((romanceActivity.value?.id.toInt() ?? 0) > 0) return;
+    final peer = peerProfile.value;
+    if (peer == null) {
+      AppLog.d('romance skip: peerProfile null');
+      return;
+    }
+    if (!peer.isGsGroupUser) {
+      AppLog.d('romance skip: peer not GS job=${peer.job} gsGroupId=${peer.gsGroupId}');
+      return;
+    }
+    final tid = peer.id.toString();
+    final cacheKey = CacheKeys.romanceActivityHasShowKey(tid);
+    // 仅「已弹出过解锁窗」才永久挡住；旧逻辑在 check 失败/result=false 时也会写缓存。
+    if (CacheUtil.getBool(cacheKey)) {
+      AppLog.d('romance skip: already shown cache tid=$tid');
+      return;
+    }
+    if (_romanceCheckedThisSession || _romanceCheckInFlight) return;
+
+    // 对齐 joyride：初始方向视为己方 SEND。
+    var boutCount = 0;
+    var lastSide = ChatSide.self;
+    for (final line in messages) {
+      if (line.kind == ChatLineKind.tip ||
+          line.kind == ChatLineKind.join ||
+          line.kind == ChatLineKind.recall) {
+        continue;
+      }
+      if (lastSide != line.side) {
+        lastSide = line.side;
+        if (lastSide == ChatSide.peer) boutCount++;
+      }
+    }
+    if (boutCount < 5) {
+      AppLog.d('romance skip: boutCount=$boutCount/5 msgs=${messages.length}');
+      return;
+    }
+    AppLog.i('romance check: boutCount=$boutCount peer=$tid');
+    _checkRomanceUnlock(peer.id.toInt(), tid);
+  }
+
+  Future<void> _checkRomanceUnlock(int uid, String tid) async {
+    final cacheKey = CacheKeys.romanceActivityHasShowKey(tid);
+    if (CacheUtil.getBool(cacheKey)) return;
+    if (_romanceCheckedThisSession || _romanceCheckInFlight) return;
+    _romanceCheckInFlight = true;
+    _romanceCheckedThisSession = true;
+    try {
+      final rsp = await ChimoApis.romance.checkActivity(uid);
+      if (isClosed) return;
+      if (!rsp.ok) {
+        AppLog.w('romance checkActivity fail: ${rsp.message}');
+        // 允许本会话稍后重试（例如网络闪断）。
+        _romanceCheckedThisSession = false;
+        return;
+      }
+      final ok = rsp.data?.result == true && (rsp.data?.hasCoupleInfo() ?? false);
+      AppLog.i('romance checkActivity result=${rsp.data?.result} hasCouple=$ok');
+      if (ok) {
+        // 只有真正弹出过才写永久缓存（避免 result=false 后永远不再 check）。
+        await CacheUtil.setBool(cacheKey, true);
+        final couple = rsp.data!.coupleInfo;
+        final unlocked = await RomanceSendGiftDialog.show(couple);
+        if (unlocked == true && !isClosed) {
+          await _requestRomanceInfo();
+          // CMD 可能稍后到；本地先弹一次，成功窗自身有去重缓存。
+          RomanceSuccessDialog.show(couple);
+        }
+      } else {
+        AppLog.d('romance check: server result=false，本会话不再弹');
+      }
+    } catch (error) {
+      _romanceCheckedThisSession = false;
+      AppLog.d('romance checkActivity failed', error: error);
+    } finally {
+      _romanceCheckInFlight = false;
+    }
+  }
+
+  Future<void> receiveRomanceReward() async {
+    if (_romanceClaiming) return;
+    final info = romanceActivity.value;
+    if (info == null || info.id.toInt() <= 0) return;
+    _romanceClaiming = true;
+    try {
+      final rsp = await ChimoApis.romance.receiveReward(activityId: info.id);
+      if (rsp.ok) {
+        AppToast.info('Received successfully');
+        await _requestRomanceInfo();
+      } else {
+        AppToast.info(rsp.message.isEmpty ? 'Claim failed' : rsp.message);
+      }
+    } finally {
+      _romanceClaiming = false;
+    }
+  }
+
+  Future<void> _refreshHeartie(String appUid) async {
+    final id = int.tryParse(appUid.trim()) ?? 0;
+    if (id <= 0) {
+      isHeartie.value = false;
+      return;
+    }
+    try {
+      final result = await ChimoApis.heartLink.getHeartiesIdList();
+      if (isClosed) return;
+      final ids = result.data?.userId ?? const [];
+      isHeartie.value = ids.any((e) => e.toInt() == id);
+    } catch (_) {
+      if (!isClosed) isHeartie.value = false;
     }
   }
 
@@ -274,6 +456,13 @@ class DmChatLogic extends ChatBaseLogic {
         if (m.isSdkRecall) continue;
         if (m.msgType == 'txt' && m.text.trim().isEmpty) continue;
         if (m.id.isNotEmpty && !seenMsgIds.add(m.id)) continue;
+        // 历史与乐观气泡（空 msgId）并行时：合并进已有行，避免同内容两条。
+        if (m.isSelf) {
+          backfillSelfLineFromIm(m);
+          if (m.id.isNotEmpty && messages.any((e) => e.msgId == m.id)) {
+            continue;
+          }
+        }
         added.add(lineFromIm(m));
       }
 
@@ -295,6 +484,7 @@ class DmChatLogic extends ChatBaseLogic {
 
       if (!loadMore) {
         onScrollToBottom?.call(force: true);
+        _showRomanceDialogIfNeed();
         return;
       }
       if (added.isEmpty) return;
@@ -321,7 +511,9 @@ class DmChatLogic extends ChatBaseLogic {
           if (e.voiceSeconds != next.voiceSeconds) continue;
         case ChatLineKind.image:
         case ChatLineKind.emote:
-          break;
+          if (!_mediaLooksSame(e, next) && !_isLastEmptyMedia(i, next.kind)) {
+            continue;
+          }
         default:
           continue;
       }
@@ -332,9 +524,88 @@ class DmChatLogic extends ChatBaseLogic {
         msgId: m.id,
         serverTimeMs: effectiveMs,
         mediaSource: next.mediaSource.isNotEmpty ? next.mediaSource : e.mediaSource,
+        imageAssets: next.imageAssets.isNotEmpty ? next.imageAssets : e.imageAssets,
       );
       return;
     }
+  }
+
+  /// 本地路径 / URL 是否像同一张图或贴纸。
+  bool _mediaLooksSame(ChatLine local, ChatLine remote) {
+    final localSrc = local.mediaSource.trim();
+    final localAsset = local.imageAssets.isNotEmpty ? local.imageAssets.first.trim() : '';
+    final localEmote = local.emoteUrl.trim();
+    final remoteSrc = remote.mediaSource.trim();
+    final remoteEmote = remote.emoteUrl.trim();
+    if (localSrc.isNotEmpty && (localSrc == remoteSrc || localSrc == remoteEmote)) {
+      return true;
+    }
+    if (localAsset.isNotEmpty && (localAsset == remoteSrc || localAsset == remoteEmote)) {
+      return true;
+    }
+    if (localEmote.isNotEmpty && (localEmote == remoteSrc || localEmote == remoteEmote)) {
+      return true;
+    }
+    return false;
+  }
+
+  bool _isLastEmptyMedia(int index, ChatLineKind kind) {
+    for (var i = messages.length - 1; i >= 0; i--) {
+      final e = messages[i];
+      if (e.side != ChatSide.self || e.kind != kind || e.msgId.isNotEmpty) continue;
+      return i == index;
+    }
+    return false;
+  }
+
+  /// 把 IM 回执合并进已有自发气泡（本地 id → 服务端 id / 空 id 回填）。
+  /// 返回是否已合并；未合并时调用方再决定是否新建一行。
+  bool _mergeSelfIncoming(ChatLine nextLine) {
+    if (nextLine.side != ChatSide.self || nextLine.msgId.isEmpty) return false;
+    final lastSelfIdx = messages.lastIndexWhere((e) => e.side == ChatSide.self);
+    for (var i = messages.length - 1; i >= 0; i--) {
+      final e = messages[i];
+      if (e.side != ChatSide.self || e.kind != nextLine.kind) continue;
+      if (e.msgId.isNotEmpty && e.msgId == nextLine.msgId) continue;
+      var matched = false;
+      switch (nextLine.kind) {
+        case ChatLineKind.text:
+          if (e.text != nextLine.text) break;
+          // 空 id 乐观行，或「最后一条自发」的本地 id（推送先于 ack）。
+          matched = e.msgId.isEmpty || i == lastSelfIdx;
+        case ChatLineKind.voice:
+          matched = e.msgId.isEmpty && e.voiceSeconds == nextLine.voiceSeconds;
+        case ChatLineKind.image:
+        case ChatLineKind.emote:
+          if (e.msgId.isNotEmpty) break;
+          matched = _mediaLooksSame(e, nextLine) || _isLastEmptyMedia(i, nextLine.kind);
+        default:
+          break;
+      }
+      if (!matched) continue;
+      final oldId = e.msgId;
+      if (oldId.isNotEmpty) seenMsgIds.remove(oldId);
+      seenMsgIds.add(nextLine.msgId);
+      final effectiveMs = nextLine.serverTimeMs > 0
+          ? nextLine.serverTimeMs
+          : (e.serverTimeMs > 0 ? e.serverTimeMs : DateTime.now().millisecondsSinceEpoch);
+      final keepLocalMedia =
+          nextLine.kind == ChatLineKind.image || nextLine.kind == ChatLineKind.emote;
+      messages[i] = nextLine.copyWith(
+        serverTimeMs: effectiveMs,
+        mediaSource: keepLocalMedia && e.mediaSource.trim().isNotEmpty
+            ? e.mediaSource
+            : nextLine.mediaSource,
+        imageAssets: keepLocalMedia && e.imageAssets.isNotEmpty
+            ? e.imageAssets
+            : nextLine.imageAssets,
+        quoteMsgId: e.quoteMsgId.isNotEmpty ? e.quoteMsgId : nextLine.quoteMsgId,
+        quoteShowText: e.quoteShowText.isNotEmpty ? e.quoteShowText : nextLine.quoteShowText,
+        quoteSendName: e.quoteSendName.isNotEmpty ? e.quoteSendName : nextLine.quoteSendName,
+      );
+      return true;
+    }
+    return false;
   }
 
   void onImMessage(ImChatMessage m) {
@@ -376,45 +647,10 @@ class DmChatLogic extends ChatBaseLogic {
     if (m.id.isNotEmpty && !seenMsgIds.add(m.id)) return;
     if (isClosed) return;
     final nextLine = lineFromIm(m);
-    // EaseMob 可能会发生 msgId 回填/替换（临时 id -> server id）。
-    if (nextLine.side == ChatSide.self) {
-      final idx = messages.lastIndexWhere((e) {
-        if (e.side != ChatSide.self || e.kind != nextLine.kind) return false;
-        if (e.msgId.isNotEmpty && e.msgId == nextLine.msgId) return false;
-        switch (nextLine.kind) {
-          case ChatLineKind.text:
-            return e.text == nextLine.text;
-          case ChatLineKind.voice:
-            return e.voiceSeconds == nextLine.voiceSeconds && e.msgId.isEmpty;
-          case ChatLineKind.image:
-          case ChatLineKind.emote:
-            return e.msgId.isEmpty;
-          default:
-            return false;
-        }
-      });
-      if (idx >= 0) {
-        final oldId = messages[idx].msgId;
-        if (oldId.isNotEmpty) seenMsgIds.remove(oldId);
-        if (nextLine.msgId.isNotEmpty) seenMsgIds.add(nextLine.msgId);
-        final prev = messages[idx];
-        final effectiveMs = nextLine.serverTimeMs > 0
-            ? nextLine.serverTimeMs
-            : (prev.serverTimeMs > 0 ? prev.serverTimeMs : DateTime.now().millisecondsSinceEpoch);
-        final keepLocalMedia =
-            nextLine.kind == ChatLineKind.image || nextLine.kind == ChatLineKind.emote;
-        messages[idx] = nextLine.copyWith(
-          serverTimeMs: effectiveMs,
-          mediaSource: keepLocalMedia && prev.mediaSource.trim().isNotEmpty
-              ? prev.mediaSource
-              : nextLine.mediaSource,
-          imageAssets: keepLocalMedia && prev.imageAssets.isNotEmpty
-              ? prev.imageAssets
-              : nextLine.imageAssets,
-        );
-        onScrollToBottom?.call();
-        return;
-      }
+    // EaseMob：推送 / 发送回执可能先后到达，本地 id 与服务端 id 不一致。
+    if (_mergeSelfIncoming(nextLine)) {
+      onScrollToBottom?.call();
+      return;
     }
     messages.add(nextLine);
     // 列表预览 / 未读：ChatsListLogic 监听 ImService.messages。
@@ -527,7 +763,7 @@ class DmChatLogic extends ChatBaseLogic {
       if (failedLine != null) {
         messages.add(failedLine.copyWith(failed: true));
         afterSend(failedLine.listPreview);
-        unawaited(persistFailedLine(failedLine));
+        persistFailedLine(failedLine);
       }
       return false;
     }
@@ -848,25 +1084,29 @@ class DmChatLogic extends ChatBaseLogic {
         final effectiveAtMs = sentAtMs > 0 ? sentAtMs : DateTime.now().millisecondsSinceEpoch;
         if (sentId.isNotEmpty) seenMsgIds.add(sentId);
         if (isClosed) return;
-        // IM 推送可能比回执先到：那条已经在列表里了，只补服务器时间。
+        // IM 推送可能比回执先到（本地 id ≠ 服务端 id）：合并进已有行，勿再插一条。
         final existingIdx = sentId.isNotEmpty ? messages.indexWhere((e) => e.msgId == sentId) : -1;
         if (existingIdx >= 0) {
           if (messages[existingIdx].serverTimeMs == 0) {
             messages[existingIdx] = messages[existingIdx].copyWith(serverTimeMs: effectiveAtMs);
           }
+          afterSend(text);
           return;
         }
-        messages.add(
-          ChatLine(
-            side: ChatSide.self,
-            text: text,
-            msgId: sentId,
-            serverTimeMs: effectiveAtMs,
-            quoteMsgId: quote?.msgId ?? '',
-            quoteShowText: quote?.showText ?? '',
-            quoteSendName: quote?.sendName ?? '',
-          ),
+        final ackLine = ChatLine(
+          side: ChatSide.self,
+          text: text,
+          msgId: sentId,
+          serverTimeMs: effectiveAtMs,
+          quoteMsgId: quote?.msgId ?? '',
+          quoteShowText: quote?.showText ?? '',
+          quoteSendName: quote?.sendName ?? '',
         );
+        if (sentId.isNotEmpty && _mergeSelfIncoming(ackLine)) {
+          afterSend(text);
+          return;
+        }
+        messages.add(ackLine);
         afterSend(text);
         return;
       } catch (error) {
@@ -933,6 +1173,25 @@ class DmChatLogic extends ChatBaseLogic {
       );
       if (sent != null && sent.id.isNotEmpty) {
         seenMsgIds.add(sent.id);
+        if (isClosed) return;
+        final ack = lineFromIm(sent);
+        if (!_mergeSelfIncoming(ack)) {
+          // 回执未进流时：回填最后一条空 id 贴纸。
+          for (var i = messages.length - 1; i >= 0; i--) {
+            final m = messages[i];
+            if (m.kind != ChatLineKind.emote || m.side != ChatSide.self || m.msgId.isNotEmpty) {
+              continue;
+            }
+            if (m.emoteUrl != url && m.mediaSource != url) continue;
+            messages[i] = m.copyWith(
+              msgId: sent.id,
+              serverTimeMs: sent.serverTimeMs > 0
+                  ? sent.serverTimeMs
+                  : DateTime.now().millisecondsSinceEpoch,
+            );
+            break;
+          }
+        }
       }
     } catch (error) {
       onSendError(error);

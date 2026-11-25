@@ -44,16 +44,14 @@ class LoginLogic extends GetxController {
     return true;
   }
 
-  void endAppleSignIn() {
-    if (!isClosed) appleSigningIn.value = false;
-  }
+  void endAppleSignIn() => appleSigningIn.value = false;
 
   /// 测试环境按 `/auth/login-platforms` 调整入口。拉不到就保持正式默认。
   Future<void> loadPlatforms() async {
     if (AppConfig.isOfficial) return;
     try {
       final res = await ChimoApis.auth.loginPlatforms();
-      if (isClosed || !res.ok || res.data == null) return;
+      if (!res.ok || res.data == null) return;
       final config = res.data!;
       showAppleEntry.value =
           _supports(config, 'apple') ||

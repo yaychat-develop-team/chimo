@@ -63,6 +63,7 @@ class AppNavBar extends StatelessWidget {
     super.key,
     this.title = '',
     this.onBack,
+    this.leading,
     this.trailing,
     this.titleStyle,
     this.foregroundColor = AppColors.white,
@@ -72,6 +73,7 @@ class AppNavBar extends StatelessWidget {
 
   final String title;
   final VoidCallback? onBack;
+  final Widget? leading;
   final Widget? trailing;
   final TextStyle? titleStyle;
   final Color foregroundColor;
@@ -84,8 +86,18 @@ class AppNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final back = circled
-        ? AppBackButton.circle(onBack: onBack, color: foregroundColor, enabled: backEnabled)
-        : AppBackButton(onBack: onBack, color: foregroundColor, enabled: backEnabled);
+        ? AppBackButton.circle(
+            onBack: onBack,
+            leading: leading,
+            color: foregroundColor,
+            enabled: backEnabled,
+          )
+        : AppBackButton(
+            onBack: onBack,
+            leading: leading,
+            color: foregroundColor,
+            enabled: backEnabled,
+          );
     return SafeArea(
       bottom: false,
       child: SizedBox(
@@ -111,28 +123,32 @@ class AppNavBar extends StatelessWidget {
 
 /// [AppBackButton.circle] 是 36 的圆形底，用在引导页和盖在头图上的返回。
 class AppBackButton extends StatelessWidget {
-  const AppBackButton({super.key, this.onBack, this.color = AppColors.white, this.enabled = true})
-    : circled = false;
+  const AppBackButton({
+    super.key,
+    this.onBack,
+    this.leading,
+    this.color = AppColors.white,
+    this.enabled = true,
+  }) : circled = false;
 
   const AppBackButton.circle({
     super.key,
     this.onBack,
+    this.leading,
     this.color = AppColors.white,
     this.enabled = true,
   }) : circled = true;
 
   final VoidCallback? onBack;
   final Color color;
+  final Widget? leading;
 
   final bool enabled;
   final bool circled;
 
-  static const double _plainExtent = 48;
-  static const double _circleExtent = 36;
-
   @override
   Widget build(BuildContext context) {
-    final icon = Chimo.image(AppAssets.chatBack, width: 17, height: 7, color: color);
+    final icon = leading ?? Chimo.image(AppAssets.chatBack, width: 17, height: 7, color: color);
     // Get.back 带可选命名参数，不能直接当 VoidCallback；包一层，点击时再返回。
     final VoidCallback? onTap = enabled ? (onBack ?? AppJumper.maybeBack) : null;
     if (!circled) {
@@ -141,23 +157,35 @@ class AppBackButton extends StatelessWidget {
         child: IconButton(
           onPressed: onTap,
           padding: const EdgeInsets.all(8),
-          constraints: const BoxConstraints(minWidth: _plainExtent, minHeight: _plainExtent),
+          constraints: BoxConstraints(minWidth: 48.w, minHeight: 48.w),
           icon: icon,
         ),
       );
     }
-    return Material(
-      color: Colors.black.withValues(alpha: 0.35),
-      shape: const CircleBorder(),
-      child: InkWell(
-        onTap: onTap,
-        customBorder: const CircleBorder(),
-        child: SizedBox(
-          width: _circleExtent,
-          height: _circleExtent,
-          child: Center(child: icon),
+    return UnconstrainedBox(
+      child: Container(
+        width: 36.w,
+        height: 36.w,
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.35),
+          shape: BoxShape.circle,
         ),
+        alignment: Alignment.center,
+        child: icon,
       ),
     );
+    // return Material(
+    //   color: Colors.black.withValues(alpha: 0.35),
+    //   shape: const CircleBorder(),
+    //   child: InkWell(
+    //     onTap: onTap,
+    //     customBorder: const CircleBorder(),
+    //     child: SizedBox(
+    //       width: _circleExtent,
+    //       height: _circleExtent,
+    //       child: Center(child: icon),
+    //     ),
+    //   ),
+    // );
   }
 }

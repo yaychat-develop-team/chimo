@@ -1,4 +1,3 @@
-import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -76,7 +75,7 @@ class _AppWebViewPageState extends State<AppWebViewPage> {
       ..addJavaScriptChannel(
         'CallFlutter',
         onMessageReceived: (message) {
-          unawaited(_onCallFlutter(message.message));
+          _onCallFlutter(message.message);
         },
       )
       ..loadRequest(Uri.parse(widget.url));

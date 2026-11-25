@@ -224,11 +224,44 @@ abstract final class AppColors {
   /// 性别标识：女。
   static const Color pinkFF5BA8 = Color(0xFFFF5BA8);
 
+  /// Reveal Card 入口渐变中段。
+  static const Color pinkFD4EFF = Color(0xFFFD4EFF);
+
+  /// Reveal Card 入口渐变末端。
+  static const Color pinkFFA7F9 = Color(0xFFFFA7F9);
+
+  /// Reveal 按钮文字。
+  static const Color pinkFF42D9 = Color(0xFFFF42D9);
+
   /// 开麦说话时头像背后的波纹。
   static const Color pinkFC5CC6 = Color(0xFFFC5CC6);
 
+  /// 神秘卡语音条渐变末端。
+  static const Color pinkFC475F = Color(0xFFFC475F);
+
   /// 礼物特效粉色微光。
   static const Color pink33FC1192 = Color(0x33FC1192);
+
+  /// Romance 进度条轨道。
+  static const Color pinkFEBAD6 = Color(0xFFFEBAD6);
+
+  /// Romance 弹窗粉底渐变起点。
+  static const Color pinkFFCBF7 = Color(0xFFFFCBF7);
+
+  /// Romance 关系条渐变起点。
+  static const Color pinkFFA0EF = Color(0xFFFFA0EF);
+
+  /// Romance 关系条渐变终点。
+  static const Color pinkFFE6F8 = Color(0xFFFFE6F8);
+
+  /// Romance 翻牌结果「Chat Now」渐变起点。
+  static const Color yellowFBC469 = Color(0xFFFBC469);
+
+  /// Romance 翻牌结果「Chat Now」渐变终点。
+  static const Color yellowFFFFD2 = Color(0xFFFFFFD2);
+
+  /// Romance 翻牌结果按钮字色。
+  static const Color brown912910 = Color(0xFF912910);
 
   // ===========================================================================
   // 蓝
@@ -256,6 +289,12 @@ abstract final class AppColors {
   // 黄 / 金
   // ===========================================================================
 
+  /// 神秘卡 Locked 标签黄。
+  static const Color yellowFFE24B = Color(0xFFFFE24B);
+
+  /// 浅灰底：神秘卡弹窗加载态。对齐 joyride `0xFFF5F6F7`。
+  static const Color grayF5F6F7 = Color(0xFFF5F6F7);
+
   /// [yellowFDF652] 的 12% 透明版本。
   static const Color yellow1FFDF652 = Color(0x1FFDF652);
 
@@ -267,6 +306,9 @@ abstract final class AppColors {
 
   /// 进房公屏昵称。
   static const Color yellowFDE42B = Color(0xFFFDE42B);
+
+  /// EchoHall Holder 徽章渐变上端。
+  static const Color yellowFCDA42 = Color(0xFFFCDA42);
 
   /// 礼物数量黄、冠名昵称。
   static const Color yellowFDF652 = Color(0xFFFDF652);
@@ -308,6 +350,9 @@ abstract final class AppColors {
   /// giftRank 第 3 名王冠 / 描边。
   static const Color orangeDC9260 = Color(0xFFDC9260);
 
+  /// EchoHall Holder 徽章渐变下端。
+  static const Color orangeFFAD02 = Color(0xFFFFAD02);
+
   // ===========================================================================
   // 紫
   // ===========================================================================
@@ -317,6 +362,12 @@ abstract final class AppColors {
 
   /// 房间页底色。没有背景图时用。
   static const Color purple14081F = Color(0xFF14081F);
+
+  /// 礼物墙页底色（对齐 oumi）。
+  static const Color purple14102B = Color(0xFF14102B);
+
+  /// 礼物墙内容区底色（对齐 oumi）。
+  static const Color purple1D1045 = Color(0xFF1D1045);
 
   /// 活动分享图标底终点。
   static const Color purple27115C = Color(0xFF27115C);
@@ -338,6 +389,9 @@ abstract final class AppColors {
 
   /// 等级徽章渐变终点。
   static const Color purple6B4EFF = Color(0xFF6B4EFF);
+
+  /// Reveal Card 入口渐变起点。
+  static const Color purple7956FF = Color(0xFF7956FF);
 
   /// 等级档位主色 3。
   static const Color purple6A39F5 = Color(0xFF6A39F5);
@@ -415,6 +469,13 @@ abstract final class AppColors {
 
   /// 心动卡片角标渐变。
   static const LinearGradient roomHeartBadge = LinearGradient(colors: [purpleBF3AFC, purple7713FC]);
+
+  /// 资料页 Reveal Card 入口条。
+  static const LinearGradient revealCardBanner = LinearGradient(
+    begin: AlignmentDirectional.centerStart,
+    end: AlignmentDirectional.centerEnd,
+    colors: [purple7956FF, pinkFD4EFF, pinkFFA7F9],
+  );
 
   /// 拍卖「Place Bid」按钮。
   static const LinearGradient auctionBidGradient = LinearGradient(

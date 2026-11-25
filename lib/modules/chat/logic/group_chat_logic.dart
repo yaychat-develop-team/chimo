@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:chimo/app/session_info.dart';
 import 'package:fixnum/fixnum.dart';
 import 'package:get/get.dart';
@@ -13,7 +11,7 @@ import '../../../common/models/server_client/group/group.pb.dart';
 import '../../../common/models/server_client/user.pb.dart';
 import '../../../common/utils/app_log.dart';
 import '../../../common/utils/app_toast.dart';
-import '../model/chat_conversation.dart';
+import '../model/conversation_model.dart';
 import '../model/chat_line.dart';
 import 'chat_base_logic.dart';
 
@@ -83,12 +81,12 @@ class GroupChatLogic extends ChatBaseLogic {
   @override
   void onInit() {
     super.onInit();
-    unawaited(loadSelfAvatar());
-    unawaited(loadPhotos());
+    loadSelfAvatar();
+    loadPhotos();
     listenIm(onImMessage);
     chats.setActiveConversation(emGroupId);
     // 未加入也拉最近 10 条预览（对齐 forya）；图片加锁模糊。
-    unawaited(loadImHistory());
+    loadImHistory();
   }
 
   @override
@@ -150,9 +148,9 @@ class GroupChatLogic extends ChatBaseLogic {
       }
       onScrollToBottom?.call(force: true);
       if (isJoined.value) {
-        unawaited(ImService.markConversationRead(gid, isGroup: true));
+        ImService.markConversationRead(gid, isGroup: true);
       }
-      unawaited(hydrateMissingSenderProfiles());
+      hydrateMissingSenderProfiles();
     } catch (error) {
       AppLog.w('GroupDetails loadImHistory', error: error);
     }
@@ -169,7 +167,7 @@ class GroupChatLogic extends ChatBaseLogic {
   void _rememberSenderGender(String uid, String gender) {
     final id = uid.trim();
     if (id.isEmpty) return;
-    final normalized = ChatLine.normalizeGender(gender);
+    final normalized = normalizeGender(gender);
     if (normalized == null) return;
     _senderGenderByUid[id] = normalized;
   }
@@ -204,7 +202,7 @@ class GroupChatLogic extends ChatBaseLogic {
   }
 
   String _resolvedSenderGender({required String uid, required String gender}) {
-    final fromMsg = ChatLine.normalizeGender(gender);
+    final fromMsg = normalizeGender(gender);
     if (fromMsg != null) {
       _rememberSenderGender(uid, fromMsg);
       return fromMsg;
@@ -317,7 +315,7 @@ class GroupChatLogic extends ChatBaseLogic {
         line.senderUid.trim().isNotEmpty &&
         (line.senderAvatar.trim().isEmpty || !line.hasSenderGender);
     if (needProfile) {
-      unawaited(hydrateMissingSenderProfiles());
+      hydrateMissingSenderProfiles();
     }
   }
 
@@ -562,7 +560,7 @@ class GroupChatLogic extends ChatBaseLogic {
       messages.add(ChatLine.join(name));
       notifyNewMessage('$name joined the community');
       onScrollToBottom?.call();
-      unawaited(loadImHistory());
+      loadImHistory();
     } catch (error) {
       if (isClosed) return;
       isJoined.value = false;

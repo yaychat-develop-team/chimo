@@ -19,51 +19,30 @@ import '../../../common/utils/time_fmt.dart';
 import '../../../common/extensions/wire_view.dart';
 import '../../../common/models/server_client/group/group.pb.dart';
 import '../../../common/models/server_client/user.pb.dart';
-import '../../friends/logic/friends_logic.dart';
-import '../model/chat_conversation.dart';
+import '../model/conversation_model.dart';
 
 /// 会话页与底部导航未读角标共用的会话列表状态。
-///
-/// 群组会话行来自 `GET /chat/group/myGroups`。
-/// 最近消息预览依赖 IM（环信）；在此之前用成员数 /
-/// 群简介作副标题，并保留本机已有本地预览。
-///
-/// 监听 [ImService.messages]，使预览 / 未读无需下拉
-/// 刷新即可更新（forya ConversationController 模式）。
-///
-/// get 4.7.3 里 `GetxService extends DisposableInterface with GetxServiceMixin`，
-/// **没有 `update`**，而 `GetBuilder<T extends GetxController>` 也只收
-/// `GetxController` —— 用 `GetxService` 这两样都用不了。
-/// 「不被 `SmartManagement` 回收」这条由 `main` 里的
-/// `Get.put(..., permanent: true)` 保证，效果与 `GetxService` 一致。
-///
-/// `dispose` → `onClose`），业务逻辑与所有 getter 一行未改。
 class ConversationListLogic extends GetxController {
   ConversationListLogic() {
     _imSub = ImService.messages.listen(_onImMessage);
     _imConnSub = ImService.connectionChanges.listen((_) {
-      unawaited(_onImConnectionChanged());
+      _onImConnectionChanged();
     });
   }
 
   @override
   void onReady() {
     super.onReady();
-    unawaited(refreshFromApi());
+    refreshFromApi();
   }
 
   /// 全量通知 + 未读角标（`'unread'` 分组）通知。
-  ///
-  /// get 4.7.3 的两条监听表是**分开**的：`update()` 走 `refresh()` → 只通知
-  /// `addListener` 与无 id 的 `GetBuilder`；`update(['unread'])` 走
-  /// `refreshGroup('unread')` → 只通知 `GetBuilder(id: 'unread')`。
-  /// 所以两条都得发 —— 漏了后者，底栏角标会停在旧数字（静默 bug）。
   void _notify() {
     update();
     update(['unread']);
   }
 
-  final List<ChatConversation> _conversations = [];
+  final List<ConversationModel> _conversations = [];
   final List<String> _pinnedIds = [];
   final Set<String> _joinedGroupIds = {};
 
@@ -85,7 +64,7 @@ class ConversationListLogic extends GetxController {
   bool get loading => _loading;
   String? get loadError => _loadError;
 
-  List<ChatConversation> get conversations => List.unmodifiable(_conversations);
+  List<ConversationModel> get conversations => List.unmodifiable(_conversations);
 
   List<String> get pinnedIds => List.unmodifiable(_pinnedIds);
 
@@ -99,9 +78,9 @@ class ConversationListLogic extends GetxController {
       _conversations.fold(0, (sum, c) => _isSuppressedOfficial(c) ? sum : sum + c.unreadCount);
 
   /// 置顶优先，再按最近消息时间降序。
-  List<ChatConversation> get visibleConversations {
+  List<ConversationModel> get visibleConversations {
     final byId = {for (final c in _conversations) c.id: c};
-    final pinned = <ChatConversation>[];
+    final pinned = <ConversationModel>[];
     for (final id in _pinnedIds) {
       final item = byId[id];
       if (item == null || _isSuppressedOfficial(item)) continue;
@@ -117,7 +96,7 @@ class ConversationListLogic extends GetxController {
     return [...pinned, ...unpinned];
   }
 
-  bool _isSuppressedOfficial(ChatConversation c) {
+  bool _isSuppressedOfficial(ConversationModel c) {
     return ImSystemAccounts.isSuppressedOfficialChat(c.id) ||
         ImSystemAccounts.isSuppressedOfficialChat(c.emUserName);
   }
@@ -172,7 +151,7 @@ class ConversationListLogic extends GetxController {
       final groups = groupsRes.data ?? const [];
 
       final prevById = {for (final c in _conversations) c.id: c};
-      final next = <ChatConversation>[];
+      final next = <ConversationModel>[];
       final nextJoined = <String>{};
 
       for (final g in groups) {
@@ -233,8 +212,9 @@ class ConversationListLogic extends GetxController {
     try {
       final sessionEm = SessionInfo.currentUser?.emUsername.trim() ?? '';
       if (sessionEm.isEmpty) return;
-      if (!ImService.isConnected) {
-        await ImService.connectFromServer();
+      if (!await ImService.ensureLoggedIn()) {
+        AppLog.w('ChatsListLogic IM not logged in, skip merge');
+        return;
       }
       final sdkEm = (await ImService.sdkUserId())?.trim() ?? '';
       if (sdkEm.isEmpty || sdkEm != sessionEm) {
@@ -252,7 +232,8 @@ class ConversationListLogic extends GetxController {
         final atMs = await ImService.latestTimeMs(conv);
         final timeLabel = TimeFmt.chatListPreview(atMs);
 
-        if (conv.type == EMConversationType.GroupChat && !ImSystemAccounts.isSystemAccount(emId)) {
+        if (conv.type == ChatConversationType.GroupChat &&
+            !ImSystemAccounts.isSystemAccount(emId)) {
           if (_isHidden(emId)) continue;
           final index = _indexOfGroup(id: emId, emUserName: emId);
           if (index < 0) continue;
@@ -307,6 +288,7 @@ class ConversationListLogic extends GetxController {
         Color? titleColor;
         var badge = ChatBadgeType.none;
         var resolvedAppUid = '';
+        var coupleLevel = 0;
 
         if (isSystem) {
           title = ImSystemAccounts.displayName(emId);
@@ -323,6 +305,7 @@ class ConversationListLogic extends GetxController {
             if (res.ok && brief != null) {
               if (brief.nickname.isNotEmpty) title = brief.nickname;
               if (brief.avatar.isNotEmpty) avatarUrl = brief.avatar;
+              coupleLevel = brief.coupleRelationLevel;
               // 插入前先吃掉资料页留下的 `dm_<数字uid>` 行。
               final appId = _appUid(brief);
               resolvedAppUid = appId;
@@ -340,6 +323,8 @@ class ConversationListLogic extends GetxController {
                     emUserName: emId,
                     appUid: appId,
                     lastMsgAtMs: atMs > 0 ? atMs : prev.lastMsgAtMs,
+                    coupleRelationLevel:
+                        coupleLevel > 0 ? coupleLevel : prev.coupleRelationLevel,
                   );
                   _collapsePeerDuplicates(existingIdx);
                   continue;
@@ -355,7 +340,7 @@ class ConversationListLogic extends GetxController {
 
         _conversations.insert(
           0,
-          ChatConversation(
+          ConversationModel(
             id: listId,
             title: title,
             avatarAsset: avatarAsset,
@@ -369,6 +354,7 @@ class ConversationListLogic extends GetxController {
             isSystem: isSystem,
             titleColor: titleColor,
             badge: badge,
+            coupleRelationLevel: coupleLevel,
           ),
         );
       }
@@ -405,9 +391,9 @@ class ConversationListLogic extends GetxController {
     return null;
   }
 
-  ChatConversation _conversationFromGroup(GroupInfo g, ChatConversation? prev) {
+  ConversationModel _conversationFromGroup(GroupInfo g, ConversationModel? prev) {
     final hadLocalPreview = prev != null && prev.lastMessage.trim().isNotEmpty;
-    return ChatConversation(
+    return ConversationModel(
       id: g.gid,
       title: g.name.isEmpty ? 'Group' : g.name,
       avatarAsset: AppAssets.avatarPlace,
@@ -443,14 +429,14 @@ class ConversationListLogic extends GetxController {
   /// 本地+远程会话，对齐 forya `removeItem`。
   void delete(String id) {
     final index = _conversations.indexWhere((c) => c.id == id);
-    ChatConversation? removed;
+    ConversationModel? removed;
     if (index >= 0) {
       removed = _conversations.removeAt(index);
     }
     _pinnedIds.remove(id);
     _hide(id, emUserName: removed?.emUserName);
     if (removed != null) {
-      unawaited(_deleteImConversation(removed));
+      _deleteImConversation(removed);
     }
     _notify();
   }
@@ -485,7 +471,7 @@ class ConversationListLogic extends GetxController {
     _hiddenIds.remove('sys_$em');
   }
 
-  Future<void> _deleteImConversation(ChatConversation c) async {
+  Future<void> _deleteImConversation(ConversationModel c) async {
     final emId = c.emUserName.isNotEmpty
         ? c.emUserName
         : c.id.startsWith('dm_')
@@ -521,11 +507,9 @@ class ConversationListLogic extends GetxController {
         ? prev.id
         : '';
     if (emId.isNotEmpty) {
-      unawaited(
-        ImService.markConversationRead(
-          emId,
-          isGroup: prev.badge == ChatBadgeType.group && !ImSystemAccounts.isSystemAccount(emId),
-        ),
+      ImService.markConversationRead(
+        emId,
+        isGroup: prev.badge == ChatBadgeType.group && !ImSystemAccounts.isSystemAccount(emId),
       );
     }
   }
@@ -536,7 +520,7 @@ class ConversationListLogic extends GetxController {
     _upsertConversation(group);
     _notify();
     // 有服务端详情时同步列表字段。
-    unawaited(_syncJoinedGroup(group.gid));
+    _syncJoinedGroup(group.gid);
   }
 
   Future<void> _syncJoinedGroup(String id) async {
@@ -563,7 +547,7 @@ class ConversationListLogic extends GetxController {
     _notify();
   }
 
-  void upsertPrivateChat(ChatConversation conversation) {
+  void upsertPrivateChat(ConversationModel conversation) {
     if (_isSuppressedOfficial(conversation)) return;
     final em = conversation.emUserName.trim();
     final canonicalId = _canonicalDmId(id: conversation.id, emUserName: em);
@@ -590,6 +574,9 @@ class ConversationListLogic extends GetxController {
         lastMsgAtMs: dm.lastMsgAtMs > 0 ? dm.lastMsgAtMs : prev.lastMsgAtMs,
         avatarUrl: dm.avatarUrl ?? prev.avatarUrl,
         emUserName: mergedEm,
+        coupleRelationLevel: dm.coupleRelationLevel > 0
+            ? dm.coupleRelationLevel
+            : prev.coupleRelationLevel,
       );
       _collapsePeerDuplicates(index);
     } else {
@@ -681,7 +668,7 @@ class ConversationListLogic extends GetxController {
     } else {
       _conversations.insert(
         0,
-        ChatConversation(
+        ConversationModel(
           id: listId,
           title: title,
           avatarAsset: avatarAsset,
@@ -789,7 +776,7 @@ class ConversationListLogic extends GetxController {
         level: existing?.level,
       );
       if (existing == null || existing.title == 'Group' || (existing.avatarUrl ?? '').isEmpty) {
-        unawaited(_enrichHiddenOrNewGroup(emId));
+        _enrichHiddenOrNewGroup(emId);
       }
       return;
     }
@@ -823,7 +810,7 @@ class ConversationListLogic extends GetxController {
       unreadDelta: unreadDelta,
       emUserName: emId,
     );
-    unawaited(_enrichDmProfile(listId, emId));
+    _enrichDmProfile(listId, emId);
   }
 
   bool _isViewingConversation(String emId) {
@@ -835,13 +822,13 @@ class ConversationListLogic extends GetxController {
     return existing != null && existing.id == active;
   }
 
-  ChatConversation? _findByEmOrListId(String emId) {
+  ConversationModel? _findByEmOrListId(String emId) {
     final index = _indexOfPeer(id: 'dm_$emId', emUserName: emId);
     if (index < 0) return null;
     return _conversations[index];
   }
 
-  ChatConversation? _findGroupByEmId(String emId) {
+  ConversationModel? _findGroupByEmId(String emId) {
     final index = _indexOfGroup(id: emId, emUserName: emId);
     if (index < 0) return null;
     return _conversations[index];
@@ -882,14 +869,14 @@ class ConversationListLogic extends GetxController {
     return idA;
   }
 
-  bool _isSameGroup(ChatConversation a, {String? id, String? emUserName}) {
+  bool _isSameGroup(ConversationModel a, {String? id, String? emUserName}) {
     if (a.badge != ChatBadgeType.group) return false;
     final left = _groupMatchKeys(id: a.id, emUserName: a.emUserName);
     final right = _groupMatchKeys(id: id, emUserName: emUserName);
     return left.any(right.contains);
   }
 
-  ChatConversation _mergeGroupRows(ChatConversation a, ChatConversation b) {
+  ConversationModel _mergeGroupRows(ConversationModel a, ConversationModel b) {
     final preferA = a.lastMsgAtMs >= b.lastMsgAtMs;
     final newer = preferA ? a : b;
     final older = preferA ? b : a;
@@ -1003,7 +990,7 @@ class ConversationListLogic extends GetxController {
     return keys;
   }
 
-  bool _isSamePeer(ChatConversation a, {String? id, String? emUserName}) {
+  bool _isSamePeer(ConversationModel a, {String? id, String? emUserName}) {
     if (a.badge == ChatBadgeType.group) return false;
     final left = _peerMatchKeys(id: a.id, emUserName: a.emUserName);
     final right = _peerMatchKeys(id: id, emUserName: emUserName);
@@ -1014,12 +1001,15 @@ class ConversationListLogic extends GetxController {
     return _conversations.indexWhere((c) => _isSamePeer(c, id: id, emUserName: emUserName));
   }
 
-  ChatConversation _mergePeerRows(ChatConversation a, ChatConversation b) {
+  ConversationModel _mergePeerRows(ConversationModel a, ConversationModel b) {
     final em = a.emUserName.isNotEmpty ? a.emUserName : b.emUserName;
     final preferA = a.lastMsgAtMs >= b.lastMsgAtMs;
     final newer = preferA ? a : b;
     final older = preferA ? b : a;
     final mergedAppUid = newer.appUid.trim().isNotEmpty ? newer.appUid : older.appUid;
+    final coupleLevel = newer.coupleRelationLevel > 0
+        ? newer.coupleRelationLevel
+        : older.coupleRelationLevel;
     return newer.copyWith(
       id: _canonicalDmId(id: newer.id, emUserName: em),
       emUserName: em,
@@ -1038,6 +1028,7 @@ class ConversationListLogic extends GetxController {
           : newer.badge,
       titleColor: newer.titleColor ?? older.titleColor,
       clearTitleColor: a.badge == ChatBadgeType.verified || b.badge == ChatBadgeType.verified,
+      coupleRelationLevel: coupleLevel,
     );
   }
 
@@ -1102,6 +1093,9 @@ class ConversationListLogic extends GetxController {
         avatarUrl: brief.avatar.isNotEmpty ? brief.avatar : prev.avatarUrl,
         emUserName: emId,
         appUid: appId.isNotEmpty ? appId : prev.appUid,
+        coupleRelationLevel: brief.coupleRelationLevel > 0
+            ? brief.coupleRelationLevel
+            : prev.coupleRelationLevel,
       );
       _collapsePeerDuplicates(keep);
       _notify();
@@ -1142,7 +1136,7 @@ class ConversationListLogic extends GetxController {
   }
 
   /// 左滑删除前先确认。取消或已关闭则不删。
-  Future<void> confirmDelete(ChatConversation item) async {
+  Future<void> confirmDelete(ConversationModel item) async {
     final confirmed =
         await AppDialog.show(
           title: 'Tip',
@@ -1155,7 +1149,7 @@ class ConversationListLogic extends GetxController {
   }
 
   /// 打开会话：群详情、新朋友通讯录，或私聊。
-  void openConversation(ChatConversation item) {
+  void openConversation(ConversationModel item) {
     markRead(item.id);
 
     if (item.badge == ChatBadgeType.group) {
@@ -1194,7 +1188,7 @@ class ConversationListLogic extends GetxController {
   }
 
   /// 头像：普通私聊进资料，其余走 [openConversation]。
-  void openAvatar(ChatConversation item) {
+  void openAvatar(ConversationModel item) {
     if (!_isPeerConversation(item)) {
       openConversation(item);
       return;
@@ -1225,15 +1219,13 @@ class ConversationListLogic extends GetxController {
     if (_promoOpening || isClosed) return;
     _promoOpening = true;
     try {
-      final profile = await loadOwnProfile();
-      if (isClosed) return;
-      await AppJumper.toEditProfile(profile: profile);
+      await AppJumper.toEditProfile();
     } finally {
       _promoOpening = false;
     }
   }
 
-  bool _isPeerConversation(ChatConversation item) {
+  bool _isPeerConversation(ConversationModel item) {
     if (item.badge == ChatBadgeType.group) return false;
     if (item.badge == ChatBadgeType.verified) return false;
     if (item.isSystem) return false;
@@ -1245,20 +1237,10 @@ class ConversationListLogic extends GetxController {
     return true;
   }
 
-  /// 会话页推广条进编辑资料时的预填。失败就给一份空资料，不打断跳转。
-  Future<User> loadOwnProfile() async {
-    try {
-      final res = await ChimoApis.user.profile();
-      return res.data?.user ?? User();
-    } catch (_) {
-      return User();
-    }
-  }
-
   @override
   void onClose() {
-    unawaited(_imSub?.cancel() ?? Future<void>.value());
-    unawaited(_imConnSub?.cancel() ?? Future<void>.value());
+    _imSub?.cancel() ?? Future<void>.value();
+    _imConnSub?.cancel() ?? Future<void>.value();
     _imSub = null;
     _imConnSub = null;
     super.onClose();

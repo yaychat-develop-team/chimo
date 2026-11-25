@@ -1,4 +1,3 @@
-import 'dart:async';
 
 import 'package:flutter/scheduler.dart';
 import 'package:get/get.dart';
@@ -52,9 +51,9 @@ class HomeLogic extends GetxController {
   @override
   void onReady() {
     super.onReady();
-    unawaited(loadBanners());
-    unawaited(loadHotStories());
-    unawaited(loadGroups());
+    loadBanners();
+    loadHotStories();
+    loadGroups();
   }
 
   @override
@@ -205,7 +204,7 @@ class HomeLogic extends GetxController {
         for (final tab in data.tabs)
           if (tab.type == HomeTabItem_Type.room && tab.id.isNotEmpty) tab,
       ];
-      if (rooms.isEmpty && _roomTab != null) unawaited(loadRooms());
+      if (rooms.isEmpty && _roomTab != null) loadRooms();
     } catch (_) {}
   }
 

@@ -22,6 +22,7 @@ class DmChatBody extends StatelessWidget {
     this.onMessageLongPress,
     this.onQuoteTap,
     this.messageKeyFor,
+    this.banner,
   });
 
   final List<ChatLine> messages;
@@ -39,6 +40,9 @@ class DmChatBody extends StatelessWidget {
   final ValueChanged<String>? onQuoteTap;
   final GlobalKey Function(String msgId)? messageKeyFor;
 
+  /// 白底区顶部（进度条或灰条把手），内部可自带 Obx；拖动手势统一挂在这里。
+  final Widget? banner;
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -47,7 +51,6 @@ class DmChatBody extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
       ),
-      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -55,21 +58,22 @@ class DmChatBody extends StatelessWidget {
             behavior: HitTestBehavior.opaque,
             onVerticalDragUpdate: onHandleDragUpdate,
             onVerticalDragEnd: onHandleDragEnd,
-            child: const Padding(
-              padding: EdgeInsets.only(top: 10, bottom: 10),
-              child: Center(
-                child: SizedBox(
-                  width: 36,
-                  height: 4,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: AppColors.grayD5D5D5,
-                      borderRadius: BorderRadius.all(Radius.circular(2)),
+            child: banner ??
+                const Padding(
+                  padding: EdgeInsets.only(top: 10, bottom: 10),
+                  child: Center(
+                    child: SizedBox(
+                      width: 36,
+                      height: 4,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: AppColors.grayD5D5D5,
+                          borderRadius: BorderRadius.all(Radius.circular(2)),
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ),
           ),
           Expanded(
             child: ChatMessageList(

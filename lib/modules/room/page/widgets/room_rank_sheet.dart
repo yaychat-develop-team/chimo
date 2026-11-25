@@ -8,12 +8,12 @@ import '../../../../common/constants/app_assets.dart';
 import '../../../../common/models/server_client/rtc.pb.dart';
 import '../../../../common/theme/app_bottom_sheet.dart';
 import '../../../../common/theme/app_colors.dart';
+import '../../../../common/utils/chimo.dart';
+import '../../../../common/utils/text_fmt.dart';
 import '../../../../common/widgets/app_image.dart';
 import '../../../../common/widgets/app_pull_refresh.dart';
 import '../../logic/room_rank_logic.dart';
-import '../../model/room_format.dart';
 import '../../service/room_service.dart';
-import 'package:chimo/common/utils/chimo.dart';
 
 /// 房间排行榜。UI 对齐 Cosmic Lounge；数据对齐 joyride `getChannelUserList`。
 ///
@@ -375,7 +375,7 @@ class _PodiumSlot extends StatelessWidget {
                         Chimo.image(AppAssets.coin, width: 12, height: 12),
                         const SizedBox(width: 2),
                         Text(
-                          roomCount(user!.contributionValue),
+                          TextFmt.roomCount(user!.contributionValue),
                           style: const TextStyle(
                             color: AppColors.yellowFFD400,
                             fontSize: 11,
@@ -461,7 +461,7 @@ class _RankRow extends StatelessWidget {
                   Chimo.image(AppAssets.coin, width: 14, height: 14),
                   const SizedBox(width: 3),
                   Text(
-                    roomCount(user.contributionValue),
+                    TextFmt.roomCount(user.contributionValue),
                     style: const TextStyle(
                       color: AppColors.yellowFFD400,
                       fontSize: 13,
@@ -556,7 +556,7 @@ class _SelfBar extends StatelessWidget {
                 Chimo.image(AppAssets.coin, width: 14, height: 14),
                 const SizedBox(width: 3),
                 Text(
-                  roomCount(user.contributionValue),
+                  TextFmt.roomCount(user.contributionValue),
                   style: const TextStyle(
                     color: AppColors.yellowFFD400,
                     fontSize: 13,

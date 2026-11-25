@@ -43,7 +43,7 @@ class VerificationLogic extends GetxController {
   void onReady() {
     super.onReady();
     focusNode.requestFocus();
-    unawaited(send(initial: true));
+    send(initial: true);
   }
 
   @override
@@ -58,7 +58,7 @@ class VerificationLogic extends GetxController {
   void _onInputChanged() {
     final value = input.text;
     code.value = value;
-    if (value.length == codeLength) unawaited(submitCode(value));
+    if (value.length == codeLength) submitCode(value);
   }
 
   Future<void> send({bool initial = false}) async {
@@ -87,16 +87,21 @@ class VerificationLogic extends GetxController {
   Future<void> submitCode(String value) async {
     if (submitting.value) return;
     submitting.value = true;
-    final res = await ChimoApis.auth.smsAuth(
-      phone: PhoneUtils.toApiPhone(phone),
-      code: value,
-    );
-    if (res.ok) {
-      eventCenter.emit(Event(EventConstant.loginGetAuthRsp, data: res.data));
-    } else {
-      AppToast.error(res.message);
+    try {
+      final res = await ChimoApis.auth.smsAuth(
+        phone: PhoneUtils.toApiPhone(phone),
+        code: value,
+      );
+      if (res.ok) {
+        eventCenter.emit(Event(EventConstant.loginGetAuthRsp, data: res.data));
+      } else {
+        AppToast.error(res.message);
+      }
+    } catch (error) {
+      AppToast.error('Verification failed: $error');
+    } finally {
+      submitting.value = false;
     }
-    if (!isClosed) submitting.value = false;
   }
 
   void _startCountdown() {

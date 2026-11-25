@@ -11,7 +11,7 @@ import '../../../common/models/server_client/base.pbenum.dart';
 import '../../../common/models/server_client/user.pb.dart';
 import '../../../common/utils/app_toast.dart';
 import '../../../common/utils/zodiac.dart';
-import '../../chat/model/chat_conversation.dart';
+import '../../chat/model/conversation_model.dart';
 
 /// 通讯录顶部 Tab：好友、关注、粉丝。
 typedef FriendTab = ({String label, String emptyTitle, String searchHint});
@@ -34,6 +34,7 @@ class FriendsLogic extends GetxController {
   final RxnString error = RxnString();
 
   Timer? _searchDebounce;
+  int _loadSeq = 0;
 
   @override
   void onInit() {
@@ -44,7 +45,7 @@ class FriendsLogic extends GetxController {
   @override
   void onReady() {
     super.onReady();
-    unawaited(load());
+    load();
   }
 
   @override
@@ -57,34 +58,37 @@ class FriendsLogic extends GetxController {
 
   void _onInputChanged() {
     _searchDebounce?.cancel();
-    _searchDebounce = Timer(const Duration(milliseconds: 350), () => unawaited(load()));
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () => load());
   }
 
   void selectTab(int next) {
     if (next == tabIndex.value) return;
     tabIndex.value = next;
-    unawaited(load());
+    load();
   }
 
   /// 按当前 Tab 和输入框关键字拉列表。下拉刷新、重试、切 Tab、搜索都走这里。
   Future<void> load() async {
+    final seq = ++_loadSeq;
     final keyword = input.text.trim();
+    final tab = tabIndex.value;
     loading.value = true;
     error.value = null;
     try {
-      final result = await switch (tabIndex.value) {
+      final result = await switch (tab) {
         1 => ChimoApis.relation.searchFollowing(keyword: keyword),
         2 => ChimoApis.relation.searchFans(keyword: keyword),
         _ => ChimoApis.relation.searchFriends(keyword: keyword),
       };
+      if (seq != _loadSeq) return;
       users.assignAll(result.data ?? const []);
       if (!result.ok && users.isEmpty) {
         error.value = result.message.isEmpty ? 'Failed to load contacts' : result.message;
       }
     } catch (failure) {
-      error.value = '$failure';
+      if (seq == _loadSeq) error.value = '$failure';
     } finally {
-      loading.value = false;
+      if (seq == _loadSeq) loading.value = false;
     }
   }
 
@@ -105,12 +109,12 @@ class FriendsLogic extends GetxController {
   }
 
   void openProfile(User user) {
-    unawaited(AppJumper.toProfile(user.uid, preview: user));
+    AppJumper.toProfile(user.uid, preview: user);
   }
 
   void openChat(User user) {
     final em = user.emUsername.trim();
-    final conversation = ChatConversation(
+    final conversation = ConversationModel(
       id: em.isNotEmpty ? 'dm_$em' : 'dm_${user.uid}',
       title: user.nickname,
       avatarAsset: AppAssets.avatarPlace,
@@ -124,6 +128,6 @@ class FriendsLogic extends GetxController {
       avatarUrl: user.avatar.trim().isEmpty ? null : user.avatar,
       emUserName: em,
     );
-    unawaited(AppJumper.toChat(conversation.id, preview: conversation));
+    AppJumper.toChat(conversation.id, preview: conversation);
   }
 }

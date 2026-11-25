@@ -1,19 +1,15 @@
 import 'package:im_flutter_sdk/im_flutter_sdk.dart';
 
-import 'chat_conversation.dart';
+import 'conversation_model.dart';
 
 /// IM 搜索命中的一条文本消息。
 ///
 /// 都要用它，私有类跨不了文件。
 class ImSearchMsgHit {
-  const ImSearchMsgHit({
-    required this.conversation,
-    required this.message,
-    required this.text,
-  });
+  const ImSearchMsgHit({required this.conversation, required this.message, required this.text});
 
-  final ChatConversation conversation;
-  final EMMessage message;
+  final ConversationModel conversation;
+  final ChatMessage message;
   final String text;
 }
 
@@ -21,6 +17,6 @@ class ImSearchMsgHit {
 class ImSearchConvHit {
   const ImSearchConvHit({required this.conversation, required this.messages});
 
-  final ChatConversation conversation;
+  final ConversationModel conversation;
   final List<ImSearchMsgHit> messages;
 }

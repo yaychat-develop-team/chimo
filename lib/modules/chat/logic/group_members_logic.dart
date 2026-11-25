@@ -27,7 +27,6 @@ class GroupMembersLogic extends GetxController {
     needsLogin.value = false;
     try {
       final res = await ChimoApis.group.members(groupId, searchKey: searchKey);
-      if (isClosed) return;
       if (!res.ok) {
         final notLogin = res.isNotLogin;
         members.clear();
@@ -40,11 +39,10 @@ class GroupMembersLogic extends GetxController {
       members.assignAll(res.data ?? const []);
       error.value = null;
     } catch (e) {
-      if (isClosed) return;
       members.clear();
       error.value = '$e';
     } finally {
-      if (!isClosed) loading.value = false;
+      loading.value = false;
     }
   }
 }

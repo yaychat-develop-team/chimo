@@ -4,6 +4,7 @@ abstract final class AppAssets {
   static const String _auth = 'assets/images/auth';
   static const String _home = 'assets/images/home';
   static const String _me = 'assets/images/me';
+  static const String _dress = 'assets/images/dress';
   static const String _wallet = 'assets/images/wallet';
   static const String _level = 'assets/images/level';
   static const String _profile = 'assets/images/profile';
@@ -30,6 +31,8 @@ abstract final class AppAssets {
   static const String triangleUp = '$_common/triangle_up.svg';
   static const String triangleDown = '$_common/triangle_down.svg';
   static const String triangleRight = '$_common/triangle_right.svg';
+  static const String telegramIcon = '$_common/telegram_icon.webp';
+  static const String roundPlayIcon = '$_common/ic_round_play.svg';
 
   // 录音
   static const String recordBg = '$_profile/bottom_bg.webp';
@@ -41,20 +44,23 @@ abstract final class AppAssets {
   static const String audioPlayingIcon = '$_profile/Group 145.png';
 
   /// 录音预览：重试 / 确认。
-  static const String audioRefreshIcon = '$_profile/Retry.png';
+  static const String audioRefreshIcon = '$_profile/retry.webp';
   static const String audioFinishIcon = '$_profile/Affirm.png';
   static const String audioPlayIcon = audioPlayingIcon;
   static const String audioWaveLine = '$_profile/Vector 272.png';
   static const String audioWaveAnim = '$_profile/Group 145.png';
 
-  /// 资料页语音条：静态波形。
-  static const String voiceWaveLine = '$_profile/ic_voice_line.svg';
+  /// 资料页 / Voice Note / 神秘卡：静态音浪。
+  static const String voiceWaveLine = '$_profile/voice_wave.webp';
 
   /// 资料页语音条：播放中的动态波形（原始 webp）。
   static const String voiceWaveAnim = '$_profile/anim_line_voice.webp';
   static const String voicePlayIcon = '$_profile/ic_play.svg';
   static const String voicePauseIcon = '$_profile/ic_pause.svg';
   static const String voiceDeleteIcon = '$_common/delete_icon.webp';
+
+  /// 资料页 Reveal Card 入口左侧插画。对齐 joyride `reveal_card_item.webp`。
+  static const String revealCardItem = '$_profile/reveal_card_item.webp';
 
   /// 启动页：角色 Logo / 白色 Chimo 标题 / 底部 Slogan。
   static const String splashLogo = logo;
@@ -173,9 +179,31 @@ abstract final class AppAssets {
   static const String mineMenu = '$_me/mine_menu.webp';
   static const String mineEdit = '$_me/mine_edit.webp';
 
+  /// 设置抽屉入口（后续接入）。
+  static const String mineDrawerHelp = '$_me/mine_drawer_help.webp';
+  static const String mineDrawerInfo = '$_me/mine_drawer_info.webp';
+  static const String mineDrawerFeedback = '$_me/mine_drawer_feedback.webp';
+  static const String mineDrawerWorkbench = '$_me/mine_drawer_workbench.webp';
+  static const String mineDrawerMagic = '$_me/mine_drawer_magic.webp';
+  static const String mineDrawerVerify = '$_me/mine_drawer_verify.webp';
+
   /// 新个人页入口图标 / 卡片（后续接入）。
   static const String mineEchoHall = '$_me/mine_echo_hall.webp';
+
+  // ---------- EchoHall ----------
+  static const String _echoHall = 'assets/images/echo_hall';
+
+  /// EchoHall 头部卡片背景。
+  static const String echoHallHeaderCard = '$_echoHall/hall_header_card.webp';
   static const String mineFrame = '$_me/mine_frame.webp';
+
+  /// My Frame 装扮页顶部背景。
+  static const String dressBg = '$_me/dress_bg.webp';
+
+  /// 装扮页背景 / 选中态卡片底 / 星级。
+  static const String dressFrameBg = '$_dress/frame_bg.webp';
+  static const String dressFrameSelectedBg = '$_dress/frame_selected_bg.webp';
+  static const String dressStar = '$_dress/star.webp';
   static const String mineMarket = '$_me/mine_market.webp';
   static const String mineCardWallet = '$_me/mine_card_wallet.webp';
   static const String mineGoldCouple = '$_me/mine_gold_couple.webp';
@@ -223,9 +251,32 @@ abstract final class AppAssets {
   static const String genderMan = '$_profile/man.webp';
   static const String genderWoman = '$_profile/woman.webp';
 
+  /// 礼物墙（对齐 oumi `res0/gift_wall`）。
+  static const String _giftWall = '$_profile/gift_wall';
+  static const String giftWallBg = '$_giftWall/gift_wall_bg.webp';
+  static const String giftWallEmpty = '$_giftWall/gift_wall_empty.webp';
+  static const String giftWallTabGifts = '$_giftWall/tab_gift_wall.webp';
+  static const String giftWallTabCards = '$_giftWall/tab_cards.webp';
+  static const String giftWallLevelNumBg = '$_giftWall/level_num_bg.webp';
+  static const String giftWallItemBgGray = '$_giftWall/gift_item_bg_gray.webp';
+  static const String giftWallAdd = '$_giftWall/add.webp';
+  static const String giftWallReduce = '$_giftWall/reduce.webp';
+  static const String giftWallCardItemBg = '$_giftWall/card_item_bg.webp';
+  static const String giftWallCardDetailBg = '$_giftWall/card_detail_bg.webp';
+  static const String giftWallCardDetailBorder = '$_giftWall/card_detail_border.webp';
+  static const String giftWallCardTipsBg = '$_giftWall/card_tips_bg.webp';
+  static const String giftWallCardBigBg = '$_giftWall/card_big_bg.webp';
+  static const String giftWallCardSuccessBg = '$_giftWall/card_success_bg.webp';
+  static const String giftWallCardSuccessTips = '$_giftWall/card_success_tips.webp';
+  static String giftWallLevelBg(int level) => '$_giftWall/gift_level_bg_$level.webp';
+  static String giftWallItemBg(int level) => '$_giftWall/gift_item_bg_$level.webp';
+  static String giftWallCardLevelTag(int level) => '$_giftWall/card_level_tag_$level.webp';
+
   /// 聊天资料卡标签（身高 / 体重）。
   static const String tagHeight = '$_profile/ic_height.svg';
   static const String tagWeight = '$_profile/ic_weight.svg';
+  /// Reveal Card About：星座图标。对齐 oumi `start_info_icon.webp`。
+  static const String tagZodiac = '$_profile/start_info_icon.webp';
 
   /// 资料设置：性别卡片（未选 / 已选）。
   static const String genderMaleImg = '$_profile/man_img.webp';
@@ -290,11 +341,11 @@ abstract final class AppAssets {
   /// 用户资料底部弹层背景（右上绿光）。
   static const String userSheetCover = '$_profile/user_sheet_cover.webp';
 
-  // ---------- 底部 Tab（对齐 yaychat_dev：Find/Home、Live/Room、Chat、Me）----------
+  // ---------- 底部 Tab（Home、Hot、Chat、Me）----------
   static const String tabHome = '$_tab/tab_home.webp';
   static const String tabHomeSelected = '$_tab/tab_home_select.webp';
-  static const String tabRoom = '$_tab/tab_room.webp';
-  static const String tabRoomSelected = '$_tab/tab_room_select.webp';
+  static const String tabHot = '$_tab/tab_hot.webp';
+  static const String tabHotSelected = '$_tab/tab_hot_select.webp';
   static const String tabChats = '$_tab/tab_msg.webp';
   static const String tabChatsSelected = '$_tab/tab_msg_select.webp';
   static const String tabMe = '$_tab/tab_mine.webp';
@@ -309,8 +360,8 @@ abstract final class AppAssets {
   /// 输入框内表情。
   static const String roomEmojiMenu = '$_room/emoji_menu.webp';
 
-  /// 礼物。
-  static const String roomGiftMenu = '$_room/gift_menu.webp';
+  /// 礼物。对齐 oumi `oumi/room/room_gift.webp`。
+  static const String roomGiftMenu = '$_room/room_gift.webp';
 
   /// 房间消息铃铛。
   static const String roomMsgMenu = '$_room/msg_menu.webp';
@@ -400,6 +451,9 @@ abstract final class AppAssets {
   /// 麦位闭麦。
   static const String roomMicOff = '$_room/icon_mic_off.webp';
 
+  /// 指定麦位自动上麦后的开麦气泡底图。对齐 joyride `mic_on_tips_icon.webp`。
+  static const String roomMicOnTipsIcon = '$_room/mic_on_tips_icon.webp';
+
   /// 缩小房间。
   static const String roomScale = '$_room/icon_scale.webp';
 
@@ -408,6 +462,52 @@ abstract final class AppAssets {
 
   /// 普通空位。
   static const String roomSeatEmpty = '$_room/seat_empty.webp';
+
+  static const String _ht = 'assets/images/room/heart_link';
+  static const String htBannerBottom = '$_ht/banner_bottom.webp';
+  static const String htBannerTop = '$_ht/banner_top.webp';
+  static const String htBannerLine = '$_ht/banner_line.webp';
+  static const String htHostBadge = '$_ht/ht_host.webp';
+  /// Boss 麦倒计时图标。对齐 joyride `res0/clock.svg`。
+  static const String htClock = '$_ht/clock.svg';
+  static const String htBtnBg = '$_ht/ht_btn_bg.webp';
+  static const String htGiftIcon = '$_ht/gift_icon.webp';
+  static const String htTopicBg = '$_ht/topic_bg.webp';
+  static const String htTopicBtnBg = '$_ht/topic_btn_bg.webp';
+  static const String htTopicCorner = '$_ht/topic_corner.webp';
+  static const String htTopicExpand = '$_ht/topic_expand.webp';
+  static const String htFoldIcon = '$_ht/fold_icon.webp';
+  static const String htRefresh = '$_ht/refresh.webp';
+  static const String htNoticeIcon = '$_ht/notice_icon.webp';
+  static const String htTwoHeart = '$_ht/two_heart_icon.webp';
+  static const String htClickTips = '$_ht/click_tips.webp';
+  static const String htSecretUnlock = '$_ht/secret_unlock_img.webp';
+  static const String htSendGiftBg = '$_ht/send_gift_bg.webp';
+  /// 抱麦开麦提示配图。对齐 oumi `res0/mic_on_tips_img.webp`。
+  static const String htMicOnTipsImg = '$_ht/mic_on_tips_img.webp';
+  /// 礼物面板 Heartie 礼物悬浮提示底图。对齐 oumi `res0/ht_gift_tips_bg.webp`。
+  static const String htGiftTipsBg = '$_ht/ht_gift_tips_bg.webp';
+  /// 邀请弹窗 / 私聊卡片背景。对齐 oumi `res0/ht_info_bg.webp`。
+  static const String htInfoBg = '$_ht/ht_info_bg.webp';
+  static const String htTextArrowBg = '$_ht/ht_text_arrow_bg.webp';
+  static const String htHouseIcon = '$_ht/house_icon.webp';
+  static const String htInfoHeart = '$_ht/ht_info_heart.webp';
+  static const String htSecretAvatar = '$_ht/secret_avatar.webp';
+
+  /// 神秘卡弹窗：价格气泡 / CTA 箭头 / 语音 CD。对齐 joyride `SecretCardDialog`。
+  static const String htPriceTipsBg = '$_ht/price_tips_bg.webp';
+  static const String htArrowRightCircle = '$_ht/arrow_right_circle.webp';
+  static const String htCdBg = '$_ht/cd_bg.webp';
+  static const String htCdPlay = '$_ht/cd_play.webp';
+  static const String htCdPause = '$_ht/cd_pause.webp';
+  static const String htPlayIcon = '$_ht/play_icon.svg';
+
+  /// 神秘卡详情语音条波形（播放 / 暂停）。对齐 joyride `voice_*_black_long.webp`。
+  static const String htVoicePlayBlackLong = '$_ht/voice_play_black_long.webp';
+  static const String htVoicePauseBlackLong = '$_ht/voice_pause_black_long.webp';
+
+  /// Host Control Tab 底部指示（对齐 oumi `home_page_tab_indicator`）。
+  static const String htTabIndicator = '$_ht/tab_indicator.png';
 
   /// 最小化浮窗上的音浪。
   static const String roomFloatWave = '$_room/anim_in_room.webp';
@@ -436,41 +536,56 @@ abstract final class AppAssets {
   /// 冠名公屏条王冠。
   static const String roomNamedCrown = '$_room/king_hat.webp';
 
-  /// 房间工具：分享。
-  static const String roomToolShare = '$_room/icon_share.webp';
-
-  /// 房间工具：举报。
-  static const String roomToolReport = '$_room/icon_report.webp';
-
-  /// 房间工具：收藏（未收藏）。
-  static const String roomToolSave = '$_room/icon_save.webp';
-
-  /// 房间工具：已收藏。
-  static const String roomToolSaved = '$_room/icon_saved.webp';
-
-  /// 房间工具：警告（设计稿与已收藏同图）。
-  static const String roomToolWarn = roomToolSaved;
-
-  /// 房间工具：关闭房间。
-  static const String roomToolClose = '$_room/icon_exit.webp';
-
-  // ---------- 房间用户更多（对齐 joyride room/tool/*） ----------
+  // ---------- 房间工具 / 用户更多（对齐 oumi `assets/images/oumi/room/tool/*`） ----------
   static const String _roomTool = 'assets/images/room/tool';
 
-  /// 房间工具：房间设置。
+  /// 房间工具：分享。对齐 oumi `share.webp`。
+  static const String roomToolShare = '$_roomTool/share.webp';
+
+  /// 房间工具：举报。对齐 oumi `report.webp`。
+  static const String roomToolReport = '$_roomTool/report.webp';
+
+  /// 房间工具：收藏（未收藏）。对齐 oumi `save.webp`。
+  static const String roomToolSave = '$_roomTool/save.webp';
+
+  /// 房间工具：已收藏。对齐 oumi `saved.webp`。
+  static const String roomToolSaved = '$_roomTool/saved.webp';
+
+  /// 全员警告（超管）。对齐 joyride `warn.webp`。
+  static const String roomToolWarn = '$_roomTool/warn.webp';
+
+  /// 关闭房间。
+  static const String roomToolClose = '$_roomTool/close.webp';
+
+  /// 房间设置。
   static const String roomToolSetting = '$_roomTool/setting.webp';
 
-  /// 房间工具：打开公屏。
+  /// 打开公屏。
   static const String roomToolScreenOpen = '$_roomTool/screen_open.webp';
 
-  /// 房间工具：关闭公屏。
+  /// 关闭公屏。
   static const String roomToolScreenClose = '$_roomTool/screen_close.webp';
 
-  /// 房间工具：礼物统计开关。
+  /// 礼物统计开关。
   static const String roomToolStatistic = '$_roomTool/statistic.webp';
 
-  /// 房间工具：房间倒计时（CP 主持）。
+  /// 房间倒计时（CP 主持）。
   static const String roomToolTimer = '$_roomTool/timer.webp';
+
+  /// 开启转盘。
+  static const String roomToolTurntableOn = '$_roomTool/turntable_on.webp';
+
+  /// 关闭转盘。
+  static const String roomToolTurntableOff = '$_roomTool/turntable_off.webp';
+
+  static const String roomToolMusic = '$_roomTool/music.webp';
+  static const String roomToolTask = '$_roomTool/task.webp';
+  static const String roomToolShareEvent = '$_roomTool/share_event.webp';
+  static const String roomToolHot = '$_roomTool/hot.webp';
+  static const String roomToolGameOpen = '$_roomTool/game_open.webp';
+  static const String roomToolGameClose = '$_roomTool/game_close.webp';
+  static const String roomToolGameSwitch = '$_roomTool/game_switch.webp';
+  static const String roomToolBan = '$_roomTool/ban.webp';
 
   static const String roomUserMicOn = '$_roomTool/mic_on.webp';
   static const String roomUserMicDown = '$_roomTool/mic_down.webp';
@@ -486,6 +601,8 @@ abstract final class AppAssets {
   static const String roomUserBlock = '$_roomTool/block.webp';
   static const String roomUserWarn = '$_roomTool/warn.webp';
   static const String roomUserBan = '$_roomTool/ban.webp';
+  static const String roomUserNumberCard = '$_roomTool/number_card.webp';
+  static const String roomUserReveal = '$_roomTool/reveal.webp';
   static const String roomUserMore = '$_chat/chat_dm_more.svg';
 
   // ---------- 拍卖房（对齐 joyride auction/*） ----------
@@ -570,4 +687,44 @@ abstract final class AppAssets {
 
   /// 装饰右翅。
   static const String cpWingRight = '$_cp/ic_cp_wing_right.webp';
+
+  // ---------- 房间转盘（对齐 joyride room_turntable） ----------
+  static const String _turntable = 'assets/images/room/turntable';
+
+  static const String turntableBg = '$_turntable/turn_bg.webp';
+  static const String turntableStart = '$_turntable/turn_start.webp';
+  static const String turntableLight = '$_turntable/turn_light.webp';
+  static const String turntableHide = '$_turntable/turn_hide.webp';
+  static const String turntableClose = '$_turntable/turn_close.webp';
+  static const String turntableEntry = '$_turntable/turn_entry.webp';
+
+  // ---------- Romance / 21 日亲密之旅（对齐 joyride common/romance） ----------
+  static const String _romance = 'assets/images/romance';
+
+  static const String romanceAlertBg = '$_romance/alert_bg.webp';
+  static const String romanceTitleBg = '$_romance/title_bg.webp';
+  static const String romanceRelationBg = '$_romance/relation_bg.webp';
+  static const String romanceRelationBg2 = '$_romance/relation_bg2.webp';
+  static const String romanceHeart = '$_romance/heart.webp';
+  static const String romanceNoticeBg = '$_romance/notice_bg.webp';
+  static const String romanceJoinBg = '$_romance/join_bg.webp';
+  static const String romanceJoinBtn = '$_romance/join_btn.webp';
+  static const String romanceJoinTips = '$_romance/join_tips.webp';
+  static const String romanceJoinTitle = '$_romance/title_v1.webp';
+  static const String romanceChatBg = '$_romance/chat_bg_v2.webp';
+  static const String romanceGiftBg = '$_romance/gift_bg.webp';
+  static const String romanceGiftBgSelect = '$_romance/gift_bg_select.webp';
+  static const String romanceClaimTips = '$_romance/claim_tips.webp';
+  static const String romanceHeartPoint = '$_romance/heart_point.webp';
+  static const String romanceCardBg = '$_romance/card_bg.webp';
+  static const String romanceCard = '$_romance/card.webp';
+  static const String romanceCardTitle = '$_romance/card_title.webp';
+  static const String romanceCardPag = '$_romance/card.pag';
+  static const String romanceCardSuccessBg = '$_romance/card_success_bg.webp';
+  static const String romanceCardSuccessTitle = '$_romance/card_success_title.webp';
+  static const String romanceCardTipsBg = '$_romance/card_tips_bg.webp';
+  static const String romanceHand = '$_romance/hand.webp';
+  static const String romanceInviteTipsMp3 = '$_romance/invite_tips.MP3';
+
+  static String romanceLevel(int level) => '$_romance/level_$level.webp';
 }

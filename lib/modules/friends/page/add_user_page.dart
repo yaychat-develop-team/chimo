@@ -48,9 +48,8 @@ class _AddUserPageState extends State<AddUserPage> {
               height: 48,
               padding: const EdgeInsets.symmetric(horizontal: 14),
               decoration: BoxDecoration(
-                color: Colors.transparent,
                 borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: AppColors.gray333333, width: 1),
+                border: Border.all(color: AppColors.gray333333),
               ),
               child: Row(
                 children: [

@@ -152,7 +152,7 @@ class _ProgressBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final w = constraints.maxWidth * value.clamp(0.0, 1.0);
+        final w = constraints.maxWidth * value;
         return Container(
           height: 4,
           width: double.infinity,

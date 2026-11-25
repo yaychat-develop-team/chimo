@@ -1,4 +1,3 @@
-import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -73,7 +72,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
       _ownsController = true;
     }
     // ⚠️ 两个 hook 要第一时间挂上：`_c` 是字段初始化时 `Get.find` 出来的，
-    // 那一刻 Controller 的 `onInit`（内含 `unawaited(loadImHistory())`）就已经
+    // 那一刻 Controller 的 `onInit`（内含 `loadImHistory()`）就已经
     // 跑了。那条链在第一个 `await` 处让出，所以这里挂得上 —— 但别往后挪。
     logic.onScrollToBottom = _scrollToBottom;
     logic.onMembershipChanged = widget.onMembershipChanged;
@@ -205,7 +204,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
       case _GroupMoreAction.report:
         AppJumper.toReport(reportedId: _group.gid, kind: ReportTargetKind.group);
       case _GroupMoreAction.leave:
-        unawaited(logic.leave());
+        logic.leave();
     }
   }
 
@@ -336,7 +335,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
                     controller: _inputController,
                     quote: logic.quote.value,
                     onClearQuote: logic.clearQuote,
-                    onSendText: (text) => unawaited(_sendMessage(text)),
+                    onSendText: (text) => _sendMessage(text),
                     onSendVoice: logic.sendVoice,
                     onSendImages: logic.sendImages,
                     onPanelChanged: (open) {
@@ -347,7 +346,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
                     },
                   )
                 else
-                  GroupJoinBar(bottomInset: bottomPadding, onTap: () => unawaited(logic.join())),
+                  GroupJoinBar(bottomInset: bottomPadding, onTap: () => logic.join()),
               ],
             ),
           ),

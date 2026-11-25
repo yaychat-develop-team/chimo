@@ -138,7 +138,7 @@ class RoomSocket {
   void _scheduleReconnect() {
     if (_closed || _retrying) return;
     _retrying = true;
-    unawaited(() async {
+    () async {
       await _dropSocket();
       final delay = _backoffMs;
       _backoffMs = (_backoffMs + 1000).clamp(2000, 5000);
@@ -147,7 +147,7 @@ class RoomSocket {
       _retrying = false;
       if (_closed || isOpen) return;
       await connect();
-    }());
+    }();
   }
 
   void _onData(dynamic raw) {

@@ -47,6 +47,7 @@ class _RoomSettingSheet extends StatelessWidget {
       service.notice.value;
       service.layoutName.value;
       service.freePub.value;
+      service.showRoomOwner.value;
       return DecoratedBox(
         decoration: const BoxDecoration(
           color: AppColors.black1C1C1E,
@@ -90,31 +91,39 @@ class _RoomSettingSheet extends StatelessWidget {
                   maxLines: 3,
                   onSubmit: (v) => _run(() => service.updateNotice(v)),
                 ),
-                if (!service.isCpRoom && !service.isAuctionRoom)
+                if (service.showMicLayoutSetting)
                   _NavRow(
                     title: 'Mic Layout',
                     value: service.layoutName.value,
                     onTap: () => _pickMicLayout(service),
                   ),
-                _NavRow(
-                  title: 'Background',
-                  value: '',
-                  onTap: () async {
-                    await showRoomBackgroundSheet();
-                  },
-                ),
-                _NavRow(
-                  title: 'Privacy',
-                  value: '',
-                  onTap: () async {
-                    await showRoomPrivacySheet();
-                  },
-                ),
+                if (service.showBackgroundSetting)
+                  _NavRow(
+                    title: 'Background',
+                    value: '',
+                    onTap: () async {
+                      await showRoomBackgroundSheet();
+                    },
+                  ),
+                if (service.showPrivacySetting)
+                  _NavRow(
+                    title: 'Privacy',
+                    value: '',
+                    onTap: () async {
+                      await showRoomPrivacySheet();
+                    },
+                  ),
                 _SwitchRow(
                   title: 'Free Mic',
                   value: service.freePub.value,
                   onChanged: (_) => _run(service.toggleFreePub),
                 ),
+                if (service.showOwnerSeatSetting)
+                  _SwitchRow(
+                    title: 'Show Owner Seat',
+                    value: service.showRoomOwner.value,
+                    onChanged: (_) => _run(service.toggleShowRoomOwner),
+                  ),
               ],
             ),
           ),

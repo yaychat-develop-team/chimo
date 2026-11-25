@@ -10,7 +10,7 @@ import '../../../common/utils/app_log.dart';
 /// 语音播放要碰的平台侧：环信附件（下载/取本地路径）+ audioplayers。
 ///
 /// 抽成接口**只为了能测**：MethodChannel 在 widget test 里一律抛
-/// `MissingPluginException`，而 `stop()` 是 `unawaited` 出去的 —— 未捕获的异步异常
+/// `MissingPluginException`，而 `stop()` 是未 await 出去的 —— 未捕获的异步异常
 /// 会直接把用例判红。用例换掉 [ChatVoicePlayback.audioFactory] 就能把这层挡住。
 abstract class ChatVoiceAudio {
   /// 拿到能直接喂给播放器的地址（本地缓存 / 已下载文件 / 可直播 URL）。
@@ -153,9 +153,9 @@ class ChatVoicePlayback extends ChangeNotifier {
   void stop() {
     _playTimer?.cancel();
     _playTimer = null;
-    unawaited(_completeSub?.cancel() ?? Future<void>.value());
+    _completeSub?.cancel() ?? Future<void>.value();
     _completeSub = null;
-    unawaited(_audio.stop());
+    _audio.stop();
     AppVoiceExclusive.release(_exclusiveStop);
     _playing = false;
     _remaining = 0;
@@ -166,8 +166,8 @@ class ChatVoicePlayback extends ChangeNotifier {
   void dispose() {
     // 顺序照旧：先摘互斥登记，再停播放器，最后拆订阅与定时器。
     AppVoiceExclusive.release(_exclusiveStop);
-    if (_playing) unawaited(_audio.stop());
-    unawaited(_completeSub?.cancel() ?? Future<void>.value());
+    if (_playing) _audio.stop();
+    _completeSub?.cancel() ?? Future<void>.value();
     _completeSub = null;
     _playTimer?.cancel();
     _playTimer = null;

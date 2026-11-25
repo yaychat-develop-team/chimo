@@ -33,7 +33,7 @@ class RoomGiftBuyBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: EdgeInsets.fromLTRB(16, 8, 16, 12 + bottomInset),
-      color: AppColors.black,
+      color: AppColors.rgba(21, 21, 35, 1),
       child: Row(
         children: [
           Chimo.image(AppAssets.coin, width: 18, height: 18),
@@ -44,7 +44,7 @@ class RoomGiftBuyBar extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           GestureDetector(
-            onTap: AppJumper.toWallet,
+            onTap: () => AppJumper.showRechargeSheet(),
             child: Container(
               height: 28,
               padding: const EdgeInsets.symmetric(horizontal: 12),

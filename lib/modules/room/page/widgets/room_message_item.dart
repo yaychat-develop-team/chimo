@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:get/get.dart';
 
 import '../../model/room_message.dart';
+import '../../types/heart_link/logic/heart_link_logic.dart';
 import 'barrage/room_barrage_activity.dart';
 import 'barrage/room_barrage_card.dart';
 import 'barrage/room_barrage_gift.dart';
@@ -12,6 +14,7 @@ import 'barrage/room_barrage_named.dart';
 import 'barrage/room_barrage_pet.dart';
 import 'barrage/room_barrage_qa.dart';
 import 'barrage/room_barrage_text.dart';
+import 'barrage/room_barrage_turntable.dart';
 import 'room_sender_tags.dart';
 
 /// 公屏一行。按 [RoomMessageType] 分发到 `barrage/` 下各 body，样式对齐 Oumi。
@@ -23,6 +26,30 @@ class RoomMessageItem extends StatelessWidget {
   /// 点头像 / 昵称打开资料卡。`uid` 为空时不回调。
   final void Function({required String uid, String name, String avatar})? onProfile;
   final void Function(String link)? onLink;
+
+  RoomSenderTags get _tags {
+    final base = message.tags;
+    if (!Get.isRegistered<HeartLinkLogic>()) return base;
+    final uid = int.tryParse(message.senderUid) ?? 0;
+    if (!Get.find<HeartLinkLogic>().isHeartie(uid)) return base;
+    return RoomSenderTags(
+      secret: base.secret,
+      heartie: true,
+      gender: base.gender,
+      novaIcon: base.novaIcon,
+      vipIcon: base.vipIcon,
+      carLevel: base.carLevel,
+      knightIcon: base.knightIcon,
+      jobLabel: base.jobLabel,
+      robot: base.robot,
+      newer: base.newer,
+      tagIcons: base.tagIcons,
+      relationIcon: base.relationIcon,
+      relationName: base.relationName,
+      relationInset: base.relationInset,
+      nameColors: base.nameColors,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +71,7 @@ class RoomMessageItem extends StatelessWidget {
                 if (message.showSender) ...[
                   // 对齐 yaychat：顶栏昵称不可点，仅头像可开资料卡。
                   RoomSenderTagsView(
-                    tags: message.tags,
+                    tags: _tags,
                     name: message.sender,
                     carIcon: message.carIcon,
                   ),
@@ -77,10 +104,10 @@ class RoomMessageItem extends StatelessWidget {
         return RoomBarrageHeartBody(host: host);
       case RoomMessageType.named:
         return RoomBarrageNamedBody(host: host);
+      case RoomMessageType.turntable:
+        return RoomBarrageTurntableBody(host: host);
       case RoomMessageType.text:
         return RoomBarrageTextBody(host: host);
-      default:
-        return const SizedBox.shrink();
     }
   }
 }

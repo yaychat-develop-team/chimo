@@ -48,11 +48,34 @@ class _CoinsDetailsPageState extends State<CoinsDetailsPage> {
     );
   }
 
-  /// 在 `Obx` 的 builder 里同步调用，所以这里读 `_c.xxx` 登记得到依赖。
+  /// 在 `Obx` 的 builder 里同步调用，读 [logic] 的 obs 才会登记依赖。
   Widget _buildBody() {
     final loading = logic.loading.value;
     final error = logic.error.value;
     final items = logic.items.toList();
+
+    final Widget? empty;
+    if (loading) {
+      empty = null;
+    } else if (error != null) {
+      empty = Padding(
+        padding: const EdgeInsets.fromLTRB(24, 120, 24, 24),
+        child: Text(
+          error,
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: AppColors.gray9A9A9A, fontSize: 14),
+        ),
+      );
+    } else {
+      empty = const Padding(
+        padding: EdgeInsets.only(top: 120),
+        child: Text(
+          'No records yet',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: AppColors.gray9A9A9A, fontSize: 14),
+        ),
+      );
+    }
 
     return AppPullRefresh.list(
       style: AppPullRefreshStyle.bar,
@@ -63,25 +86,7 @@ class _CoinsDetailsPageState extends State<CoinsDetailsPage> {
       showNoMoreFooter: false,
       padding: const EdgeInsets.only(top: 8, bottom: 24),
       itemCount: items.length,
-      empty: loading
-          ? null
-          : error != null
-          ? Padding(
-              padding: const EdgeInsets.fromLTRB(24, 120, 24, 24),
-              child: Text(
-                error,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.gray9A9A9A, fontSize: 14),
-              ),
-            )
-          : const Padding(
-              padding: EdgeInsets.only(top: 120),
-              child: Text(
-                'No records yet',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: AppColors.gray9A9A9A, fontSize: 14),
-              ),
-            ),
+      empty: empty,
       itemBuilder: (context, index) => _HistoryTile(item: items[index]),
     );
   }
@@ -137,7 +142,7 @@ class _HistoryTile extends StatelessWidget {
                 ),
               ),
               Text(
-                _formatTime(item.timestamp.toInt()),
+                TimeFmt.dateTimeSeconds(item.timestamp.toInt()),
                 style: const TextStyle(
                   fontSize: 13,
                   color: Colors.white70,
@@ -155,7 +160,4 @@ class _HistoryTile extends StatelessWidget {
       ),
     );
   }
-
-  /// 对齐 forya `TimeAgo.timeForJMS`（秒时间戳）。
-  static String _formatTime(int sec) => TimeFmt.dateTimeSeconds(sec);
 }

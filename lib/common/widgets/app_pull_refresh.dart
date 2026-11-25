@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
@@ -14,7 +13,7 @@ enum AppPullRefreshStyle {
   /// 圆环进度 → 转圈 → 对勾。
   spinner,
 
-  /// 顶部细进度条（对齐钱包页 [RefreshIndicator] / [AppTopLoadingBar] 观感）。
+  /// 顶部细进度条（对齐钱包页 [RefreshIndicator] 。
   bar,
 }
 
@@ -177,8 +176,13 @@ class AppPullRefresh extends StatefulWidget {
   /// 指示器样式：转圈 / 进度条。
   final AppPullRefreshStyle style;
 
+  /// 固定头部，不随滚动。
   final Widget? header;
+
+  /// 顶部固定区域，随滚动。
   final List<Widget> topSlivers;
+
+  /// 底部固定区域，随滚动。
   final List<Widget> bottomSlivers;
   final ScrollController? controller;
   final Future<void> Function()? onLoadMore;
@@ -252,7 +256,7 @@ class _AppPullRefreshState extends State<AppPullRefresh> {
     final position = _controller.position;
     if (position.pixels < position.maxScrollExtent - widget.loadMoreThreshold) return;
     _loadMoreLocked = true;
-    unawaited(onLoadMore());
+    onLoadMore();
   }
 
   Future<void> _handleRefresh() async {

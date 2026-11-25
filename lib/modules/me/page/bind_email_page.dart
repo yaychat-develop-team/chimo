@@ -100,8 +100,6 @@ class BindEmailPage extends GetView<BindEmailLogic> {
 class BindEmailCodePage extends GetView<EmailCodeLogic> {
   const BindEmailCodePage({super.key});
 
-  static const Color _green = AppColors.green1CFF8A;
-
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.sizeOf(context).width;
@@ -110,7 +108,7 @@ class BindEmailCodePage extends GetView<EmailCodeLogic> {
       final canVerify = controller.canVerify;
       return AppScaffold(
         backgroundColor: AppColors.black111111,
-        // appBar: AppNavBar(title: 'Check your email!'),
+        appBar: AppNavBar(),
         backdrop: Chimo.image(
           AppAssets.homeTopBg,
           width: screenWidth,
@@ -145,7 +143,10 @@ class BindEmailCodePage extends GetView<EmailCodeLogic> {
                     const TextSpan(text: 'We just sent a magic key to '),
                     TextSpan(
                       text: controller.email,
-                      style: const TextStyle(color: _green, fontWeight: FontWeight.w600),
+                      style: const TextStyle(
+                        color: AppColors.green1CFF8A,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     const TextSpan(text: '. Enter it below to meet your crew.'),
                   ],
@@ -167,7 +168,7 @@ class BindEmailCodePage extends GetView<EmailCodeLogic> {
                   maxLength: EmailCodeLogic.codeLength,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   style: AppText.field.copyWith(letterSpacing: 2),
-                  cursorColor: _green,
+                  cursorColor: AppColors.green1CFF8A,
                   decoration: const AppInputDecoration(
                     isDense: true,
                     counterText: '',
@@ -187,7 +188,7 @@ class BindEmailCodePage extends GetView<EmailCodeLogic> {
                 onTap: controller.verify,
                 enabled: canVerify,
                 loading: controller.verifying.value,
-                color: _green,
+                color: AppColors.green1CFF8A,
                 disabledColor: AppColors.gray333333,
                 disabledLabelColor: AppColors.gray8A8A8A,
                 borderRadius: 27,
@@ -211,7 +212,9 @@ class BindEmailCodePage extends GetView<EmailCodeLogic> {
                           ? 'Resend code'
                           : 'Resend code (${controller.resendLeft.value}s)',
                       style: TextStyle(
-                        color: controller.canResend ? _green : _green.withValues(alpha: 0.7),
+                        color: controller.canResend
+                            ? AppColors.green1CFF8A
+                            : AppColors.green1CFF8A.withValues(alpha: 0.7),
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                       ),

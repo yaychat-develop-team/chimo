@@ -10,6 +10,7 @@ import '../../../../../common/theme/app_bottom_sheet.dart';
 import '../../../../../common/theme/app_colors.dart';
 import '../../../../../common/utils/app_toast.dart';
 import '../../../../../common/utils/chimo.dart';
+import '../../../../../common/utils/text_fmt.dart';
 import '../../../../../common/widgets/app_image.dart';
 import '../../../../../common/widgets/app_pull_refresh.dart';
 
@@ -57,12 +58,6 @@ class _CpRankSheetState extends State<CpRankSheet> {
     if (!result.ok) {
       AppToast.error(result.message.isEmpty ? 'Load failed' : result.message);
     }
-  }
-
-  /// 设计稿：≥1万用 `13.56w`，否则原值。
-  String _heart(int value) {
-    if (value >= 10000) return '${(value / 10000).toStringAsFixed(2)}w';
-    return '$value';
   }
 
   String _nick(String name) {
@@ -183,7 +178,7 @@ class _CpRankSheetState extends State<CpRankSheet> {
             right: 0,
             child: Center(
               child: Text(
-                _heart(item.heart.toInt()),
+                TextFmt.wan(item.heart.toInt()),
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: _scoreBrown,
@@ -290,7 +285,7 @@ class _CpRankSheetState extends State<CpRankSheet> {
           Chimo.image(AppAssets.cpRankLoveIcon, width: 14, height: 12),
           SizedBox(width: 4.w),
           Text(
-            _heart(item.heart.toInt()),
+            TextFmt.wan(item.heart.toInt()),
             style: TextStyle(
               color: _rankPink,
               fontSize: 13.sp,

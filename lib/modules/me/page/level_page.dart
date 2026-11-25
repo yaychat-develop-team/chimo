@@ -7,7 +7,7 @@ import '../../../common/theme/app_colors.dart';
 import 'package:chimo/common/utils/chimo.dart';
 import '../../../common/widgets/app_pull_refresh.dart';
 import '../../../common/widgets/app_scaffold.dart';
-import 'logic/level_logic.dart';
+import '../logic/level_logic.dart';
 import 'package:chimo/common/widgets/app_image.dart';
 
 /// 我的等级 — 对齐 forya `MineLevelPage` / `MineLevelModel`。

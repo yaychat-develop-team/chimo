@@ -63,7 +63,7 @@ class _GroupMembersSheetState extends State<GroupMembersSheet> {
     logic.query.value = value;
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 320), () {
-      unawaited(logic.load(searchKey: value.trim()));
+      logic.load(searchKey: value.trim());
     });
   }
 
@@ -189,7 +189,7 @@ class _GroupMembersSheetState extends State<GroupMembersSheet> {
                 TextButton(onPressed: _goLogin, child: const Text('Log in'))
               else
                 TextButton(
-                  onPressed: () => unawaited(logic.load(searchKey: _query.trim())),
+                  onPressed: () => logic.load(searchKey: _query.trim()),
                   child: const Text('Retry'),
                 ),
             ],

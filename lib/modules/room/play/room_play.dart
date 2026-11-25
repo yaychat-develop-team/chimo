@@ -3,7 +3,7 @@ import 'package:flutter/widgets.dart';
 import '../../../common/models/server_client/rtc.pb.dart';
 import '../../../common/utils/app_log.dart';
 import '../addons/box/box_room_play.dart';
-import '../addons/turntable/turntable_room_play.dart';
+import '../types/turntable/turntable_room_play.dart';
 import '../service/room_service.dart';
 import '../socket/room_msg_handler.dart';
 import '../types/auction/auction_room_play.dart';
@@ -15,7 +15,6 @@ import '../types/joy_ride/joy_ride_room_play.dart';
 import '../types/lucky_game/lucky_game_room_play.dart';
 import '../types/million_club/million_club_room_play.dart';
 import '../types/order_sing/order_sing_room_play.dart';
-import '../types/romance/romance_room_play.dart';
 import '../types/story/story_room_play.dart';
 import '../types/voice/voice_room_play.dart';
 
@@ -63,7 +62,7 @@ abstract final class RoomPlays {
     const HeartLinkRoomPlay(),
     const AuctionRoomPlay(),
     const StoryRoomPlay(),
-    const RomanceRoomPlay(),
+    // Romance 新人房玩法暂不启用，只保留私聊 21 日触发。
     const LuckyGameRoomPlay(),
     const TurntableRoomPlay(),
     const BoxRoomPlay(),

@@ -20,6 +20,14 @@ abstract class CacheKeys {
     final now = DateTime.now();
     return 'userDailyKey_${uid}_${now.year}_${now.month}_${now.day}_$type';
   }
+
+  /// 21 日活动「送礼解锁」弹窗是否已触发（按对方 uid）。
+  static String romanceActivityHasShowKey(String tid) =>
+      'romanceActivityHasShowKey_$tid';
+
+  /// 21 日活动成功弹窗是否已触发（按情侣 uid 对）。
+  static String romanceActivitySuccessHasShowKey(String tid) =>
+      'romanceActivitySuccessHasShowKey_$tid';
 }
 
 abstract class CacheUtil {

@@ -1,8 +1,9 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 
+import '../../../../app/app_jumper.dart';
+import '../../../../common/constants/app_assets.dart';
 import '../../../../common/models/server_client/cash.pb.dart';
 import '../../../../common/theme/app_colors.dart';
 import '../../../../common/utils/app_log.dart';
@@ -14,6 +15,7 @@ import '../../logic/room_gift_logic.dart';
 import '../../model/mic_seat.dart';
 import '../../model/room_gift_receiver.dart';
 import '../../service/room_service.dart';
+import '../../types/heart_link/logic/heart_link_logic.dart';
 import 'gift/room_gift_buy_bar.dart';
 import 'gift/room_gift_grids.dart';
 import 'gift/room_gift_receivers_bar.dart';
@@ -45,6 +47,7 @@ Future<void> showRoomGiftSheet(
   String preferredUid = '',
   String preferredName = '',
   String preferredAvatar = '',
+  int preferredGiftId = 0,
 }) {
   final service = RoomService.findOrNull();
   if (service == null || !service.inRoom.value) {
@@ -86,6 +89,7 @@ Future<void> showRoomGiftSheet(
       channelId: '${service.rid}',
       receivers: people,
       preferredUid: prefer,
+      preferredGiftId: preferredGiftId,
     ),
   );
 }
@@ -105,6 +109,7 @@ class RoomGiftSheet extends StatefulWidget {
     required this.channelId,
     required this.receivers,
     this.preferredUid = '',
+    this.preferredGiftId = 0,
     this.returnResult = false,
   });
 
@@ -112,6 +117,7 @@ class RoomGiftSheet extends StatefulWidget {
   final String channelId;
   final List<RoomGiftReceiver> receivers;
   final String preferredUid;
+  final int preferredGiftId;
 
   /// 私聊：成功后 `pop` [GiftSendResult] 供消息流插卡。
   final bool returnResult;
@@ -140,6 +146,7 @@ class _RoomGiftSheetState extends State<RoomGiftSheet> with SingleTickerProvider
         channelId: widget.channelId,
         receivers: widget.receivers,
         preferredUid: widget.preferredUid,
+        preferredGiftId: widget.preferredGiftId,
       ),
       tag: _tag,
     );
@@ -187,6 +194,10 @@ class _RoomGiftSheetState extends State<RoomGiftSheet> with SingleTickerProvider
     if (!mounted) return;
     if (!result.ok) {
       logic.idle();
+      if (result.insufficient) {
+        await AppJumper.showRechargeSheet(price: result.needPrice, onSuccess: () => logic.load());
+        return;
+      }
       AppToast.info(result.error ?? 'Gift failed');
       return;
     }
@@ -333,23 +344,29 @@ class _RoomGiftSheetState extends State<RoomGiftSheet> with SingleTickerProvider
             ],
             SizedBox(
               height: _panelH,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Stack(
                 children: [
-                  _tabBar(),
-                  Expanded(child: _catalog()),
-                  RoomGiftBuyBar(
-                    bottomInset: bottom,
-                    balance: logic.balance.value,
-                    qty: logic.qty.value,
-                    busy: !logic.canDispatch,
-                    sending: logic.sending.value,
-                    canSend:
-                        !logic.isBagTab ||
-                        (logic.currentBagItem != null && logic.currentBagItem!.canSend),
-                    onPickQty: _pickQty,
-                    onSend: () => unawaited(_send()),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _tabBar(),
+                      Expanded(child: _catalog()),
+                      RoomGiftBuyBar(
+                        bottomInset: bottom,
+                        balance: logic.balance.value,
+                        qty: logic.qty.value,
+                        busy: !logic.canDispatch,
+                        sending: logic.sending.value,
+                        canSend:
+                            !logic.isBagTab ||
+                            (logic.currentBagItem != null && logic.currentBagItem!.canSend),
+                        onPickQty: _pickQty,
+                        onSend: () => _send(),
+                      ),
+                    ],
                   ),
+                  // 对齐 oumi GiftPage._renderTipsWidget showHtTips。
+                  if (_showHtTips) _htGiftTips(bottom),
                 ],
               ),
             ),
@@ -357,6 +374,79 @@ class _RoomGiftSheetState extends State<RoomGiftSheet> with SingleTickerProvider
         ),
       );
     });
+  }
+
+  /// 对齐 oumi `GiftPageModel.showHtTips`：房间场景 + 已选收礼人 + 当前礼物为牵手礼物。
+  bool get _showHtTips {
+    if (!widget.isRoomScene || logic.selectedUids.isEmpty || logic.isBagTab) {
+      return false;
+    }
+    if (!Get.isRegistered<HeartLinkLogic>()) return false;
+    final htId = Get.find<HeartLinkLogic>().roomHtInfo?.itemId.toInt() ?? 0;
+    if (htId <= 0) return false;
+    return logic.currentGift?.id.toInt() == htId;
+  }
+
+  String get _htTipsName {
+    if (logic.selectedUids.length != 1) return 'her';
+    final uid = logic.selectedUids.first;
+    for (final user in logic.receivers) {
+      if (user.uid == uid) {
+        final name = user.name.trim();
+        return name.isEmpty ? 'her' : name;
+      }
+    }
+    return 'her';
+  }
+
+  /// Heartie 牵手礼物悬浮提示。
+  Widget _htGiftTips(double bottomInset) {
+    final name = _htTipsName;
+    final text = 'Send this gift to partner up with $name and enjoy exclusive features';
+    final nameIndex = text.indexOf(name);
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: 32 + bottomInset,
+      child: IgnorePointer(
+        child: Container(
+          width: double.infinity,
+          height: 93.w,
+          padding: EdgeInsetsDirectional.only(start: 104.w, top: 30.w, end: 35.w),
+          decoration: const BoxDecoration(
+            image: DecorationImage(image: AssetImage(AppAssets.htGiftTipsBg), fit: BoxFit.fill),
+          ),
+          child: nameIndex < 0
+              ? Text(
+                  text,
+                  style: TextStyle(
+                    color: AppColors.white,
+                    fontSize: 11.sp,
+                    fontWeight: FontWeight.w500,
+                    height: 1.3,
+                  ),
+                )
+              : Text.rich(
+                  TextSpan(
+                    style: TextStyle(
+                      color: AppColors.white,
+                      fontSize: 11.sp,
+                      fontWeight: FontWeight.w500,
+                      height: 1.3,
+                    ),
+                    children: [
+                      TextSpan(text: text.substring(0, nameIndex)),
+                      TextSpan(
+                        text: name,
+                        style: const TextStyle(color: Color(0xFFFFE05A)),
+                      ),
+                      TextSpan(text: text.substring(nameIndex + name.length)),
+                    ],
+                  ),
+                ),
+        ),
+      ),
+    );
   }
 
   Widget _tabBar() {
@@ -409,7 +499,7 @@ class _RoomGiftSheetState extends State<RoomGiftSheet> with SingleTickerProvider
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(error, style: const TextStyle(color: AppColors.gray9A9A9A, fontSize: 13)),
-            TextButton(onPressed: () => unawaited(logic.load()), child: const Text('Retry')),
+            TextButton(onPressed: () => logic.load(), child: const Text('Retry')),
           ],
         ),
       );
@@ -420,7 +510,7 @@ class _RoomGiftSheetState extends State<RoomGiftSheet> with SingleTickerProvider
         selected: logic.bagIndex.value,
         loading: logic.bagLoading.value,
         onSelect: logic.selectBagItem,
-        onRetry: () => unawaited(logic.loadBag()),
+        onRetry: () => logic.loadBag(),
       );
     }
     if (logic.isInteractiveTab) {

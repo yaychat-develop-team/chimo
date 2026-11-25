@@ -1,4 +1,5 @@
 import '../../../common/models/server_client/honor.pb.dart';
+import '../../../common/utils/time_fmt.dart';
 
 /// 荣誉展示文案（有效期 / 奖励天数 / 进度）。
 abstract final class HonorDisplay {
@@ -11,8 +12,7 @@ abstract final class HonorDisplay {
   static String receivedStatus(HonorItem item) {
     if (item.forever) return 'Permanent';
     final days = _daysLeft(item.expireTime.toInt());
-    if (days == null) return 'Expired';
-    if (days <= 0) return 'Expired';
+    if (days == null || days <= 0) return 'Expired';
     if (days == 1) return 'Expires in 1 day';
     return 'Expires in $days days';
   }
@@ -35,12 +35,14 @@ abstract final class HonorDisplay {
   }
 
   static String activationDate(HonorItem item) {
-    return _formatYmd(item.firstActiveTime.toInt());
+    final d = _date(item.firstActiveTime.toInt());
+    return d == null ? '--' : TimeFmt.isoDate(d);
   }
 
   static String validToDate(HonorItem item) {
     if (item.forever) return 'Permanent';
-    return _formatYmd(item.expireTime.toInt());
+    final d = _date(item.expireTime.toInt());
+    return d == null ? '--' : TimeFmt.isoDate(d);
   }
 
   /// Hero 标签。列表 ↔ 详情共用；[fromTarget] 区分 Attainable，避免 IndexedStack 双列表同 hid 冲突。
@@ -56,10 +58,8 @@ abstract final class HonorDisplay {
 
   /// 详情页获得时间：Obtained on Month D, YYYY。
   static String obtainedLabel(HonorItem item) {
-    final raw = item.firstActiveTime.toInt();
-    if (raw <= 0) return 'Obtained on --';
-    final ms = raw < 100000000000 ? raw * 1000 : raw;
-    final d = DateTime.fromMillisecondsSinceEpoch(ms);
+    final d = _date(item.firstActiveTime.toInt());
+    if (d == null) return 'Obtained on --';
     const months = [
       'January',
       'February',
@@ -77,25 +77,21 @@ abstract final class HonorDisplay {
     return 'Obtained on ${months[d.month - 1]} ${d.day}, ${d.year}';
   }
 
-  static int? _daysLeft(int millis) {
+  /// 秒和毫秒都收成同一时刻。无效时间返回 `null`。
+  static DateTime? _date(int millis) {
     if (millis <= 0) return null;
     final ms = millis < 100000000000 ? millis * 1000 : millis;
-    final end = DateTime.fromMillisecondsSinceEpoch(ms);
+    return DateTime.fromMillisecondsSinceEpoch(ms);
+  }
+
+  static int? _daysLeft(int millis) {
+    final end = _date(millis);
+    if (end == null) return null;
     return end.difference(DateTime.now()).inDays;
   }
 
   static bool _isAfterNow(int millis) {
-    if (millis <= 0) return false;
-    final ms = millis < 100000000000 ? millis * 1000 : millis;
-    return DateTime.fromMillisecondsSinceEpoch(ms).isAfter(DateTime.now());
-  }
-
-  static String _formatYmd(int millis) {
-    if (millis <= 0) return '--';
-    final ms = millis < 100000000000 ? millis * 1000 : millis;
-    final d = DateTime.fromMillisecondsSinceEpoch(ms);
-    final m = d.month.toString().padLeft(2, '0');
-    final day = d.day.toString().padLeft(2, '0');
-    return '${d.year}-$m-$day';
+    final end = _date(millis);
+    return end != null && end.isAfter(DateTime.now());
   }
 }

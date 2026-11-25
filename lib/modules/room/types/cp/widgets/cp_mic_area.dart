@@ -9,6 +9,7 @@ import '../../../../../common/constants/app_assets.dart';
 import '../../../../../common/models/server_client/room_cp.pb.dart';
 import '../../../../../common/theme/app_colors.dart';
 import '../../../../../common/utils/chimo.dart';
+import '../../../../../common/utils/time_fmt.dart';
 import '../../../logic/mic_logic.dart';
 import '../../../model/mic_seat.dart';
 import '../../../service/room_service.dart';
@@ -139,12 +140,6 @@ class _RoomCountDownState extends State<_RoomCountDown> {
     super.dispose();
   }
 
-  String _fmt(int seconds) {
-    final m = (seconds ~/ 60).toString().padLeft(2, '0');
-    final s = (seconds % 60).toString().padLeft(2, '0');
-    return '$m:$s';
-  }
-
   @override
   Widget build(BuildContext context) {
     final room = RoomService.findOrNull();
@@ -169,7 +164,7 @@ class _RoomCountDownState extends State<_RoomCountDown> {
               border: Border.all(color: AppColors.white.withValues(alpha: 0.3)),
             ),
             child: Text(
-              _fmt(left),
+              TimeFmt.duration(left),
               style: TextStyle(color: AppColors.white, fontSize: 11.sp),
             ),
           ),

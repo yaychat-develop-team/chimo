@@ -4,12 +4,14 @@ import 'dart:math' as math;
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../../../../common/utils/app_audio_playback.dart';
 import '../../../../common/constants/app_assets.dart';
 import '../../../../common/theme/app_colors.dart';
 import '../../../../common/utils/app_log.dart';
 import '../album_photo_viewer_page.dart';
+import '../../../../common/widgets/app_pull_refresh.dart';
 import '../../../../common/widgets/app_scaffold.dart';
 import '../../../../common/utils/app_toast.dart';
 import '../../../../common/utils/zodiac.dart';
@@ -21,8 +23,6 @@ class ProfileFlavorTag {
 
   final String label;
   final String emoji;
-
-  static const List<ProfileFlavorTag> defaults = [];
 }
 
 /// 自己 / 他人资料共用外壳：背景、信息、Moments、Flavor；底部栏由调用方提供。
@@ -37,6 +37,7 @@ class UserProfileScaffold extends StatelessWidget {
     required this.zodiac,
     required this.bio,
     required this.bottomBar,
+    required this.onRefresh,
     this.avatarUrl,
     this.avatarUnderReview = false,
     this.voiceSeconds,
@@ -45,13 +46,14 @@ class UserProfileScaffold extends StatelessWidget {
     this.momentAssets = const [],
     this.momentUrls = const [],
     this.flavors,
-    this.inPartyName,
     this.showMore = false,
     this.showZodiac = true,
     this.showGenderAge = true,
     this.onBack,
     this.onMore,
-    this.onInPartyTap,
+    this.partyBanner,
+    this.revealBanner,
+    this.extraSections = const [],
   });
 
   final String nickname;
@@ -75,11 +77,9 @@ class UserProfileScaffold extends StatelessWidget {
   final List<String> momentAssets;
   final List<String> momentUrls;
 
-  /// `null` → 显示默认 mock 标签；空 → 隐藏标签区。
+  /// 空列表隐藏标签区。
   final List<ProfileFlavorTag>? flavors;
 
-  /// 非 null 时在头像旁显示 “In Party: …” 胶囊。
-  final String? inPartyName;
   final bool showMore;
 
   /// 未设置生日时隐藏星座芯片。
@@ -89,8 +89,17 @@ class UserProfileScaffold extends StatelessWidget {
   final bool showGenderAge;
   final VoidCallback? onBack;
   final VoidCallback? onMore;
-  final VoidCallback? onInPartyTap;
   final Widget bottomBar;
+  final Future<void> Function() onRefresh;
+
+  /// 头像旁 In Party 条（与头像底侧重叠）。
+  final Widget? partyBanner;
+
+  /// 个性签名下方 Reveal Card 入口（对齐 joyride `_revealCardWidget`）。
+  final Widget? revealBanner;
+
+  /// Flavor 之后追加区块（Relationship / Gift Wall 等）。
+  final List<Widget> extraSections;
 
   Future<void> _copyId(BuildContext context) async {
     await Clipboard.setData(ClipboardData(text: userId));
@@ -116,333 +125,375 @@ class UserProfileScaffold extends StatelessWidget {
 
     return AppScaffold(
       backgroundColor: AppColors.black111111,
-      body: Stack(
+      backdrop: Chimo.image(
+        AppAssets.personalBg,
+        fit: BoxFit.cover,
+        alignment: Alignment.topCenter,
+      ),
+      appBar: AppNavBar(
+        trailing: showMore
+            ? IconButton(
+                onPressed: onMore ?? () {},
+                icon: const Icon(Icons.more_horiz_rounded, color: Colors.white, size: 20),
+              )
+            : null,
+      ),
+      body: Column(
         children: [
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 360,
-            child: Chimo.image(
-              AppAssets.personalBg,
-              fit: BoxFit.cover,
-              alignment: Alignment.topCenter,
-            ),
-          ),
-          Positioned(
-            top: 280,
-            left: 0,
-            right: 0,
-            height: 100,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    AppColors.black111111.withValues(alpha: 0.85),
-                    AppColors.black111111,
-                  ],
-                ),
-              ),
-            ),
-          ),
-          SafeArea(
-            bottom: false,
-            child: Column(
-              children: [
-                SizedBox(
-                  height: 48,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Row(
-                      children: [
-                        AppBackButton.circle(onBack: onBack),
-                        const Spacer(),
-                        if (showMore)
-                          _TopCircleButton(
-                            onTap: onMore ?? () {},
-                            child: const Icon(
-                              Icons.more_horiz_rounded,
-                              color: Colors.white,
-                              size: 20,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: SingleChildScrollView(
-                    // 原 om_personal：仅 start 侧 padding，使语音条可贴右边缘。
-                    padding: EdgeInsets.fromLTRB(16, math.max(8, avatarTop), 0, 24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.only(right: 16),
-                          child: SizedBox(
-                            height: 72,
-                            width: double.infinity,
-                            child: Stack(
-                              clipBehavior: Clip.none,
-                              children: [
-                                Container(
-                                  width: 72,
-                                  height: 72,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    border: Border.all(color: Colors.white, width: 2),
-                                  ),
-                                  child: ClipOval(
-                                    child: Stack(
-                                      fit: StackFit.expand,
-                                      children: [
-                                        Chimo.image(
-                                          avatarUrl,
-                                          fallbackAsset: avatarAsset,
-                                          fit: BoxFit.cover,
-                                          fadeIn: Duration.zero,
-                                        ),
-                                        if (avatarUnderReview)
-                                          ColoredBox(
-                                            color: Colors.black.withValues(alpha: 0.5),
-                                            child: const Center(
-                                              child: Text(
-                                                'Under review',
-                                                textAlign: TextAlign.center,
-                                                style: TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 11,
-                                                  height: 1.1,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                // 先移除“进房入口/房间相关”入口：
-                                // 任何 inPartyName 对应的胶囊都不再展示。
-                              ],
-                            ),
+          Expanded(
+            child: AppPullRefresh(
+              onRefresh: onRefresh,
+              padding: EdgeInsets.fromLTRB(16, math.max(8, avatarTop), 0, 24),
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _ProfileAvatarHeader(
+                        avatarUrl: avatarUrl,
+                        avatarAsset: avatarAsset,
+                        avatarUnderReview: avatarUnderReview,
+                        partyBanner: partyBanner,
+                      ),
+                      const SizedBox(height: 16),
+                      _ProfileIdentity(
+                        nickname: nickname,
+                        userId: userId,
+                        isMale: isMale,
+                        age: age,
+                        zodiac: zodiac,
+                        showZodiac: showZodiac,
+                        showGenderAge: showGenderAge,
+                        vipIconUrl: vipIconUrl,
+                        voiceSeconds: voiceSeconds,
+                        voiceUrl: voiceUrl,
+                        onCopyId: () => _copyId(context),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(0, 16, 16, 8),
+                        child: Text(
+                          bio,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            height: 20 / 14,
+                            fontWeight: FontWeight.w400,
                           ),
                         ),
-                        const SizedBox(height: 16),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Expanded(
-                              child: Padding(
-                                padding: const EdgeInsets.only(right: 8),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      nickname,
-                                      maxLines: 1,
-                                      softWrap: false,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w600,
-                                        height: 27 / 18,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    GestureDetector(
-                                      onTap: () => _copyId(context),
-                                      behavior: HitTestBehavior.opaque,
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text(
-                                            'ID:$userId',
-                                            style: const TextStyle(
-                                              color: AppColors.gray9A9A9A,
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w400,
-                                              height: 18 / 12,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 6),
-                                          Chimo.image(
-                                            AppAssets.mineCopy,
-                                            width: 10,
-                                            height: 10,
-                                            color: AppColors.gray9A9A9A,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Wrap(
-                                      spacing: 4,
-                                      runSpacing: 4,
-                                      crossAxisAlignment: WrapCrossAlignment.center,
-                                      children: [
-                                        if (showZodiac && zodiac.trim().isNotEmpty)
-                                          _ProfileChip(
-                                            height: 20,
-                                            padding: const EdgeInsets.symmetric(horizontal: 10),
-                                            background: Colors.white12,
-                                            child: Text(
-                                              Zodiac.chipLabel(zodiac),
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 10,
-                                                fontWeight: FontWeight.w500,
-                                                height: 1,
-                                              ),
-                                            ),
-                                          ),
-                                        if (showGenderAge)
-                                          _ProfileChip(
-                                            height: 16,
-                                            padding: const EdgeInsets.fromLTRB(0, 0, 4, 0),
-                                            background: isMale
-                                                ? AppColors.blue0091FF
-                                                : AppColors.pinkFF5BA8,
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Chimo.image(
-                                                  isMale
-                                                      ? AppAssets.genderMan
-                                                      : AppAssets.genderWoman,
-                                                  width: 16,
-                                                  height: 16,
-                                                ),
-                                                const SizedBox(width: 2),
-                                                Text(
-                                                  '$age',
-                                                  style: const TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 11,
-                                                    fontWeight: FontWeight.w600,
-                                                    height: 1,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        if ((vipIconUrl ?? '').trim().isNotEmpty)
-                                          _VipLevelIcon(url: vipIconUrl!.trim()),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            if (voiceSeconds != null &&
-                                voiceSeconds! > 0 &&
-                                (voiceUrl ?? '').trim().isNotEmpty)
-                              _VoiceCard(seconds: voiceSeconds!, source: voiceUrl),
-                          ],
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(0, 16, 16, 8),
-                          child: Text(
-                            bio,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              height: 20 / 14,
-                              fontWeight: FontWeight.w400,
-                            ),
-                          ),
-                        ),
-                        if (moments.isNotEmpty) ...[
-                          const Padding(
-                            padding: EdgeInsets.only(top: 12, bottom: 8),
-                            child: Text(
-                              'Moments',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                height: 21 / 14,
-                              ),
-                            ),
-                          ),
-                          SizedBox(
-                            height: 89,
-                            child: ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              padding: const EdgeInsets.only(right: 16),
-                              itemCount: moments.length,
-                              separatorBuilder: (_, _) => const SizedBox(width: 6),
-                              itemBuilder: (context, index) {
-                                final src = moments[index];
-                                return GestureDetector(
-                                  onTap: () => AlbumPhotoViewerPage.open(
-                                    context,
-                                    paths: moments,
-                                    initialIndex: index,
-                                  ),
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(10),
-                                    child: Chimo.image(
-                                      src,
-                                      width: 90,
-                                      height: 89,
-                                      fit: BoxFit.cover,
-                                      error: Chimo.image(
-                                        avatarAsset,
-                                        width: 90,
-                                        height: 89,
-                                        fit: BoxFit.cover,
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
-                        if (flavorTags.isNotEmpty) ...[
-                          const Padding(
-                            padding: EdgeInsets.only(top: 20, bottom: 8),
-                            child: Text(
-                              'My Flavor',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                height: 21 / 14,
-                              ),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.only(right: 16),
-                            child: Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: flavorTags
-                                  .map((tag) => _FlavorChip(label: tag.label))
-                                  .toList(),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-                ColoredBox(
-                  color: AppColors.black111111,
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(16, 8, 16, 12 + bottomPadding),
-                    child: bottomBar,
+                      ),
+                      ?revealBanner,
+                      if (moments.isNotEmpty)
+                        _ProfileMoments(paths: moments, fallbackAsset: avatarAsset),
+                      if (flavorTags.isNotEmpty) _ProfileFlavors(tags: flavorTags),
+                      ...extraSections,
+                    ],
                   ),
                 ),
               ],
             ),
           ),
+          ColoredBox(
+            color: AppColors.black111111,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(16, 8, 16, 12 + bottomPadding),
+              child: bottomBar,
+            ),
+          ),
         ],
       ),
+    );
+  }
+}
+
+class _ProfileAvatarHeader extends StatelessWidget {
+  const _ProfileAvatarHeader({
+    required this.avatarAsset,
+    required this.avatarUnderReview,
+    this.avatarUrl,
+    this.partyBanner,
+  });
+
+  final String avatarAsset;
+  final String? avatarUrl;
+  final bool avatarUnderReview;
+  final Widget? partyBanner;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height: 72.w,
+      child: Stack(
+        alignment: Alignment.topLeft,
+        children: [
+          if (partyBanner != null)
+            Positioned(bottom: 0, left: 36.w, right: 0, child: partyBanner!),
+          Positioned(
+            left: 0,
+            top: 0,
+            child: Container(
+              width: 72.w,
+              height: 72.w,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+              child: ClipOval(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Chimo.image(
+                      avatarUrl,
+                      fallbackAsset: avatarAsset,
+                      fit: BoxFit.cover,
+                      fadeIn: Duration.zero,
+                    ),
+                    if (avatarUnderReview)
+                      ColoredBox(
+                        color: Colors.black.withValues(alpha: 0.5),
+                        child: const Center(
+                          child: Text(
+                            'Under review',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.white, fontSize: 11, height: 1.1),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfileIdentity extends StatelessWidget {
+  const _ProfileIdentity({
+    required this.nickname,
+    required this.userId,
+    required this.isMale,
+    required this.age,
+    required this.zodiac,
+    required this.showZodiac,
+    required this.showGenderAge,
+    required this.onCopyId,
+    this.vipIconUrl,
+    this.voiceSeconds,
+    this.voiceUrl,
+  });
+
+  final String nickname;
+  final String userId;
+  final bool isMale;
+  final int age;
+  final String zodiac;
+  final bool showZodiac;
+  final bool showGenderAge;
+  final String? vipIconUrl;
+  final int? voiceSeconds;
+  final String? voiceUrl;
+  final VoidCallback onCopyId;
+
+  @override
+  Widget build(BuildContext context) {
+    final showVoice =
+        voiceSeconds != null && voiceSeconds! > 0 && (voiceUrl ?? '').trim().isNotEmpty;
+    final vip = (vipIconUrl ?? '').trim();
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  nickname,
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    height: 27 / 18,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                GestureDetector(
+                  onTap: onCopyId,
+                  behavior: HitTestBehavior.opaque,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'ID:$userId',
+                        style: const TextStyle(
+                          color: AppColors.gray9A9A9A,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w400,
+                          height: 18 / 12,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Chimo.image(
+                        AppAssets.mineCopy,
+                        width: 10,
+                        height: 10,
+                        color: AppColors.gray9A9A9A,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Wrap(
+                  spacing: 4,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    if (showZodiac && zodiac.trim().isNotEmpty)
+                      _ProfileChip(
+                        height: 20,
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        background: Colors.white12,
+                        child: Text(
+                          Zodiac.chipLabel(zodiac),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                            height: 1,
+                          ),
+                        ),
+                      ),
+                    if (showGenderAge)
+                      _ProfileChip(
+                        height: 16,
+                        padding: const EdgeInsets.fromLTRB(0, 0, 4, 0),
+                        background: isMale ? AppColors.blue0091FF : AppColors.pinkFF5BA8,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Chimo.image(
+                              isMale ? AppAssets.genderMan : AppAssets.genderWoman,
+                              width: 16,
+                              height: 16,
+                            ),
+                            const SizedBox(width: 2),
+                            Text(
+                              '$age',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                height: 1,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    if (vip.isNotEmpty) _VipLevelIcon(url: vip),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (showVoice) _VoiceCard(seconds: voiceSeconds!, source: voiceUrl),
+      ],
+    );
+  }
+}
+
+class _ProfileMoments extends StatelessWidget {
+  const _ProfileMoments({required this.paths, required this.fallbackAsset});
+
+  final List<String> paths;
+  final String fallbackAsset;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(top: 12, bottom: 8),
+          child: Text(
+            'Moments',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              height: 21 / 14,
+            ),
+          ),
+        ),
+        SizedBox(
+          height: 89,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.only(right: 16),
+            itemCount: paths.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 6),
+            itemBuilder: (context, index) {
+              final src = paths[index];
+              return GestureDetector(
+                onTap: () => AlbumPhotoViewerPage.open(context, paths: paths, initialIndex: index),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Chimo.image(
+                    src,
+                    width: 90,
+                    height: 89,
+                    fit: BoxFit.cover,
+                    error: Chimo.image(fallbackAsset, width: 90, height: 89, fit: BoxFit.cover),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ProfileFlavors extends StatelessWidget {
+  const _ProfileFlavors({required this.tags});
+
+  final List<ProfileFlavorTag> tags;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(top: 20, bottom: 8),
+          child: Text(
+            'My Flavor',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              height: 21 / 14,
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(right: 16),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [for (final tag in tags) _FlavorChip(label: tag.label)],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -534,26 +585,6 @@ class ProfileGiftAction extends StatelessWidget {
   }
 }
 
-class _TopCircleButton extends StatelessWidget {
-  const _TopCircleButton({required this.onTap, required this.child});
-
-  final VoidCallback onTap;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.black.withValues(alpha: 0.35),
-      borderRadius: BorderRadius.circular(18),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: SizedBox(width: 36, height: 36, child: Center(child: child)),
-      ),
-    );
-  }
-}
-
 class _ProfileChip extends StatelessWidget {
   const _ProfileChip({
     required this.child,
@@ -620,7 +651,7 @@ class _VoiceCardState extends State<_VoiceCard> {
   void initState() {
     super.initState();
     _completeSub = _player.onPlayerComplete.listen((_) {
-      unawaited(_stopPlay(resetOnly: true));
+      _stopPlay(resetOnly: true);
     });
   }
 
@@ -628,7 +659,7 @@ class _VoiceCardState extends State<_VoiceCard> {
   void didUpdateWidget(covariant _VoiceCard oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.seconds != widget.seconds || oldWidget.source != widget.source) {
-      unawaited(_stopPlay());
+      _stopPlay();
     }
   }
 
@@ -637,12 +668,12 @@ class _VoiceCardState extends State<_VoiceCard> {
     AppVoiceExclusive.release(_exclusiveStop);
     _playTimer?.cancel();
     _completeSub?.cancel();
-    unawaited(_player.dispose());
+    _player.dispose();
     super.dispose();
   }
 
   void _exclusiveStop() {
-    unawaited(_stopPlay());
+    _stopPlay();
   }
 
   Future<void> _stopPlay({bool resetOnly = false}) async {
@@ -695,7 +726,7 @@ class _VoiceCardState extends State<_VoiceCard> {
         if (_remaining <= 1) {
           timer.cancel();
           _playTimer = null;
-          unawaited(_stopPlay());
+          _stopPlay();
           return;
         }
         setState(() => _remaining -= 1);
@@ -712,57 +743,56 @@ class _VoiceCardState extends State<_VoiceCard> {
   Widget build(BuildContext context) {
     final displaySeconds = _playing ? _remaining : widget.seconds;
 
-    // 对齐 forya AudioPlayerWidget（borderEnd: false）— 贴齐屏幕边缘。
-    return GestureDetector(
-      onTap: () => unawaited(_togglePlay()),
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        width: 140,
-        height: 32,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        alignment: Alignment.center,
-        decoration: const BoxDecoration(
-          color: AppColors.yellow1FFDF652,
-          borderRadius: BorderRadiusDirectional.only(
-            topStart: Radius.circular(16),
-            bottomStart: Radius.circular(16),
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(end: 16),
+      child: GestureDetector(
+        onTap: () => _togglePlay(),
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          width: 140,
+          height: 32,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          alignment: Alignment.center,
+          decoration: const ShapeDecoration(
+            shape: StadiumBorder(),
+            color: AppColors.yellow1FFDF652,
           ),
-        ),
-        child: Row(
-          children: [
-            Chimo.image(
-              _playing ? AppAssets.voicePauseIcon : AppAssets.voicePlayIcon,
-              width: 18,
-              height: 18,
-            ),
-            const SizedBox(width: 6),
-            Expanded(
-              child: SizedBox(
-                height: 14,
-                child: _playing
-                    ? Chimo.image(
-                        AppAssets.voiceWaveAnim,
-                        fit: BoxFit.contain,
-                        alignment: Alignment.centerLeft,
-                      )
-                    : Chimo.image(
-                        AppAssets.voiceWaveLine,
-                        height: 10,
-                        fit: BoxFit.contain,
-                        color: Colors.white70,
-                      ),
+          child: Row(
+            children: [
+              Chimo.image(
+                _playing ? AppAssets.voicePauseIcon : AppAssets.voicePlayIcon,
+                width: 18,
+                height: 18,
               ),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              '$displaySeconds"',
-              style: const TextStyle(
-                color: Colors.white54,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
+              const SizedBox(width: 6),
+              Expanded(
+                child: SizedBox(
+                  height: 14,
+                  child: _playing
+                      ? Chimo.image(
+                          AppAssets.voiceWaveAnim,
+                          fit: BoxFit.contain,
+                          alignment: Alignment.centerLeft,
+                        )
+                      : Chimo.image(
+                          AppAssets.voiceWaveLine,
+                          height: 10,
+                          fit: BoxFit.contain,
+                          color: AppColors.white70,
+                        ),
+                ),
               ),
-            ),
-          ],
+              const SizedBox(width: 6),
+              Text(
+                '$displaySeconds"',
+                style: const TextStyle(
+                  color: AppColors.white50,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -776,19 +806,16 @@ class _FlavorChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 原 My Flavor 标签仅为文字（无 emoji 前缀）。
-    return DecoratedBox(
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(color: AppColors.white12, borderRadius: BorderRadius.circular(15)),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        child: Text(
-          label,
-          style: const TextStyle(
-            color: AppColors.gray9A9A9A,
-            fontSize: 12,
-            fontWeight: FontWeight.w400,
-            height: 1.2,
-          ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: AppColors.gray9A9A9A,
+          fontSize: 12,
+          fontWeight: FontWeight.w400,
+          height: 1.2,
         ),
       ),
     );

@@ -131,7 +131,7 @@ class _MyTagsPageState extends State<MyTagsPage> {
                 style: const TextStyle(color: AppColors.gray9A9A9A),
               ),
               const SizedBox(height: 16),
-              TextButton(onPressed: () => unawaited(logic.load()), child: const Text('Retry')),
+              TextButton(onPressed: () => logic.load(), child: const Text('Retry')),
             ],
           ),
         ),

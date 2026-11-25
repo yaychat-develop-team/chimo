@@ -1,5 +1,5 @@
 /// 公屏上一行的种类，对应 Oumi 的几种消息 builder。
-enum RoomMessageType { text, gift, join, qa, pet, activity, card, heart, named }
+enum RoomMessageType { text, gift, join, qa, pet, activity, card, heart, named, turntable }
 
 /// 富文本里的一段。
 enum RoomPieceKind { text, icon, emote }
@@ -44,6 +44,7 @@ class RoomShowPiece {
 class RoomSenderTags {
   const RoomSenderTags({
     this.secret = false,
+    this.heartie = false,
     this.gender = '',
     this.novaIcon = '',
     this.vipIcon = '',
@@ -61,6 +62,9 @@ class RoomSenderTags {
 
   /// 神秘人只留昵称。
   final bool secret;
+
+  /// Heart Link Heartie 关系标。
+  final bool heartie;
   final String gender;
   final String novaIcon;
   final String vipIcon;
@@ -118,12 +122,26 @@ class RoomCardBody {
 }
 
 class RoomHeartBody {
-  const RoomHeartBody({this.photo = '', this.name = '', this.gender = '', this.age = 0});
+  const RoomHeartBody({
+    this.photo = '',
+    this.name = '',
+    this.gender = '',
+    this.age = 0,
+    this.gsUid = 0,
+  });
 
   final String photo;
   final String name;
   final String gender;
   final int age;
+  final int gsUid;
+}
+
+class RoomTurntableBody {
+  const RoomTurntableBody({this.title = '', this.desc = ''});
+
+  final String title;
+  final String desc;
 }
 
 /// 公屏上的一行。
@@ -153,6 +171,7 @@ class RoomMessage {
     this.pet,
     this.card,
     this.heart,
+    this.turntable,
     this.cover = '',
     this.link = '',
   });
@@ -181,6 +200,7 @@ class RoomMessage {
   final RoomPetBody? pet;
   final RoomCardBody? card;
   final RoomHeartBody? heart;
+  final RoomTurntableBody? turntable;
   final String cover;
   final String link;
 }

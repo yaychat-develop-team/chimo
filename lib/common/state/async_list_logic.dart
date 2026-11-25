@@ -1,4 +1,3 @@
-import 'dart:async';
 
 import 'package:get/get.dart';
 
@@ -57,7 +56,7 @@ abstract class AsyncListLogic<T> extends GetxController {
   void onReady() {
     super.onReady();
     // onReady = 首帧之后，等价于原来页面里的 addPostFrameCallback。
-    unawaited(load());
+    load();
   }
 
   /// 重新取一次。下拉刷新直接把它接给 [AppPullRefresh.onRefresh]。
@@ -66,8 +65,6 @@ abstract class AsyncListLogic<T> extends GetxController {
     error.value = null;
     try {
       final res = await fetch();
-      // isClosed：Controller 侧的 `mounted`。请求回来时页面可能已经退了。
-      if (isClosed) return;
       if (!res.ok) {
         error.value = res.message.isEmpty ? failMessage : res.message;
         items.clear();
@@ -76,11 +73,10 @@ abstract class AsyncListLogic<T> extends GetxController {
       items.assignAll(res.data ?? const []);
       onItemsChanged();
     } catch (failure) {
-      if (isClosed) return;
-      // 刷新失败不该把列表清空）。
+      // 刷新失败不该把列表清空。
       error.value = errorText(failure);
     } finally {
-      if (!isClosed) loading.value = false;
+      loading.value = false;
     }
   }
 }

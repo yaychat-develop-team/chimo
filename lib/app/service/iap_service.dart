@@ -56,7 +56,7 @@ abstract final class IapService {
   }
 
   static void dispose() {
-    unawaited(_sub?.cancel() ?? Future<void>.value());
+    _sub?.cancel() ?? Future<void>.value();
     _sub = null;
     _inited = false;
   }

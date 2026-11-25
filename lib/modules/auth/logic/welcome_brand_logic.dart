@@ -33,7 +33,6 @@ class WelcomeBrandLogic extends GetxController {
   Future<void> loadIndustries() async {
     try {
       final res = await ChimoApis.group.typeList();
-      if (isClosed) return;
       if (res.ok) {
         final types = res.data ?? const <String>[];
         if (types.isNotEmpty) industries.assignAll(types);
@@ -41,7 +40,7 @@ class WelcomeBrandLogic extends GetxController {
     } catch (_) {
       // 保留兜底列表。
     } finally {
-      if (!isClosed) loadingTypes.value = false;
+      loadingTypes.value = false;
     }
   }
 

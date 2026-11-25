@@ -7,7 +7,7 @@ import '../../../app/app_jumper.dart';
 import '../../../common/im/im_system_accounts.dart';
 import '../../../app/storage/app_storage.dart';
 import 'chats_list_logic.dart';
-import '../model/chat_conversation.dart';
+import '../model/conversation_model.dart';
 import '../model/im_search_hit.dart';
 
 /// IM 搜索：会话昵称 + 近 30 天文本消息。
@@ -19,7 +19,7 @@ class ImSearchLogic extends GetxController {
   ImSearchLogic({this.scopeConversation});
 
   /// 非空时仅搜该会话内消息（私聊「更多 → Search」）。
-  final ChatConversation? scopeConversation;
+  final ConversationModel? scopeConversation;
 
   final ConversationListLogic chats = Get.find<ConversationListLogic>();
 
@@ -29,7 +29,7 @@ class ImSearchLogic extends GetxController {
   final RxInt showIndex = 0.obs;
   final RxBool searching = false.obs;
   final RxString keyword = ''.obs;
-  final RxList<ChatConversation> contacts = <ChatConversation>[].obs;
+  final RxList<ConversationModel> contacts = <ConversationModel>[].obs;
   final RxList<ImSearchConvHit> historyHits = <ImSearchConvHit>[].obs;
   final RxList<ImSearchMsgHit> scopedMsgs = <ImSearchMsgHit>[].obs;
 
@@ -68,26 +68,26 @@ class ImSearchLogic extends GetxController {
     if (history.length > 20) {
       history.removeRange(20, history.length);
     }
-    unawaited(persistHistory());
+    persistHistory();
   }
 
   void removeHistory(String query) {
     history.remove(query);
-    unawaited(persistHistory());
+    persistHistory();
   }
 
   void clearHistory() {
     history.clear();
-    unawaited(persistHistory());
+    persistHistory();
   }
 
-  String emIdOf(ChatConversation c) {
+  String emIdOf(ConversationModel c) {
     final em = c.emUserName.trim();
     if (em.isNotEmpty) return em;
     return c.id;
   }
 
-  ChatConversation? findByEmId(String conversationId) {
+  ConversationModel? findByEmId(String conversationId) {
     final list = chats.conversations;
     for (final c in list) {
       if (emIdOf(c) == conversationId || c.id == conversationId) return c;
@@ -108,7 +108,7 @@ class ImSearchLogic extends GetxController {
       return;
     }
     _debounce = Timer(const Duration(milliseconds: 500), () {
-      unawaited(search(q));
+      search(q);
     });
   }
 
@@ -134,7 +134,7 @@ class ImSearchLogic extends GetxController {
     keyword.value = kw;
     addHistory(kw);
 
-    final hitContacts = <ChatConversation>[];
+    final hitContacts = <ConversationModel>[];
     final hitConvs = <ImSearchConvHit>[];
     final hitScoped = <ImSearchMsgHit>[];
 
@@ -153,14 +153,14 @@ class ImSearchLogic extends GetxController {
     }
 
     try {
-      final List<EMMessage> emMessages;
+      final List<ChatMessage> emMessages;
       if (scoped) {
         final scope = scopeConversation!;
         final emId = emIdOf(scope);
         final type = scope.badge == ChatBadgeType.group
-            ? EMConversationType.GroupChat
-            : EMConversationType.Chat;
-        final emConv = await EMClient.getInstance.chatManager.getConversation(emId, type: type);
+            ? ChatConversationType.GroupChat
+            : ChatConversationType.Chat;
+        final emConv = await ChatClient.getInstance.chatManager.getConversation(emId, type: type);
         emMessages = emConv == null
             ? const []
             : await emConv.loadMessagesWithKeyword(
@@ -168,15 +168,15 @@ class ImSearchLogic extends GetxController {
                 searchScope: MessageSearchScope.Content,
                 count: 50,
                 timestamp: since,
-                direction: EMSearchDirection.Down,
+                direction: ChatSearchDirection.Down,
               );
       } else {
-        emMessages = await EMClient.getInstance.chatManager.loadMessagesWithKeyword(
+        emMessages = await ChatClient.getInstance.chatManager.loadMessagesWithKeyword(
           kw,
           searchScope: MessageSearchScope.Content,
           count: 500,
           timestamp: since,
-          direction: EMSearchDirection.Down,
+          direction: ChatSearchDirection.Down,
         );
       }
 
@@ -235,13 +235,13 @@ class ImSearchLogic extends GetxController {
     showIndex.value = hasAny ? 2 : 1;
   }
 
-  static String txtOf(EMMessage m) {
+  static String txtOf(ChatMessage m) {
     final body = m.body;
-    if (body is EMTextMessageBody) return body.content.trim();
+    if (body is ChatTextMessageBody) return body.content.trim();
     return '';
   }
 
-  void openChat(ChatConversation conversation) {
+  void openChat(ConversationModel conversation) {
     AppJumper.toChat(conversation.id, preview: conversation);
   }
 }

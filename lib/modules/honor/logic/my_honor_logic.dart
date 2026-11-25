@@ -4,6 +4,7 @@ import '../../../app/chimo_api.dart';
 import '../../../app/session_info.dart';
 import '../../../common/models/server_client/honor.pb.dart';
 import '../../../common/models/server_client/user.pb.dart';
+import 'honor_display.dart';
 
 /// 我的荣誉。对齐 joyride `MineHonorPage`：`/user/honorTarget` / `/user/honor`。
 class MyHonorLogic extends GetxController {
@@ -53,34 +54,30 @@ class MyHonorLogic extends GetxController {
       final res = isMe
           ? await ChimoApis.honor.target()
           : await ChimoApis.honor.list(targetUid);
-      if (isClosed) return;
       if (!res.ok || res.data == null) {
         error.value = res.message.isEmpty ? 'Failed to load' : res.message;
         activeList.clear();
         targetList.clear();
-      } else {
-        activeList.assignAll(res.data!.activeList);
-        targetList.assignAll(isMe ? res.data!.targetList : const []);
+        return;
       }
+      activeList.assignAll(res.data!.activeList);
+      targetList.assignAll(isMe ? res.data!.targetList : const []);
     } catch (e) {
-      if (!isClosed) error.value = '$e';
+      error.value = '$e';
     } finally {
-      if (!isClosed) loading.value = false;
+      loading.value = false;
     }
   }
 
   Future<void> _loadUser() async {
     try {
-      if (isMe) {
-        final res = await ChimoApis.user.profile();
-        if (isClosed) return;
-        if (res.ok && res.data != null) profile.value = res.data!.user;
-        return;
-      }
-      final res = await ChimoApis.user.profileByUid('$targetUid');
-      if (isClosed) return;
+      final res = isMe
+          ? await ChimoApis.user.profile()
+          : await ChimoApis.user.profileByUid('$targetUid');
       if (res.ok && res.data != null) profile.value = res.data!.user;
-    } catch (_) {}
+    } catch (_) {
+      // 头像昵称拉不到时，荣誉列表仍然可用。
+    }
   }
 
   /// 资料佩戴上限（对齐 Manage Honors 设计稿）。
@@ -92,8 +89,7 @@ class MyHonorLogic extends GetxController {
   /// 佩戴 / 取消佩戴。成功返回 `null`，失败返回 toast 文案。
   Future<String?> toggleWear(HonorItem item) async {
     if (!isMe || wearing.value) return null;
-    final valid = item.forever || _isAfterNow(item.expireTime.toInt());
-    if (!valid) return 'This honor has expired';
+    if (!HonorDisplay.isValid(item)) return 'This honor has expired';
 
     final nextWear = !item.wear;
     if (nextWear && wearingItems.length >= maxWearCount) {
@@ -106,7 +102,6 @@ class MyHonorLogic extends GetxController {
         hid: item.hid.toInt(),
         wear: nextWear,
       );
-      if (isClosed) return null;
       if (!res.ok) {
         return res.message.isEmpty ? 'Failed to update' : res.message;
       }
@@ -115,7 +110,7 @@ class MyHonorLogic extends GetxController {
     } catch (e) {
       return '$e';
     } finally {
-      if (!isClosed) wearing.value = false;
+      wearing.value = false;
     }
   }
 
@@ -132,19 +127,14 @@ class MyHonorLogic extends GetxController {
         for (final e in activeList)
           if (e.wear) e.hid.toInt(),
       };
-      final toUnwear = current.difference(selectedHids);
-      final toWear = selectedHids.difference(current);
-
-      for (final hid in toUnwear) {
+      for (final hid in current.difference(selectedHids)) {
         final res = await ChimoApis.honor.wear(hid: hid, wear: false);
-        if (isClosed) return null;
         if (!res.ok) {
           return res.message.isEmpty ? 'Failed to update' : res.message;
         }
       }
-      for (final hid in toWear) {
+      for (final hid in selectedHids.difference(current)) {
         final res = await ChimoApis.honor.wear(hid: hid, wear: true);
-        if (isClosed) return null;
         if (!res.ok) {
           return res.message.isEmpty ? 'Failed to update' : res.message;
         }
@@ -154,13 +144,7 @@ class MyHonorLogic extends GetxController {
     } catch (e) {
       return '$e';
     } finally {
-      if (!isClosed) wearing.value = false;
+      wearing.value = false;
     }
-  }
-
-  static bool _isAfterNow(int millis) {
-    if (millis <= 0) return false;
-    final ms = millis < 100000000000 ? millis * 1000 : millis;
-    return DateTime.fromMillisecondsSinceEpoch(ms).isAfter(DateTime.now());
   }
 }

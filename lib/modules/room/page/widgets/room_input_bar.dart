@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -54,11 +52,11 @@ class RoomInputBar extends StatelessWidget {
             const SizedBox(width: 8),
             Expanded(child: _field(context)),
             const SizedBox(width: 10),
-            _asset(AppAssets.roomGiftMenu, 26, onGift),
+            _asset(AppAssets.roomGiftMenu, 32.w, onGift, showBgColor: false),
             const SizedBox(width: 16),
-            _asset(AppAssets.roomMsgMenu, 24, onMessages),
+            _asset(AppAssets.roomMsgMenu, 24.w, onMessages),
             const SizedBox(width: 16),
-            _asset(AppAssets.roomFuncMenu, 26, onTools),
+            _asset(AppAssets.roomFuncMenu, 26.w, onTools),
           ],
         ),
       ),
@@ -187,11 +185,17 @@ class RoomInputBar extends StatelessWidget {
     );
   }
 
-  Widget _asset(String asset, double size, VoidCallback onTap) {
+  Widget _asset(String asset, double size, VoidCallback onTap, {bool showBgColor = true}) {
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      child: Chimo.image(asset, width: size, height: size, fit: BoxFit.contain),
+      child: Container(
+        height: 32.w,
+        width: 32.w,
+        alignment: .center,
+        decoration: BoxDecoration(shape: .circle, color: showBgColor ? AppColors.white10 : null),
+        child: Chimo.image(asset, width: size, height: size, fit: BoxFit.contain),
+      ),
     );
   }
 
@@ -202,7 +206,11 @@ class RoomInputBar extends StatelessWidget {
       if (!logic.onMic) return _join();
       final open = logic.localOpen;
       return GestureDetector(
-        onTap: onToggleMic,
+        key: logic.micButtonKey,
+        onTap: () {
+          logic.dismissOpenMicTip();
+          onToggleMic();
+        },
         behavior: HitTestBehavior.opaque,
         child: SizedBox(
           width: _barHeight.w,
@@ -466,7 +474,7 @@ class _RoomMessageInputState extends State<RoomMessageInput> {
                       stickers: ChatStickerSource(
                         loadPacks: () => ChimoApis.emote.packs(scene: 'ROOM'),
                         loadStickers: ChimoApis.emote.stickers,
-                        onSend: (pack, sticker) => unawaited(_sendSticker(pack, sticker)),
+                        onSend: (pack, sticker) => _sendSticker(pack, sticker),
                       ),
                     ),
                   ),

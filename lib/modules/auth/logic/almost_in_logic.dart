@@ -67,17 +67,16 @@ class AlmostInLogic extends GetxController {
 
       final res = await ChimoApis.user.update(fields);
       if (!res.ok) {
-        submitting.value = false;
         AppToast.error(res.message.isEmpty ? 'Unable to update profile' : res.message);
         return;
       }
       SessionInfo.refreshUserInfo();
       OnboardingState.clearDraft();
       AppJumper.toWelcome();
-      submitting.value = false;
     } catch (error) {
-      submitting.value = false;
       AppToast.error('Unable to update profile: $error');
+    } finally {
+      submitting.value = false;
     }
   }
 
@@ -103,23 +102,27 @@ class AlmostInLogic extends GetxController {
 
     localAvatarPath.value = file.path;
     uploadingAvatar.value = true;
-    final remote = await MediaUpload.uploadImage(file.path);
-    if (remote == null || remote.isEmpty) {
-      uploadingAvatar.value = false;
-      localAvatarPath.value = null;
-      AppToast.error('Avatar upload failed. Try again.');
-      return;
-    }
+    try {
+      final remote = await MediaUpload.uploadImage(file.path);
+      if (remote == null || remote.isEmpty) {
+        localAvatarPath.value = null;
+        AppToast.error('Avatar upload failed. Try again.');
+        return;
+      }
 
-    final res = await ChimoApis.user.update({'avatarUrl': remote, 'register': true});
-    if (!res.ok) {
-      uploadingAvatar.value = false;
+      final res = await ChimoApis.user.update({'avatarUrl': remote, 'register': true});
+      if (!res.ok) {
+        localAvatarPath.value = null;
+        AppToast.error(res.message.isEmpty ? 'Unable to update avatar' : res.message);
+        return;
+      }
+      remoteAvatarUrl.value = remote;
       localAvatarPath.value = null;
-      AppToast.error(res.message.isEmpty ? 'Unable to update avatar' : res.message);
-      return;
+    } catch (error) {
+      localAvatarPath.value = null;
+      AppToast.error('Avatar upload failed: $error');
+    } finally {
+      uploadingAvatar.value = false;
     }
-    remoteAvatarUrl.value = remote;
-    localAvatarPath.value = null;
-    uploadingAvatar.value = false;
   }
 }

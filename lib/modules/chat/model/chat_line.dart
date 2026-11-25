@@ -1,4 +1,5 @@
 import '../../../app/service/im_service.dart' show ImQuoteMsg;
+import '../../../common/extensions/wire_view.dart' show normalizeGender;
 import '../../../common/theme/app_emoji.dart';
 
 /// 消息在气泡里的一侧。
@@ -289,14 +290,6 @@ class ChatLine {
   bool get hasSenderGender => normalizeGender(senderGender) != null;
 
   bool get senderIsMale => normalizeGender(senderGender) == 'male';
-
-  /// 归一化为 `male` / `female`；未设置返回 `null`。
-  static String? normalizeGender(String? raw) {
-    final g = (raw ?? '').trim().toLowerCase();
-    if (g == 'male' || g == 'm' || g == '1') return 'male';
-    if (g == 'female' || g == 'f' || g == '2') return 'female';
-    return null;
-  }
 
   ChatLine copyWith({
     bool? failed,

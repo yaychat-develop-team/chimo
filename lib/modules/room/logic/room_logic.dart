@@ -1,7 +1,7 @@
-import 'dart:async';
 
 import 'package:get/get.dart';
 
+import '../../../common/models/server_client/rtc.pbenum.dart';
 import '../../../common/utils/app_toast.dart';
 import '../model/room_join_result.dart';
 import '../page/widgets/mic_queue_sheet.dart';
@@ -11,9 +11,10 @@ enum RoomPhase { loading, needPassword, ready, failed }
 
 /// 跟房间页走的状态。频道、麦位、socket 都在 [RoomService]。
 class RoomLogic extends GetxController {
-  RoomLogic(this.rid);
+  RoomLogic(this.rid, {this.joinSource});
 
   final int rid;
+  final JoinSource? joinSource;
   final phase = RoomPhase.loading.obs;
   final joining = false.obs;
 
@@ -35,7 +36,7 @@ class RoomLogic extends GetxController {
     super.onReady();
     final current = RoomService.findOrNull();
     if (current != null && current.inRoom.value && current.rid == rid) {
-      unawaited(_restore(current));
+      _restore(current);
       return;
     }
     enter();
@@ -53,7 +54,11 @@ class RoomLogic extends GetxController {
     if (joining.value) return;
     joining.value = true;
     phase.value = RoomPhase.loading;
-    final result = await service.join(rid, password: password);
+    final result = await service.join(
+      rid,
+      password: password,
+      joinSource: joinSource,
+    );
     joining.value = false;
     await _apply(result);
   }

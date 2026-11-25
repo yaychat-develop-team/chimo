@@ -6,15 +6,19 @@ import '../../../../app/chimo_api.dart';
 import '../../../../app/session_info.dart';
 import '../../../../common/constants/app_assets.dart';
 import '../../../../common/extensions/wire_view.dart';
+import '../../../../common/models/server_client/ban.pb.dart';
 import '../../../../common/models/server_client/rtc.pb.dart';
 import '../../../../common/models/server_client/user.pb.dart';
 import '../../../../common/theme/app_bottom_sheet.dart';
 import '../../../../common/theme/app_colors.dart';
 import '../../../../common/theme/app_dialog.dart';
 import '../../../../common/utils/app_toast.dart';
+import '../../../heart_link/widgets/heart_link_secret_card_dialog.dart';
 import '../../service/room_service.dart';
+import '../../types/heart_link/logic/heart_link_logic.dart';
 import 'mic_select_sheet.dart';
 import 'package:chimo/common/utils/chimo.dart';
+import 'package:get/get.dart';
 
 /// 房间资料卡「更多」操作面板。对齐 joyride `RoomUserMoreBtns`。
 Future<void> showRoomUserMoreSheet({required User profile, SimpleChannelUser? channelUser}) {
@@ -77,6 +81,35 @@ class _RoomUserMoreSheetState extends State<_RoomUserMoreSheet> {
 
   bool get _hasKnightBan => (SessionInfo.currentUser?.knightLevel ?? 0) >= 6;
 
+  bool get _htRoom => _room?.isHtRoom ?? false;
+
+  bool get _roomCanHugMic => _room?.roomCanHugMic ?? true;
+
+  bool get _htHost => SessionInfo.currentUser?.heartLinkRole == 'HOST';
+
+  bool get _htIncrease => SessionInfo.currentUser?.heartLinkRole == 'INCREASE';
+
+  /// 对齐 Host Control：0 号麦即主持人（不单靠 heartLinkRole，避免角色字段未下发时丢入口）。
+  bool get _htSeatHost =>
+      Get.isRegistered<HeartLinkLogic>() && Get.find<HeartLinkLogic>().isHost;
+
+  bool get _showSecretType =>
+      (_channelUser?.secretUser ?? 0) == 1 && !_isSelf;
+
+  bool get _isShowNumCard => SessionInfo.currentUser?.isShowNumCard ?? false;
+
+  int get _micPosition => _room?.userMicPosition(_uid) ?? -1;
+
+  /// HT：仅对 Boss 麦（position==2）。操作者需 HOST / INCREASE / 当前主持麦。
+  /// 对齐 joyride `htRoom && onMic && (htIncrease || htHost) && micPosition == 2`。
+  bool get _showHtTimer =>
+      _htRoom &&
+      _onMic &&
+      _micPosition == 2 &&
+      (_htHost || _htIncrease || _htSeatHost);
+
+  bool get _showNormalTimer => _isManager && !_htRoom && _onMic;
+
   @override
   void initState() {
     super.initState();
@@ -115,24 +148,37 @@ class _RoomUserMoreSheetState extends State<_RoomUserMoreSheet> {
   }
 
   List<_MoreItem> get _items {
+    // 对齐 joyride `superActionButtons`：抱麦 / 踢 / 警告 / 封禁。
+    // HT Boss 倒计时仍按 `_showHtTimer` 放出，避免超管测试号看不到入口。
     if (_isSuper) {
       return [
-        if (!_isSelf && _onMic) _micItem(),
+        if (!_isSelf && _onMic && _roomCanHugMic) _micItem(),
+        if (_showHtTimer) _timerItem(),
         if (!_isSelf) _kickItem(),
         if (!_isSelf) _warnItem(),
+        if (!_isSelf) _banUserItem(),
+      ];
+    }
+    // 神秘人：管理能力降级。对齐 joyride `showSecretType` 分支。
+    if (_showSecretType && _isManager) {
+      return [
+        if (!_isSelf && _roomCanHugMic) _micItem(),
+        if (_isLowerManager && !_isSelf && _onMic) _micForbidItem(),
+        if (_isLowerManager && !_isSelf) _kickItem(),
         _reportItem(),
-        if (!_isSelf) _blockItem(),
       ];
     }
     return [
-      if (!_isSelf && _isManager) _micItem(),
+      if (!_isSelf && _isManager && _roomCanHugMic) _micItem(),
       if (_isManager) _clearItem(),
-      if (_isManager && _onMic) _timerItem(),
+      if (_showNormalTimer || _showHtTimer) _timerItem(),
+      if (_isSelf && _onMic && _isShowNumCard) _numberCardItem(),
       if (_isLowerManager && !_isSelf && _onMic) _micForbidItem(),
       if (_isLowerManager && !_isSelf && !(_channelUser?.kickOutPermission ?? false)) _kickItem(),
       if (_channelUser?.kickOutPermission ?? false) _knightKickItem(),
       if (_hasKnightBan && !_isSelf) _knightBanItem(),
       if (_isLowerManager && (_isOwner || _isReception) && !_isSelf) _adminItem(),
+      if (widget.profile.heartLinkCardStatus == 1) _revealItem(),
       _reportItem(),
       if (!_isSelf) _blockItem(),
     ];
@@ -247,6 +293,75 @@ class _RoomUserMoreSheetState extends State<_RoomUserMoreSheet> {
       await _run(() => _room!.warnUser(_uid), done: 'Warning sent');
     },
   );
+
+  _MoreItem _numberCardItem() => _MoreItem(
+    icon: AppAssets.roomUserNumberCard,
+    label: 'Number Card',
+    onTap: () => _run(() => _room!.useNumberCard()),
+  );
+
+  _MoreItem _revealItem() => _MoreItem(
+    icon: AppAssets.roomUserReveal,
+    label: 'Reveal Card',
+    onTap: () {
+      AppJumper.back();
+      HeartLinkSecretCardDialog.show(_uid, source: 1);
+    },
+  );
+
+  _MoreItem _banUserItem() => _MoreItem(
+    icon: AppAssets.roomUserBan,
+    label: 'Ban',
+    onTap: _banUserFlow,
+  );
+
+  Future<void> _banUserFlow() async {
+    final room = _room;
+    if (room == null) return;
+    final reason = await AppBottomSheet.actions<String>(
+      buildItems: () => [
+        AppSheetAction(label: 'Break law', onTap: () => AppJumper.back(result: 'Break law')),
+        AppSheetAction(label: 'Fraud', onTap: () => AppJumper.back(result: 'Fraud')),
+        AppSheetAction(label: 'Abuse', onTap: () => AppJumper.back(result: 'Abuse')),
+        AppSheetAction(label: 'Other', onTap: () => AppJumper.back(result: 'Other')),
+        AppSheetAction(label: 'Cancel', onTap: () => AppJumper.back()),
+      ],
+    );
+    if (reason == null || reason.isEmpty) return;
+    final type = await AppBottomSheet.actions<BanType>(
+      buildItems: () => [
+        AppSheetAction(label: 'Ban mic', onTap: () => AppJumper.back(result: BanType.UP_MIC)),
+        AppSheetAction(
+          label: 'Ban private chat',
+          onTap: () => AppJumper.back(result: BanType.PRIVATE_CHAT),
+        ),
+        AppSheetAction(label: 'Ban account', onTap: () => AppJumper.back(result: BanType.ACCOUNT)),
+        AppSheetAction(label: 'Cancel', onTap: () => AppJumper.back()),
+      ],
+    );
+    if (type == null) return;
+    final days = await AppBottomSheet.actions<int>(
+      buildItems: () => [
+        AppSheetAction(label: '1 day', onTap: () => AppJumper.back(result: 1)),
+        AppSheetAction(label: '3 days', onTap: () => AppJumper.back(result: 3)),
+        AppSheetAction(label: '7 days', onTap: () => AppJumper.back(result: 7)),
+        AppSheetAction(label: 'Forever', onTap: () => AppJumper.back(result: 36500)),
+        AppSheetAction(label: 'Cancel', onTap: () => AppJumper.back()),
+      ],
+    );
+    if (days == null || days <= 0) return;
+    final endMs = DateTime.now().millisecondsSinceEpoch + days * 24 * 3600 * 1000;
+    await _run(
+      () => room.banTarget(
+        busId: _uid,
+        type: type,
+        level: BanLevel.S,
+        reason: reason,
+        endMs: endMs,
+      ),
+      done: 'Banned',
+    );
+  }
 
   Future<void> _kickFlow() async {
     final room = _room;

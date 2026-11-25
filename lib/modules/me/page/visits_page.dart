@@ -1,4 +1,3 @@
-import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -54,7 +53,7 @@ class VisitsPage extends GetView<VisitsLogic> {
                 style: const TextStyle(color: AppColors.gray9A9A9A, fontSize: 14),
               ),
               const SizedBox(height: 12),
-              TextButton(onPressed: () => unawaited(controller.load()), child: const Text('Retry')),
+              TextButton(onPressed: () => controller.load(), child: const Text('Retry')),
             ],
           ),
         ),
@@ -80,8 +79,8 @@ class VisitsPage extends GetView<VisitsLogic> {
             final item = items[index];
             return _VisitTile(
               item: item,
-              onTap: () => unawaited(controller.open(item)),
-              onDelete: () => unawaited(controller.remove(item)),
+              onTap: () => controller.open(item),
+              onDelete: () => controller.remove(item),
             );
           },
         ),

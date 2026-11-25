@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -32,75 +30,103 @@ class FriendsPage extends GetView<FriendsLogic> {
           onBack: AppJumper.back,
           onTabChanged: controller.selectTab,
         ),
-        body: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              child: _FriendsSearchField(
-                controller: controller.input,
-                hintText: FriendsLogic.tabs[controller.tabIndex.value].searchHint,
-              ),
+        body: AppPullRefresh(
+          onRefresh: controller.load,
+          padding: EdgeInsets.symmetric(horizontal: 12.w),
+          header: _FriendsSearchField(
+            controller: controller.input,
+            hintText: FriendsLogic.tabs[controller.tabIndex.value].searchHint,
+          ),
+          slivers: [
+            SliverList.separated(
+              itemCount: controller.users.length,
+              separatorBuilder: (_, _) => Chimo.gap(height: 10),
+              itemBuilder: (context, index) {
+                return _FriendTile(
+                  user: controller.users[index],
+                  onTap: () => controller.openProfile(controller.users[index]),
+                  onChat: () => controller.openChat(controller.users[index]),
+                  onFollow: controller.users[index].relationType == RelationType.FAN
+                      ? () => controller.follow(controller.users[index])
+                      : null,
+                );
+              },
             ),
-            Expanded(child: Obx(_buildList)),
           ],
         ),
       ),
     );
   }
-
-  Widget _buildList() {
-    final users = controller.users.toList();
-    final error = controller.error.value;
-    final loading = controller.loading.value;
-
-    final Widget sliver;
-    if (error != null && users.isEmpty) {
-      sliver = SliverFillRemaining(
-        hasScrollBody: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 120, 24, 24),
-          child: Column(
-            children: [
-              Text(
-                error,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.gray9A9A9A, fontSize: 14),
-              ),
-              const SizedBox(height: 12),
-              TextButton(onPressed: () => unawaited(controller.load()), child: const Text('Retry')),
-            ],
-          ),
-        ),
-      );
-    } else if (users.isEmpty && !loading) {
-      sliver = SliverFillRemaining(
-        hasScrollBody: false,
-        child: _FriendsEmptyState(title: FriendsLogic.tabs[controller.tabIndex.value].emptyTitle),
-      );
-    } else {
-      sliver = SliverPadding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-        sliver: SliverList.separated(
-          itemCount: users.length,
-          separatorBuilder: (_, _) => Chimo.gap(height: 10),
-          itemBuilder: (context, index) {
-            final user = users[index];
-            return _FriendTile(
-              user: user,
-              onTap: () => controller.openProfile(user),
-              onChat: () => controller.openChat(user),
-              onFollow: user.relationType == RelationType.FAN
-                  ? () => unawaited(controller.follow(user))
-                  : null,
-            );
-          },
-        ),
-      );
-    }
-    return AppPullRefresh(onRefresh: controller.load, slivers: [sliver]);
-  }
 }
+// body: Column(
+//   crossAxisAlignment: CrossAxisAlignment.stretch,
+//   children: [
+//     Padding(
+//       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+//       child: _FriendsSearchField(
+//         controller: controller.input,
+//         hintText: FriendsLogic.tabs[controller.tabIndex.value].searchHint,
+//       ),
+//     ),
+//     Expanded(child: Obx(_buildList)),
+//   ],
+// ),
+//     ),
+//   );
+// }
+
+//   Widget _buildList() {
+//     final users = controller.users.toList();
+//     final error = controller.error.value;
+//     final loading = controller.loading.value;
+
+//     final Widget sliver;
+//     if (error != null && users.isEmpty) {
+//       sliver = SliverFillRemaining(
+//         hasScrollBody: false,
+//         child: Padding(
+//           padding: const EdgeInsets.fromLTRB(24, 120, 24, 24),
+//           child: Column(
+//             children: [
+//               Text(
+//                 error,
+//                 textAlign: TextAlign.center,
+//                 style: const TextStyle(color: AppColors.gray9A9A9A, fontSize: 14),
+//               ),
+//               const SizedBox(height: 12),
+//               TextButton(onPressed: () => controller.load(), child: const Text('Retry')),
+//             ],
+//           ),
+//         ),
+//       );
+//     } else if (users.isEmpty && !loading) {
+//       sliver = SliverFillRemaining(
+//         hasScrollBody: false,
+//         child: _FriendsEmptyState(title: FriendsLogic.tabs[controller.tabIndex.value].emptyTitle),
+//       );
+//     } else {
+//       sliver = SliverPadding(
+//         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+//         sliver: SliverList.separated(
+//           itemCount: users.length,
+//           separatorBuilder: (_, _) => Chimo.gap(height: 10),
+//           itemBuilder: (context, index) {
+//             final user = users[index];
+//             return _FriendTile(
+//               user: user,
+//               onTap: () => controller.openProfile(user),
+//               onChat: () => controller.openChat(user),
+//               onFollow: user.relationType == RelationType.FAN
+//                   ? () => controller.follow(user)
+//                   : null,
+//             );
+//           },
+//         ),
+//       );
+//     }
+//     return AppPullRefresh(onRefresh: controller.load, slivers: [sliver]);
+//   }
+// }
 
 class _FriendsHeader extends StatelessWidget {
   const _FriendsHeader({required this.current, required this.onBack, required this.onTabChanged});
@@ -114,6 +140,7 @@ class _FriendsHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SafeArea(
+      bottom: false,
       child: DecoratedBox(
         decoration: const BoxDecoration(
           border: Border(bottom: BorderSide(color: AppColors.gray333333, width: 0.5)),
@@ -211,6 +238,7 @@ class _FriendsSearchField extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: 44,
+      margin: EdgeInsets.symmetric(vertical: 12, horizontal: 8.w),
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
         color: AppColors.black1C1C1E,
@@ -277,8 +305,6 @@ class _FriendTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final showFollow = user.relationType == RelationType.FAN && onFollow != null;
-
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
@@ -320,8 +346,8 @@ class _FriendTile extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 10),
-            if (showFollow)
-              _ActionChip(label: 'Follow', filled: true, onTap: onFollow!)
+            if (onFollow != null)
+              _ActionChip(label: 'Follow', filled: true, onTap: onFollow)
             else
               _ActionChip(label: 'Chat', filled: false, onTap: onChat),
           ],
@@ -336,7 +362,7 @@ class _ActionChip extends StatelessWidget {
 
   final String label;
   final bool filled;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {

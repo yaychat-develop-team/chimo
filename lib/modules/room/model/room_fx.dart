@@ -38,6 +38,21 @@ class RoomJoinFx {
   final String level;
 }
 
+/// 入场 banner（ENTRANCE_BANNER）。对齐 joyride `JoinBannerDisplay`。
+class RoomEntranceBannerFx {
+  const RoomEntranceBannerFx({
+    required this.id,
+    required this.bgUrl,
+    this.avatars = const [],
+    this.names = const [],
+  });
+
+  final String id;
+  final String bgUrl;
+  final List<String> avatars;
+  final List<String> names;
+}
+
 /// 实时打赏榜上的一个人。
 class RoomRankUser {
   const RoomRankUser({required this.name, required this.avatar, required this.value});

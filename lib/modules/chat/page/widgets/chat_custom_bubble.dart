@@ -4,6 +4,7 @@ import '../../../../common/im/im_custom_events.dart';
 import '../../../../common/im/im_custom_payload.dart';
 import '../../../../common/theme/app_colors.dart';
 import '../../model/chat_line.dart';
+import 'chat_heart_link_invite_card.dart';
 import 'chat_room_invite_card.dart';
 
 /// 自定义消息气泡分发器。
@@ -25,6 +26,12 @@ class ChatCustomBubble extends StatelessWidget {
       final payload = ImCustomPayload.tryRoomInvite(line.customPayload);
       if (payload != null) {
         return ChatRoomInviteCard(payload: payload, isSelf: line.isSelf);
+      }
+    }
+    if (ImCustomEvents.isHeartLinkInvite(event)) {
+      final payload = ImCustomPayload.tryHeartLinkInvite(line.customPayload);
+      if (payload != null) {
+        return ChatHeartLinkInviteCard(payload: payload, isSelf: line.isSelf);
       }
     }
 
