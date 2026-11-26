@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 
 import '../../../../common/constants/app_assets.dart';
 import '../../../../common/theme/app_colors.dart';
@@ -252,6 +253,9 @@ class ChatMessageList extends StatelessWidget {
     this.locked = false,
     this.historyLoading = false,
     this.historyHasMore = false,
+    this.historyLoadingRx,
+    this.historyHasMoreRx,
+    this.allowHistoryLoadMoreRx,
     this.onBlankTap,
     this.onRetry,
     this.onAvatarTap,
@@ -284,6 +288,11 @@ class ChatMessageList extends StatelessWidget {
 
   final bool historyLoading;
   final bool historyHasMore;
+
+  /// 私聊分页：内层 Obx 订阅，避免 history 变化重建整表消息依赖。
+  final RxBool? historyLoadingRx;
+  final RxBool? historyHasMoreRx;
+  final RxBool? allowHistoryLoadMoreRx;
 
   /// 点消息之外的空白（收起表情 / 更多面板）。
   final VoidCallback? onBlankTap;
@@ -343,7 +352,18 @@ class ChatMessageList extends StatelessWidget {
 
     // 顶部转圈占 index 0：转着的时候占位，还有更多也占位（不然一到顶就
     // 「跳」一格）。私聊群聊都是这条。
-    final showTopLoader = historyLoading || historyHasMore;
+    if (historyLoadingRx != null) {
+      return Obx(() {
+        final loading = historyLoadingRx!.value;
+        final hasMore = (historyHasMoreRx?.value ?? false) &&
+            (allowHistoryLoadMoreRx?.value ?? true);
+        return _list(context, loading || hasMore);
+      });
+    }
+    return _list(context, historyLoading || historyHasMore);
+  }
+
+  Widget _list(BuildContext context, bool showTopLoader) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onBlankTap,

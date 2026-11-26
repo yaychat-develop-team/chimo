@@ -37,13 +37,12 @@ class AuctionMicArea extends StatelessWidget {
     final auction = Get.find<AuctionLogic>();
     final mic = Get.find<MicLogic>();
     return Obx(() {
-      mic.clock.value;
       // 显式订阅表演麦，避免上麦后 Obx 未感知座位内容变化。
+      // mic.clock / auction.clock 下沉到剩余时长与舞台计时小组件。
       final seats = mic.seats.toList();
       final artist = seats.length > 1 ? seats[1] : MicSeat(index: 1);
       final emotes = Map<int, String>.from(mic.micEmotes);
       auction.info.value;
-      auction.clock.value;
       auction.busy.value;
       return Padding(
         padding: EdgeInsets.only(top: 8.w),
@@ -106,45 +105,48 @@ class AuctionMicArea extends StatelessWidget {
   }
 
   Widget _stageTimer(AuctionLogic auction) {
-    return Container(
-      width: 110.w,
-      height: 36.w,
-      padding: EdgeInsets.only(left: 16.w),
-      alignment: Alignment.centerLeft,
-      decoration: const BoxDecoration(
-        image: DecorationImage(image: AssetImage(AppAssets.auctionTimeBg), fit: BoxFit.fill),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            auction.stageTitle,
-            style: TextStyle(color: AppColors.white, fontSize: 11.sp),
-          ),
-          if (auction.showTimeInfo)
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Chimo.image(AppAssets.auctionClock, width: 11.w, height: 11.w),
-                SizedBox(width: 2.w),
-                Text(
-                  auction.remainTimeStr,
-                  style: TextStyle(color: AppColors.white, fontSize: 11.sp),
-                ),
-                if (auction.showPlusBtn)
-                  GestureDetector(
-                    onTap: auction.addTime,
-                    child: Padding(
-                      padding: EdgeInsets.only(left: 12.w),
-                      child: Chimo.image(AppAssets.auctionPlus, width: 24.w, height: 16.w),
-                    ),
-                  ),
-              ],
+    return Obx(() {
+      auction.clock.value;
+      return Container(
+        width: 110.w,
+        height: 36.w,
+        padding: EdgeInsets.only(left: 16.w),
+        alignment: Alignment.centerLeft,
+        decoration: const BoxDecoration(
+          image: DecorationImage(image: AssetImage(AppAssets.auctionTimeBg), fit: BoxFit.fill),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              auction.stageTitle,
+              style: TextStyle(color: AppColors.white, fontSize: 11.sp),
             ),
-        ],
-      ),
-    );
+            if (auction.showTimeInfo)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Chimo.image(AppAssets.auctionClock, width: 11.w, height: 11.w),
+                  SizedBox(width: 2.w),
+                  Text(
+                    auction.remainTimeStr,
+                    style: TextStyle(color: AppColors.white, fontSize: 11.sp),
+                  ),
+                  if (auction.showPlusBtn)
+                    GestureDetector(
+                      onTap: auction.addTime,
+                      child: Padding(
+                        padding: EdgeInsets.only(left: 12.w),
+                        child: Chimo.image(AppAssets.auctionPlus, width: 24.w, height: 16.w),
+                      ),
+                    ),
+                ],
+              ),
+          ],
+        ),
+      );
+    });
   }
 
   Widget _hostBtn(AuctionLogic auction) {
@@ -316,9 +318,8 @@ class _AuctionSeat extends StatelessWidget {
 
   double get _h => _actor ? 118.w : 90.w;
 
-  int get _remain => seat.remainSeconds();
-
-  bool get _showScore => seat.occupied && !_host && !(_remain > 0 && _remain <= 30);
+  bool _showScoreAt(int remain) =>
+      seat.occupied && !_host && !(remain > 0 && remain <= 30);
 
   @override
   Widget build(BuildContext context) {
@@ -366,8 +367,22 @@ class _AuctionSeat extends StatelessWidget {
                   fit: BoxFit.contain,
                 ),
               ),
-            // 底部麦：贡献 pill 在头像上方
-            if (_showScore && !_actor) Positioned(top: 4.w, child: _score()),
+            if (seat.occupied && !_host)
+              Positioned(
+                top: _actor ? 90.w : 4.w,
+                child: seat.downMicAt > 0
+                    ? Obx(() {
+                        if (Get.isRegistered<MicLogic>()) {
+                          Get.find<MicLogic>().clock.value;
+                        }
+                        final remain = seat.remainSeconds();
+                        if (!_showScoreAt(remain)) {
+                          return const SizedBox.shrink();
+                        }
+                        return _score();
+                      })
+                    : _score(),
+              ),
             if (!seat.occupied)
               Positioned(
                 top: _actor ? 74.w : 65.w,
@@ -393,8 +408,6 @@ class _AuctionSeat extends StatelessWidget {
                   ),
                 ),
               ),
-            // 艺人：贡献 pill 在昵称下方
-            if (_showScore && _actor) Positioned(top: 90.w, child: _score()),
           ],
         ),
       ),
@@ -415,7 +428,12 @@ class _AuctionSeat extends StatelessWidget {
       alignment: Alignment.center,
       clipBehavior: Clip.none,
       children: [
-        if (seat.speaking) RoomSeatWave(size: _avatar),
+        RoomSeatSpeakingFx(
+          uid: seat.uid,
+          micOpen: seat.micOpen,
+          size: _avatar,
+          micEffect: seat.micEffect,
+        ),
         if (_actor)
           Container(
             width: _avatar,
@@ -474,44 +492,49 @@ class _AuctionSeat extends StatelessWidget {
               ),
             ),
           ),
-        if (_remain > 0 && _remain <= 30) _remainTip(),
+        if (seat.downMicAt > 0) _remainOverlay(),
       ],
     );
   }
 
-  Widget _remainTip() {
-    return OverflowBox(
-      minWidth: _avatar,
-      minHeight: _avatar,
-      maxWidth: _avatar * 2,
-      maxHeight: _avatar * 2,
-      child: Container(
-        width: 48,
-        height: 15,
-        alignment: Alignment.center,
-        margin: EdgeInsets.only(bottom: _avatar * 1.3 + 5),
-        decoration: ShapeDecoration(
-          shape: const StadiumBorder(),
-          color: AppColors.white.withValues(alpha: 0.12),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Chimo.image(AppAssets.roomMicRemain, width: 14, height: 14),
-            const SizedBox(width: 3),
-            Text(
-              '${_remain}s',
-              style: const TextStyle(
-                color: AppColors.white,
-                fontSize: 10,
-                fontWeight: FontWeight.w500,
-                height: 1,
+  Widget _remainOverlay() {
+    return Obx(() {
+      if (Get.isRegistered<MicLogic>()) Get.find<MicLogic>().clock.value;
+      final remain = seat.remainSeconds();
+      if (remain <= 0 || remain > 30) return const SizedBox.shrink();
+      return OverflowBox(
+        minWidth: _avatar,
+        minHeight: _avatar,
+        maxWidth: _avatar * 2,
+        maxHeight: _avatar * 2,
+        child: Container(
+          width: 48,
+          height: 15,
+          alignment: Alignment.center,
+          margin: EdgeInsets.only(bottom: _avatar * 1.3 + 5),
+          decoration: ShapeDecoration(
+            shape: const StadiumBorder(),
+            color: AppColors.white.withValues(alpha: 0.12),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Chimo.image(AppAssets.roomMicRemain, width: 14, height: 14),
+              const SizedBox(width: 3),
+              Text(
+                '${remain}s',
+                style: const TextStyle(
+                  color: AppColors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w500,
+                  height: 1,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
-    );
+      );
+    });
   }
 
   Widget _score() {

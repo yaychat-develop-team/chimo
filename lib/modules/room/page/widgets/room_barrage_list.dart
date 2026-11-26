@@ -65,14 +65,8 @@ class _RoomBarrageListState extends State<RoomBarrageList> {
     final added = lines.length - _count;
     _count = lines.length;
     if (!mounted) return;
-    if (added <= 0) {
-      setState(() {});
-      return;
-    }
-    if (_pinned) {
-      setState(() {});
-      return;
-    }
+    // 列表刷新交给内层 Obx；此处只维护未读角标。
+    if (added <= 0 || _pinned) return;
     setState(() => _unread += added);
   }
 

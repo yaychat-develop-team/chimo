@@ -111,7 +111,13 @@ class CpMicSeat extends StatelessWidget {
       alignment: Alignment.center,
       clipBehavior: Clip.none,
       children: [
-        if (seat.occupied && seat.speaking) RoomSeatWave(size: avatar),
+        if (seat.occupied)
+          RoomSeatSpeakingFx(
+            uid: seat.uid,
+            micOpen: seat.micOpen,
+            size: avatar,
+            micEffect: seat.micEffect,
+          ),
         Container(
           width: avatar,
           height: avatar,

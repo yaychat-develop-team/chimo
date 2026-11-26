@@ -306,74 +306,88 @@ class _RoomGiftSheetState extends State<RoomGiftSheet> with SingleTickerProvider
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.paddingOf(context).bottom;
-    return Obx(() {
-      logic.tabs.length;
-      logic.tabIndex.value;
-      logic.giftIndex.value;
-      logic.bagIndex.value;
-      logic.bagItems.length;
-      logic.bagLoading.value;
-      logic.qty.value;
-      logic.balance.value;
-      logic.loading.value;
-      logic.sending.value;
-      logic.selectedUids.length;
-      return AppBlurBackdrop(
-        blur: 28,
-        color: AppColors.black111DE5.withValues(alpha: 0.9),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // 对齐 joyride showUserList：仅房间且有收礼人时展示顶部 To 区。
-            if (widget.isRoomScene && widget.receivers.isNotEmpty) ...[
-              RoomGiftReceiversBar(
+    // 毛玻璃壳不进 Obx：余额 / 选中 / 页签变化只刷局部，避免整板重建。
+    return AppBlurBackdrop(
+      blur: 28,
+      color: AppColors.black111DE5.withValues(alpha: 0.9),
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // 对齐 joyride showUserList：仅房间且有收礼人时展示顶部 To 区。
+          if (widget.isRoomScene && widget.receivers.isNotEmpty) ...[
+            Obx(
+              () => RoomGiftReceiversBar(
                 receivers: widget.receivers,
                 selectedUids: logic.selectedUids.toSet(),
                 allSelected: logic.allSelected,
                 onToggleUser: logic.toggleUser,
                 onToggleAll: logic.toggleAll,
               ),
-              const Divider(
-                color: AppColors.white12,
-                indent: 12,
-                endIndent: 12,
-                thickness: 1,
-                height: 1,
-              ),
-            ],
-            SizedBox(
-              height: _panelH,
-              child: Stack(
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _tabBar(),
-                      Expanded(child: _catalog()),
-                      RoomGiftBuyBar(
+            ),
+            const Divider(
+              color: AppColors.white12,
+              indent: 12,
+              endIndent: 12,
+              thickness: 1,
+              height: 1,
+            ),
+          ],
+          SizedBox(
+            height: _panelH,
+            child: Stack(
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Obx(() {
+                      logic.tabs.length;
+                      logic.tabIndex.value;
+                      return _tabBar();
+                    }),
+                    Expanded(
+                      child: Obx(() {
+                        logic.tabs.length;
+                        logic.tabIndex.value;
+                        logic.giftIndex.value;
+                        logic.bagIndex.value;
+                        logic.bagItems.length;
+                        logic.bagLoading.value;
+                        logic.loading.value;
+                        logic.loadError.value;
+                        return _catalog();
+                      }),
+                    ),
+                    Obx(
+                      () => RoomGiftBuyBar(
                         bottomInset: bottom,
                         balance: logic.balance.value,
                         qty: logic.qty.value,
                         busy: !logic.canDispatch,
                         sending: logic.sending.value,
-                        canSend:
-                            !logic.isBagTab ||
-                            (logic.currentBagItem != null && logic.currentBagItem!.canSend),
+                        canSend: !logic.isBagTab ||
+                            (logic.currentBagItem != null &&
+                                logic.currentBagItem!.canSend),
                         onPickQty: _pickQty,
                         onSend: () => _send(),
                       ),
-                    ],
-                  ),
-                  // 对齐 oumi GiftPage._renderTipsWidget showHtTips。
-                  if (_showHtTips) _htGiftTips(bottom),
-                ],
-              ),
+                    ),
+                  ],
+                ),
+                // 对齐 oumi GiftPage._renderTipsWidget showHtTips。
+                Obx(() {
+                  logic.selectedUids.length;
+                  logic.giftIndex.value;
+                  logic.tabIndex.value;
+                  if (!_showHtTips) return const SizedBox.shrink();
+                  return _htGiftTips(bottom);
+                }),
+              ],
             ),
-          ],
-        ),
-      );
-    });
+          ),
+        ],
+      ),
+    );
   }
 
   /// 对齐 oumi `GiftPageModel.showHtTips`：房间场景 + 已选收礼人 + 当前礼物为牵手礼物。

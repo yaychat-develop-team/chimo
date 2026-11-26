@@ -79,8 +79,9 @@ class RoomBarrageHost {
         constraints: const BoxConstraints(minWidth: 59, minHeight: 46),
         padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 14),
         decoration: BoxDecoration(
-          image: DecorationImage(
-            image: NetworkImage(skin, scale: 3),
+          image: Chimo.decorationImage(
+            skin,
+            scale: 3,
             centerSlice: const Rect.fromLTWH(28, 22, 1, 1),
             fit: BoxFit.fill,
           ),

@@ -1,13 +1,24 @@
-import 'package:flutter/material.dart';
-import 'package:get/get.dart';
+import 'dart:async';
 
-import '../../../../common/theme/app_colors.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+
+import '../../../../common/constants/app_assets.dart';
+import '../../../../common/models/server_client/common/car.pbenum.dart';
+import '../../../../common/models/server_client/message.pb.dart';
+import '../../../../common/models/server_client/rtc.pb.dart';
+import '../../../../common/utils/app_log.dart';
+import '../../../../common/utils/event_center.dart';
+import '../../../../common/utils/event_constant.dart';
 import '../../../../common/widgets/app_image.dart';
-import '../../logic/room_effect_logic.dart';
-import '../../model/room_fx.dart';
 import 'package:chimo/common/utils/chimo.dart';
 
-/// 座驾从右侧滑入，停留后滑出。时长 2500ms。
+/// 座驾入场横条。对齐 joyride `JoinAnimationDisplay` + `UserJoinAnimationWidget`。
+///
+/// 不走 GetX：`eventCenter` 直达本层，本地 `_buffer` 排队播放，
+/// 避免 `RoomEffectLogic.join` Rx 漏订（表现为要热刷新才有）。
+///
+/// **必须作为房间全屏 Stack 的直接子节点**（播放时返回 [PositionedDirectional]）。
 class RoomJoinLayer extends StatefulWidget {
   const RoomJoinLayer({super.key});
 
@@ -15,119 +26,153 @@ class RoomJoinLayer extends StatefulWidget {
   State<RoomJoinLayer> createState() => _RoomJoinLayerState();
 }
 
-class _RoomJoinLayerState extends State<RoomJoinLayer> with SingleTickerProviderStateMixin {
+class _RoomJoinLayerState extends State<RoomJoinLayer>
+    with WidgetsBindingObserver, SingleTickerProviderStateMixin {
+  final List<RoomUserJoin> _buffer = [];
+  AppLifecycleState _lifecycle = AppLifecycleState.resumed;
+  StreamSubscription<Event>? _addSub;
+  StreamSubscription<Event>? _clearSub;
+
   late final AnimationController _controller;
   late final Animation<double> _slide;
-  Worker? _worker;
-  RoomEffectLogic? _bound;
-  RoomJoinFx? _playing;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 2500));
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2500),
+    )..addStatusListener((status) {
+        if (status == AnimationStatus.completed) _onComplete();
+      });
     _slide = TweenSequence<double>([
       TweenSequenceItem(tween: Tween(begin: 0, end: 1), weight: 2.5),
       TweenSequenceItem(tween: ConstantTween(1), weight: 5),
       TweenSequenceItem(tween: Tween(begin: 1, end: 2), weight: 2.5),
     ]).animate(_controller);
-    _controller.addStatusListener((status) {
-      if (status == AnimationStatus.completed) _finish();
+
+    _addSub = eventCenter
+        .subscribe(EventConstant.addJoinRoomAnimationConfig)
+        .listen((event) {
+      final data = event.data;
+      if (data is RoomUserJoin) _addItem(data);
     });
-    _bind();
+    _clearSub = eventCenter
+        .subscribe(EventConstant.clearJoinRoomAnimationConfig)
+        .listen((_) => _clearBuffer());
+
+    WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
-    _worker?.dispose();
+    _addSub?.cancel();
+    _clearSub?.cancel();
     _controller.dispose();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
-  void _bind() {
-    if (!Get.isRegistered<RoomEffectLogic>()) return;
-    final logic = Get.find<RoomEffectLogic>();
-    if (identical(logic, _bound)) return;
-    _worker?.dispose();
-    _bound = logic;
-    _worker = ever(logic.join, (_) {
-      if (mounted) _sync();
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _sync();
-    });
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _lifecycle = state;
+    if (state == AppLifecycleState.paused) _clearBuffer();
   }
 
-  void _sync() {
-    final next = _bound?.join.value;
-    if (next == null) {
-      if (_playing != null) {
-        _controller.stop();
-        setState(() => _playing = null);
-      }
-      return;
+  void _clearBuffer() {
+    _buffer.clear();
+    _controller.reset();
+    if (mounted) setState(() {});
+  }
+
+  void _addItem(RoomUserJoin message) {
+    if (_lifecycle == AppLifecycleState.paused) return;
+    if (!message.hasUser() || !message.user.hasCar()) return;
+    AppLog.i(
+      'RoomJoinLayer add nick=${message.user.nickname} '
+      'car=${_carName(message.user)}',
+    );
+    // 对齐 joyride：空闲时立刻 forward，再入队；否则只入队等上一条播完。
+    if (_controller.status == AnimationStatus.dismissed) {
+      _controller.forward();
     }
-    if (_playing?.id == next.id) return;
-    setState(() => _playing = next);
-    _controller.forward(from: 0);
+    _buffer.add(message);
+    if (mounted) setState(() {});
   }
 
-  void _finish() {
-    _playing = null;
-    if (Get.isRegistered<RoomEffectLogic>()) Get.find<RoomEffectLogic>().finishJoin();
+  void _onComplete() {
+    _controller.reset();
+    if (_buffer.isNotEmpty) _buffer.removeAt(0);
+    if (_buffer.isNotEmpty) {
+      _controller.forward();
+    }
+    if (mounted) setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
-    _bind();
-    final item = _playing;
-    if (item == null) return const SizedBox.shrink();
-    return IgnorePointer(
-      child: AnimatedBuilder(
-        animation: _slide,
-        builder: (context, child) {
-          final width = MediaQuery.sizeOf(context).width;
-          return Transform.translate(offset: Offset(width * (1 - _slide.value), 0), child: child);
-        },
-        child: _banner(item),
-      ),
+    if (_buffer.isEmpty) return const SizedBox.shrink();
+    final width = MediaQuery.sizeOf(context).width;
+    final user = _buffer.first.user;
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return PositionedDirectional(
+          start: width * (1 - _slide.value),
+          top: 73.w,
+          child: child!,
+        );
+      },
+      child: IgnorePointer(child: _banner(user, width)),
     );
   }
 
-  Widget _banner(RoomJoinFx item) {
+  Widget _banner(SimpleChannelUser user, double width) {
     return Container(
-      height: 84,
-      width: double.infinity,
-      padding: const EdgeInsetsDirectional.only(start: 22, end: 16),
-      decoration: BoxDecoration(gradient: AppColors.roomCarGradient(item.level)),
+      width: width,
+      height: 84.w,
+      padding: EdgeInsetsDirectional.only(start: 22.w, end: 16.w),
+      // 对齐 joyride：只铺 join_bg 图，不要额外底色（图本身带透明渐变）。
+      decoration: BoxDecoration(
+        image: Chimo.decorationImage(
+          AppAssets.roomJoinBg(_carLevel(user)),
+          fit: BoxFit.cover,
+        ),
+      ),
       child: Row(
         children: [
-          AppImage.avatar(item.avatar, size: 36),
-          const SizedBox(width: 8),
+          AppImage.avatar(user.avatar, size: 36.w),
+          SizedBox(width: 8.w),
           Expanded(
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  item.name,
+                  user.nickname,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: AppColors.green29EEAA,
+                    color: Color(0xFFFDF652),
                     fontSize: 13,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w400,
+                    height: 1,
                   ),
                 ),
-                const SizedBox(height: 2),
+                SizedBox(height: 1.w),
                 Text.rich(
                   TextSpan(
-                    style: const TextStyle(color: AppColors.white70, fontSize: 12),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w400,
+                      height: 1,
+                    ),
                     children: [
                       const TextSpan(text: 'entered in '),
                       TextSpan(
-                        text: item.carName,
-                        style: const TextStyle(color: AppColors.yellowFFD400),
+                        text: _carName(user),
+                        style: const TextStyle(color: Color(0xFFFDF652)),
                       ),
                     ],
                   ),
@@ -137,10 +182,37 @@ class _RoomJoinLayerState extends State<RoomJoinLayer> with SingleTickerProvider
               ],
             ),
           ),
-          if (item.carImage.isNotEmpty)
-            Chimo.image(item.carImage, width: 88, height: 48, fit: BoxFit.contain),
+          SizedBox(width: 4.w),
+          if (_carImage(user).isNotEmpty)
+            Chimo.image(
+              _carImage(user),
+              width: 88.w,
+              fit: BoxFit.fitWidth,
+            ),
         ],
       ),
     );
   }
+}
+
+String _carName(SimpleChannelUser user) {
+  if (!user.hasCar() || !user.car.hasCarMetaInfo()) return '';
+  return user.car.carMetaInfo.name.trim();
+}
+
+String _carImage(SimpleChannelUser user) {
+  if (!user.hasCar() || !user.car.hasCarMetaInfo()) return '';
+  return user.car.carMetaInfo.rightImgLink.trim();
+}
+
+String _carLevel(SimpleChannelUser user) {
+  if (!user.hasCar() || !user.car.hasCarMetaInfo()) return '';
+  return switch (user.car.carMetaInfo.level) {
+    CarLevel.SSS => 'SSS',
+    CarLevel.SS => 'SS',
+    CarLevel.S => 'S',
+    CarLevel.A => 'A',
+    CarLevel.B => 'B',
+    _ => '',
+  };
 }

@@ -151,7 +151,8 @@ class _RoomPageState extends State<RoomPage> {
     logic.send(text);
   }
 
-  void _bulletin(String notice) {
+  void _bulletin() {
+    final notice = RoomService.findOrNull()?.notice.value ?? '';
     RoomBulletinDialog.show(notice);
   }
 
@@ -272,91 +273,102 @@ class _RoomPageState extends State<RoomPage> {
         resizeToAvoidBottomInset: false,
         backgroundColor: AppColors.purple14081F,
         // 对齐 yaychat：飞麦挂房间 Stack，且放在 Obx 外，关 sheet / Obx 刷新都不拆播放层。
+        // clipBehavior: none —— 座驾横条 Transform 滑入时不被裁掉。
         body: Stack(
           fit: StackFit.expand,
+          clipBehavior: Clip.none,
           children: [
+            // 背景单独 Obx：notice / plays / phase 变化时不重建 PAG。
+            Obx(() {
+              // service 未 put 前 ?.obs 不会登记依赖，先读 phase 保证 Obx 合法。
+              logic.phase.value;
+              final service = RoomService.findOrNull();
+              if (service == null) return _background('', null);
+              final background = service.background.value;
+              // 玩法 backdrop 依赖 plays。
+              service.plays.length;
+              return _background(background, service);
+            }),
             Obx(() {
               final service = RoomService.findOrNull();
-              final notice = service?.notice.value ?? '';
-              final background = service?.background.value ?? '';
               final ready = logic.phase.value == RoomPhase.ready;
-              // 订阅玩法列表，进拍卖房后才能挂上 BidBar。
+              // 订阅玩法列表，进拍卖房后才能挂上 BidBar / mic 区玩法。
               service?.plays.length;
-              return Stack(
-                fit: StackFit.expand,
-                children: [
-                  _background(background, service),
-                  if (!ready)
-                    const Center(
-                      child: CircularProgressIndicator(
-                        color: AppColors.green29EEAA,
+              if (!ready) {
+                return const Center(
+                  child: CircularProgressIndicator(
+                    color: AppColors.green29EEAA,
+                  ),
+                );
+              }
+              return SafeArea(
+                child: Column(
+                  children: [
+                    RoomTopBar(
+                      roomId: service?.rid ?? widget.rid,
+                      onSave: logic.toggleSave,
+                      onBulletin: _bulletin,
+                      onMoreRooms: AppJumper.showMoreRoomsDrawer,
+                      onRank: () =>
+                          RoomRankSheet.show(initial: RoomRankTab.givers),
+                      onAudience: () => RoomRankSheet.show(
+                        initial: RoomRankTab.members,
                       ),
-                    )
-                  else
-                    SafeArea(
-                      child: Column(
+                      onScale: _minimize,
+                      extraPills: _topPills(context, service),
+                    ),
+                    _micArea(context, service),
+                    ..._playSlots(service),
+                    const Expanded(
+                      child: Stack(
                         children: [
-                          RoomTopBar(
-                            roomId: service?.rid ?? widget.rid,
-                            onSave: logic.toggleSave,
-                            onBulletin: () => _bulletin(notice),
-                            onMoreRooms: AppJumper.showMoreRoomsDrawer,
-                            onRank: () =>
-                                RoomRankSheet.show(initial: RoomRankTab.givers),
-                            onAudience: () => RoomRankSheet.show(
-                              initial: RoomRankTab.members,
-                            ),
-                            onScale: _minimize,
-                            extraPills: _topPills(context, service),
+                          Positioned.fill(child: RoomBarrageList()),
+                          Positioned(
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            child: RoomEntranceBannerLayer(),
                           ),
-                          _micArea(context, service),
-                          ..._playSlots(service),
-                          const Expanded(
-                            child: Stack(
-                              children: [
-                                Positioned.fill(child: RoomBarrageList()),
-                                Positioned(
-                                  top: 0,
-                                  left: 0,
-                                  right: 0,
-                                  child: RoomJoinLayer(),
-                                ),
-                                Positioned(
-                                  top: 0,
-                                  left: 0,
-                                  right: 0,
-                                  child: RoomEntranceBannerLayer(),
-                                ),
-                                Positioned(
-                                  right: 8,
-                                  bottom: 8,
-                                  child: _GamesButton(),
-                                ),
-                              ],
-                            ),
-                          ),
-                          // Bid 在底栏上方 Column 内，不被礼物全屏层盖住。
-                          if (Get.isRegistered<AuctionLogic>())
-                            const AuctionBidBar(),
-                          RoomInputBar(
-                            controller: _input,
-                            onSend: _send,
-                            onJoinMic: logic.toggleMic,
-                            onToggleMic: logic.toggleLocalMic,
-                            onGift: _gift,
-                            onMessages: AppJumper.showChatsSheet,
-                            onTools: _tools,
+                          Positioned(
+                            right: 8,
+                            bottom: 8,
+                            child: _GamesButton(),
                           ),
                         ],
                       ),
                     ),
-                  if (ready) ..._playOverlays(context, service),
-                ],
+                    // Bid 在底栏上方 Column 内，不被礼物全屏层盖住。
+                    if (Get.isRegistered<AuctionLogic>())
+                      const AuctionBidBar(),
+                    RoomInputBar(
+                      controller: _input,
+                      onSend: _send,
+                      onJoinMic: logic.toggleMic,
+                      onToggleMic: logic.toggleLocalMic,
+                      onGift: _gift,
+                      onMessages: AppJumper.showChatsSheet,
+                      onTools: _tools,
+                    ),
+                  ],
+                ),
+              );
+            }),
+            Obx(() {
+              final service = RoomService.findOrNull();
+              final ready = logic.phase.value == RoomPhase.ready;
+              service?.plays.length;
+              if (!ready) return const SizedBox.shrink();
+              return Stack(
+                fit: StackFit.expand,
+                children: _playOverlays(context, service),
               );
             }),
             // 歌词在上便于拖动；空态 shrink，不挡 PAG。礼物层保持可被 VisibilityDetector 看见。
             const Positioned.fill(child: RoomLyricLayer()),
             Positioned.fill(child: RoomGiftPag(key: _giftPagKey)),
+            // 座驾横条：对齐 joyride，须为 Stack 直接子节点（内部 PositionedDirectional）。
+            // 放在 GiftPag 之后，避免被全屏座驾 PAG 盖住。
+            const RoomJoinLayer(),
             // 开麦气泡用麦钮 GlobalKey 全局坐标，挂在最外层 Stack。
             const RoomOpenMicTip(),
           ],

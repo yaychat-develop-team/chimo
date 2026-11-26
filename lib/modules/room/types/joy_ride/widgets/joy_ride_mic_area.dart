@@ -30,7 +30,7 @@ class JoyRideMicArea extends StatelessWidget {
     if (!Get.isRegistered<MicLogic>()) return const SizedBox(height: 140);
     final logic = Get.find<MicLogic>();
     return Obx(() {
-      logic.clock.value;
+      // 剩余时长由 RoomMicSeat 内层 Obx 订阅 clock。
       final emotes = Map<int, String>.from(logic.micEmotes);
       final seats = logic.seats.toList();
       final left = seats.isNotEmpty ? seats[0] : const MicSeat(index: 0);

@@ -11,7 +11,6 @@ import '../../../../../common/theme/app_colors.dart';
 import '../../../../../common/utils/chimo.dart';
 import '../../../../../common/utils/time_fmt.dart';
 import '../../../logic/mic_logic.dart';
-import '../../../model/mic_seat.dart';
 import '../../../service/room_service.dart';
 import '../logic/cp_logic.dart';
 import 'cp_action_bottom.dart';
@@ -30,13 +29,10 @@ class CpMicArea extends StatelessWidget {
       return const SizedBox.shrink();
     }
     final logic = Get.find<CpLogic>();
-    final mic = Get.find<MicLogic>();
     return Obx(() {
       logic.info.value;
       logic.stageAnim.value;
-      // 订阅整表，避免只读 length 时麦位内容变更不刷新。
-      final seats = List<MicSeat>.from(mic.seats);
-      seats.length;
+      // 麦位由子组件各自 Obx 订阅，这里不拷 seats，避免舞台 PAG 随麦位秒刷。
       final stage = logic.stage;
       final anim = logic.stageAnim.value;
       return Padding(

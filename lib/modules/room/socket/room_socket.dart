@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:chimo/common/utils/app_toast.dart';
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter/foundation.dart';
 import 'package:protobuf/protobuf.dart';
@@ -164,7 +163,9 @@ class RoomSocket {
       if (_takeReq(decoded)) return;
       final message = Message.create()
         ..mergeFromProto3Json(decoded, typeRegistry: registry, ignoreUnknownFields: true);
-      AppToast.info(message.data.scene.name);
+      if (message.data.scene == Scene.USER_JOIN) {
+        AppLog.i('RoomSocket USER_JOIN handlers=${handlers.length}');
+      }
       for (final handler in handlers) {
         if (handler.supports(message)) handler.handle(message);
       }

@@ -1,20 +1,24 @@
 import 'package:get/get.dart';
 
-import '../../../common/models/server_client/common/car.pbenum.dart';
 import '../../../common/models/server_client/message.pb.dart';
 import '../../../common/models/server_client/rtc.pb.dart';
 import '../../../common/utils/app_log.dart';
+import '../../../common/utils/event_center.dart';
+import '../../../common/utils/event_constant.dart';
 import '../model/room_fx.dart';
 import '../model/room_gift_display.dart';
 import '../service/room_service.dart';
 import '../socket/room_msg_handler.dart';
 
-/// 礼物、座驾、歌词、排行。历史消息不进这里。
+/// 礼物、座驾全屏 PAG、歌词、排行。历史消息不进这里。
+///
+/// 顶部座驾横条不走本类 Rx：对齐 joyride，由 [eventCenter] 发给 [RoomJoinLayer] 自管队列。
 class RoomEffectLogic extends GetxController {
   final ranks = <RoomRankUser>[].obs;
   final lyric = ''.obs;
+  /// 已拆好的歌词行，UI 直接读，避免 Obx 内反复 split。
+  final lyricLines = <String>[].obs;
   final banner = Rxn<RoomGiftFx>();
-  final join = Rxn<RoomJoinFx>();
   final entranceBanner = Rxn<RoomEntranceBannerFx>();
 
   /// 全屏礼物队列（含麦位飞入飞出）。对齐 joyride GiftDisplay。
@@ -24,7 +28,6 @@ class RoomEffectLogic extends GetxController {
   final flyEpoch = 0.obs;
 
   final List<RoomGiftFx> _gifts = [];
-  final List<RoomJoinFx> _joins = [];
   final List<RoomEntranceBannerFx> _entranceBanners = [];
   final List<RoomGiftDisplay> _giftBuffer = [];
   int _seq = 0;
@@ -39,29 +42,35 @@ class RoomEffectLogic extends GetxController {
     final next = text.trim();
     if (next.isEmpty) return;
     lyric.value = next;
+    lyricLines.assignAll(
+      next.split('\n').map((line) => line.trim()).where((line) => line.isNotEmpty),
+    );
   }
 
-  void hideLyric() => lyric.value = '';
+  void hideLyric() {
+    lyric.value = '';
+    lyricLines.clear();
+  }
 
   /// 换房间时清空，包括榜和歌词。
   void reset() {
     clearPlayback();
     ranks.clear();
     lyric.value = '';
+    lyricLines.clear();
   }
 
   /// 最小化或退房时停掉正在播的队列。榜保留到 [reset]。
   void clearPlayback() {
     _gifts.clear();
-    _joins.clear();
     _entranceBanners.clear();
     _giftBuffer.clear();
     _recentFly.clear();
     banner.value = null;
-    join.value = null;
     entranceBanner.value = null;
     playingGifts.clear();
     flyEpoch.value++;
+    eventCenter.emit(Event(EventConstant.clearJoinRoomAnimationConfig));
   }
 
   void finishBanner() {
@@ -70,14 +79,6 @@ class RoomEffectLogic extends GetxController {
     banner.value = null;
     if (_gifts.isNotEmpty && _gifts.first.id == playing.id) _gifts.removeAt(0);
     _advanceBanner();
-  }
-
-  void finishJoin() {
-    final playing = join.value;
-    if (playing == null) return;
-    join.value = null;
-    if (_joins.isNotEmpty && _joins.first.id == playing.id) _joins.removeAt(0);
-    _advanceJoin();
   }
 
   void finishEntranceBanner() {
@@ -146,26 +147,28 @@ class RoomEffectLogic extends GetxController {
       if (Get.isRegistered<RoomService>()) {
         Get.find<RoomService>().applyUserJoin(joined);
       }
+
+      // —— 全屏入场特效（对齐 joyride：effect.url → GiftDisplay / RoomGiftPag）——
       final effectUrl = joined.hasEffect() ? joined.effect.url.trim() : '';
-      if (roomIsPag(effectUrl)) {
-        _enqueueGiftDisplay(RoomGiftDisplay(
-          id: 'join-fx-${_seq++}',
-          giftUrl: effectUrl,
-          showAnimation: false,
-          imgList: joined.effect.imgList.toList(),
-          textList: joined.effect.textList.toList(),
-        ));
+      if (effectUrl.isNotEmpty) {
+        if (roomIsPag(effectUrl)) {
+          AppLog.i('RoomJoin fullscreen PAG enqueue url=$effectUrl');
+          _enqueueGiftDisplay(RoomGiftDisplay(
+            id: 'join-fx-${_seq++}',
+            giftUrl: effectUrl,
+            showAnimation: false,
+            imgList: joined.effect.imgList.toList(),
+            textList: joined.effect.textList.toList(),
+          ));
+        } else {
+          AppLog.i('RoomJoin fullscreen skip non-pag url=$effectUrl');
+        }
       }
-      if (!joined.hasUser() || !joined.user.hasCar()) return;
-      final user = joined.user;
-      _enqueueJoin(RoomJoinFx(
-        id: 'join-${_seq++}',
-        name: user.nickname,
-        avatar: user.avatar,
-        carName: _carName(user),
-        carImage: _carImage(user),
-        level: _carLevel(user),
-      ));
+
+      // —— 顶部座驾横条：对齐 joyride，整包丢给 JoinAnimationDisplay / RoomJoinLayer ——
+      eventCenter.emit(
+        Event(EventConstant.addJoinRoomAnimationConfig, data: joined),
+      );
       return;
     }
     if (message.data.scene == Scene.ENTRANCE_BANNER) {
@@ -348,11 +351,6 @@ class RoomEffectLogic extends GetxController {
     return true;
   }
 
-  void _enqueueJoin(RoomJoinFx fx) {
-    _joins.add(fx);
-    _advanceJoin();
-  }
-
   void _enqueueEntranceBanner(RoomEntranceBannerFx fx) {
     _entranceBanners.add(fx);
     _advanceEntranceBanner();
@@ -385,11 +383,6 @@ class RoomEffectLogic extends GetxController {
     banner.value = _gifts.first;
   }
 
-  void _advanceJoin() {
-    if (join.value != null || _joins.isEmpty) return;
-    join.value = _joins.first;
-  }
-
   void _advanceEntranceBanner() {
     if (entranceBanner.value != null || _entranceBanners.isEmpty) return;
     entranceBanner.value = _entranceBanners.first;
@@ -412,28 +405,6 @@ class _FlyDedup {
   final int count;
   final int iconHash;
   final int at;
-}
-
-String _carName(SimpleChannelUser user) {
-  if (!user.hasCar() || !user.car.hasCarMetaInfo()) return '';
-  return user.car.carMetaInfo.name.trim();
-}
-
-String _carImage(SimpleChannelUser user) {
-  if (!user.hasCar() || !user.car.hasCarMetaInfo()) return '';
-  return user.car.carMetaInfo.rightImgLink.trim();
-}
-
-String _carLevel(SimpleChannelUser user) {
-  if (!user.hasCar() || !user.car.hasCarMetaInfo()) return '';
-  return switch (user.car.carMetaInfo.level) {
-    CarLevel.SSS => 'SSS',
-    CarLevel.SS => 'SS',
-    CarLevel.S => 'S',
-    CarLevel.A => 'A',
-    CarLevel.B => 'B',
-    _ => '',
-  };
 }
 
 class _EffectMsgHandler implements RoomMsgHandler {

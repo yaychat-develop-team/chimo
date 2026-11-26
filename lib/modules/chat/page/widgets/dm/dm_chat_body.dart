@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 
 import '../../../../../common/theme/app_colors.dart';
 import '../../../model/chat_line.dart';
@@ -17,6 +18,9 @@ class DmChatBody extends StatelessWidget {
     this.selfAvatarUrl,
     this.historyLoading = false,
     this.historyHasMore = false,
+    this.historyLoadingRx,
+    this.historyHasMoreRx,
+    this.allowHistoryLoadMoreRx,
     this.onBlankTap,
     this.onFailedTap,
     this.onMessageLongPress,
@@ -34,6 +38,9 @@ class DmChatBody extends StatelessWidget {
   final GestureDragEndCallback onHandleDragEnd;
   final bool historyLoading;
   final bool historyHasMore;
+  final RxBool? historyLoadingRx;
+  final RxBool? historyHasMoreRx;
+  final RxBool? allowHistoryLoadMoreRx;
   final VoidCallback? onBlankTap;
   final ValueChanged<int>? onFailedTap;
   final void Function(ChatLine line, Rect anchor)? onMessageLongPress;
@@ -85,6 +92,9 @@ class DmChatBody extends StatelessWidget {
               selfAvatarUrl: selfAvatarUrl,
               historyLoading: historyLoading,
               historyHasMore: historyHasMore,
+              historyLoadingRx: historyLoadingRx,
+              historyHasMoreRx: historyHasMoreRx,
+              allowHistoryLoadMoreRx: allowHistoryLoadMoreRx,
               onBlankTap: onBlankTap,
               onRetry: onFailedTap,
               onMessageLongPress: onMessageLongPress,

@@ -42,11 +42,7 @@ class _RoomLyricLayerState extends State<RoomLyricLayer> {
     final logic = Get.find<RoomEffectLogic>();
     final size = MediaQuery.sizeOf(context);
     return Obx(() {
-      final lines = logic.lyric.value
-          .split('\n')
-          .map((line) => line.trim())
-          .where((line) => line.isNotEmpty)
-          .toList();
+      final lines = logic.lyricLines.toList();
       // 空态必须 shrink：全屏 expand 会盖住下层 RoomGiftPag，PAG VisibilityDetector 判定不可见并 pause。
       if (lines.isEmpty) return const SizedBox.shrink();
       return Stack(

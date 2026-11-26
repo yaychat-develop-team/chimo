@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 
@@ -21,6 +22,9 @@ class MicLogic extends GetxController {
   /// 麦上表情：uid → 图片 URL。对齐 joyride mic avatar overlay。
   final micEmotes = <int, String>{}.obs;
   final Map<int, Timer> _micEmoteTimers = {};
+
+  /// 当前正在发言的 uid。对齐 joyride `speakers`：用 ValueNotifier，不走 GetX Rx。
+  final speakers = ValueNotifier<Set<int>>({});
 
   /// 秒表跳动，驱动麦位剩余时长刷新。
   final clock = 0.obs;
@@ -96,22 +100,31 @@ class MicLogic extends GetxController {
   }
 
   void setLocalOpen(bool open) {
-    seats.assignAll(
-      seats.map((seat) => seat.uid == myUid ? seat.copyWith(micOpen: open) : seat).toList(),
-    );
+    seats
+      ..assignAll(
+        seats.map((seat) => seat.uid == myUid ? seat.copyWith(micOpen: open) : seat).toList(),
+      )
+      ..refresh();
   }
 
   void setSpeaking(Set<int> uids) {
-    final talking = uids.contains(0) ? {...uids, myUid} : uids;
-    seats.assignAll(
-      seats
-          .map(
-            (seat) => seat.copyWith(
-              speaking: seat.micOpen && seat.uid != null && talking.contains(seat.uid),
-            ),
-          )
-          .toList(),
-    );
+    if (isClosed) return;
+    // TRTC 本地用户 userId 为空，回调里记成 0，这里映射成 myUid（对齐 joyride）。
+    final talking = uids.contains(0) ? {...uids, myUid} : {...uids};
+    if (setEquals(speakers.value, talking)) return;
+    speakers.value = talking;
+    // 同步 seat.speaking，兼容仍读该字段的逻辑；UI 波纹以 speakers 为准。
+    seats
+      ..assignAll(
+        seats
+            .map(
+              (seat) => seat.copyWith(
+                speaking: seat.micOpen && seat.uid != null && talking.contains(seat.uid),
+              ),
+            )
+            .toList(),
+      )
+      ..refresh();
   }
 
   RoomMsgHandler handler() => _MicMsgHandler(this);
@@ -216,6 +229,8 @@ class MicLogic extends GetxController {
     }
     _micEmoteTimers.clear();
     micEmotes.clear();
+    speakers.value = {};
+    speakers.dispose();
     _seatKeys.clear();
     _uidKeys.clear();
     dismissOpenMicTip();

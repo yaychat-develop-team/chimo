@@ -22,8 +22,8 @@ class RoomMicGrid extends StatelessWidget {
     if (!Get.isRegistered<MicLogic>()) return const SizedBox(height: 220);
     final logic = Get.find<MicLogic>();
     return Obx(() {
-      logic.clock.value;
       // 必须在 Obx 回调里读完整 map，否则只改 value、length 不变时不会刷新。
+      // 剩余时长由 RoomMicSeat 内层 Obx 订阅 clock，避免整表每秒重建。
       final emotes = Map<int, String>.from(logic.micEmotes);
       final service = RoomService.findOrNull();
       service?.giftValueCountSwitch.value;
@@ -79,11 +79,14 @@ class RoomMicGrid extends StatelessWidget {
   Widget _flatGrid(_MicLayoutCtx ctx, List<MicSeat> seats, {required bool host}) {
     return GridView(
       shrinkWrap: true,
+      // 波纹 / 头像框会溢出格子，不能裁切。
+      clipBehavior: Clip.none,
       physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 8),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 4,
-        mainAxisExtent: 108,
+        // 头像 56 + 波纹外扩 0.3*56≈17 + 昵称行，给足纵向避免裁切。
+        mainAxisExtent: 120,
       ),
       children: [for (final seat in seats) ctx.seat(seat, host: host)],
     );
@@ -385,7 +388,12 @@ class RoomMicSeat extends StatelessWidget {
       alignment: Alignment.center,
       clipBehavior: Clip.none,
       children: [
-        if (seat.speaking) RoomSeatWave(size: size),
+        RoomSeatSpeakingFx(
+          uid: seat.uid,
+          micOpen: seat.micOpen,
+          size: size,
+          micEffect: seat.micEffect,
+        ),
         avatar,
         if (frame.isNotEmpty) IgnorePointer(child: _frame(frame, size)),
         if (emote.isNotEmpty)
@@ -417,47 +425,50 @@ class RoomMicSeat extends StatelessWidget {
               ),
             ),
           ),
-        if (_remain > 0 && _remain <= 30) _remainTip(size),
+        if (seat.downMicAt > 0) _remainOverlay(size),
       ],
     );
   }
 
-  int get _remain => seat.remainSeconds();
-
-  /// 剩余 ≤30 秒时显示在头像上方，对齐 Oumi `_micRemainTips`。
-  Widget _remainTip(double size) {
-    return OverflowBox(
-      minWidth: size,
-      minHeight: size,
-      maxWidth: size * 2,
-      maxHeight: size * 2,
-      child: Container(
-        width: 48,
-        height: 15,
-        alignment: Alignment.center,
-        margin: EdgeInsets.only(bottom: size * 1.3 + 5),
-        decoration: ShapeDecoration(
-          shape: const StadiumBorder(),
-          color: Colors.white.withValues(alpha: 0.12),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Chimo.image(AppAssets.roomMicRemain, width: 14, height: 14),
-            const SizedBox(width: 3),
-            Text(
-              '${_remain}s',
-              style: const TextStyle(
-                color: AppColors.white,
-                fontSize: 10,
-                fontWeight: FontWeight.w500,
-                height: 1,
+  /// 仅限时麦订阅 clock；剩余 ≤30 秒时显示，对齐 Oumi `_micRemainTips`。
+  Widget _remainOverlay(double size) {
+    return Obx(() {
+      if (Get.isRegistered<MicLogic>()) Get.find<MicLogic>().clock.value;
+      final remain = seat.remainSeconds();
+      if (remain <= 0 || remain > 30) return const SizedBox.shrink();
+      return OverflowBox(
+        minWidth: size,
+        minHeight: size,
+        maxWidth: size * 2,
+        maxHeight: size * 2,
+        child: Container(
+          width: 48,
+          height: 15,
+          alignment: Alignment.center,
+          margin: EdgeInsets.only(bottom: size * 1.3 + 5),
+          decoration: ShapeDecoration(
+            shape: const StadiumBorder(),
+            color: Colors.white.withValues(alpha: 0.12),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Chimo.image(AppAssets.roomMicRemain, width: 14, height: 14),
+              const SizedBox(width: 3),
+              Text(
+                '${remain}s',
+                style: const TextStyle(
+                  color: AppColors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w500,
+                  height: 1,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
-    );
+      );
+    });
   }
 
   /// 头像框按头像的 1.25 倍画，溢出槽位，不把麦位撑大。
@@ -518,7 +529,68 @@ class RoomMicSeat extends StatelessWidget {
   }
 }
 
-/// 说话时从头像边缘扩出去的一圈，1 秒淡出后重复。对齐 Oumi `WaveBorder`。
+/// 发言特效。对齐 joyride `ValueListenableBuilder(speakers)`。
+class RoomSeatSpeakingFx extends StatelessWidget {
+  const RoomSeatSpeakingFx({
+    super.key,
+    required this.uid,
+    required this.micOpen,
+    required this.size,
+    this.micEffect = '',
+  });
+
+  final int? uid;
+  final bool micOpen;
+  final double size;
+  final String micEffect;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!Get.isRegistered<MicLogic>()) return const SizedBox.shrink();
+    final logic = Get.find<MicLogic>();
+    final seatUid = uid ?? 0;
+    // 对齐 joyride `_overFlowBox(waveBorder)`：给波纹 / 麦效 1.6 倍绘制空间。
+    return OverflowBox(
+      minWidth: size,
+      minHeight: size,
+      maxWidth: size * 1.6,
+      maxHeight: size * 1.6,
+      child: ValueListenableBuilder<Set<int>>(
+        valueListenable: logic.speakers,
+        builder: (context, ids, _) {
+          MicSeat? live;
+          for (final seat in logic.seats) {
+            if (seat.uid == seatUid) {
+              live = seat;
+              break;
+            }
+          }
+          final open = live?.micOpen ?? micOpen;
+          final speaking = open &&
+              seatUid > 0 &&
+              (ids.contains(seatUid) ||
+                  (ids.contains(0) && seatUid == logic.myUid));
+          if (!speaking) return const SizedBox.shrink();
+          final effect = (live?.micEffect ?? micEffect).trim();
+          if (effect.isNotEmpty) {
+            return IgnorePointer(
+              child: Chimo.image(
+                effect,
+                width: size * 1.6,
+                height: size * 1.6,
+                fit: BoxFit.cover,
+              ),
+            );
+          }
+          return RoomSeatWave(size: size);
+        },
+      ),
+    );
+  }
+}
+
+/// 说话波纹。对齐 joyride `WaveBorder`：直径从 [size] 扩到 [size]*1.6，1s 淡出循环。
+/// 外层需用 OverflowBox(max: size*1.6) 包住（见 [_face]）。
 class RoomSeatWave extends StatefulWidget {
   const RoomSeatWave({super.key, required this.size});
 
@@ -543,19 +615,16 @@ class _RoomSeatWaveState extends State<RoomSeatWave>
 
   @override
   Widget build(BuildContext context) {
-    final size = widget.size;
-    return OverflowBox(
-      minWidth: size,
-      minHeight: size,
-      maxWidth: size * 1.6,
-      maxHeight: size * 1.6,
+    final min = widget.size;
+    final max = widget.size * 1.6;
+    return IgnorePointer(
       child: AnimatedBuilder(
         animation: _controller,
         builder: (context, _) {
-          final progress = _controller.value;
-          final diameter = size + size * 0.6 * progress;
+          final t = _controller.value;
+          final diameter = min + (max - min) * t;
           return Opacity(
-            opacity: 1 - progress,
+            opacity: (1 - t).clamp(0.0, 1.0),
             child: Container(
               width: diameter,
               height: diameter,

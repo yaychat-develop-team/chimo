@@ -381,6 +381,28 @@ abstract final class AppAssets {
   /// 房间游戏入口。
   static const String roomGames = '$_room/icon_games.webp';
 
+  /// 座驾入场横条背景（按等级）。对齐 joyride `oumi/room/join_bg_*.webp`。
+  static const String roomJoinBgB = '$_room/join_bg_b.webp';
+  static const String roomJoinBgA = '$_room/join_bg_a.webp';
+  static const String roomJoinBgS = '$_room/join_bg_s.webp';
+  static const String roomJoinBgSs = '$_room/join_bg_ss.webp';
+  static const String roomJoinBgSss = '$_room/join_bg_sss.webp';
+
+  static String roomJoinBg(String level) {
+    switch (level) {
+      case 'SSS':
+        return roomJoinBgSss;
+      case 'SS':
+        return roomJoinBgSs;
+      case 'S':
+        return roomJoinBgS;
+      case 'A':
+        return roomJoinBgA;
+      default:
+        return roomJoinBgB;
+    }
+  }
+
   /// 公屏性别标：男。
   static const String roomMale = '$_room/icon_male.webp';
 

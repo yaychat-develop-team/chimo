@@ -30,11 +30,20 @@ class TencentRoomRtc implements RoomRtc {
       return;
     }
     _listener = TRTCCloudListener(
-      onEnterRoom: (code) => AppLog.i('TencentRoomRtc enter $code'),
+      onEnterRoom: (code) {
+        AppLog.i('TencentRoomRtc enter $code');
+        // 进房成功后再开音量回调，避免 enter 未完成时评价无效。
+        if (code >= 0) {
+          _engine?.enableAudioVolumeEvaluation(
+            true,
+            TRTCAudioVolumeEvaluateParams(interval: 300),
+          );
+        }
+      },
       onUserVoiceVolume: (volumes, _) {
         final speaking = <int>{};
         for (final item in volumes) {
-          // 本地用户的 userId 是空字符串，和 Oumi 一样记成 0。
+          // 本地用户的 userId 是空字符串，和 Oumi / joyride 一样记成 0。
           final uid = int.tryParse(item.userId) ?? 0;
           if (uid >= 0 && item.volume >= 4) speaking.add(uid);
         }
@@ -51,9 +60,10 @@ class TencentRoomRtc implements RoomRtc {
       ),
       TRTCAppScene.voiceChatRoom,
     );
+    // 先开一次；onEnterRoom 成功后再开一次兜底。
     _engine!.enableAudioVolumeEvaluation(
       true,
-      TRTCAudioVolumeEvaluateParams(interval: 500),
+      TRTCAudioVolumeEvaluateParams(interval: 300),
     );
     _entered = true;
   }

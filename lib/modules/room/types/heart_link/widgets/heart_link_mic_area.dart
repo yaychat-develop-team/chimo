@@ -51,7 +51,7 @@ class HeartLinkMicArea extends StatelessWidget {
     final ht = Get.find<HeartLinkLogic>();
     final mic = Get.find<MicLogic>();
     return Obx(() {
-      mic.clock.value;
+      // Boss 倒计时由 _SeatBlock 内层 Obx 订阅 mic.clock，避免整区每秒重建。
       ht.heartLinkInfo.value;
       ht.heartfelt.value;
       ht.noticeInfo.value;
@@ -128,7 +128,6 @@ class HeartLinkMicArea extends StatelessWidget {
                               role: _SeatRole.boss,
                               emptyLabel: 'Handsome',
                               accent: const Color(0xFF0080FF),
-                              timerRemain: _bossRemain(boss),
                               showGiftStats: showGiftStats,
                               emoteUrl: _emoteOf(emotes, boss.uid),
                               anchor: mic.anchorFor(boss),
@@ -185,14 +184,6 @@ class HeartLinkMicArea extends StatelessWidget {
         ),
       );
     });
-  }
-
-  /// Boss 倒计时剩余秒。对齐 joyride `counterTimestamp - now`；Obx 已订阅 `mic.clock`。
-  int? _bossRemain(MicSeat boss) {
-    if (!boss.occupied || boss.counterAt <= 0) return null;
-    final remain = boss.counterAt - DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    if (remain <= 0) return null;
-    return remain;
   }
 
   static String _emoteOf(Map<int, String> emotes, int? uid) {
@@ -430,7 +421,6 @@ class _SeatBlock extends StatelessWidget {
     this.showHostBadge = false,
     this.showGift = false,
     this.showGiftStats = false,
-    this.timerRemain,
   });
 
   final MicSeat seat;
@@ -444,7 +434,6 @@ class _SeatBlock extends StatelessWidget {
   final bool showHostBadge;
   final bool showGift;
   final bool showGiftStats;
-  final int? timerRemain;
 
   bool get _host => role == _SeatRole.host;
 
@@ -517,34 +506,8 @@ class _SeatBlock extends StatelessWidget {
                 ),
               ),
             ),
-          // 对齐 joyride Boss `counterTime` 头顶条：时钟图标 + mm:ss。
-          if (timerRemain != null && timerRemain! > 0)
-            Positioned(
-              top: 4.w,
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 5.w, vertical: 2.w),
-                decoration: BoxDecoration(
-                  color: AppColors.black.withValues(alpha: 0.36),
-                  borderRadius: BorderRadius.circular(99),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Chimo.image(AppAssets.htClock, width: 11.w, height: 11.w),
-                    SizedBox(width: 3.w),
-                    Text(
-                      TimeFmt.duration(timerRemain!),
-                      style: const TextStyle(
-                        color: AppColors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w400,
-                        height: 1,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+          // 对齐 joyride Boss `counterTime` 头顶条；仅此处订阅 mic.clock。
+          if (_boss && seat.occupied && seat.counterAt > 0) _bossTimer(),
           Positioned(
             top: _host ? 58.w : 82.w,
             left: 0,
@@ -566,6 +529,42 @@ class _SeatBlock extends StatelessWidget {
     );
   }
 
+  /// 对齐 joyride Boss `counterTime`：时钟图标 + mm:ss。
+  Widget _bossTimer() {
+    return Positioned(
+      top: 4.w,
+      child: Obx(() {
+        if (Get.isRegistered<MicLogic>()) Get.find<MicLogic>().clock.value;
+        final remain =
+            seat.counterAt - DateTime.now().millisecondsSinceEpoch ~/ 1000;
+        if (remain <= 0) return const SizedBox.shrink();
+        return Container(
+          padding: EdgeInsets.symmetric(horizontal: 5.w, vertical: 2.w),
+          decoration: BoxDecoration(
+            color: AppColors.black.withValues(alpha: 0.36),
+            borderRadius: BorderRadius.circular(99),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Chimo.image(AppAssets.htClock, width: 11.w, height: 11.w),
+              SizedBox(width: 3.w),
+              Text(
+                TimeFmt.duration(remain),
+                style: const TextStyle(
+                  color: AppColors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w400,
+                  height: 1,
+                ),
+              ),
+            ],
+          ),
+        );
+      }),
+    );
+  }
+
   Widget _face(double size) {
     if (!seat.occupied) {
       // 三人房 MicLogic 不会给 index=2 打 boss 标记，空麦按角色位展示。
@@ -584,18 +583,13 @@ class _SeatBlock extends StatelessWidget {
       alignment: Alignment.center,
       clipBehavior: Clip.none,
       children: [
-        // 说话麦效：佩戴光环优先，否则默认波纹。对齐 joyride `MicAvatarWidget`。
-        if (seat.speaking)
-          micEffect.isNotEmpty
-              ? IgnorePointer(
-                  child: Chimo.image(
-                    micEffect,
-                    width: size * 1.6,
-                    height: size * 1.6,
-                    fit: BoxFit.cover,
-                  ),
-                )
-              : RoomSeatWave(size: size),
+        // 说话麦效：订 speakingUids；佩戴光环优先，否则默认波纹。
+        RoomSeatSpeakingFx(
+          uid: seat.uid,
+          micOpen: seat.micOpen,
+          size: size,
+          micEffect: micEffect,
+        ),
         Container(
           width: size,
           height: size,

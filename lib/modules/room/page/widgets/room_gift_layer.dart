@@ -166,21 +166,13 @@ class RoomGiftPag extends StatefulWidget {
 }
 
 class _RoomGiftPagState extends State<RoomGiftPag> {
-  Worker? _worker;
   RoomEffectLogic? _bound;
-  List<RoomGiftDisplay> _items = const [];
   var _bindRetries = 0;
 
   @override
   void initState() {
     super.initState();
     _bind();
-  }
-
-  @override
-  void dispose() {
-    _worker?.dispose();
-    super.dispose();
   }
 
   void _bind() {
@@ -194,28 +186,10 @@ class _RoomGiftPagState extends State<RoomGiftPag> {
     }
     final logic = Get.find<RoomEffectLogic>();
     if (identical(logic, _bound)) return;
-    _worker?.dispose();
     _bound = logic;
     _bindRetries = 0;
-    // playingGifts + flyEpoch 双通道，避免 RxList 变更偶发不通知。
-    _worker = everAll([logic.playingGifts, logic.flyEpoch], (_) {
-      if (mounted) _sync();
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _sync();
-    });
-  }
-
-  void _sync() {
-    final next = List<RoomGiftDisplay>.from(_bound?.playingGifts ?? const []);
-    final same =
-        next.length == _items.length &&
-        List.generate(
-          next.length,
-          (i) => next[i].id == _items[i].id,
-        ).every((ok) => ok);
-    if (same) return;
-    setState(() => _items = next);
+    // Obx 首订可能发生在 put 之前；绑上后强制重建一次。
+    if (mounted) setState(() {});
   }
 
   @override
@@ -223,7 +197,7 @@ class _RoomGiftPagState extends State<RoomGiftPag> {
     _bind();
     final logic = _bound;
     if (logic == null) return const SizedBox.shrink();
-    // Obx 再订 flyEpoch，避免仅靠 ever 时偶发不同步。
+    // 只走 Obx：playingGifts + flyEpoch 双通道，避免 ever + setState 重复刷新。
     return Obx(() {
       logic.flyEpoch.value;
       final items = List<RoomGiftDisplay>.from(logic.playingGifts);

@@ -316,14 +316,15 @@ class _ChatDetailPageState extends State<ChatDetailPage> with SingleTickerProvid
                 // `.toList()` 不是多余的：`DmChatBody` 的 build 在 Obx 的
                 // builder 之外跑，光把 RxList 传下去登记不到依赖，消息变化
                 // 不会重建。在 builder 里读一次列表才算订阅。
-                // 进度条另用 [_DmRomanceTopSlot] 内层 Obx，避免亲密分刷新整表重建。
+                // 进度条 / 历史分页各自内层 Obx，避免拖累消息表。
                 messages: logic.messages.toList(),
                 peerAvatar: logic.conversation.value.avatarAsset,
                 peerAvatarUrl: logic.conversation.value.avatarUrl,
                 selfAvatarUrl: logic.selfAvatarUrl.value,
                 messagesScroll: _anchor.controller,
-                historyLoading: logic.historyLoading.value,
-                historyHasMore: logic.historyHasMore.value && logic.allowHistoryLoadMore.value,
+                historyLoadingRx: logic.historyLoading,
+                historyHasMoreRx: logic.historyHasMore,
+                allowHistoryLoadMoreRx: logic.allowHistoryLoadMore,
                 onHandleDragUpdate: _onIntroDragUpdate,
                 onHandleDragEnd: _onIntroDragEnd,
                 onBlankTap: () => _inputBarKey.currentState?.dismissComposer(),

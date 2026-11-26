@@ -117,8 +117,10 @@ class RoomTopBar extends StatelessWidget {
   Widget _roomChip({required String title, required String cover, required bool saved}) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        // 封面、间距、内边距和 Save 占掉的宽度，剩下的才给标题。
-        final titleMax = (constraints.maxWidth - 138).clamp(48.0, constraints.maxWidth);
+        // padding10 + cover36 + gap8；未收藏再加 gap8 + Save≈72。
+        final reserved = 54.0 + (saved ? 0 : 80);
+        final titleMax =
+            (constraints.maxWidth - reserved).clamp(0.0, constraints.maxWidth);
         return Align(
           alignment: Alignment.centerLeft,
           child: Container(
@@ -133,36 +135,37 @@ class RoomTopBar extends StatelessWidget {
               children: [
                 _cover(cover),
                 const SizedBox(width: 8),
-                ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: titleMax),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: AppColors.white,
-                          fontSize: 13.sp,
-                          fontWeight: FontWeight.w700,
-                          height: 1.1,
+                if (titleMax > 0)
+                  ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: titleMax),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: AppColors.white,
+                            fontSize: 13.sp,
+                            fontWeight: FontWeight.w700,
+                            height: 1.1,
+                          ),
                         ),
-                      ),
-                      Text(
-                        'ID: $roomId',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.white60,
-                          fontSize: 11,
-                          height: 1.15,
+                        Text(
+                          'ID: $roomId',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: AppColors.white60,
+                            fontSize: 11,
+                            height: 1.15,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
                 if (!saved) ...[const SizedBox(width: 8), _save()],
               ],
             ),
