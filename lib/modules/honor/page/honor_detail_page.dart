@@ -201,7 +201,7 @@ class _HonorDetailPageState extends State<HonorDetailPage> {
                   children: [
                     Chimo.gap(height: 20.w),
                     Obx(() {
-                      widget.logic.activeList.length;
+                      // wearing：佩戴态可能原地改 item.wear，不单靠列表 length。
                       widget.logic.wearing.value;
                       return _InfoBlock(item: _current);
                     }),
@@ -212,7 +212,6 @@ class _HonorDetailPageState extends State<HonorDetailPage> {
                         margin: const EdgeInsets.symmetric(horizontal: 40).copyWith(bottom: 120.w),
                         alignment: Alignment.center,
                         child: Obx(() {
-                          widget.logic.activeList.length;
                           final item = _current;
                           final valid = HonorDisplay.isValid(item);
                           final busy = widget.logic.wearing.value;

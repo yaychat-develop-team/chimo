@@ -135,6 +135,11 @@ class CashApi {
     );
   }
 
+  /// Lucky 礼物关联装扮 / 大奖信息。对齐 joyride `CashApi.getLuckyBuffInfo`。
+  Future<ApiResult<LuckyBuffInfo>> luckyBuff() {
+    return Http.ins.getAndParse<LuckyBuffInfo>('/cash/lucky-buff');
+  }
+
   /// 金币消费 / 充值明细。
   Future<ApiResult<List<CashOpHistoryItem>>> opHistory({
     required int pageNum,

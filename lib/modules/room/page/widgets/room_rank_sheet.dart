@@ -42,46 +42,45 @@ class RoomRankSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final height = MediaQuery.sizeOf(context).height * 0.78;
     final bottom = MediaQuery.paddingOf(context).bottom;
+    final logic = Get.find<RoomRankLogic>();
     return SizedBox(
       height: height,
-      child: Obx(() {
-        final logic = Get.find<RoomRankLogic>();
-        // 订阅 tab / period / 列表，保证切换与刷新都走 Obx。
-        final bg = logic.backgroundAsset;
-        logic.tab.value;
-        logic.period.value;
-        logic.loading.value;
-        logic.users.length;
-        logic.error.value;
-        logic.myself.value;
-        return ClipRRect(
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              AppBlurBackdrop(blur: 28, color: AppColors.rgba(17, 17, 29, 0.9), child: Container()),
-              if (bg.isNotEmpty)
-                Positioned.fill(
-                  child: Chimo.image(bg, fit: BoxFit.cover, alignment: Alignment.topCenter),
+      child: ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            AppBlurBackdrop(blur: 28, color: AppColors.rgba(17, 17, 29, 0.9), child: Container()),
+            Obx(() {
+              final bg = logic.backgroundAsset;
+              if (bg.isEmpty) return const SizedBox.shrink();
+              return Positioned.fill(
+                child: Chimo.image(bg, fit: BoxFit.cover, alignment: Alignment.topCenter),
+              );
+            }),
+            Column(
+              children: [
+                SizedBox(height: 24.w),
+                _Tabs(logic: logic),
+                Obx(() {
+                  if (!logic.showPeriod) return const SizedBox.shrink();
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(height: 12),
+                      _PeriodSwitch(logic: logic),
+                    ],
+                  );
+                }),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: _Body(logic: logic, bottomInset: bottom),
                 ),
-              Column(
-                children: [
-                  SizedBox(height: 24.w),
-                  _Tabs(logic: logic),
-                  if (logic.showPeriod) ...[
-                    const SizedBox(height: 12),
-                    _PeriodSwitch(logic: logic),
-                  ],
-                  const SizedBox(height: 8),
-                  Expanded(
-                    child: _Body(logic: logic, bottomInset: bottom),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        );
-      }),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -99,45 +98,48 @@ class _Tabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Row(
-        children: _items.map((item) {
-          final selected = logic.tab.value == item.$1;
-          return Expanded(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => logic.selectTab(item.$1),
-              child: Column(
-                children: [
-                  Text(
-                    item.$2,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: selected ? AppColors.white : AppColors.white60,
-                      fontSize: 13.sp,
-                      fontWeight: FontWeight.w600,
+    return Obx(() {
+      final tab = logic.tab.value;
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Row(
+          children: _items.map((item) {
+            final selected = tab == item.$1;
+            return Expanded(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => logic.selectTab(item.$1),
+                child: Column(
+                  children: [
+                    Text(
+                      item.$2,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: selected ? AppColors.white : AppColors.white60,
+                        fontSize: 13.sp,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    height: 3,
-                    width: selected ? 28 : 0,
-                    decoration: BoxDecoration(
-                      color: AppColors.green29EEAA,
-                      borderRadius: BorderRadius.circular(2),
+                    const SizedBox(height: 6),
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      height: 3,
+                      width: selected ? 28 : 0,
+                      decoration: BoxDecoration(
+                        color: AppColors.green29EEAA,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
+            );
+          }).toList(),
+        ),
+      );
+    });
   }
 }
 
@@ -148,22 +150,28 @@ class _PeriodSwitch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 32,
-      width: 168,
-      padding: const EdgeInsets.all(2),
-      decoration: BoxDecoration(
-        color: AppColors.rgba(255, 255, 255, 0.12),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [_chip('Daily', RoomRankPeriod.daily), _chip('Weekly', RoomRankPeriod.weekly)],
-      ),
-    );
+    return Obx(() {
+      final period = logic.period.value;
+      return Container(
+        height: 32,
+        width: 168,
+        padding: const EdgeInsets.all(2),
+        decoration: BoxDecoration(
+          color: AppColors.rgba(255, 255, 255, 0.12),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            _chip('Daily', RoomRankPeriod.daily, period),
+            _chip('Weekly', RoomRankPeriod.weekly, period),
+          ],
+        ),
+      );
+    });
   }
 
-  Widget _chip(String label, RoomRankPeriod period) {
-    final on = logic.period.value == period;
+  Widget _chip(String label, RoomRankPeriod period, RoomRankPeriod current) {
+    final on = current == period;
     return Expanded(
       child: GestureDetector(
         onTap: () => logic.selectPeriod(period),
@@ -196,70 +204,72 @@ class _Body extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (logic.loading.value && logic.users.isEmpty) {
-      return const Center(child: CircularProgressIndicator(color: AppColors.green29EEAA));
-    }
-    if (logic.error.value.isNotEmpty && logic.users.isEmpty) {
-      return Center(
-        child: GestureDetector(
-          onTap: logic.load,
-          child: Text(
-            logic.error.value,
-            style: const TextStyle(color: AppColors.white60, fontSize: 13),
-          ),
-        ),
-      );
-    }
-    if (logic.users.isEmpty) {
-      return const Center(
-        child: Text('No data yet', style: TextStyle(color: AppColors.white60)),
-      );
-    }
-
-    final self = logic.myself.value;
-    final showSelf = logic.showValue && self != null && self.hasId();
-    final bottomPad = (showSelf ? 78.0 : 16.0) + bottomInset;
-    final rows = logic.listUsers;
-
-    return Stack(
-      children: [
-        AppPullRefresh(
-          accentColor: AppColors.green29EEAA,
-          onRefresh: logic.load,
-          padding: EdgeInsets.fromLTRB(12, 4, 12, bottomPad),
-          slivers: [
-            if (logic.showPodium)
-              SliverToBoxAdapter(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _Podium(users: logic.topThree),
-                    const SizedBox(height: 12),
-                  ],
-                ),
-              ),
-            SliverList(
-              delegate: SliverChildBuilderDelegate((context, index) {
-                final user = rows[index];
-                return _RankRow(
-                  user: user,
-                  index: logic.showPodium ? index + 3 : index,
-                  showValue: logic.showValue,
-                  seatNo: logic.showValue ? null : logic.seatNo(user.id.toInt()),
-                );
-              }, childCount: rows.length),
+    return Obx(() {
+      if (logic.loading.value && logic.users.isEmpty) {
+        return const Center(child: CircularProgressIndicator(color: AppColors.green29EEAA));
+      }
+      if (logic.error.value.isNotEmpty && logic.users.isEmpty) {
+        return Center(
+          child: GestureDetector(
+            onTap: logic.load,
+            child: Text(
+              logic.error.value,
+              style: const TextStyle(color: AppColors.white60, fontSize: 13),
             ),
-          ],
-        ),
-        if (showSelf)
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: _SelfBar(user: self, bottomInset: bottomInset),
           ),
-      ],
-    );
+        );
+      }
+      if (logic.users.isEmpty) {
+        return const Center(
+          child: Text('No data yet', style: TextStyle(color: AppColors.white60)),
+        );
+      }
+
+      final self = logic.myself.value;
+      final showSelf = logic.showValue && self != null && self.hasId();
+      final bottomPad = (showSelf ? 78.0 : 16.0) + bottomInset;
+      final rows = logic.listUsers;
+
+      return Stack(
+        children: [
+          AppPullRefresh(
+            accentColor: AppColors.green29EEAA,
+            onRefresh: logic.load,
+            padding: EdgeInsets.fromLTRB(12, 4, 12, bottomPad),
+            slivers: [
+              if (logic.showPodium)
+                SliverToBoxAdapter(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _Podium(users: logic.topThree),
+                      const SizedBox(height: 12),
+                    ],
+                  ),
+                ),
+              SliverList(
+                delegate: SliverChildBuilderDelegate((context, index) {
+                  final user = rows[index];
+                  return _RankRow(
+                    user: user,
+                    index: logic.showPodium ? index + 3 : index,
+                    showValue: logic.showValue,
+                    seatNo: logic.showValue ? null : logic.seatNo(user.id.toInt()),
+                  );
+                }, childCount: rows.length),
+              ),
+            ],
+          ),
+          if (showSelf)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: _SelfBar(user: self, bottomInset: bottomInset),
+            ),
+        ],
+      );
+    });
   }
 }
 

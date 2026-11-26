@@ -18,12 +18,12 @@ class TurntableOverlay extends StatelessWidget {
     if (!Get.isRegistered<TurntableLogic>()) return const SizedBox.shrink();
     final logic = Get.find<TurntableLogic>();
     return Obx(() {
+      // tick：_info 非 obs，靠 tick 驱动展示刷新。
       logic.tick.value;
-      logic.status.value;
-      logic.visible.value;
       if (!logic.show) return const SizedBox.shrink();
       final info = logic.info;
       if (info == null) return const SizedBox.shrink();
+      final status = logic.status.value;
       final room = RoomService.findOrNull();
       return ColoredBox(
         color: Colors.black.withValues(alpha: 0.8),
@@ -36,7 +36,7 @@ class TurntableOverlay extends StatelessWidget {
                 children: [
                   TurntableWheel(
                     info: info,
-                    status: logic.status.value,
+                    status: status,
                     stopId: logic.stopId,
                     onBtnTap: () {
                       if (logic.isRotating) return;

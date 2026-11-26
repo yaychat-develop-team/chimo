@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:fixnum/fixnum.dart';
 
+import '../../../common/models/server_client/blind_box.pb.dart';
 import '../../../common/models/server_client/commodity.pb.dart';
 import '../http/api_result.dart';
 import '../http/http.dart';
@@ -8,6 +9,17 @@ import '../http/http.dart';
 /// 背包 / 装扮物品。
 class CommodityApi {
   const CommodityApi();
+
+  /// 开启背包盲盒。对齐 joyride `RtcApi.openBlindBox` → `POST /blind-box/open`。
+  Future<ApiResult<BlindBoxOpenData>> openBlindBox(Int64 grantRecordId) {
+    return Http.ins.postAndParse<BlindBoxOpenData>(
+      '/blind-box/open',
+      data: BlindBoxOpenReq(grantRecordId: grantRecordId),
+      options: Options(
+        headers: {Headers.contentTypeHeader: Headers.jsonContentType},
+      ),
+    );
+  }
 
   /// 礼物面板 Package 列表。`v=1` 含车卡。
   Future<ApiResult<List<CommodityItem>>> bag() async {

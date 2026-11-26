@@ -139,8 +139,6 @@ class _MicQueueSheetState extends State<MicQueueSheet> with SingleTickerProvider
       child: SizedBox(
         height: height,
         child: Obx(() {
-        room.waitQueue.length;
-        room.carOwnerMicQueue.length;
         final inQueue =
             room.inQueue(QueueType.COMMON_QUEUE) || room.inQueue(QueueType.CAR_OWNER_QUEUE);
         final list = _current == QueueType.CAR_OWNER_QUEUE

@@ -30,8 +30,6 @@ class CpMicArea extends StatelessWidget {
     }
     final logic = Get.find<CpLogic>();
     return Obx(() {
-      logic.info.value;
-      logic.stageAnim.value;
       // 麦位由子组件各自 Obx 订阅，这里不拷 seats，避免舞台 PAG 随麦位秒刷。
       final stage = logic.stage;
       final anim = logic.stageAnim.value;

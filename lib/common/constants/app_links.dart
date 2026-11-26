@@ -7,6 +7,9 @@ abstract final class AppLinks {
   static const String accountCancellation = 'https://www.chimoapp.com/agreements/zhanghuzhuxiao.html';
   static const String officialWebsite = 'https://test-h5.chimoapp.com';
 
+  /// 协议 / 说明页根域名。对齐 joyride `UrlConfig.protocolDomain`。
+  static const String protocolHost = 'https://www.chimoapp.com/agreements';
+
   /// H5 活动页根域名。
   ///
   /// 当前测试/正式环境活动页部署在 yaychat H5（与接口、`gsWorkbenchUrl` 同源）；
@@ -17,4 +20,12 @@ abstract final class AppLinks {
   /// 21 日亲密任务页。对齐 joyride `UrlConfig.intimacyMission`。
   static String intimacyMission(String activityId) =>
       '$h5Host/IntimacyMission?activityId=$activityId&is_full_screen=1';
+
+  /// Lucky Buff 说明。对齐 joyride `LuckyBuff.html?type=`。
+  static String luckyBuffHelp({int payCurrency = 0}) =>
+      '$protocolHost/LuckyBuff.html?type=$payCurrency';
+
+  /// Lucky 礼物开箱说明。对齐 joyride `LuckyBox.html?type=`。
+  static String luckyBoxHelp({int payCurrency = 0}) =>
+      '$protocolHost/LuckyBox.html?type=$payCurrency';
 }

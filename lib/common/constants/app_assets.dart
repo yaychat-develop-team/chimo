@@ -509,6 +509,21 @@ abstract final class AppAssets {
   static const String htMicOnTipsImg = '$_ht/mic_on_tips_img.webp';
   /// 礼物面板 Heartie 礼物悬浮提示底图。对齐 oumi `res0/ht_gift_tips_bg.webp`。
   static const String htGiftTipsBg = '$_ht/ht_gift_tips_bg.webp';
+
+  /// Lucky 礼物顶部 buff 区 / 底部 tip。对齐 joyride `lucky_buff/*`、`box_open_bg`。
+  static const String _luckyBuff = 'assets/images/room/lucky_buff';
+  static const String luckyBuffBg = '$_luckyBuff/bg.png';
+  static const String luckyBuffLuckyBg = '$_luckyBuff/lucky_bg.png';
+  static const String luckyBuffTitle = '$_luckyBuff/lucky_buff.png';
+  static const String luckyBuffBorder = '$_luckyBuff/border.png';
+  static const String luckyBuffLuckyBorder = '$_luckyBuff/lucky_border.png';
+  static const String luckyBuffAdd = '$_luckyBuff/add.svg';
+  static const String luckyBuffCoin = '$_luckyBuff/coin.png';
+  static const String luckyBuffSj = '$_luckyBuff/sj.svg';
+  static const String luckyBuffHelp = '$_luckyBuff/quesition.png';
+  static const String luckyBoxTipsBg = '$_luckyBuff/box_open_bg.png';
+  static const String luckyTipsFlashLeft = '$_luckyBuff/flash_left.png';
+  static const String luckyTipsFlashRight = '$_luckyBuff/flash_right.png';
   /// 邀请弹窗 / 私聊卡片背景。对齐 oumi `res0/ht_info_bg.webp`。
   static const String htInfoBg = '$_ht/ht_info_bg.webp';
   static const String htTextArrowBg = '$_ht/ht_text_arrow_bg.webp';

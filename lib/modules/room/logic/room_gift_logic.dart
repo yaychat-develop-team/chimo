@@ -1,11 +1,30 @@
 import 'package:get/get.dart';
 
 import '../../../app/chimo_api.dart';
+import '../../../app/session_info.dart';
 import '../../../common/extensions/wire_view.dart';
 import '../../../common/models/server_client/cash.pb.dart';
 import '../../../common/models/server_client/commodity.pb.dart';
 import '../../../common/utils/app_log.dart';
 import '../model/room_gift_receiver.dart';
+
+/// 礼物底栏动作。对齐 joyride GiftPage / GiftBagPanel。
+enum RoomGiftBuyAction {
+  /// 数量 + Gift。
+  send,
+
+  /// 骑士未达标 → unlock。
+  unlock,
+
+  /// 背包盲盒 → Open。
+  open,
+
+  /// 特权卡 → Apply。
+  apply,
+
+  /// 不可赠送。
+  blocked,
+}
 
 /// 送礼结果。成功时带上礼物信息：私聊插气泡，房间播飞麦。
 class RoomGiftDispatch {
@@ -109,14 +128,65 @@ class RoomGiftLogic extends GetxController {
 
   bool get allSelected => receivers.isNotEmpty && selectedUids.length == receivers.length;
 
+  /// 当前用户爵位是否够送选中商店礼物。对齐 joyride `GiftPageModel.hasRightSend`。
+  bool get hasRightSend {
+    final gift = currentGift;
+    if (gift == null) return false;
+    return !isGiftLocked(gift);
+  }
+
+  /// 爵位锁。`knightLevel > 0` 且用户等级不足。
+  bool isGiftLocked(ItemInfo gift) {
+    if (gift.knightLevel <= 0) return false;
+    final mine = SessionInfo.currentUser?.knightLevel ?? 0;
+    return mine < gift.knightLevel;
+  }
+
+  /// 底栏应展示的动作。
+  RoomGiftBuyAction get buyAction {
+    if (isBagTab) {
+      final item = currentBagItem;
+      if (item == null) return RoomGiftBuyAction.blocked;
+      if (item.type == CommodityType.BLIND_BOX) return RoomGiftBuyAction.open;
+      if (item.type == CommodityType.BENEFIT_CARD && item.subType > 0) {
+        return RoomGiftBuyAction.apply;
+      }
+      if (!item.canSend) return RoomGiftBuyAction.blocked;
+      return RoomGiftBuyAction.send;
+    }
+    final gift = currentGift;
+    if (gift == null) return RoomGiftBuyAction.blocked;
+    if (!hasRightSend) return RoomGiftBuyAction.unlock;
+    return RoomGiftBuyAction.send;
+  }
+
+  String get unlockLabel {
+    final name = currentGift?.knightName.trim() ?? '';
+    return name.isEmpty ? 'Unlock' : '$name unlock';
+  }
+
+  /// 特权卡说明。对齐 joyride `CommodityItem.desc`。
+  String get privilegeHint {
+    final item = currentBagItem;
+    if (item == null || item.type != CommodityType.BENEFIT_CARD) return '';
+    return switch (item.subType) {
+      1 => 'Use the megaphone to broadcast to all rooms.',
+      2 => 'Apply a colored nickname style.',
+      3 => 'Apply a rainbow nickname style.',
+      4 => 'Send a floating message in the room.',
+      _ => '',
+    };
+  }
+
   /// 是否可选中礼物并点 Gift；未选收礼人时仍可点，由 [send] 提示。
   bool get canDispatch {
     if (sending.value) return false;
+    if (buyAction != RoomGiftBuyAction.send) return false;
     if (isBagTab) {
       final item = currentBagItem;
       return item != null && item.canSend && item.num > 0;
     }
-    return currentGift != null;
+    return currentGift != null && hasRightSend;
   }
 
   @override
@@ -246,9 +316,20 @@ class RoomGiftLogic extends GetxController {
     return _sendCashGift();
   }
 
+  /// 发送房间飘屏（特权卡 subType=4）。
+  Future<ApiResult<void>> sendRoomFloatMsg(String content) async {
+    final channel = int.tryParse(channelId.trim()) ?? rid;
+    final res = await ChimoApis.room.sendRoomFloatMsg(channel: channel, content: content);
+    if (!res.ok) return ApiResult.fail(res.message);
+    return ApiResult.ok();
+  }
+
   Future<RoomGiftDispatch> _sendCashGift() async {
     final gift = currentGift;
     if (gift == null) return const RoomGiftDispatch.fail('No gifts available');
+    if (!hasRightSend) {
+      return const RoomGiftDispatch.fail('Unlock this gift first');
+    }
     final count = qty.value;
     final total = gift.price.toInt() * count * selectedUids.length;
     if (balance.value < total) {
@@ -292,6 +373,10 @@ class RoomGiftLogic extends GetxController {
   Future<RoomGiftDispatch> _sendBag() async {
     final item = currentBagItem;
     if (item == null) return const RoomGiftDispatch.fail('No gifts available');
+    if (item.type == CommodityType.BLIND_BOX ||
+        (item.type == CommodityType.BENEFIT_CARD && item.subType > 0)) {
+      return const RoomGiftDispatch.fail('This item cannot be sent');
+    }
     if (!item.canSend) {
       return const RoomGiftDispatch.fail('This item cannot be sent');
     }

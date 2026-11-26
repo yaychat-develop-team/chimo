@@ -42,8 +42,6 @@ class AuctionMicArea extends StatelessWidget {
       final seats = mic.seats.toList();
       final artist = seats.length > 1 ? seats[1] : MicSeat(index: 1);
       final emotes = Map<int, String>.from(mic.micEmotes);
-      auction.info.value;
-      auction.busy.value;
       return Padding(
         padding: EdgeInsets.only(top: 8.w),
         child: Stack(

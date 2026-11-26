@@ -14,11 +14,15 @@ class RoomGiftCashGrid extends StatelessWidget {
     required this.gifts,
     required this.selected,
     required this.onSelect,
+    this.isLocked,
   });
 
   final List<ItemInfo> gifts;
   final int selected;
   final ValueChanged<int> onSelect;
+
+  /// 爵位锁判断；为空则不显示锁。
+  final bool Function(ItemInfo gift)? isLocked;
 
   @override
   Widget build(BuildContext context) {
@@ -42,6 +46,7 @@ class RoomGiftCashGrid extends StatelessWidget {
       itemBuilder: (context, index) {
         final gift = gifts[index];
         final on = index == selected;
+        final locked = isLocked?.call(gift) ?? false;
         return GestureDetector(
           onTap: () => onSelect(index),
           child: Container(
@@ -53,52 +58,140 @@ class RoomGiftCashGrid extends StatelessWidget {
               ),
               color: on ? AppColors.black2A2A2A.withValues(alpha: 0.55) : null,
             ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+            child: Stack(
+              clipBehavior: Clip.none,
               children: [
-                Chimo.image(
-                  gift.icon,
-                  width: 56.w,
-                  height: 56.w,
-                  fit: BoxFit.contain,
-                  error: const Text('🎁', style: TextStyle(fontSize: 28)),
-                ),
-                const SizedBox(height: 4),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: Text(
-                    gift.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: AppColors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
+                Positioned.fill(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Opacity(
+                        opacity: locked ? 0.3 : 1,
+                        child: Chimo.image(
+                          gift.icon,
+                          width: 56.w,
+                          height: 56.w,
+                          fit: BoxFit.contain,
+                          error: const Text('🎁', style: TextStyle(fontSize: 28)),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Opacity(
+                        opacity: locked ? 0.5 : 1,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: Text(
+                            gift.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: AppColors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Opacity(
+                        opacity: locked ? 0.3 : 1,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Chimo.image(AppAssets.coin, width: 12, height: 12),
+                            const SizedBox(width: 3),
+                            Text(
+                              '${gift.price}',
+                              style: const TextStyle(
+                                color: AppColors.gray9A9A9A,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 2),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Chimo.image(AppAssets.coin, width: 12, height: 12),
-                    const SizedBox(width: 3),
-                    Text(
-                      '${gift.price}',
-                      style: const TextStyle(
-                        color: AppColors.gray9A9A9A,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
+                if (gift.corner.isNotEmpty)
+                  PositionedDirectional(
+                    top: 0,
+                    end: 0,
+                    child: Chimo.image(gift.corner, height: 20, fit: BoxFit.fitHeight),
+                  )
+                else if (gift.hasBoxMaxItem())
+                  const PositionedDirectional(top: 0, end: 0, child: _LuckyTag())
+                else if (gift.type == ItemInfo_Type.vip)
+                  const PositionedDirectional(top: 0, end: 0, child: _VipTag()),
+                if (locked)
+                  const PositionedDirectional(
+                    start: 6,
+                    top: 6,
+                    child: Icon(Icons.lock, color: AppColors.white, size: 12),
+                  ),
               ],
             ),
           ),
         );
       },
+    );
+  }
+}
+
+class _LuckyTag extends StatelessWidget {
+  const _LuckyTag();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 14,
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      decoration: const BoxDecoration(
+        borderRadius: BorderRadiusDirectional.only(
+          topStart: Radius.circular(8),
+          bottomStart: Radius.circular(3),
+          topEnd: Radius.circular(7),
+          bottomEnd: Radius.circular(7),
+        ),
+        gradient: LinearGradient(colors: [Color(0xFFEB436C), Color(0xFFFF5C24)]),
+      ),
+      alignment: Alignment.center,
+      child: const Text(
+        'Lucky',
+        style: TextStyle(color: AppColors.white, fontSize: 9, fontWeight: FontWeight.w500),
+      ),
+    );
+  }
+}
+
+class _VipTag extends StatelessWidget {
+  const _VipTag();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 36,
+      height: 14,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFFFFF7E), Color(0xFFFFBD0E)],
+          begin: AlignmentDirectional.topStart,
+          end: AlignmentDirectional.bottomStart,
+        ),
+        borderRadius: BorderRadiusDirectional.only(
+          topStart: Radius.circular(7),
+          topEnd: Radius.circular(7),
+          bottomStart: Radius.circular(2),
+          bottomEnd: Radius.circular(7),
+        ),
+      ),
+      alignment: Alignment.center,
+      child: const Text(
+        'VIP',
+        style: TextStyle(color: Color(0xFF7D2729), fontSize: 9, fontWeight: FontWeight.w500),
+      ),
     );
   }
 }
@@ -236,6 +329,10 @@ class RoomGiftBagGrid extends StatelessWidget {
     return '${days}d';
   }
 
+  static bool isPrivilegeCard(CommodityItem item) {
+    return item.type == CommodityType.BENEFIT_CARD && item.subType > 0;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (loading && items.isEmpty) {
@@ -269,6 +366,7 @@ class RoomGiftBagGrid extends StatelessWidget {
       itemBuilder: (context, index) {
         final item = items[index];
         final on = index == selected;
+        final privilege = isPrivilegeCard(item);
         return GestureDetector(
           onTap: () => onSelect(index),
           child: Container(
@@ -298,7 +396,7 @@ class RoomGiftBagGrid extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(horizontal: 4),
                         child: Text(
                           item.name,
-                          maxLines: 1,
+                          maxLines: privilege ? 2 : 1,
                           overflow: TextOverflow.ellipsis,
                           textAlign: TextAlign.center,
                           style: const TextStyle(
@@ -308,7 +406,7 @@ class RoomGiftBagGrid extends StatelessWidget {
                           ),
                         ),
                       ),
-                      if (item.type != CommodityType.GIFT) ...[
+                      if (item.type != CommodityType.GIFT && !privilege) ...[
                         const SizedBox(height: 2),
                         Text(
                           validityLabel(item),
@@ -324,7 +422,7 @@ class RoomGiftBagGrid extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (item.num > 1)
+                if (item.num > 1 && !privilege)
                   Positioned(
                     right: 4,
                     top: 4,

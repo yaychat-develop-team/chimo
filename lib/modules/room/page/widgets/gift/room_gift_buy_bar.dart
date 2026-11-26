@@ -4,9 +4,10 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../../../app/app_jumper.dart';
 import '../../../../../common/constants/app_assets.dart';
 import '../../../../../common/theme/app_colors.dart';
+import '../../../logic/room_gift_logic.dart';
 import 'package:chimo/common/utils/chimo.dart';
 
-/// 礼物面板底栏：余额 + 充值 + 数量/Gift 胶囊。
+/// 礼物面板底栏：余额 + 充值 + 按 [action] 切换 Gift / Unlock / Open / Apply。
 class RoomGiftBuyBar extends StatelessWidget {
   const RoomGiftBuyBar({
     super.key,
@@ -15,9 +16,14 @@ class RoomGiftBuyBar extends StatelessWidget {
     required this.qty,
     required this.busy,
     required this.sending,
-    required this.canSend,
+    required this.action,
+    required this.unlockLabel,
+    this.applyHint = '',
     required this.onPickQty,
     required this.onSend,
+    required this.onUnlock,
+    required this.onOpen,
+    required this.onApply,
   });
 
   final double bottomInset;
@@ -25,15 +31,30 @@ class RoomGiftBuyBar extends StatelessWidget {
   final int qty;
   final bool busy;
   final bool sending;
-  final bool canSend;
+  final RoomGiftBuyAction action;
+  final String unlockLabel;
+  final String applyHint;
   final VoidCallback onPickQty;
   final VoidCallback onSend;
+  final VoidCallback onUnlock;
+  final VoidCallback onOpen;
+  final VoidCallback onApply;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: EdgeInsets.fromLTRB(16, 8, 16, 12 + bottomInset),
-      color: AppColors.rgba(21, 21, 35, 1),
+      // 半透明渐变，让下方 Lucky tips 上沿仍可见（对齐 joyride buyPanel）。
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            AppColors.rgba(21, 21, 35, 0.55),
+            AppColors.rgba(21, 21, 35, 1),
+          ],
+        ),
+      ),
       child: Row(
         children: [
           Chimo.image(AppAssets.coin, width: 18, height: 18),
@@ -64,20 +85,104 @@ class RoomGiftBuyBar extends StatelessWidget {
             ),
           ),
           const Spacer(),
-          if (!canSend)
-            const Text(
-              'This item cannot be sent',
-              style: TextStyle(color: AppColors.gray9A9A9A, fontSize: 12),
-            )
-          else
-            _QtyGiftPill(
-              qty: qty,
-              busy: busy,
-              sending: sending,
-              onPickQty: onPickQty,
-              onSend: onSend,
-            ),
+          _trailing(),
         ],
+      ),
+    );
+  }
+
+  Widget _trailing() {
+    switch (action) {
+      case RoomGiftBuyAction.blocked:
+        return const Text(
+          'This item cannot be sent',
+          style: TextStyle(color: AppColors.gray9A9A9A, fontSize: 12),
+        );
+      case RoomGiftBuyAction.unlock:
+        return GestureDetector(
+          onTap: onUnlock,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            decoration: const ShapeDecoration(
+              shape: StadiumBorder(),
+              gradient: LinearGradient(colors: [Color(0xFFF7D7B9), Color(0xFFE7B07E)]),
+            ),
+            child: Text(
+              unlockLabel,
+              style: TextStyle(
+                color: const Color(0xFF3E2C1E),
+                fontSize: 13.sp,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        );
+      case RoomGiftBuyAction.open:
+        return _ActionButton(label: 'Open', onTap: onOpen, busy: sending);
+      case RoomGiftBuyAction.apply:
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (applyHint.isNotEmpty) ...[
+              SizedBox(
+                width: 120.w,
+                child: Text(
+                  applyHint,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: AppColors.white70, fontSize: 11.sp),
+                ),
+              ),
+              SizedBox(width: 12.w),
+            ],
+            _ActionButton(label: 'Apply', onTap: onApply, busy: sending),
+          ],
+        );
+      case RoomGiftBuyAction.send:
+        return _QtyGiftPill(
+          qty: qty,
+          busy: busy,
+          sending: sending,
+          onPickQty: onPickQty,
+          onSend: onSend,
+        );
+    }
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  const _ActionButton({required this.label, required this.onTap, required this.busy});
+
+  final String label;
+  final VoidCallback onTap;
+  final bool busy;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: busy ? null : onTap,
+      child: Container(
+        height: 32.w,
+        width: 72.w,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          gradient: LinearGradient(colors: [AppColors.green00FEA8, AppColors.green00F875]),
+        ),
+        child: busy
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.black),
+              )
+            : Text(
+                label,
+                style: TextStyle(
+                  color: AppColors.black1F2518,
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
       ),
     );
   }

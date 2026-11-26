@@ -19,10 +19,10 @@ class CpOverlay extends StatelessWidget {
     if (!Get.isRegistered<CpLogic>()) return const SizedBox.shrink();
     final logic = Get.find<CpLogic>();
     return Obx(() {
-      logic.info.value;
       final pair = logic.pairEffect.value;
       final stage = logic.stage;
-      final end = logic.info.value.hasEndInfo() ? logic.info.value.endInfo : null;
+      final info = logic.info.value;
+      final end = info.hasEndInfo() ? info.endInfo : null;
       return Stack(
         fit: StackFit.expand,
         children: [

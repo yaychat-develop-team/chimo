@@ -68,10 +68,6 @@ class RoomInputBar extends StatelessWidget {
     final room = RoomService.findOrNull();
     if (room == null) return const SizedBox.shrink();
     return Obx(() {
-      room.freePub.value;
-      room.role.value;
-      room.waitQueue.length;
-      room.carOwnerMicQueue.length;
       if (!room.isStaff || room.freePub.value) return const SizedBox.shrink();
       final count = room.waitQueue.length + room.carOwnerMicQueue.length;
       return Padding(

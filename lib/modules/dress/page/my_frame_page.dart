@@ -95,8 +95,7 @@ class _MyFramePageState extends State<MyFramePage> with SingleTickerProviderStat
             ),
           );
         }
-        // tabs / TabController 由 ever + setState 同步；这里只读 loading/error，避免整页 TabBarView 被列表刷新拖垮。
-        logic.tabs.length;
+        // tabs / TabController 由 ever + setState 同步；这里只读 loading/error，避免整页被列表刷新拖垮。
         return _FrameBody(logic: logic, controller: _tabController);
       }),
     );

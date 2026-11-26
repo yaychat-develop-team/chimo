@@ -28,10 +28,10 @@ class CpMicHands extends StatelessWidget {
     final logic = Get.find<CpLogic>();
     final mic = Get.find<MicLogic>();
     return Obx(() {
-      logic.info.value;
       final seats = List<MicSeat>.from(mic.seats);
       final emotes = Map<int, String>.from(mic.micEmotes);
-      final hands = logic.info.value.hasHandsInfo() ? logic.info.value.handsInfo : CPHandsInfo();
+      final info = logic.info.value;
+      final hands = info.hasHandsInfo() ? info.handsInfo : CPHandsInfo();
       final pair = _resolvePair(logic, seats, hands);
       return Column(
         mainAxisSize: MainAxisSize.min,

@@ -10,6 +10,7 @@ import '../../../common/models/server_client/message.pb.dart';
 import '../../../common/models/server_client/message_api.pb.dart';
 import '../../../common/models/server_client/mic_tool.pb.dart';
 import '../../../common/models/server_client/room/base.pb.dart';
+import '../../../common/models/server_client/room_float_msg.pb.dart';
 import '../../../common/models/server_client/rtc.pb.dart';
 import '../../../common/models/server_client/super_admin.pb.dart';
 import '../../../common/models/server_client/user.pb.dart';
@@ -520,6 +521,21 @@ class RoomApi {
   /// 开始转动转盘。对齐 joyride `TurntableApi.start`。
   Future<ApiResult<void>> startTurntable(int rid) {
     return Http.ins.postAndParse('/room-turntable/start?rid=$rid');
+  }
+
+  /// 房间飘屏。对齐 joyride `PrivilegeApi.sendRoomFloatMsg`。
+  Future<ApiResult<SendRoomFloatMsgRsp>> sendRoomFloatMsg({
+    required int channel,
+    required String content,
+  }) {
+    return Http.ins.postAndParse<SendRoomFloatMsgRsp>(
+      '/room/float-msg/send',
+      data: SendRoomFloatMsgReq(
+        channel: Int64(channel),
+        content: content,
+      ),
+      options: _jsonBody,
+    );
   }
 
   Future<ApiResult<void>> _verb(String method, String path) async {

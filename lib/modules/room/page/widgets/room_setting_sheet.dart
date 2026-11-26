@@ -42,12 +42,6 @@ class _RoomSettingSheet extends StatelessWidget {
     final bottom = MediaQuery.paddingOf(context).bottom;
     final maxH = MediaQuery.sizeOf(context).height * 0.8;
     return Obx(() {
-      service.title.value;
-      service.theme.value;
-      service.notice.value;
-      service.layoutName.value;
-      service.freePub.value;
-      service.showRoomOwner.value;
       return DecoratedBox(
         decoration: const BoxDecoration(
           color: AppColors.black1C1C1E,

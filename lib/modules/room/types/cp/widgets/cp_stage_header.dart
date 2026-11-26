@@ -2,10 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 
-import '../../../../../common/constants/app_assets.dart';
 import '../../../../../common/models/server_client/room_cp.pb.dart';
 import '../../../../../common/theme/app_colors.dart';
-import '../../../../../common/utils/chimo.dart';
 import '../../../logic/mic_logic.dart';
 import '../../../model/mic_seat.dart';
 import '../logic/cp_logic.dart';
@@ -38,7 +36,6 @@ class CpStageHeader extends StatelessWidget {
     final logic = Get.find<CpLogic>();
     final mic = Get.find<MicLogic>();
     return Obx(() {
-      logic.info.value;
       final seats = List<MicSeat>.from(mic.seats);
       final emotes = Map<int, String>.from(mic.micEmotes);
       final stage = logic.stage;

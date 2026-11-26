@@ -94,8 +94,6 @@ class _ManageHonorsPageState extends State<ManageHonorsPage> {
       backgroundColor: AppColors.black,
       body: Obx(() {
         final items = logic.activeList.toList(growable: false);
-        // 列表刷新后校正选中（卸下失败重载等）。
-        logic.activeList.length;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [

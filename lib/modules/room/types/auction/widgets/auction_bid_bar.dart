@@ -18,8 +18,7 @@ class AuctionBidBar extends StatelessWidget {
     if (!Get.isRegistered<AuctionLogic>()) return const SizedBox.shrink();
     final logic = Get.find<AuctionLogic>();
     return Obx(() {
-      logic.info.value;
-      logic.needShowMicTips.value;
+      // showBidBtn 依赖 info；座位变化时嘉宾态也需刷新。
       if (Get.isRegistered<MicLogic>()) {
         Get.find<MicLogic>().seats.toList();
       }

@@ -40,12 +40,12 @@ class CpMicIntroduce extends StatelessWidget {
     final logic = Get.find<CpLogic>();
     final mic = Get.find<MicLogic>();
     return Obx(() {
-      logic.info.value;
       final showHot = RoomService.findOrNull()?.giftValueCountSwitch.value ?? false;
       final seats = List<MicSeat>.from(mic.seats);
       final emotes = Map<int, String>.from(mic.micEmotes);
-      final List<CPNewHotItem> hotItems = logic.info.value.hasHotInfo()
-          ? logic.info.value.hotInfo.newItems.toList()
+      final info = logic.info.value;
+      final List<CPNewHotItem> hotItems = info.hasHotInfo()
+          ? info.hotInfo.newItems.toList()
           : const <CPNewHotItem>[];
       final children = <Widget>[
         Chimo.image(AppAssets.cpMainBg, width: 280, height: 246),

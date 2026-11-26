@@ -41,18 +41,6 @@ class _RoomToolsSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final bottom = MediaQuery.paddingOf(context).bottom;
     return Obx(() {
-      // 订阅会变状态。
-      service.saved.value;
-      service.isRoomClosed;
-      service.freePublicChat.value;
-      service.giftValueCountSwitch.value;
-      service.hasRoomTimer;
-      service.showRoomOwner.value;
-      if (Get.isRegistered<MicLogic>()) Get.find<MicLogic>().seats.length;
-      if (Get.isRegistered<TurntableLogic>()) {
-        Get.find<TurntableLogic>().enabled;
-      }
-
       final items = service.isSuperAdmin ? _superItems() : _normalItems();
 
       return DecoratedBox(

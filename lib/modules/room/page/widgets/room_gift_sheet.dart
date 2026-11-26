@@ -3,12 +3,15 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 
 import '../../../../app/app_jumper.dart';
+import '../../../../app/session_info.dart';
 import '../../../../common/constants/app_assets.dart';
 import '../../../../common/models/server_client/cash.pb.dart';
+import '../../../../common/models/server_client/commodity.pb.dart';
 import '../../../../common/theme/app_colors.dart';
 import '../../../../common/utils/app_log.dart';
 import '../../../../common/utils/app_toast.dart';
 import '../../../../common/widgets/app_blur_backdrop.dart';
+import 'package:chimo/common/utils/chimo.dart';
 import '../../logic/mic_logic.dart';
 import '../../logic/room_effect_logic.dart';
 import '../../logic/room_gift_logic.dart';
@@ -16,8 +19,10 @@ import '../../model/mic_seat.dart';
 import '../../model/room_gift_receiver.dart';
 import '../../service/room_service.dart';
 import '../../types/heart_link/logic/heart_link_logic.dart';
+import 'gift/room_gift_blind_box_dialog.dart';
 import 'gift/room_gift_buy_bar.dart';
 import 'gift/room_gift_grids.dart';
+import 'gift/room_gift_lucky_buff.dart';
 import 'gift/room_gift_receivers_bar.dart';
 
 /// 私聊送礼成功结果，供聊天页插礼物气泡。
@@ -84,6 +89,8 @@ Future<void> showRoomGiftSheet(
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     barrierColor: Colors.transparent,
+    // LuckyBuff 在卡片外并下移叠边，勿裁切。
+    clipBehavior: Clip.none,
     builder: (_) => RoomGiftSheet(
       rid: service.rid,
       channelId: '${service.rid}',
@@ -131,6 +138,11 @@ class RoomGiftSheet extends StatefulWidget {
 
 class _RoomGiftSheetState extends State<RoomGiftSheet> with SingleTickerProviderStateMixin {
   static const _panelH = 360.0;
+
+  /// 底栏内容高度（不含安全区）：padding 8+12 + 按钮 32。
+  /// 目录区底部留白，避免最后一行被底栏挡住。
+  static const _buyBarContentH = 52.0;
+
   late final String _tag;
   late final RoomGiftLogic logic;
   late final Worker _tabsWorker;
@@ -305,89 +317,191 @@ class _RoomGiftSheetState extends State<RoomGiftSheet> with SingleTickerProvider
 
   @override
   Widget build(BuildContext context) {
-    final bottom = MediaQuery.paddingOf(context).bottom;
-    // 毛玻璃壳不进 Obx：余额 / 选中 / 页签变化只刷局部，避免整板重建。
-    return AppBlurBackdrop(
-      blur: 28,
-      color: AppColors.black111DE5.withValues(alpha: 0.9),
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // 对齐 joyride showUserList：仅房间且有收礼人时展示顶部 To 区。
-          if (widget.isRoomScene && widget.receivers.isNotEmpty) ...[
-            Obx(
-              () => RoomGiftReceiversBar(
-                receivers: widget.receivers,
-                selectedUids: logic.selectedUids.toSet(),
-                allSelected: logic.allSelected,
-                onToggleUser: logic.toggleUser,
-                onToggleAll: logic.toggleAll,
-              ),
-            ),
-            const Divider(
-              color: AppColors.white12,
-              indent: 12,
-              endIndent: 12,
-              thickness: 1,
-              height: 1,
-            ),
-          ],
-          SizedBox(
-            height: _panelH,
-            child: Stack(
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+    final bottom = Get.mediaQuery.padding.bottom;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Obx(() {
+          final gift = logic.isBagTab ? null : logic.currentGift;
+          if (gift == null || !gift.hasBoxMaxItem()) return const SizedBox.shrink();
+          return RoomGiftLuckyBuff(box: gift);
+        }),
+        AppBlurBackdrop(
+          blur: 28,
+          color: AppColors.black111DE5.withValues(alpha: 0.9),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 对齐 joyride showUserList：仅房间且有收礼人时展示顶部 To 区。
+              if (widget.isRoomScene && widget.receivers.isNotEmpty) ...[
+                Obx(
+                  () => RoomGiftReceiversBar(
+                    receivers: widget.receivers,
+                    selectedUids: logic.selectedUids.toSet(),
+                    allSelected: logic.allSelected,
+                    onToggleUser: logic.toggleUser,
+                    onToggleAll: logic.toggleAll,
+                  ),
+                ),
+                const Divider(
+                  color: AppColors.white12,
+                  indent: 12,
+                  endIndent: 12,
+                  thickness: 1,
+                  height: 1,
+                ),
+              ],
+              // 目录铺满；tips / buyBar 叠在 Stack 底部。
+              SizedBox(
+                height: _panelH,
+                child: Stack(
                   children: [
-                    Obx(() {
-                      logic.tabs.length;
-                      logic.tabIndex.value;
-                      return _tabBar();
-                    }),
-                    Expanded(
-                      child: Obx(() {
-                        logic.tabs.length;
-                        logic.tabIndex.value;
-                        logic.giftIndex.value;
-                        logic.bagIndex.value;
-                        logic.bagItems.length;
-                        logic.bagLoading.value;
-                        logic.loading.value;
-                        logic.loadError.value;
-                        return _catalog();
-                      }),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Obx(_tabBar),
+                        Expanded(
+                          child: Padding(
+                            padding: EdgeInsets.only(bottom: _buyBarContentH + bottom),
+                            child: Obx(_catalog),
+                          ),
+                        ),
+                      ],
                     ),
-                    Obx(
-                      () => RoomGiftBuyBar(
-                        bottomInset: bottom,
-                        balance: logic.balance.value,
-                        qty: logic.qty.value,
-                        busy: !logic.canDispatch,
-                        sending: logic.sending.value,
-                        canSend: !logic.isBagTab ||
-                            (logic.currentBagItem != null &&
-                                logic.currentBagItem!.canSend),
-                        onPickQty: _pickQty,
-                        onSend: () => _send(),
+                    Obx(() => _specialTips(bottom)),
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: Obx(
+                        () => RoomGiftBuyBar(
+                          bottomInset: bottom,
+                          balance: logic.balance.value,
+                          qty: logic.qty.value,
+                          busy: !logic.canDispatch,
+                          sending: logic.sending.value,
+                          action: logic.buyAction,
+                          unlockLabel: logic.unlockLabel,
+                          applyHint: logic.privilegeHint,
+                          onPickQty: _pickQty,
+                          onSend: () => _send(),
+                          onUnlock: _onUnlock,
+                          onOpen: _onOpenBlindBox,
+                          onApply: _onApplyPrivilege,
+                        ),
                       ),
                     ),
                   ],
                 ),
-                // 对齐 oumi GiftPage._renderTipsWidget showHtTips。
-                Obx(() {
-                  logic.selectedUids.length;
-                  logic.giftIndex.value;
-                  logic.tabIndex.value;
-                  if (!_showHtTips) return const SizedBox.shrink();
-                  return _htGiftTips(bottom);
-                }),
-              ],
-            ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _onUnlock() {
+    final user = SessionInfo.currentUser;
+    _closeSheet();
+    AppJumper.toLevel(
+      level: user?.vipLevel ?? 0,
+      experience: user?.experience.toInt() ?? 0,
+      moreExpForNextLevel: user?.moreExpForNextLevel.toInt() ?? 0,
+      totalExperience: user?.totalExperience.toInt() ?? 0,
+    );
+  }
+
+  Future<void> _onOpenBlindBox() async {
+    final item = logic.currentBagItem;
+    if (item == null || item.type != CommodityType.BLIND_BOX) return;
+    final opened = await RoomGiftBlindBoxDialog.show(item.id);
+    if (opened) await logic.loadBag();
+  }
+
+  Future<void> _onApplyPrivilege() async {
+    final item = logic.currentBagItem;
+    if (item == null || item.type != CommodityType.BENEFIT_CARD) return;
+    final subType = item.subType;
+    if (subType == 4) {
+      if (!widget.isRoomScene) {
+        AppToast.info('Enter a room to use this card');
+        return;
+      }
+      // 先发飘屏再关面板，避免 dispose 后 Logic 已删。
+      await _showFloatMsgInput();
+      if (mounted) _closeSheet();
+      return;
+    }
+    _closeSheet();
+    // 喇叭 / 彩名 / 炫彩依赖独立页与 H5，尚未接入。
+    AppToast.info('Coming soon');
+  }
+
+  Future<void> _showFloatMsgInput() async {
+    final controller = TextEditingController();
+    final text = await Get.dialog<String>(
+      AlertDialog(
+        backgroundColor: AppColors.black2A2A2A,
+        title: const Text('Floating Message', style: TextStyle(color: AppColors.white)),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLength: 60,
+          style: const TextStyle(color: AppColors.white),
+          decoration: const InputDecoration(
+            hintText: 'Enter message',
+            hintStyle: TextStyle(color: AppColors.gray9A9A9A),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Get.back<String>(), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Get.back<String>(result: controller.text.trim()),
+            child: const Text('Send'),
           ),
         ],
       ),
     );
+    controller.dispose();
+    if (text == null || text.isEmpty) return;
+    final res = await logic.sendRoomFloatMsg(text);
+    if (res.ok) {
+      AppToast.info('Sent');
+    } else {
+      AppToast.info(res.message.isEmpty ? 'Send failed' : res.message);
+    }
+  }
+
+  /// Lucky / Tricky / Heartie tips。
+  /// 对齐 joyride：`bottom: 24 + safeArea`，tips 中部条落在 Gift 按钮上方；底栏后绘不挡点击。
+  Widget _specialTips(double bottomInset) {
+    if (logic.isBagTab) return const SizedBox.shrink();
+    final item = logic.currentGift;
+    if (item == null) return const SizedBox.shrink();
+    final tipBottom = 24.0 + bottomInset;
+    if (item.hasBoxMaxItem()) {
+      return Positioned(
+        left: 0,
+        right: 0,
+        bottom: tipBottom,
+        // 勿整层 IgnorePointer：右侧问号要可点（闪电图标在 tips 内部已 IgnorePointer）。
+        child: RoomGiftLuckyTips(boxMaxItem: item.boxMaxItem, payCurrency: item.payCurrency),
+      );
+    }
+    if (item.hasTrickyConfig() && item.trickyConfig.items.isNotEmpty) {
+      final pic = item.trickyConfig.items.first.pic.trim();
+      if (pic.isEmpty) return const SizedBox.shrink();
+      return Positioned(
+        left: 0,
+        right: 0,
+        bottom: tipBottom,
+        child: IgnorePointer(child: Chimo.image(pic, fit: BoxFit.fitWidth)),
+      );
+    }
+    if (_showHtTips) return _htGiftTips(tipBottom);
+    return const SizedBox.shrink();
   }
 
   /// 对齐 oumi `GiftPageModel.showHtTips`：房间场景 + 已选收礼人 + 当前礼物为牵手礼物。
@@ -413,15 +527,15 @@ class _RoomGiftSheetState extends State<RoomGiftSheet> with SingleTickerProvider
     return 'her';
   }
 
-  /// Heartie 牵手礼物悬浮提示。
-  Widget _htGiftTips(double bottomInset) {
+  /// Heartie 牵手礼物悬浮提示。[tipBottom] 已含赠送栏高度。
+  Widget _htGiftTips(double tipBottom) {
     final name = _htTipsName;
     final text = 'Send this gift to partner up with $name and enjoy exclusive features';
     final nameIndex = text.indexOf(name);
     return Positioned(
       left: 0,
       right: 0,
-      bottom: 32 + bottomInset,
+      bottom: tipBottom,
       child: IgnorePointer(
         child: Container(
           width: double.infinity,
@@ -538,6 +652,7 @@ class _RoomGiftSheetState extends State<RoomGiftSheet> with SingleTickerProvider
       gifts: logic.currentGifts,
       selected: logic.giftIndex.value,
       onSelect: logic.selectGift,
+      isLocked: logic.isGiftLocked,
     );
   }
 }

@@ -18,8 +18,6 @@ class CpActionBottom extends StatelessWidget {
     if (!Get.isRegistered<CpLogic>()) return const SizedBox.shrink();
     final logic = Get.find<CpLogic>();
     return Obx(() {
-      logic.info.value;
-      logic.busy.value;
       final stage = logic.stage;
       final admin = logic.isCpAdmin;
       final joined = logic.onMic;

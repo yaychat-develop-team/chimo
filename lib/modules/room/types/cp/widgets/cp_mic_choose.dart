@@ -39,12 +39,10 @@ class CpMicChoose extends StatelessWidget {
     final logic = Get.find<CpLogic>();
     final mic = Get.find<MicLogic>();
     return Obx(() {
-      logic.info.value;
       final seats = List<MicSeat>.from(mic.seats);
       final emotes = Map<int, String>.from(mic.micEmotes);
-      final choose = logic.info.value.hasChooseInfo()
-          ? logic.info.value.chooseInfo
-          : CPChooseInfo();
+      final info = logic.info.value;
+      final choose = info.hasChooseInfo() ? info.chooseInfo : CPChooseInfo();
       final pairs = _buildPairs(logic, mic, choose, seats, emotes);
       return SizedBox(
         width: 310.w,

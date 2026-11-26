@@ -14,8 +14,8 @@ class TurntableEntry extends StatelessWidget {
     if (!Get.isRegistered<TurntableLogic>()) return const SizedBox.shrink();
     final logic = Get.find<TurntableLogic>();
     return Obx(() {
+      // tick：_info 非 obs，靠 tick 驱动展开/收起后的入口刷新。
       logic.tick.value;
-      logic.visible.value;
       if (!logic.enabled || logic.visible.value) return const SizedBox.shrink();
       return GestureDetector(
         onTap: logic.reveal,
