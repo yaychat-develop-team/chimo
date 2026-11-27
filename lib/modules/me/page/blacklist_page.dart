@@ -2,7 +2,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../../common/constants/app_assets.dart';
 import '../../../common/theme/app_colors.dart';
+import '../../../common/widgets/app_empty_holder.dart';
 import '../../../common/widgets/app_image.dart';
 import '../../../common/widgets/app_pull_refresh.dart';
 import '../../../common/widgets/app_scaffold.dart';
@@ -26,15 +28,10 @@ class BlacklistPage extends GetView<BlacklistLogic> {
 
     final Widget sliver;
     if (users.isEmpty && !loading) {
-      sliver = const SliverFillRemaining(
-        hasScrollBody: false,
-        child: Center(
-          child: Text(
-            'No blocked users',
-            style: TextStyle(color: AppColors.gray9A9A9A),
-          ),
-        ),
-      );
+      sliver = const AppEmptyHolder.empty(
+        message: 'No blocked users',
+        icon: AppAssets.friendsEmpty,
+      ).asSliver;
     } else {
       sliver = SliverPadding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),

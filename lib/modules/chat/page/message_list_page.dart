@@ -8,6 +8,7 @@ import 'package:get/get.dart';
 import '../../../app/app_jumper.dart';
 import '../../../common/constants/app_assets.dart';
 import '../../../common/theme/app_colors.dart';
+import '../../../common/widgets/app_empty_holder.dart';
 import '../../../common/widgets/app_pull_refresh.dart';
 import '../../../common/widgets/line_loading_bar.dart';
 import '../../heart_link/widgets/heart_link_relation_section.dart';
@@ -123,25 +124,7 @@ class _MessageListPageState extends State<MessageListPage> {
 Widget _empty(ConversationListLogic logic) {
   final error = logic.loadError;
   if (error == null) return const ChatsEmptyState();
-  return Center(
-    child: Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            error,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: AppColors.gray9A9A9A),
-          ),
-          TextButton(
-            onPressed: () => logic.refreshFromApi(),
-            child: const Text('Retry'),
-          ),
-        ],
-      ),
-    ),
-  );
+  return AppEmptyHolder.error(message: error, onRetry: () => logic.refreshFromApi());
 }
 
 /// 消息列表顶部光晕。按原图 1024×546 撑开，避免被拉满整屏。

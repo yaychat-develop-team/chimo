@@ -1,5 +1,8 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 
 import '../../../app/app_jumper.dart';
@@ -7,223 +10,201 @@ import '../../../common/constants/app_assets.dart';
 import '../../../common/models/server_client/rtc.pb.dart';
 import '../../../common/theme/app_colors.dart';
 import '../../../common/theme/app_input.dart';
-import '../../../common/theme/app_text.dart';
-import 'package:chimo/common/utils/chimo.dart';
+import '../../../common/utils/chimo.dart';
+import '../../../common/utils/type_util.dart';
+import '../../../common/widgets/app_empty_holder.dart';
+import '../../../common/widgets/app_pull_refresh.dart';
 import '../../../common/widgets/app_scaffold.dart';
-import '../../../common/widgets/gender_age_chip.dart';
 import '../logic/user_search_logic.dart';
 import '../model/search_user.dart';
 
+/// 首页搜索。UI 对齐设计稿 + joyride `HomeSearchPage`。
 class HomeSearchPage extends GetView<UserSearchLogic> {
   const HomeSearchPage({super.key});
 
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
-      appBar: _buildAppBar(),
-      // 整页一个 Obx：原版每次 setState 也是整页重建，收窄反而改了行为。
-      body: Obx(() {
-        // 提交后显示结果 / 空态 / 加载；清空输入回到 History。
-        final showResults = controller.hasSearched.value;
-        final result = controller.result.value;
-        final room = controller.room.value;
-        final editingHistory = controller.editingHistory.value;
-        final history = controller.history.toList();
+      backgroundColor: AppColors.black0F0F0F,
+      appBar: _SearchTopBar(controller: controller),
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => controller.focusNode.unfocus(),
+        child: Obx(() {
+          final showResults = controller.hasSearched.value;
+          final result = controller.result.value;
+          final room = controller.room.value;
+          final editingHistory = controller.editingHistory.value;
+          final history = controller.history.toList();
+          final searching = controller.searching.value;
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (showResults)
-              Expanded(child: _results(result, room))
-            else ...[
-              Container(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                child: Row(
-                  children: [
-                    const Expanded(
-                      child: Text(
-                        'History',
-                        style: TextStyle(
-                          color: AppColors.gray9A9A9A,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w500,
-                        ),
+          return AppPullRefresh(
+            onRefresh: _onRefresh,
+            accentColor: AppColors.green1CFF8A,
+            padding: EdgeInsets.fromLTRB(16.w, 16.w, 16.w, 24.w),
+            header: !showResults
+                ? _HistorySection(
+                    history: history,
+                    editing: editingHistory,
+                    onEnterEdit: controller.enterEditHistory,
+                    onExitEdit: controller.exitEditHistory,
+                    onClearAll: controller.clearAllHistory,
+                    onTapItem: controller.onHistoryTap,
+                    onDeleteItem: controller.removeHistoryItem,
+                  )
+                : null,
+            slivers: [
+              if (showResults && searching)
+                const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(
+                    child: SizedBox(
+                      width: 28,
+                      height: 28,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.4,
+                        color: AppColors.green1CFF8A,
                       ),
                     ),
-                    if (editingHistory) ...[
-                      GestureDetector(
-                        onTap: controller.clearAllHistory,
-                        behavior: HitTestBehavior.opaque,
-                        child: const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-                          child: Text('Clear All', style: AppText.body),
-                        ),
-                      ),
-                      Container(
-                        width: 1,
-                        height: 12,
-                        margin: const EdgeInsets.symmetric(horizontal: 10),
-                        color: AppColors.gray333333,
-                      ),
-                      GestureDetector(
-                        onTap: controller.exitEditHistory,
-                        behavior: HitTestBehavior.opaque,
-                        child: const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-                          child: Text(
-                            'Done',
-                            style: TextStyle(
-                              color: AppColors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ] else
-                      IconButton(
-                        onPressed: history.isEmpty ? null : controller.enterEditHistory,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                        icon: Chimo.image(
-                          AppAssets.msgDelete,
-                          width: 22,
-                          height: 22,
-                          color: history.isEmpty ? AppColors.gray6E6E6E : AppColors.gray9A9A9A,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              if (history.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-                  child: Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: history
-                        .map(
-                          (item) => _HistoryChip(
-                            label: item,
-                            editing: editingHistory,
-                            onTap: () => controller.onHistoryTap(item),
-                            onDelete: () => controller.removeHistoryItem(item),
-                          ),
-                        )
-                        .toList(),
                   ),
-                ),
+                )
+              else if (result == null && room == null)
+                const AppEmptyHolder.empty(
+                  message: 'Sorry. No relevant content.',
+                  icon: AppAssets.emptyNoSearch,
+                  iconWidth: 220,
+                  messageStyle: TextStyle(
+                    color: AppColors.white70,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ).asSliver
+              else ...[
+                if (result != null)
+                  SliverToBoxAdapter(
+                    child: _UsersResult(
+                      user: result,
+                      onFollow: () => controller.follow(result),
+                      onChat: () => controller.openChat(result),
+                      onProfile: () => controller.openProfile(result),
+                    ),
+                  ),
+                if (room != null) ...[
+                  if (result != null) SliverToBoxAdapter(child: SizedBox(height: 8.w)),
+                  SliverToBoxAdapter(
+                    child: _RoomResult(room: room, onJoin: () => controller.openRoom(room)),
+                  ),
+                ],
+              ],
             ],
-          ],
-        );
-      }),
+          );
+        }),
+      ),
     );
   }
 
-  Widget _results(SearchUser? user, Channel? room) {
-    if (controller.searching.value) {
-      return const Center(
-        child: SizedBox(width: 28, height: 28, child: CircularProgressIndicator(strokeWidth: 2.4)),
-      );
+  Future<void> _onRefresh() async {
+    if (controller.hasSearched.value) {
+      await controller.submit(controller.input.text);
+    } else {
+      controller.loadHistory();
     }
-    if (user == null && room == null) return const _SearchEmptyState();
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
-      children: [
-        if (user != null)
-          _UsersResult(
-            user: user,
-            onFollow: () => controller.follow(user),
-            onChat: () => controller.openChat(user),
-            onProfile: () => controller.openProfile(user),
-          ),
-        if (room != null) ...[
-          if (user != null) const SizedBox(height: 28),
-          _RoomResult(room: room, onJoin: () => controller.openRoom(room)),
-        ],
-      ],
-    );
   }
+}
 
-  Widget _buildAppBar() {
+/// 返回 + 搜索框（内嵌绿色 Search）。对齐 joyride `JRSearchTextField(showSearchBtn: true)`。
+class _SearchTopBar extends StatelessWidget {
+  const _SearchTopBar({required this.controller});
+
+  final UserSearchLogic controller;
+
+  @override
+  Widget build(BuildContext context) {
     return SafeArea(
       bottom: false,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(16, 8, 8, 0),
+      child: SizedBox(
+        height: 48,
         child: Row(
           children: [
+            AppBackButton(
+              onBack: () {
+                controller.focusNode.unfocus();
+                AppJumper.back();
+              },
+            ),
             Expanded(
               child: Container(
-                height: 40,
-                padding: const EdgeInsets.symmetric(horizontal: 14),
+                height: 44,
+                margin: EdgeInsetsDirectional.only(end: 16.w),
+                padding: const EdgeInsetsDirectional.only(start: 12),
                 decoration: BoxDecoration(
                   color: AppColors.white10,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(22),
                 ),
                 child: Row(
                   children: [
                     Chimo.image(
                       AppAssets.msgSearch,
-                      width: 16,
-                      height: 16,
-                      color: AppColors.gray6E6E6E,
+                      width: 14,
+                      height: 14,
+                      color: AppColors.white,
                       fit: BoxFit.contain,
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: 8.w),
                     Expanded(
                       child: TextField(
                         controller: controller.input,
                         focusNode: controller.focusNode,
                         keyboardType: TextInputType.number,
-                        style: const TextStyle(color: AppColors.white, fontSize: 15),
-                        cursorColor: AppColors.green1BBA77,
+                        style: const TextStyle(
+                          color: AppColors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w400,
+                        ),
+                        cursorColor: AppColors.green1CFF8A,
                         cursorWidth: 1.5,
                         textInputAction: TextInputAction.search,
                         inputFormatters: [
                           FilteringTextInputFormatter.digitsOnly,
                           LengthLimitingTextInputFormatter(64),
                         ],
-                        onSubmitted: (value) => controller.submit(value),
+                        onSubmitted: controller.submit,
                         decoration: const AppInputDecoration(
                           isDense: true,
-                          hintText: 'Search contacts or mess...',
-                          hintStyle: TextStyle(color: AppColors.gray6E6E6E, fontSize: 15),
+                          hintText: 'Enter User ID or Room ID...',
+                          hintStyle: TextStyle(
+                            color: AppColors.white36,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w400,
+                          ),
                         ),
                       ),
                     ),
-                    ValueListenableBuilder<TextEditingValue>(
-                      valueListenable: controller.input,
-                      builder: (context, value, _) {
-                        if (value.text.isEmpty) return const SizedBox.shrink();
-                        return GestureDetector(
-                          onTap: controller.clearInput,
-                          behavior: HitTestBehavior.opaque,
-                          child: const Padding(
-                            padding: EdgeInsets.only(left: 6),
-                            child: Icon(
-                              Icons.cancel_rounded,
-                              size: 18,
-                              color: AppColors.gray6E6E6E,
+                    Padding(
+                      padding: const EdgeInsetsDirectional.only(end: 4),
+                      child: GestureDetector(
+                        onTap: () => controller.submit(controller.input.text),
+                        child: Container(
+                          width: 72,
+                          height: 34,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: AppColors.green1CFF8A,
+                            borderRadius: BorderRadius.circular(17),
+                          ),
+                          child: const Text(
+                            'Search',
+                            style: TextStyle(
+                              color: Color(0xFF111111),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
-                        );
-                      },
+                        ),
+                      ),
                     ),
                   ],
                 ),
-              ),
-            ),
-            TextButton(
-              onPressed: () => AppJumper.back(),
-              style: TextButton.styleFrom(
-                foregroundColor: AppColors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                minimumSize: const Size(0, 40),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              child: const Text(
-                'Cancel',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
               ),
             ),
           ],
@@ -233,24 +214,152 @@ class HomeSearchPage extends GetView<UserSearchLogic> {
   }
 }
 
-class _SearchEmptyState extends StatelessWidget {
-  const _SearchEmptyState();
+class _HistorySection extends StatelessWidget {
+  const _HistorySection({
+    required this.history,
+    required this.editing,
+    required this.onEnterEdit,
+    required this.onExitEdit,
+    required this.onClearAll,
+    required this.onTapItem,
+    required this.onDeleteItem,
+  });
+
+  final List<String> history;
+  final bool editing;
+  final VoidCallback onEnterEdit;
+  final VoidCallback onExitEdit;
+  final VoidCallback onClearAll;
+  final ValueChanged<String> onTapItem;
+  final ValueChanged<String> onDeleteItem;
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-        child: Column(
+    return Padding(
+      padding: EdgeInsets.all(16.w),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text(
+                'History',
+                style: TextStyle(
+                  color: AppColors.white60,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+              const Spacer(),
+              if (editing) ...[
+                GestureDetector(
+                  onTap: onClearAll,
+                  behavior: HitTestBehavior.opaque,
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                    child: Text(
+                      'Clear All',
+                      style: TextStyle(color: AppColors.white60, fontSize: 14),
+                    ),
+                  ),
+                ),
+                Container(
+                  width: 1,
+                  height: 10,
+                  margin: const EdgeInsets.symmetric(horizontal: 12),
+                  color: AppColors.gray333333,
+                ),
+                GestureDetector(
+                  onTap: onExitEdit,
+                  behavior: HitTestBehavior.opaque,
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                    child: Text(
+                      'Done',
+                      style: TextStyle(
+                        color: AppColors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ),
+              ] else
+                GestureDetector(
+                  onTap: history.isEmpty ? null : onEnterEdit,
+                  behavior: HitTestBehavior.opaque,
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: Chimo.image(
+                      AppAssets.msgDelete,
+                      width: 16,
+                      height: 16,
+                      color: history.isEmpty ? AppColors.gray6E6E6E : AppColors.white,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          if (history.isNotEmpty) ...[
+            SizedBox(height: 10.w),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                for (final item in history)
+                  _HistoryChip(
+                    label: item,
+                    editing: editing,
+                    onTap: () => onTapItem(item),
+                    onDelete: () => onDeleteItem(item),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _HistoryChip extends StatelessWidget {
+  const _HistoryChip({
+    required this.label,
+    required this.editing,
+    required this.onTap,
+    required this.onDelete,
+  });
+
+  final String label;
+  final bool editing;
+  final VoidCallback onTap;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: editing ? onDelete : onTap,
+      child: Container(
+        padding: EdgeInsetsDirectional.only(start: 16, end: editing ? 10 : 16, top: 6, bottom: 6),
+        decoration: BoxDecoration(
+          color: AppColors.white12,
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Chimo.image(AppAssets.emptyNoSearch, width: 220, height: 160, fit: BoxFit.contain),
-            const SizedBox(height: 10),
-            const Text(
-              'Sorry. No relevant content.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w500),
+            Text(
+              label,
+              style: TextStyle(
+                color: AppColors.white.withValues(alpha: 0.8),
+                fontSize: 14,
+                fontWeight: FontWeight.w400,
+              ),
             ),
+            if (editing) ...[
+              const SizedBox(width: 8),
+              Icon(Icons.close_rounded, size: 12, color: AppColors.white.withValues(alpha: 0.6)),
+            ],
           ],
         ),
       ),
@@ -278,72 +387,134 @@ class _UsersResult extends StatelessWidget {
       children: [
         const Text(
           'Users',
-          style: TextStyle(color: AppColors.white, fontSize: 17, fontWeight: FontWeight.w700),
+          style: TextStyle(color: AppColors.white, fontSize: 14, fontWeight: FontWeight.w600),
         ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            GestureDetector(
+        SizedBox(height: 12.w),
+        _UserCard(user: user, onFollow: onFollow, onChat: onChat, onProfile: onProfile),
+      ],
+    );
+  }
+}
+
+class _UserCard extends StatelessWidget {
+  const _UserCard({
+    required this.user,
+    required this.onFollow,
+    required this.onChat,
+    required this.onProfile,
+  });
+
+  final SearchUser user;
+  final VoidCallback onFollow;
+  final VoidCallback onChat;
+  final VoidCallback onProfile;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 14.w),
+      decoration: BoxDecoration(
+        color: const Color(0xFF16161D),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: onProfile,
+            behavior: HitTestBehavior.opaque,
+            child: _AvatarWithGender(user: user),
+          ),
+          SizedBox(width: 12.w),
+          Expanded(
+            child: GestureDetector(
               onTap: onProfile,
               behavior: HitTestBehavior.opaque,
-              child: ClipOval(
-                child: Chimo.image(
-                  user.avatarUrl,
-                  fallbackAsset: user.avatarAsset,
-                  width: 52,
-                  height: 52,
-                  fit: BoxFit.cover,
-                  fadeIn: Duration.zero,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    user.nickname,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  SizedBox(height: 4.w),
+                  Text(
+                    'ID: ${user.userId}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.white60,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: GestureDetector(
-                onTap: onProfile,
-                behavior: HitTestBehavior.opaque,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            user.nickname,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppText.title,
-                          ),
-                        ),
-                        if (user.hasGender) ...[
-                          const SizedBox(width: 8),
-                          GenderAgeChip(isMale: user.isMale, age: user.age),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'ID:${user.userId}',
-                      style: const TextStyle(
-                        color: AppColors.gray9A9A9A,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            if (user.relation != SearchRelation.self) ...[
-              const SizedBox(width: 10),
-              if (user.relation == SearchRelation.notFollowing)
-                _FollowAction(onTap: onFollow)
-              else
-                _ChatAction(onTap: onChat),
-            ],
+          ),
+          if (user.relation != SearchRelation.self) ...[
+            SizedBox(width: 8.w),
+            if (user.relation == SearchRelation.notFollowing)
+              _ActionPill(label: 'Follow', filled: true, onTap: onFollow)
+            else
+              _ActionPill(label: 'Chat', filled: false, onTap: onChat),
           ],
-        ),
-      ],
+        ],
+      ),
+    );
+  }
+}
+
+class _AvatarWithGender extends StatelessWidget {
+  const _AvatarWithGender({required this.user});
+
+  final SearchUser user;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 48.w,
+      height: 48.w,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          ClipOval(
+            child: Chimo.image(
+              user.avatarUrl,
+              fallbackAsset: user.avatarAsset,
+              width: 48.w,
+              height: 48.w,
+              fit: BoxFit.cover,
+              fadeIn: Duration.zero,
+            ),
+          ),
+          if (user.hasGender)
+            PositionedDirectional(
+              end: -1,
+              bottom: -1,
+              child: Container(
+                width: 16.w,
+                height: 16.w,
+                decoration: BoxDecoration(
+                  color: user.isMale ? AppColors.blue4F8BFF : AppColors.pinkFF5BA8,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFF16161D), width: 1.5),
+                ),
+                alignment: Alignment.center,
+                child: Chimo.image(
+                  user.isMale ? AppAssets.genderMan : AppAssets.genderWoman,
+                  width: 10.w,
+                  height: 10.w,
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -356,202 +527,258 @@ class _RoomResult extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final title = room.title.trim().isEmpty ? 'Room' : room.title.trim();
-    final theme = room.theme.trim();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const Text(
-          'Rooms',
-          style: TextStyle(color: AppColors.white, fontSize: 17, fontWeight: FontWeight.w700),
+          'Room',
+          style: TextStyle(color: AppColors.white, fontSize: 14, fontWeight: FontWeight.w600),
         ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            GestureDetector(
-              onTap: onJoin,
-              behavior: HitTestBehavior.opaque,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Chimo.image(
-                  room.icon,
-                  fallbackAsset: AppAssets.avatarPlace,
-                  width: 52,
-                  height: 52,
-                  fit: BoxFit.cover,
-                  fadeIn: Duration.zero,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: GestureDetector(
-                onTap: onJoin,
-                behavior: HitTestBehavior.opaque,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.title),
-                    const SizedBox(height: 6),
-                    Text(
-                      theme.isEmpty ? 'ID:${room.channelId}' : theme,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.gray9A9A9A,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            _JoinAction(onTap: onJoin),
-          ],
-        ),
+        SizedBox(height: 8.w),
+        _RoomCard(room: room, onTap: onJoin),
       ],
     );
   }
 }
 
-class _JoinAction extends StatelessWidget {
-  const _JoinAction({required this.onTap});
+/// 对齐 joyride `RoomDrawerItemWidget(darkStyle: true)`。
+class _RoomCard extends StatelessWidget {
+  const _RoomCard({required this.room, required this.onTap});
 
+  final Channel room;
   final VoidCallback onTap;
 
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Ink(
-          height: 32,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(
-            color: AppColors.green1CFF8A,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: const Center(
-            child: Text(
-              'Join',
-              style: TextStyle(color: Colors.black, fontSize: 14, fontWeight: FontWeight.w800),
-            ),
-          ),
-        ),
-      ),
-    );
+  List<Color> get _labelColors {
+    final list = <Color>[];
+    for (final raw in room.roomLabelColor) {
+      final c = TypeUtil.parseColor(raw);
+      if (c != null) list.add(c);
+    }
+    if (list.isEmpty) {
+      return const [AppColors.pinkFF5BA8, AppColors.pinkFC475F];
+    }
+    if (list.length == 1) return [list.first, list.first];
+    return list;
   }
-}
-
-class _FollowAction extends StatelessWidget {
-  const _FollowAction({required this.onTap});
-
-  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Ink(
-          height: 32,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(
-            color: AppColors.green1CFF8A,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: const Center(
-            child: Text(
-              'Follow',
-              style: TextStyle(color: Colors.black, fontSize: 14, fontWeight: FontWeight.w800),
-            ),
-          ),
+    final title = room.title.trim().isEmpty ? 'Room' : room.title.trim();
+    final theme = room.theme.trim();
+    final label = room.roomLabelDesc.trim();
+    final users = room.userList;
+    final online = room.currentUserCount;
+
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        margin: const EdgeInsets.only(top: 8),
+        padding: const EdgeInsetsDirectional.only(start: 8, top: 8, bottom: 8, end: 8),
+        decoration: BoxDecoration(
+          color: AppColors.white12,
+          borderRadius: BorderRadius.circular(12),
         ),
-      ),
-    );
-  }
-}
-
-class _ChatAction extends StatelessWidget {
-  const _ChatAction({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Ink(
-          height: 32,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(
-            color: AppColors.green1A3A28,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: const Center(
-            child: Text(
-              'Chat',
-              style: TextStyle(
-                color: AppColors.green1CFF8A,
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
+        child: Row(
+          children: [
+            Stack(
+              alignment: AlignmentDirectional.bottomCenter,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Chimo.image(
+                    room.icon,
+                    fallbackAsset: AppAssets.avatarPlace,
+                    width: 72.w,
+                    height: 72.w,
+                    fit: BoxFit.cover,
+                    fadeIn: Duration.zero,
+                  ),
+                ),
+                Container(
+                  width: 72.w,
+                  height: 16,
+                  decoration: BoxDecoration(
+                    borderRadius: const BorderRadius.vertical(bottom: Radius.circular(8)),
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withValues(alpha: 0),
+                        Colors.black.withValues(alpha: 0.5),
+                      ],
+                    ),
+                  ),
+                  padding: const EdgeInsetsDirectional.only(start: 6),
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Chimo.image(AppAssets.roomFloatWave, width: 10, color: AppColors.white),
+                ),
+              ],
+            ),
+            SizedBox(width: 12.w),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: AppColors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      if (label.isNotEmpty) ...[
+                        SizedBox(width: 8.w),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                          decoration: ShapeDecoration(
+                            shape: const StadiumBorder(),
+                            gradient: LinearGradient(colors: _labelColors),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (room.roomLabelIcon.isNotEmpty) ...[
+                                Chimo.image(room.roomLabelIcon, width: 12, height: 12),
+                                const SizedBox(width: 2),
+                              ],
+                              Text(
+                                label,
+                                style: const TextStyle(
+                                  color: AppColors.white,
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.w400,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  if (theme.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      theme,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.white60,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(child: _RoomUserAvatars(users: users)),
+                      Text(
+                        '$online people are online',
+                        style: const TextStyle(
+                          color: AppColors.white60,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
-          ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _HistoryChip extends StatelessWidget {
-  const _HistoryChip({
-    required this.label,
-    required this.editing,
-    required this.onTap,
-    required this.onDelete,
-  });
+class _RoomUserAvatars extends StatelessWidget {
+  const _RoomUserAvatars({required this.users});
+
+  final List<SimpleChannelUser> users;
+
+  @override
+  Widget build(BuildContext context) {
+    if (users.isEmpty) return const SizedBox.shrink();
+    final shown = min(users.length, 6);
+    return SizedBox(
+      height: 22,
+      width: 18.0 * shown + 4,
+      child: Stack(
+        alignment: AlignmentDirectional.centerStart,
+        children: [
+          for (var i = 0; i < shown; i++)
+            PositionedDirectional(
+              start: 18.0 * i,
+              child: i == 5 && users.length > 6
+                  ? Container(
+                      width: 22,
+                      height: 22,
+                      alignment: Alignment.center,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF3A3A44),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Text(
+                        '...',
+                        style: TextStyle(color: AppColors.white70, fontSize: 9, height: 1),
+                      ),
+                    )
+                  : Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: const Color(0xFF272730), width: 1),
+                      ),
+                      child: Chimo.image(
+                        users[i].avatar,
+                        fallbackAsset: AppAssets.avatarPlace,
+                        width: 22,
+                        height: 22,
+                        circle: true,
+                        fadeIn: Duration.zero,
+                      ),
+                    ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActionPill extends StatelessWidget {
+  const _ActionPill({required this.label, required this.filled, required this.onTap});
 
   final String label;
-  final bool editing;
+  final bool filled;
   final VoidCallback onTap;
-  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: editing ? null : onTap,
+      onTap: onTap,
       child: Container(
-        padding: EdgeInsets.fromLTRB(14, 8, editing ? 8 : 14, 8),
+        width: 66,
+        height: 32,
+        alignment: Alignment.center,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppColors.gray333333, width: 1),
+          color: filled ? AppColors.green1CFF8A : AppColors.green1A3A28,
+          borderRadius: BorderRadius.circular(16),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(label, style: AppText.label),
-            if (editing) ...[
-              const SizedBox(width: 6),
-              GestureDetector(
-                onTap: onDelete,
-                behavior: HitTestBehavior.opaque,
-                child: const Padding(
-                  padding: EdgeInsets.all(2),
-                  child: Icon(Icons.close_rounded, size: 14, color: AppColors.gray9A9A9A),
-                ),
-              ),
-            ],
-          ],
+        child: Text(
+          label,
+          style: TextStyle(
+            color: filled ? const Color(0xFF111111) : AppColors.green1CFF8A,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
     );

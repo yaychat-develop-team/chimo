@@ -7,6 +7,7 @@ import '../../../common/models/server_client/gift_wall.pb.dart';
 import '../../../common/models/server_client/user.pb.dart';
 import '../../../common/theme/app_colors.dart';
 import '../../../common/utils/chimo.dart';
+import '../../../common/widgets/app_empty_holder.dart';
 import '../../../common/widgets/app_scaffold.dart';
 import '../logic/gift_wall_logic.dart';
 import 'gift_wall_card_detail_page.dart';
@@ -215,8 +216,11 @@ class _GiftWallPageState extends State<GiftWallPage> {
 
   Widget _cardGrid(List<CardInfo> cards) {
     if (cards.isEmpty) {
-      return const Center(
-        child: Text('No cards yet', style: TextStyle(color: AppColors.white60)),
+      return const AppEmptyHolder.empty(
+        message: 'No cards yet',
+        icon: AppAssets.giftWallEmpty,
+        iconWidth: 160,
+        messageStyle: TextStyle(color: AppColors.white60),
       );
     }
     return GridView.builder(

@@ -15,6 +15,7 @@ import '../logic/home_logic.dart';
 import 'widgets/home_banner_swiper.dart';
 import 'widgets/room_item_card.dart';
 import 'widgets/home_search_header.dart';
+import '../../../common/widgets/app_empty_holder.dart';
 import '../../../common/widgets/section_title_view.dart';
 
 /// 房间 Tab：横幅、热门故事、房间列表。
@@ -71,45 +72,12 @@ class RoomListPage extends GetView<HomeLogic> {
           child: SectionTitleView(title: "Today's Top Picks"),
         ),
         if (loadError != null && rooms.isEmpty)
-          SliverFillRemaining(
-            hasScrollBody: false,
-            child: Center(
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 32.w),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      loadError,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: AppColors.gray9A9A9A,
-                        fontSize: 14,
-                      ),
-                    ),
-                    SizedBox(height: 16.w),
-                    TextButton(
-                      onPressed: () => controller.loadRooms(),
-                      child: const Text(
-                        'Retry',
-                        style: TextStyle(color: AppColors.green1BBA77),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          )
+          AppEmptyHolder.error(message: loadError, onRetry: () => controller.loadRooms()).asSliver
         else if (rooms.isEmpty)
-          const SliverFillRemaining(
-            hasScrollBody: false,
-            child: Center(
-              child: Text(
-                'No rooms',
-                style: TextStyle(color: AppColors.gray9A9A9A, fontSize: 14),
-              ),
-            ),
-          )
+          const AppEmptyHolder.empty(
+            message: 'No rooms',
+            icon: AppAssets.friendsEmpty,
+          ).asSliver
         else
           SliverList.builder(
             itemCount: rooms.length,

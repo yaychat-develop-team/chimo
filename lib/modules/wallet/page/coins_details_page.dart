@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../../common/constants/app_assets.dart';
 import '../../../common/models/server_client/cash.pb.dart';
 import '../../../common/theme/app_colors.dart';
 import '../../../common/theme/app_text.dart';
+import '../../../common/widgets/app_empty_holder.dart';
 import '../../../common/widgets/app_pull_refresh.dart';
 import '../../../common/widgets/app_scaffold.dart';
 import '../../../common/utils/time_fmt.dart';
@@ -58,22 +60,11 @@ class _CoinsDetailsPageState extends State<CoinsDetailsPage> {
     if (loading) {
       empty = null;
     } else if (error != null) {
-      empty = Padding(
-        padding: const EdgeInsets.fromLTRB(24, 120, 24, 24),
-        child: Text(
-          error,
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: AppColors.gray9A9A9A, fontSize: 14),
-        ),
-      );
+      empty = AppEmptyHolder.error(message: error, onRetry: () => logic.load());
     } else {
-      empty = const Padding(
-        padding: EdgeInsets.only(top: 120),
-        child: Text(
-          'No records yet',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: AppColors.gray9A9A9A, fontSize: 14),
-        ),
+      empty = const AppEmptyHolder.empty(
+        message: 'No records yet',
+        icon: AppAssets.friendsEmpty,
       );
     }
 

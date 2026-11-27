@@ -6,6 +6,7 @@ import '../../../app/session_info.dart';
 import '../../../common/constants/app_assets.dart';
 import '../../../common/models/server_client/honor.pb.dart';
 import '../../../common/theme/app_colors.dart';
+import '../../../common/widgets/app_empty_holder.dart';
 import '../../../common/widgets/app_pull_refresh.dart';
 import '../../../common/widgets/app_scaffold.dart';
 import '../logic/my_honor_logic.dart';
@@ -177,12 +178,12 @@ class _ReceivedBody extends StatelessWidget {
             SliverFillRemaining(
               hasScrollBody: false,
               child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const SizedBox(height: 140),
-                  const Text(
-                    'No Honors Yet',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
+                  const AppEmptyHolder.empty(
+                    message: 'No Honors Yet',
+                    icon: AppAssets.friendsEmpty,
+                    messageStyle: TextStyle(
                       color: AppColors.gray9A9A9A,
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -229,24 +230,16 @@ class _AttainableBody extends StatelessWidget {
         return AppPullRefresh(
           onRefresh: logic.load,
           accentColor: AppColors.green00FEA8,
-          slivers: const [
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: Column(
-                children: [
-                  SizedBox(height: 140),
-                  Text(
-                    'No attainable honors',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: AppColors.gray9A9A9A,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
+          slivers: [
+            const AppEmptyHolder.empty(
+              message: 'No attainable honors',
+              icon: AppAssets.friendsEmpty,
+              messageStyle: TextStyle(
+                color: AppColors.gray9A9A9A,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
               ),
-            ),
+            ).asSliver,
           ],
         );
       }

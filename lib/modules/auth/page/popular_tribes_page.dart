@@ -7,6 +7,7 @@ import '../../../common/extensions/wire_view.dart';
 import '../../../common/models/server_client/group/group.pb.dart';
 import '../../../common/theme/app_colors.dart';
 import '../logic/popular_tribes_logic.dart';
+import '../../../common/widgets/app_empty_holder.dart';
 import '../../../common/widgets/app_scaffold.dart';
 import 'package:chimo/common/utils/chimo.dart';
 
@@ -47,30 +48,12 @@ class _PopularTribesPageState extends State<PopularTribesPage> {
     ];
     final error = logic.error.value;
     if (error != null && groups.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                error,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.gray9A9A9A, fontSize: 14),
-              ),
-              const SizedBox(height: 12),
-              TextButton(onPressed: () => logic.load(), child: const Text('Retry')),
-            ],
-          ),
-        ),
-      );
+      return AppEmptyHolder.error(message: error, onRetry: () => logic.load());
     }
     if (groups.isEmpty) {
-      return const Center(
-        child: Text(
-          'No tribes available',
-          style: TextStyle(color: AppColors.gray9A9A9A, fontSize: 14),
-        ),
+      return const AppEmptyHolder.empty(
+        message: 'No tribes available',
+        icon: AppAssets.friendsEmpty,
       );
     }
     return LayoutBuilder(

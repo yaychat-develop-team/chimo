@@ -10,6 +10,7 @@ import '../../../common/models/server_client/auction.pb.dart';
 import '../../../common/models/server_client/base.pb.dart';
 import '../../../common/theme/app_colors.dart';
 import '../../../common/utils/text_fmt.dart';
+import '../../../common/widgets/app_empty_holder.dart';
 import '../../../common/widgets/app_image.dart';
 import '../../../common/widgets/app_pull_refresh.dart';
 import '../../../common/widgets/app_scaffold.dart';
@@ -304,15 +305,10 @@ class _TalentSliver extends StatelessWidget {
   Widget build(BuildContext context) {
     final artists = logic.artists;
     if (artists.isEmpty) {
-      return SliverFillRemaining(
-        hasScrollBody: false,
-        child: Center(
-          child: Text(
-            'No talent yet',
-            style: TextStyle(color: AppColors.gray9A9A9A, fontSize: 14.sp),
-          ),
-        ),
-      );
+      return const AppEmptyHolder.empty(
+        message: 'No talent yet',
+        icon: AppAssets.friendsEmpty,
+      ).asSliver;
     }
     return SliverGrid(
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(

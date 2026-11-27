@@ -9,6 +9,7 @@ import '../../../common/models/server_client/base.pb.dart';
 import '../../../common/theme/app_colors.dart';
 import '../../../common/utils/text_fmt.dart';
 import '../../../common/utils/time_fmt.dart';
+import '../../../common/widgets/app_empty_holder.dart';
 import '../../../common/widgets/app_image.dart';
 import '../../../common/widgets/app_pull_refresh.dart';
 import '../../../common/widgets/app_scaffold.dart';
@@ -271,15 +272,10 @@ class _GiftSliver extends StatelessWidget {
   Widget build(BuildContext context) {
     final gifts = logic.gifts;
     if (gifts.isEmpty) {
-      return SliverFillRemaining(
-        hasScrollBody: false,
-        child: Center(
-          child: Text(
-            'No gifts yet',
-            style: TextStyle(color: AppColors.gray9A9A9A, fontSize: 14.sp),
-          ),
-        ),
-      );
+      return const AppEmptyHolder.empty(
+        message: 'No gifts yet',
+        icon: AppAssets.friendsEmpty,
+      ).asSliver;
     }
     return SliverList(
       delegate: SliverChildBuilderDelegate((context, index) {

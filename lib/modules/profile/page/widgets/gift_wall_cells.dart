@@ -6,7 +6,7 @@ import '../../../../common/constants/app_assets.dart';
 import '../../../../common/models/server_client/gift_wall.pb.dart';
 import '../../../../common/models/server_client/user.pb.dart';
 import '../../../../common/theme/app_colors.dart';
-import '../../../../common/utils/cache_util.dart';
+import '../../../../app/storage/app_storage.dart';
 import '../../../../common/utils/chimo.dart';
 
 enum GiftWallCellMode { wall, showcase, vault }
@@ -322,12 +322,12 @@ class GiftWallCardFrame extends StatelessWidget {
   }
 }
 
-String giftWallCardEffectCacheKey(int cardId) => 'gift_card_effect_shown_$cardId';
+String giftWallCardEffectCacheKey(int cardId) => StorageKeys.giftWallCardEffect(cardId);
 
 bool giftWallCardEffectShouldShow(int cardId) {
   final key = giftWallCardEffectCacheKey(cardId);
-  if (CacheUtil.getBool(key)) return false;
-  CacheUtil.setBool(key, true);
+  if (AppStorage.getBool(AppStorage.cache, key)) return false;
+  AppStorage.setBool(AppStorage.cache, key, true);
   return true;
 }
 

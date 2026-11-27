@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:app_tracking_transparency/app_tracking_transparency.dart';
-import 'package:chimo/common/utils/cache_util.dart';
 import 'package:chimo/common/widgets/app_image.dart';
 import 'package:flutter/material.dart';
 
@@ -21,17 +20,16 @@ Future<void> main() async {
   final binding = WidgetsFlutterBinding.ensureInitialized();
   AppLog.init();
   AppConfig.init();
+  // 本地存储必须早于任何读缓存的初始化（环境 / 代理 / token），
+  // 否则那些读会拿到 null 并静默降级。
+  await AppStorage.init();
   ApiStore.load();
   ProxyStore.load();
   await AuthRequestHeaders.initialize();
-  // 本地存储必须早于任何读缓存的初始化（NetworkBootstrap 会读 token /
-  // 环境 / 代理），否则那些读会拿到 null 并静默降级。
-  await AppStorage.init();
   // 接口返回的图片多为不带域名的相对 key，注入 CDN 域名后
   // AppImage 拿到 `/upload/xxx.jpg` 也能直接加载。
   AppImage.cdnBase = MediaUpload.cdnDomain;
   await IapService.init();
-  await CacheUtil.init();
   binding.addPostFrameCallback((_) {
     _requestTrackingAuthorization();
   });

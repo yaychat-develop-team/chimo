@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../common/constants/app_assets.dart';
 import '../../../../common/theme/app_colors.dart';
-import 'package:chimo/common/utils/chimo.dart';
+import '../../../../common/widgets/app_empty_holder.dart';
 
 /// 无会话时的空态：插图 + 提示文案。
 class ChatsEmptyState extends StatelessWidget {
@@ -10,26 +10,15 @@ class ChatsEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Chimo.image(AppAssets.msgEmpty, width: 160, fit: BoxFit.contain),
-            const SizedBox(height: 20),
-            const Text(
-              "It's super quiet here...\nbreak the silence!",
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: AppColors.gray9A9A9A,
-                fontSize: 15,
-                fontWeight: FontWeight.w400,
-                height: 1.45,
-              ),
-            ),
-          ],
-        ),
+    return const AppEmptyHolder.empty(
+      message: "It's super quiet here...\nbreak the silence!",
+      icon: AppAssets.msgEmpty,
+      iconWidth: 160,
+      messageStyle: TextStyle(
+        color: AppColors.gray9A9A9A,
+        fontSize: 15,
+        fontWeight: FontWeight.w400,
+        height: 1.45,
       ),
     );
   }

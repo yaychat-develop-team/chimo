@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../../common/constants/app_assets.dart';
 import '../../../../../common/models/server_client/group/group.pb.dart';
 import '../../../../../common/theme/app_colors.dart';
+import '../../../../../common/widgets/app_empty_holder.dart';
 import 'package:chimo/common/utils/chimo.dart';
 
 /// 群相册：按 `periodName` 分段的 4 列网格；未加入时是一把锁 + 引导加群。
@@ -51,10 +52,13 @@ class GroupPhotosGrid extends StatelessWidget {
     }
 
     if (sections.isEmpty) {
-      return const Center(
-        child: Text(
-          'No photos yet',
-          style: TextStyle(color: AppColors.grayB0B0B0, fontSize: 14, fontWeight: FontWeight.w500),
+      return const AppEmptyHolder.empty(
+        message: 'No photos yet',
+        icon: AppAssets.friendsEmpty,
+        messageStyle: TextStyle(
+          color: AppColors.grayB0B0B0,
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
         ),
       );
     }

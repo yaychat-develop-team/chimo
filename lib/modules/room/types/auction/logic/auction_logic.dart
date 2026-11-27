@@ -8,7 +8,7 @@ import '../../../../../app/session_info.dart';
 import '../../../../../common/models/server_client/auction.pb.dart';
 import '../../../../../common/utils/app_log.dart';
 import '../../../../../common/utils/app_toast.dart';
-import '../../../../../common/utils/cache_util.dart';
+import '../../../../../app/storage/app_storage.dart';
 import '../../../../../common/utils/time_fmt.dart';
 import '../../../logic/mic_logic.dart';
 import '../../../model/mic_seat.dart';
@@ -111,13 +111,13 @@ class AuctionLogic extends GetxController {
   @override
   void onReady() {
     super.onReady();
-    final key = CacheKeys.userDailyKey(myUid, _micTipsDailyType);
-    final count = CacheUtil.getInt(key);
+    final key = StorageKeys.userDaily(myUid, _micTipsDailyType);
+    final count = AppStorage.getInt(AppStorage.cache, key);
     if (count >= 3) return;
     _tipsTimer = Timer(const Duration(milliseconds: 1500), () {
       if (isClosed) return;
       needShowMicTips.value = true;
-      CacheUtil.setInt(key, count + 1);
+      AppStorage.setInt(AppStorage.cache, key, count + 1);
       _tipsTimer = Timer(const Duration(seconds: 6), () {
         if (!isClosed) needShowMicTips.value = false;
       });

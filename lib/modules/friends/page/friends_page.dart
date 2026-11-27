@@ -8,6 +8,7 @@ import '../../../common/theme/app_colors.dart';
 import '../../../common/theme/app_input.dart';
 import '../../../common/theme/app_text.dart';
 import 'package:chimo/common/utils/chimo.dart';
+import '../../../common/widgets/app_empty_holder.dart';
 import '../../../common/widgets/app_pull_refresh.dart';
 import '../../../common/widgets/app_scaffold.dart';
 import '../../../common/widgets/gender_age_chip.dart';
@@ -38,95 +39,37 @@ class FriendsPage extends GetView<FriendsLogic> {
             hintText: FriendsLogic.tabs[controller.tabIndex.value].searchHint,
           ),
           slivers: [
-            SliverList.separated(
-              itemCount: controller.users.length,
-              separatorBuilder: (_, _) => Chimo.gap(height: 10),
-              itemBuilder: (context, index) {
-                return _FriendTile(
-                  user: controller.users[index],
-                  onTap: () => controller.openProfile(controller.users[index]),
-                  onChat: () => controller.openChat(controller.users[index]),
-                  onFollow: controller.users[index].relationType == RelationType.FAN
-                      ? () => controller.follow(controller.users[index])
-                      : null,
-                );
-              },
-            ),
+            if (controller.error.value != null && controller.users.isEmpty)
+              AppEmptyHolder.error(
+                message: controller.error.value!,
+                onRetry: () => controller.load(),
+              ).asSliver
+            else if (controller.users.isEmpty && !controller.loading.value)
+              AppEmptyHolder.empty(
+                message: FriendsLogic.tabs[controller.tabIndex.value].emptyTitle,
+                icon: AppAssets.friendsEmpty,
+              ).asSliver
+            else
+              SliverList.separated(
+                itemCount: controller.users.length,
+                separatorBuilder: (_, _) => Chimo.gap(height: 10),
+                itemBuilder: (context, index) {
+                  return _FriendTile(
+                    user: controller.users[index],
+                    onTap: () => controller.openProfile(controller.users[index]),
+                    onChat: () => controller.openChat(controller.users[index]),
+                    onFollow: controller.users[index].relationType == RelationType.FAN
+                        ? () => controller.follow(controller.users[index])
+                        : null,
+                  );
+                },
+              ),
           ],
         ),
       ),
     );
   }
 }
-// body: Column(
-//   crossAxisAlignment: CrossAxisAlignment.stretch,
-//   children: [
-//     Padding(
-//       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-//       child: _FriendsSearchField(
-//         controller: controller.input,
-//         hintText: FriendsLogic.tabs[controller.tabIndex.value].searchHint,
-//       ),
-//     ),
-//     Expanded(child: Obx(_buildList)),
-//   ],
-// ),
-//     ),
-//   );
-// }
-
-//   Widget _buildList() {
-//     final users = controller.users.toList();
-//     final error = controller.error.value;
-//     final loading = controller.loading.value;
-
-//     final Widget sliver;
-//     if (error != null && users.isEmpty) {
-//       sliver = SliverFillRemaining(
-//         hasScrollBody: false,
-//         child: Padding(
-//           padding: const EdgeInsets.fromLTRB(24, 120, 24, 24),
-//           child: Column(
-//             children: [
-//               Text(
-//                 error,
-//                 textAlign: TextAlign.center,
-//                 style: const TextStyle(color: AppColors.gray9A9A9A, fontSize: 14),
-//               ),
-//               const SizedBox(height: 12),
-//               TextButton(onPressed: () => controller.load(), child: const Text('Retry')),
-//             ],
-//           ),
-//         ),
-//       );
-//     } else if (users.isEmpty && !loading) {
-//       sliver = SliverFillRemaining(
-//         hasScrollBody: false,
-//         child: _FriendsEmptyState(title: FriendsLogic.tabs[controller.tabIndex.value].emptyTitle),
-//       );
-//     } else {
-//       sliver = SliverPadding(
-//         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-//         sliver: SliverList.separated(
-//           itemCount: users.length,
-//           separatorBuilder: (_, _) => Chimo.gap(height: 10),
-//           itemBuilder: (context, index) {
-//             final user = users[index];
-//             return _FriendTile(
-//               user: user,
-//               onTap: () => controller.openProfile(user),
-//               onChat: () => controller.openChat(user),
-//               onFollow: user.relationType == RelationType.FAN
-//                   ? () => controller.follow(user)
-//                   : null,
-//             );
-//           },
-//         ),
-//       );
-//     }
-//     return AppPullRefresh(onRefresh: controller.load, slivers: [sliver]);
-//   }
-// }
 
 class _FriendsHeader extends StatelessWidget {
   const _FriendsHeader({required this.current, required this.onBack, required this.onTabChanged});
@@ -267,29 +210,6 @@ class _FriendsSearchField extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _FriendsEmptyState extends StatelessWidget {
-  const _FriendsEmptyState({required this.title});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Chimo.image(AppAssets.friendsEmpty, width: 180, fit: BoxFit.contain),
-            const SizedBox(height: 16),
-            Text(title, textAlign: TextAlign.center, style: AppText.field),
-          ],
-        ),
       ),
     );
   }

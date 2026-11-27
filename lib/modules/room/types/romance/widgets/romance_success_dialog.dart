@@ -7,16 +7,16 @@ import '../../../../../app/network/services/romance_api.dart';
 import '../../../../../common/constants/app_assets.dart';
 import '../../../../../common/models/server_client/couple.pb.dart';
 import '../../../../../common/theme/app_colors.dart';
-import '../../../../../common/utils/cache_util.dart';
+import '../../../../../app/storage/app_storage.dart';
 import '../../../../../common/widgets/app_image.dart';
 import '../../../../chat/logic/chats_list_logic.dart';
 
 /// 21 日解锁成功弹窗。对齐 joyride `RomanceSuccessDialog`。
 abstract final class RomanceSuccessDialog {
   static Future<void> show(CoupleInfo info) {
-    final key = CacheKeys.romanceActivitySuccessHasShowKey('${info.uid1}_${info.uid2}');
-    if (CacheUtil.getBool(key)) return Future.value();
-    CacheUtil.setBool(key, true);
+    final key = StorageKeys.romanceActivitySuccessHasShow('${info.uid1}_${info.uid2}');
+    if (AppStorage.getBool(AppStorage.cache, key)) return Future.value();
+    AppStorage.setBool(AppStorage.cache, key, true);
 
     final em = info.emUid2.trim();
     if (em.isNotEmpty && Get.isRegistered<ConversationListLogic>()) {

@@ -5,18 +5,22 @@ import 'package:chimo/common/utils/app_log.dart';
 
 import '../common/models/server_client/login.pb.dart';
 import '../common/models/server_client/user.pb.dart';
-import '../common/utils/cache_util.dart';
 import 'app_jumper.dart';
 import 'global_config.dart';
+import 'storage/app_storage.dart';
 
-///记录用户登录信息和状态
+/// 记录用户登录信息和状态（内存态）；持久化只走 [AppStorage.user]。
 abstract class SessionInfo {
   static User? _currentUser;
   static AuthRsp? _authRsp;
 
   static void setAuthRsp(AuthRsp? authRsp) {
     _authRsp = authRsp;
-    CacheUtil.savePb(CacheKeys.authInfoKey(RegionConfig.regionCode), authRsp);
+    AppStorage.savePb(
+      AppStorage.user,
+      StorageKeys.authInfo(RegionConfig.regionCode),
+      authRsp,
+    );
   }
 
   static User? get currentUser => _currentUser;
@@ -31,7 +35,7 @@ abstract class SessionInfo {
     var result = await ChimoApis.user.profile();
     if (result.ok) {
       _currentUser = result.data?.user;
-      CacheUtil.savePb(CacheKeys.lastUserInfoKey, _currentUser);
+      AppStorage.savePb(AppStorage.user, StorageKeys.lastUserInfo, _currentUser);
     }
     return result.ok;
   }
@@ -39,23 +43,23 @@ abstract class SessionInfo {
   static void clear() {
     _currentUser = null;
     _authRsp = null;
-    CacheUtil.removeObject(CacheKeys.lastUserInfoKey);
+    AppStorage.remove(AppStorage.user, StorageKeys.lastUserInfo);
   }
 
-  ///根据本地缓存token 自动登录
-  static Future<bool> authLogin([String cause = ""]) async {
+  /// 根据本地缓存 token 自动登录。
+  static Future<bool> authLogin([String cause = '']) async {
     try {
-      AuthRsp? authRsp = CacheUtil.getPb(
-        CacheKeys.authInfoKey(RegionConfig.regionCode),
+      final authRsp = AppStorage.getPb(
+        AppStorage.user,
+        StorageKeys.authInfo(RegionConfig.regionCode),
         AuthRsp.create(),
       );
       if (authRsp == null || authRsp.token.isNotEmpty != true) return false;
       setAuthRsp(authRsp);
 
-      ///刷新
-      var rsp = await ChimoApis.auth.refreshToken();
+      final rsp = await ChimoApis.auth.refreshToken();
       if (!rsp.ok) return false;
-      bool result = await loginSuccessUpdateInfo(rsp.data?.authInfo);
+      final result = await loginSuccessUpdateInfo(rsp.data?.authInfo);
       if (!result) return false;
     } catch (e) {
       AppLog.e('authLogin:', error: e);
@@ -63,10 +67,10 @@ abstract class SessionInfo {
     return false;
   }
 
-  ///登录成功更新用户信息
+  /// 登录成功更新用户信息。
   static Future<bool> loginSuccessUpdateInfo(AuthRsp? authRsp) async {
     setAuthRsp(authRsp);
-    var result = await refreshUserInfo();
+    final result = await refreshUserInfo();
     if (!result) return false;
     await GlobalConfig.refreshConfInfo();
     await GlobalConfig.refreshSettings(force: true);
@@ -76,11 +80,14 @@ abstract class SessionInfo {
   }
 
   static Future logout(bool changeAccount) async {
-    AppLog.d("start logout $uid");
+    AppLog.d('start logout $uid');
     if (!changeAccount) {
-      CacheUtil.removeObject(CacheKeys.authInfoKey(RegionConfig.regionCode));
+      await AppStorage.remove(
+        AppStorage.user,
+        StorageKeys.authInfo(RegionConfig.regionCode),
+      );
     }
-    CacheUtil.removeObject(CacheKeys.lastUserInfoKey);
+    await AppStorage.remove(AppStorage.user, StorageKeys.lastUserInfo);
     await ImService.logout().timeout(const Duration(seconds: 3));
     clear();
   }

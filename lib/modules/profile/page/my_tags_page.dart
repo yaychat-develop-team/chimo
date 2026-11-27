@@ -7,6 +7,7 @@ import 'package:get/get.dart';
 import '../../../common/models/server_client/user.pb.dart';
 import '../../../common/theme/app_colors.dart';
 import '../../../common/theme/app_text.dart';
+import '../../../common/widgets/app_empty_holder.dart';
 import '../../../common/widgets/app_scaffold.dart';
 import '../logic/my_tags_logic.dart';
 
@@ -119,23 +120,7 @@ class _MyTagsPageState extends State<MyTagsPage> {
     }
     final error = logic.error.value;
     if (error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                error,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.gray9A9A9A),
-              ),
-              const SizedBox(height: 16),
-              TextButton(onPressed: () => logic.load(), child: const Text('Retry')),
-            ],
-          ),
-        ),
-      );
+      return AppEmptyHolder.error(message: error, onRetry: () => logic.load());
     }
     final catalog = logic.items.toList();
     return ListView(

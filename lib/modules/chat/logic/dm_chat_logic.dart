@@ -12,7 +12,7 @@ import '../../../common/models/server_client/user.pb.dart';
 import '../../../common/theme/app_dialog.dart';
 import '../../../common/utils/app_log.dart';
 import '../../../common/utils/app_toast.dart';
-import '../../../common/utils/cache_util.dart';
+import '../../../app/storage/app_storage.dart';
 import '../../../common/utils/zodiac.dart';
 import '../../room/types/romance/widgets/romance_success_dialog.dart';
 import '../../room/types/romance/widgets/send_gift_dialog.dart';
@@ -302,9 +302,9 @@ class DmChatLogic extends ChatBaseLogic {
       // 成功窗只走 CMD `UNLOCK_COUPLE_ACTIVITY` / 送礼解锁成功，避免进会话误弹。
       if (rsp.data!.id.toInt() <= 0) {
         final tid = peerProfile.value?.id.toString() ?? '$uid';
-        final key = CacheKeys.romanceActivityHasShowKey(tid);
-        if (CacheUtil.getBool(key)) {
-          CacheUtil.delete(key);
+        final key = StorageKeys.romanceActivityHasShow(tid);
+        if (AppStorage.getBool(AppStorage.cache, key)) {
+          await AppStorage.remove(AppStorage.cache, key);
           _romanceCheckedThisSession = false;
           AppLog.d('romance cleared stale unlock cache tid=$tid');
         }
@@ -332,9 +332,9 @@ class DmChatLogic extends ChatBaseLogic {
       return;
     }
     final tid = peer.id.toString();
-    final cacheKey = CacheKeys.romanceActivityHasShowKey(tid);
+    final cacheKey = StorageKeys.romanceActivityHasShow(tid);
     // 仅「已弹出过解锁窗」才永久挡住；旧逻辑在 check 失败/result=false 时也会写缓存。
-    if (CacheUtil.getBool(cacheKey)) {
+    if (AppStorage.getBool(AppStorage.cache, cacheKey)) {
       AppLog.d('romance skip: already shown cache tid=$tid');
       return;
     }
@@ -363,8 +363,8 @@ class DmChatLogic extends ChatBaseLogic {
   }
 
   Future<void> _checkRomanceUnlock(int uid, String tid) async {
-    final cacheKey = CacheKeys.romanceActivityHasShowKey(tid);
-    if (CacheUtil.getBool(cacheKey)) return;
+    final cacheKey = StorageKeys.romanceActivityHasShow(tid);
+    if (AppStorage.getBool(AppStorage.cache, cacheKey)) return;
     if (_romanceCheckedThisSession || _romanceCheckInFlight) return;
     _romanceCheckInFlight = true;
     _romanceCheckedThisSession = true;
@@ -381,7 +381,7 @@ class DmChatLogic extends ChatBaseLogic {
       AppLog.i('romance checkActivity result=${rsp.data?.result} hasCouple=$ok');
       if (ok) {
         // 只有真正弹出过才写永久缓存（避免 result=false 后永远不再 check）。
-        await CacheUtil.setBool(cacheKey, true);
+        await AppStorage.setBool(AppStorage.cache, cacheKey, true);
         final couple = rsp.data!.coupleInfo;
         final unlocked = await RomanceSendGiftDialog.show(couple);
         if (unlocked == true && !isClosed) {

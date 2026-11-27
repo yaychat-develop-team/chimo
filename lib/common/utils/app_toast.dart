@@ -7,8 +7,6 @@ import '../theme/app_colors.dart';
 import '../theme/app_text.dart';
 import 'app_log.dart';
 
-/// 全项目唯一的轻提示出口。overlay 从 GetX 取，不需要 `BuildContext`。
-///
 /// [info] 中性提示，[success] 成功，[error] 失败。
 abstract final class AppToast {
   static const _infoDuration = Duration(seconds: 2);
@@ -86,11 +84,7 @@ class _ToastBody extends StatelessWidget {
             color: AppColors.blackE62A2A2A,
             borderRadius: BorderRadius.circular(24),
           ),
-          child: Text(
-            message,
-            textAlign: TextAlign.center,
-            style: AppText.label,
-          ),
+          child: Text(message, textAlign: TextAlign.center, style: AppText.label),
         ),
       ),
     ),

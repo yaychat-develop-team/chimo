@@ -13,6 +13,7 @@ import 'widgets/my_group_card.dart';
 import 'widgets/popular_group_card.dart';
 import '../logic/home_logic.dart';
 import 'widgets/home_search_header.dart';
+import '../../../common/widgets/app_empty_holder.dart';
 import '../../../common/widgets/section_title_view.dart';
 import '../../../common/widgets/app_pull_refresh.dart';
 import 'package:chimo/common/widgets/app_image.dart';
@@ -69,32 +70,7 @@ class HomePage extends GetView<HomeLogic> {
       showNoMoreFooter: false,
       slivers: [
         if (loadError != null && popular.isEmpty)
-          SliverFillRemaining(
-            hasScrollBody: false,
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      loadError,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: AppColors.gray9A9A9A,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextButton(
-                      onPressed: () => controller.loadGroups(),
-                      child: const Text('Retry'),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
+          AppEmptyHolder.error(message: loadError, onRetry: () => controller.loadGroups()).asSliver,
         if (joined.isNotEmpty) _myGroups(joined),
         _popularGroups(popular),
       ],
